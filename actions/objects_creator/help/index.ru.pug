@@ -1,0 +1,111 @@
+//
+  Created by asbel on 16.04.2020.
+   Copyright (C) 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Object creator: создание новых объектов
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Object creator
+                    h5.light С помощью Object creator можно создать новый объект и установить некоторые его свойства.
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png").materialboxed.card-panel.hoverable
+                    h5.
+                        Возвращаемое значение: разделенные запятыми object ID (идентификаторы созданных объектов
+                        из базы данных).
+
+                    h3 Описание полей ввода
+                    h4 New object name
+                    p.
+                        В это поле необходимо ввести имя нового объекта, либо несколько имен, разделенных запятыми.
+                        Все перечисленные объекты будут созданы и доступны в системном меню Objects.
+                        У каждого объекта должно быть свое уникальное имя: не может быть двух объектов с одинаковым именем.
+                        Все перечисленные ниже свойства для всех создаваемых объектов будут одинаковыми.
+
+                    h4 Create disabled object
+                    p.
+                        Можно создать отключенный объект. В этом случае, после подключения к объекту счетчиков (counters), сбор данных
+                        производиться не будет. В системном меню Objects отключенные объекты обозначаются курсивом.
+                    img(src="./images/help.disabledObjects.png").materialboxed.card-panel.hoverable
+                    h4 Description for all new objects
+                    p.
+                        С помощью этого поля можно ввести описание для новых объектов. Подсказка с описанием объекта
+                        появится, если в системном меню Objects навести курсор на объект.
+                    img(src="./images/help.objectDescription.png").materialboxed.card-panel.hoverable
+                    h4 Order in a objects menu for a new objects
+                    p.
+                        Поле позволяет установить сортировку, которая влияет на порядок отображения объектов в
+                        системном меню Objects.
+                        Если для объектов установлена одинаковая сортировка, они сортируются по алфавиту.
+                    img(src="./images/help.objectOrder.png").materialboxed.card-panel.hoverable
+                    p Объекты с разной сортировкой сортируются по следующим правилам:
+                    h5 Сортировка объектов, находящихся на верхнем уровне
+                    p.
+                        Объекты с сортировкой из таблицы ниже будут располагаться на самом верхнем уровне
+                        списка объектов. Для того, чтобы увидеть эти объекты в списке нужно в системном меню Objects
+                        нажать на "TO TOP". Если эти объекты включить в группу, они также будут
+                        отображаться в этой группе.
+                    table
+                        thead
+                            tr
+                                th Сортировка
+                                th Описание
+                        tbody
+                            tr
+                                td On top and at up level
+                                td На самом верху списка объектов и на самом верхнем уровне объектов
+                            tr
+                                td At the middle and at up level
+                                td В середине списка и на самом верхнем уровне объектов
+                            tr
+                                td At the end at up level
+                                td В конце списка и на самом верхнем уровне объектов
+                    h5 Сортировка объектов, включенных в другие объекты
+                    p.
+                        Объекты с сортировкой из таблицы ниже должны быть включены
+                        в какую-то группу. Для доступа к такому объекту необходимо в системном меню Objects
+                        зайти в группу объектов, в которой находится требуемый объект. Если такому объекту не присвоить
+                        никакую группу, объект невозможно будет найти с помощью навигации по системному меню Objects.
+                        В этом случае объект может быть отображен в списке только если ввести его имя в строке поиска объектов.
+                        Строка поиска объектов находится над системным меню Objects и активируется когда активна вкладка OBJECT.
+                    table
+                        thead
+                            tr
+                                th Сортировка
+                                th Описание
+                        tbody
+                            tr
+                                td On top of the list
+                                td На самом верху списка объектов
+                            tr
+                                td Between middle and top
+                                td Между верхними объектами и объектами в середине списка
+                            tr
+                                td At the middle of the list
+                                td В середине списка объектов
+                            tr
+                                td Between middle and end
+                                td Между объектами в середине списка и объектами в конце списка
+                            tr
+                                td At the end of the list
+                                td Внизу списка объектов
+                    h4 Groups for new objects
+                    p.
+                        Для того, чтобы задать группы в которые будут включены новые объекты, необходимо их выбрать
+                        в системном меню Objects.
+
+                    img(src="./images/help.objectGroups.png").materialboxed.card-panel.hoverable
+                    p
+    footer

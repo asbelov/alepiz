@@ -1,0 +1,51 @@
+//
+  Created by asbel on 18.04.2020.
+   Copyright (C) 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Objects remover: удаление объектов. Удаление вложенных объектов
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Objects remover
+                    h5.light.
+                        С помощью Objects remover вы можете удалять объекты.
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h5.
+                        Возвращаемое значение: ничего не возвращает.
+
+                    h3 Описание полей ввода
+                    h4 Objects list
+                    p.
+                        Для удаления объектов необходимо выбрать один или несколько объектов в
+                        системном меню Objects. Выбранные объекты отобразятся в поле Objects list
+
+                    h4 Delete selected objects with children objects
+                    p.
+                        При установке этого checkbox будут удалены не только выбранные объекты, но и объекты, которые
+                        включены в выбранные объекты. Количество вложенных объектов, которые тоже будут удалены -
+                        не ограничено. Но одновременно можно удалить не более 10 000 объектов. При использовании
+                        Objects remover в задачах автоматизации это значение можно переопределить полем с названием
+                        maxObjectsCnt
+
+                    img(src="./images/help.main1.png" width="1024").materialboxed.card-panel.hoverable
+
+                    p.
+                        До выполнения действия появится диалог в котором необходимо еще раз подтвердить намерение
+                        удалить выбранные объекты. Только после нажатия на YES объекты будут удалены
+
+                    img(src="./images/help.confirmation.png").materialboxed.card-panel.hoverable
+

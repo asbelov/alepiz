@@ -1,0 +1,191 @@
+{
+    "name": "Task maker",
+    "description": "Create new task",
+    "homePage": "index",
+    "ajaxServer": "ajax.js",
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "launcherPrms": { "javaScript": "server.js" },
+    "staticDir": "static",
+    "callbackBeforeExec": "callbackBeforeExec",
+    "callbackAfterExec": "callbackAfterExec",
+    "onChangeObjectMenuEvent": "callback:onChangeObjects",
+    "cleanInputIDs": "taskName",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": true,
+    "refreshTaskList": 15000,
+    "offsetDaysForRunTask": 1,
+    "defaultTimeForRunTask": "00:20",
+    "rolesPriority": ["Administrators", "Businesses", "Watchers", "Guests"],
+    "workflow": {
+        "Administrators": [{
+            "action": "Default group, Business tasks",
+            "message": {
+                "priority": 20,
+                "rcpt": "Administrators,Businesses",
+                "configID": "createTask"
+            }
+        }, {
+            "action":"approve",
+            "message": {
+                "priority": 20,
+                "rcpt": "Administrators,Businesses",
+                "configID": "approveTask"
+            }
+        }, {
+            "action":"cancel",
+            "message": {
+                "priority": 20,
+                "rcpt": "Administrators,Businesses",
+                "configID": "cancelTask"
+            }
+        }, {
+            "action":"execute",
+            "message": {
+                "priority": 20,
+                "rcpt": "Administrators,Businesses",
+                "configID": "executeTask"
+            }
+        }, {
+            "action":"change",
+            "message": {
+                "priority": 20,
+                "rcpt": "Administrators,Businesses",
+                "configID": "createTask"
+            }
+        }],
+        "Businesses": [{
+            "action": "Default group, Business tasks for validation",
+            "message": {
+                "priority": 20,
+                "rcpt": "Businesses",
+                "configID": "createTask"
+            }
+        }, {
+            "action": "Business tasks for validation, Business tasks",
+            "message": {
+                "priority": 20,
+                "rcpt": "Administrators,Businesses",
+                "configID": "checkTask"
+            }
+        }, {
+            "action":"approve",
+            "message": {
+                "priority": 20,
+                "rcpt": "Administrators,Businesses",
+                "configID": "approveTask"
+            }
+        }, {
+            "action":"change",
+            "message": {
+                "priority": 20,
+                "rcpt": "Administrators,Businesses",
+                "configID": "createTask"
+            }
+        }, {
+            "action":"remove",
+            "message": {
+                "priority": 20,
+                "rcpt": "Administrators,Businesses",
+                "configID": "createTask"
+            }
+        }]
+    },
+    "launchModeTheme": {
+        "null": {
+            "icon": "save",
+            "color": "",
+            "comment": "do not run"
+        },
+        "0": {
+            "icon": "hourglass_empty",
+            "nextLaunchMode": 20,
+            "color" : "amber lighten-3",
+            "comment": "ask to run every time the condition is met"
+        },
+        "1": {
+            "icon" : "hourglass_empty",
+            "nextLaunchMode": 21,
+            "color" : "amber lighten-3",
+            "comment": "ask to run once when the condition is met"
+        },
+        "2": {
+            "icon" : "hourglass_empty",
+            "nextLaunchMode": 22,
+            "color" : "amber lighten-3",
+            "comment": "ask to run immediately"
+        },
+        "9": {
+            "icon" : "hourglass_empty",
+            "nextLaunchMode": 29,
+            "color" : "amber lighten-3",
+            "comment": "ask to run on time"
+        },
+        "11": {
+            "icon" : "done",
+            "nextLaunchMode": 21,
+            "color" : "amber darken-3",
+            "comment": "the task was run once when the condition is met"
+        },
+        "12": {
+            "icon" : "done",
+            "nextLaunchMode": 22,
+            "color" : "amber darken-3",
+            "comment": "task was launched on demand"
+        },
+        "19": {
+            "icon" : "done",
+            "nextLaunchMode": 29,
+            "color" : "amber darken-3",
+            "comment": "task run time has passed"
+        },
+        "20": {
+            "icon" : "thumb_up",
+            "nextLaunchMode": 30,
+            "color" : "teal lighten-5",
+            "comment": "approved to run every time the condition is met"
+        },
+        "21": {
+            "icon" : "thumb_up",
+            "nextLaunchMode": 31,
+            "color" : "teal lighten-5",
+            "comment": "approved to run once when the condition is met"
+        },
+        "22": {
+            "icon" : "play_arrow",
+            "nextLaunchMode": 32,
+            "color" : "teal lighten-5",
+            "comment": "approved to run immediately"
+        },
+        "29": {
+            "icon" : "alarm",
+            "nextLaunchMode": 39,
+            "color" : "teal lighten-5",
+            "comment": "approved to run on time"
+        },
+        "30": {
+            "icon" : "thumb_down",
+            "nextLaunchMode": 20,
+            "color" : "grey lighten-3",
+            "comment": "canceled to run every time the condition is met"
+        },
+        "31": {
+            "icon" : "thumb_down",
+            "nextLaunchMode": 21,
+            "color" : "grey lighten-3",
+            "comment": "canceled to run once when the condition is met"
+        },
+        "32": {
+            "icon" : "thumb_down",
+            "nextLaunchMode": 22,
+            "color" : "grey lighten-3",
+            "comment": "canceled to run immediately"
+        },
+        "39": {
+            "icon" : "thumb_down",
+            "nextLaunchMode": 29,
+            "color" : "grey lighten-3",
+            "comment": "canceled to run on time"
+        }
+    }
+}

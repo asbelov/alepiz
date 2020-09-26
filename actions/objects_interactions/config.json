@@ -1,0 +1,34 @@
+{
+    "name": "Objects interactions",
+    "description": "Edit objects interactions",
+    "homePage": "index",
+    "ajaxServer": "ajax.js",
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "launcherPrms": { "javaScript": "server.js" },
+    "staticDir": "static",
+    "onChangeObjectMenuEvent": "none",
+    "callbackBeforeExec": "callbackBeforeExec",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": true,
+    "outputFormat": "text",
+    "descriptionTemplate": "%:interactions_description:%. %:deleteOtherInteractions:% ?? Not listed interactions will be deleted :: Not listed interactions will be also saved",
+    "icon": "games",
+    "canAddParametersToAction": true,
+    "parameters": {
+        "o": {
+            "description": "List of edited objects (used if objectsIDs is empty)"
+        },
+        "objectsIDs": {
+            "description": "List of edited objects (used as primary)",
+            "canBeDeleted": true
+        },
+        "interactions_description": {
+            "description": "Actions description",
+            "canBeDeleted": true
+        },
+        "deleteOtherInteractions": {
+            "description": "Delete other not listed interactions from object [1|0]"
+        }
+    }
+}

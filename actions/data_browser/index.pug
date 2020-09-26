@@ -1,0 +1,121 @@
+//
+    Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        link(rel='stylesheet', href='/stylesheets/actions.css')
+        style.
+            div.collapsible-body {
+                padding: 0 1em 0 1em !important;
+            }
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            div.col.s12
+                script(src='/javascripts/Flotr2-master/flotr2.js')
+
+                script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+                div.row
+                    div.col.s12.m12.l4#leftDiv
+                        a(href='#!')#fullScreenCountersBtn: i.material-icons.right fullscreen
+                        div.col.s12.input-field
+                            select#select-groups(multiple)
+                            label Counter groups
+                        div.col.s12.input-field
+                            select#select-counters(multiple)
+                            label Counters
+                        div.col.s12
+                            ul.collapsible.expandable#latest-data
+                    div.col.s12.m12.l8#rightDiv
+                        div.card.big#graphCard
+                            div.card-content
+                                div.row
+                                    a(href='#!')#fullScreenGraphBtn: i.material-icons.right fullscreen
+                                    a(href="#").activator: i.material-icons.right settings
+                                    div(style='height:300px;width:100%').col.s12.center#graphArea
+                                    div.col.s12#legendArea
+                                div(style="margin:0").row
+                                    div.input-field.col.s2
+                                        // value set to raise label
+                                        input(type='text' value="7 November, 1975").datepicker#startDate
+                                        label(for='startDate').active Start date
+                                    div.input-field.col.s2
+                                        input(type='text' value="7 November, 1975").datepicker.active#endDate
+                                        label(for='endDate').active End date
+                                    div.col.s8
+                                        div.col.s12
+                                            label
+                                                input(type='checkbox' checked)#auto-update
+                                                span Auto update latest data
+                                        div.input-field.col.s12
+                                            span#message-area
+                            div.card-reveal
+                                div.card-title Settings
+                                    i.material-icons.right#closeGraphSettings close
+                                div.row
+                                    div.input-field.col.s3
+                                        input(type="text" placeholder="auto when empty" id="yMinLeft")
+                                        label(for="yMinLeft") Minimum value for Y axis at left
+                                    div.input-field.col.s3
+                                        input(type="text" placeholder="auto when empty" id="yMaxLeft")
+                                        label(for="yMaxLeft") Maximum value for Y axis at left
+                                    div.input-field.col.s3
+                                        input(type="text" placeholder="auto when empty" id="yMinRight")
+                                        label(for="yMinRight") Minimum value for Y axis at right
+                                    div.input-field.col.s3
+                                        input(type="text" placeholder="auto when empty" id="yMaxRight")
+                                        label(for="yMaxRight") Maximum value for Y axis at right
+                                h5 Y axis align
+                                b
+                                    div.col.s1 left\right
+                                    div.col.s8 object:counter
+                                    div.col.s3 min\avg\max
+                                div.row#alignSettings
+                                //h5 Help
+                                //ol
+                                    li Select graph part of area by mouse for zooming graph
+                                    li Click on a zoomed graph to reset zoom
+                                    li Change date period of the graph and history values using date pickers "Start date" and "End date"
+                                    li If value of the date picker "End date" is set to today, then graph and history table will be automatically updated to latest data
+                                    li If you zoom in graph near the end of data (less, then 10 minutes from the latest data), graph and history table  will be automatically updated to latest data
+                                    li Set "Auto update latest data" checkbox to "checked" for automatically updating graphic and history data to latest data
+                                    li If time perion on the X axis more, then 1.5 hour, you probably see an average values in a graph and in a history table
+                                    li If you want to see an accurate values in a graph and in a history table, please zoom in graph to 1.5 hour or less on a X axis
+                                    li If can see current data mode ("accurate" or "average") at the message behind of the graph area.
+                        table#history-data.highlight.bordered
+    footer
+        input(type="hidden" name="actionName" value= action.name)

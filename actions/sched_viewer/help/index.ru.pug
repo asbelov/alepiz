@@ -1,0 +1,73 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-8-9 23:19:40
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Schedule viewer: Просмотр расписания
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Schedule viewer
+                    h5.light.
+                        Позволяет посмотреть исторические данные о запуске, остановке и текущем статусе сервиса
+
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h2 Просмотр расписания
+                    p.
+                        С помощью действия можно посмотреть исторические данные о запуске, остановке и текущем статусе сервиса.
+                        Элемент "Number of historical values" позволяет настроить какое количество исторических данных необходимо показывать.
+                    h5.
+                        Returned value: нет
+
+                    h2 Настройки действия
+                    p.
+                       Действие можно настроить через #[a(href="/actions/action_editor/help/") Action editor]. 
+                       Настройки хранятся в файле config.json.
+                    ol
+                       li startTimeCounterName - Имя счетчика, в котором хранится время запуска сервиса в секундах, с начала суток
+                       li stopTimeCounterName - Имя счетчика, в котором хранится время остановки сервиса в секундах, с начала суток
+                       li serviceStatus - Имя счетчика в котором хранится статус сервиса (запущен, остановлен, сервиса не существует и т.п.)
+                       li serviceStates - соответствие цифровых статусов сервиса и их описаний
+                       li historyDataNum - количество исторических данных необходимо показывать в таблице
+                    ul.collapsible
+                        li
+                            div.collapsible-header #[i.material-icons settings] Пример файла настроек (нажмите для того, чтобы развернуть)
+                            div.collapsible-body
+                                pre.
+                                   {
+                                       "name": "Schedule viewer",
+                                       "description": "View service schedule",
+                                       "homePage": "index",
+                                       "ajaxServer": "ajax.js",
+                                       "staticDir": "static",
+                                       "showWhenNoObjectsSelected": false,
+                                       "onChangeObjectMenuEvent": "callback:onChangeObjects",
+                                       "showOnlyForObjectsWithProperties": "SERVICE_NAME",
+                                       "startTimeCounterName": "I: Service start time",
+                                       "stopTimeCounterName": "I: Service stop time",
+                                       "serviceStatus": "I: Service state",
+                                       "historyDataNum": 7,
+                                       "serviceStates": {
+                                           "0": "running",
+                                           "1": "paused",
+                                           "2": "start pending",
+                                           "3": "pause pending",
+                                           "4": "continue pending",
+                                           "5": "stop pending",
+                                           "6": "stopped",
+                                           "7": "unknown",
+                                           "255": "no such service"
+                                       }
+                                   }

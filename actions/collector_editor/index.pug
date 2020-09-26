@@ -1,0 +1,224 @@
+//
+   Created by asbel on 25.07.2015.
+   Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            div.col.s12
+                script(src='/javascripts/javaScriptEditor.js')
+                script(src='/javascripts/pugEditor.js')
+                script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+                div.col.s12.m12.l12
+                    ul#mainTabs.tabs
+                        li.tab.col.s3: a(href='#tabSettings')#settings Settings
+                        li.tab.col.s3: a(href='#tabCode')#code Collector code
+                        li.tab.col.s3: a(href='#tabHelp')#help Help page
+                div#tabSettings
+                    div.row
+                        // set some space between tabs and settings elements
+                        div.input-field.col.s12
+                        div.input-field.col.s12.m12.l4
+                            select#collectorID
+                                //option New collector
+                            label Select collector
+                        div.input-field.col.s12.m6.l4
+                            input(type='text' data-tooltip='It will be used as directory name')#ID.tooltipped
+                            label(for='ID') Collector ID
+                        div.input-field.col.s12.m6.l4
+                            input(type='text' data-tooltip='Short name of collector for any drop down selectors')#name.tooltipped
+                            label(for='name') Collector name
+                        p(data-tooltip='Prevent running multiple collectors for defined object and counter at one time').col.s12.m2.l2.tooltipped
+                            label
+                                input(type='checkbox')#runCollectorSeparately
+                                span Run collector separately
+                        p(data-tooltip='Collector will be return data without requests. It will be running in separate process').col.s12.m2.l2.tooltipped
+                            label
+                                input(type='checkbox')#activeCollector
+                                span Active collector
+                        p(data-tooltip='Collector will be run at separate process for high loaded collectors').col.s12.m2.l2.tooltipped
+                            label
+                                input(type='checkbox')#separateCollector
+                                span Separate collector
+                        p(data-tooltip='Delete this collector').col.s12.m2.l2.tooltipped
+                            label
+                                input(type='checkbox')#deleteCollector
+                                span Delete collector
+                        p(data-tooltip='Restart server after saving changes for collector for applying changes').col.s12.m2.l2.tooltipped
+                            label
+                                input(type='checkbox')#restartServer
+                                span Restart server
+                        div.input-field.col.s12
+                            textarea(data-length="65535" data-tooltip='Description about collector usage').materialize-textarea.tooltipped#description
+                            label(for="description") Collector description
+                    input(type="hidden")#parametersOrder
+                    ul#parameters
+                    div.row
+                        div.col.s1
+                            a(href='#addParameter')#addParameter.btn-floating.grey.waves-effect.waves-light
+                                i.material-icons add
+                div#tabCode.row
+                    div.col.s12
+                        textarea#jsEditorParent.
+                            /*
+                            * Copyright © #{new Date().getFullYear()}. Alexandr Belov. Contacts: <asbel@alepiz.com>
+                            * Created on #{new Date().toLocaleString()}
+                            */
+
+                            var collector = {};
+                            module.exports = collector;
+                            /*
+                                get data and return it to server
+
+                                prms - object with collector parameters {
+                                    <parameter1>: <value>,
+                                    <parameter2>: <value>,
+                                    ....
+                                    $id: <objectCounterID>,
+                                    $counterID: <counterID>,
+                                    $objectID: <objectID>,
+                                    $parentID: <parentObjectCounterID>,
+                                    $variables: {
+                                        <variable1>: <variableValue1>,
+                                        <variable2>: <variableValue2>,
+                                        ...
+                                    }
+                                }
+
+                                where
+                                $id - objectCounter ID
+                                $counterID - counter ID,
+                                $objectID - object ID
+                                $parentID - parent objectCounter ID
+                                $variables - variables for collector from counter settings
+
+                                callback(err, result)
+                                result - object {timestamp: <timestamp>, value: <value>} or simple value
+                            */
+
+                            collector.get = function(prms, callback) {
+
+                                /* insert collector code here */
+
+                                callback();
+                            };
+
+                            /*
+                                destroy objects when reinit collector
+                                destroy function is not required and can be skipping
+
+                                callback(err);
+                            */
+                            collector.destroy = function(callback) {
+                                /* if has an objects, that can be destroyed while reinit collectors
+                                    do this here
+                                */
+
+                                callback();
+                            };
+
+                            /*
+                                remove counters with objectCounterIDs (OCIDs) when remove object
+                                removeCounters is not required and can be skipping
+
+                                OCIDs - array of objectsCountersIDs
+                                callback(err);
+
+                                objectCounterID of specific counter you can get from $id parameter
+                                from the counter parameters, sending to collector.get(prms, callback) function
+                            */
+                            collector.removeCounters = function(OCIDs, callback) {
+                                /* if has counters with OCIDs, that it can be removed
+                                    do this here
+                                */
+
+                                callback();
+                            };
+
+                div#tabHelp.row
+                    div.input-field.col.s2
+                        select#lang
+                        label Help page language
+                    div.input-field.col.s2
+                        input(type='text' data-tooltip='Add new help page translation')#addLang.tooltipped
+                        label(for='addLang') Add new language
+                    div.input-field.col.s1
+                        a(href='#addLangBtn')#addLangBtn.btn-floating.waves-effect.waves-light
+                            i.material-icons add
+                    div.col.s12
+                        textarea#helpEditor.
+                            //
+                                Copyright © #{new Date().getFullYear()}. Alexander Belov. Contacts: <asbel@alepiz.com>
+                                Created on #{new Date().toLocaleString()}
+                            doctype
+                            html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+                                head
+                                    title Collector name
+                                    link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+                                    link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+                                    meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+                                    meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+                                    script(src='/materialize-css/dist/js/materialize.js')
+                                    script(src='/javascripts/help.js')
+                                body
+                                    header
+                                        div.row
+                                            div.col.s12.m10.offset-m1
+                                                h1 Collector name
+                                                h5.light.
+                                                    Collector name usually used for collect something
+                                    main
+                                        div.row
+                                            div.col.s12.m10.offset-m1
+                                                h3 Collector name description
+                                                p.
+                                                    Collector name used for collect something and show something for you
+                                                    You can use this collector for get some data from something
+
+
+                div#modalDeleteConfirm.modal
+                    div.modal-content
+                        h4 Delete confirmation
+                        p Do you really delete selected collector?
+                    div.modal-footer
+                        a(href='#!')#modalDeleteConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                        a(href='#!')#modalDeleteConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+
+    footer
+        input(type="hidden" name="actionName" value= action.name)

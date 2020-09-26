@@ -1,0 +1,128 @@
+/*
+ * Copyright ? 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ */
+
+header, main, footer {
+    padding-left: 400px;
+}
+
+@media only screen and (max-width : 992px) {
+    header, main, footer {
+        padding-left: 0;
+    }
+}
+/*
+fix error, when overlay closing sideNav menu
+ */
+#sidenav-overlay {
+    left: 300px !important;
+}
+
+.width-400 {
+    width: 400px !important;
+}
+
+.tab-padding {
+    padding: 0 12px 0 12px !important;
+}
+
+a.object {
+    margin: 0 0 2px 0 !important;
+    padding: 10px 0 0 24px !important;
+    min-height: 48px !important;
+    cursor: pointer !important;
+}
+
+div.object-checkbox {
+    padding: 0 !important;
+}
+
+div.object-label {
+    height: 32px !important;
+    line-height: 32px !important;
+}
+
+li.action {
+    cursor: pointer !important;
+}
+
+.italic {
+    font-style: italic !important;
+    font-weight: lighter !important;
+}
+
+.no-margin {
+    margin: 0 !important;
+}
+
+div.user-view {
+    padding-top: 1em !important;
+    padding-bottom: 0 !important;
+}
+
+.search-textarea {
+    padding: 0 0 0 0 !important;
+    margin: 0 0 0 0 !important;
+    min-height: 2.4em !important;
+}
+.logWindowController-btn {
+    position:fixed;
+    bottom:0;
+    width:100%;
+    background: white;
+    opacity: 0.7;
+    border-top:1px solid grey;
+    text-align: center
+}
+
+ul#collapsible-log-body {
+    border: 0 !important;
+}
+
+div.logRecord {
+    padding: 0 !important;
+}
+
+.logColorDefault {
+    color: grey !important;
+}
+
+.logColor01m {
+    color: grey !important;
+}
+
+.logColor30m {
+    color: black !important;
+}
+
+.logColor31m {
+    color: red !important;
+}
+
+.logColor32m {
+    color: green !important;
+}
+
+.logColor33m {
+    color: brown !important;
+}
+
+.logColor34m {
+    color: blue !important;
+}
+
+.logColor35m {
+    color: magenta !important;
+}
+
+.logColor36m {
+    color: cyan !important;
+}
+
+.logColor37m {
+    color: white !important;
+}
+
+.logColor38m {
+    color: grey !important;
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Log viewer",
+  "description": "View log files",
+  "homePage": "index",
+  "ajaxServer": "ajax.js",
+  "staticDir": "static",
+  "onChangeObjectMenuEvent": "fullreload",
+  "timeout": 60,
+  "showOnlyForObjectsWithProperties": "SERVICE_PATH",
+  "options": {
+    "IDForm": "LogViewerForm",
+    "filterFiles": "(\\.log)|(\\.data$)",
+    "order": "events.log,.log",
+    "skipDirs": "old_version,sav,archive,certs",
+    "filePath": "LOG_FILES_PATH",
+    "codePage": "utf-8"
+  }
+}

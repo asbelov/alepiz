@@ -1,0 +1,40 @@
+{
+    "name": "Objects clone",
+    "description": "Clone counters links from template",
+    "homePage": "index",
+    "ajaxServer": "ajax.js",
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "launcherPrms": { "javaScript": "server.js" },
+    "staticDir": "static",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": true,
+    "callbackBeforeExec": "callbackBeforeExec",
+    "onChangeObjectMenuEvent": "none",
+    "descriptionTemplate": "Clone {{%:isCloneCounters:% ??{{%:cloneAllCounters:% ??all ::part of }}counters links {{%:isCloneInteractions:% ??and ::}}::}} {{%:isCloneInteractions:% ??{{%:cloneAllInteractions:% ??all ::part of }} interactions::}} from objects %:o:%, used as templates to %:cloneObjectsIDs:%",
+    "icon": "content_copy",
+    "canAddParametersToAction": true,
+    "parameters": {
+        "objects": {
+            "description": "List of objects IDs, used as templates"
+        },
+        "sourceObjectsIDs": {
+            "description": "List of objects IDs, used as templates"
+        },
+        "cloneToObjectsIDs": {
+            "description": "Comma separated string with objects IDs for existing objects and objects names for a new objects, f.e. '0,10,6,newObjectName,17'"
+        },
+        "isCloneCounters": {
+            "description": "Clone counters links"
+        },
+        "isCloneInteractions": {
+            "description": "Clone interaction"
+        },
+        "cloneAllCounters": {
+            "description": "Clone all counters links (if checked, then don't require to specifying counters ID for clone)"
+        },
+        "cloneAllInteractions": {
+            "description": "Clone all interactions (if checked, then don't require to specifying interactions for clone)"
+        }
+    }
+}

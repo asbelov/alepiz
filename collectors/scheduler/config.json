@@ -1,0 +1,12 @@
+{
+    "name": "Scheduler",
+    "description": "",
+    "active": "on",
+    "separate": "",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "time": {
+            "description": "Schedule time (f.e. 13:25)"
+        }
+    }
+}

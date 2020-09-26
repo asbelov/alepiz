@@ -1,0 +1,43 @@
+{
+    "name": "Zabbix active",
+    "description": "Zabbix agent ask from server, what data it need and then send this data to server",
+    "active": "on",
+    "separate": "",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "zabbixHostname": {
+            "description": "Value of parameter \"hostname\" from zabbix_agentd.conf"
+        },
+        "item": {
+            "description": "Zabbix item key"
+        },
+        "itemParameters": {
+            "description": "Parameters for Zabbix item key",
+            "canBeEmpty": "on"
+        },
+        "pollingFreq": {
+            "description": "Polling frequency for item in seconds",
+            "checkAs": "Integer",
+            "default": 30
+        },
+        "onlyNumeric": {
+            "description": "Return only numeric values",
+            "canBeEmpty": "on",
+            "type": "checkbox"
+        },
+        "throttlingMaxSkippingValues": {
+            "description": "Number of values that can be skipped (throttling)",
+            "checkAs": "Integer",
+            "default": 10
+        },
+        "throttlingMaxTimeInterval": {
+            "description": "Time interval when values can be skipped (throttling)",
+            "default": "3m"
+        },
+        "throttlingDeviation": {
+            "description": "Values deviation for skip 0-100%. 0 - values must be equal (throttling)",
+            "checkAs": "Integer",
+            "default": 5
+        }
+    }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "Objects remover",
+  "description": "Remove selected objects",
+  "homePage": "index",
+  "ajaxServer": "ajax.js",
+  "execMethod": "post",
+  "launcher": "nodeModule",
+  "launcherPrms": { "javaScript": "server.js" },
+  "staticDir": "static",
+  "callbackBeforeExec": "callbackBeforeExec",
+  "onChangeObjectMenuEvent": "callback:onChangeObjects",
+  "timeout": 60,
+  "showWhenNoObjectsSelected": false,
+  "outputFormat": "text",
+  "descriptionTemplate": "Removing objects: %:o:%.",
+  "icon": "delete",
+  "parameters": {
+    "o": {
+      "description": "These objects will be removed from the database"
+    }
+  }
+}

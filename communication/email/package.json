@@ -1,0 +1,16 @@
+{
+  "name": "alepiz.media.email",
+  "version": "1.0.0",
+  "description": "Compose and send email messages",
+  "main": "server.js",
+  "dependencies": {
+    "nodemailer": "^6.4.10"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "Alexander Belov <asbel@alepiz.com>",
+  "license": "GPL-3.0"
+}

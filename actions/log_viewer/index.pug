@@ -1,0 +1,84 @@
+//
+    Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        style.
+            .skeleton {
+                height: 1300px;
+                background-color: rgb(224, 224, 224);
+                font-size: 600px;
+                color: rgb(208, 208, 208);
+                overflow: hidden;
+                text-align: center;
+            }
+            p {
+                margin-bottom: 0 !important;
+            }
+
+        script(src='/jquery/jquery.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div(style="height: 98vh; overflow: hidden; margin: 10px 0px 0px 10px")#tmodule
+            div.row#LogViewerForm
+                p.input-field.col.s2
+                    select#selectService
+                    label Select service
+                p.input-field.col.s3
+                    select#selectFile
+                    label Select file
+                p.input-field.col.s3
+                    input(type="text")#searchInput
+                    label(for="searchInput") Search
+                p.input-field.col
+                    a.btn-floating.waves-effect.waves-light#searchBtn
+                        i.material-icons#searchBtnIcon search
+                p(style="width:60px").input-field.col
+                    label
+                        input(type="checkbox")#searchDirection
+                        span#searchDirectionLabel up
+                p(style="width:60px").input-field.col
+                    label
+                        input(type="checkbox")#searchAsRegExp
+                        span#searchAsRegExpLabel re
+                p.input-field.col.s2
+                    select#codePage
+                        option(value="") Default UTF-8
+                        option(value="win1251") Windows CP-1251
+                        option(value="cp866") MS-DOS CP-866
+                    label Code page
+
+        script(src= action.link + "/" + action.staticDir + "/" + "logViewer.js")
+        script(src= action.link + "/" + action.staticDir + "/" + "menu.js")
+        script(src= action.link + "/" + action.staticDir + "/" + "client.js")
+
+    footer
+        input(type="hidden" name="actionName" value= action.name)

@@ -1,0 +1,196 @@
+//
+   Created by asbel on 21.04.2015.
+   Copyright © 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            div.col.s12
+                script(src='/javascripts/javaScriptEditor.js')
+                script(src='/javascripts/pugEditor.js')
+                script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+                div.col.s12.m12.l12
+                    ul#mainTabs.tabs
+                        li.tab.col.s2: a(href='#tabMedia')#media Server
+                        li.tab.col.s2: a(href='#tabConf')#config Configuration
+                        li.tab.col.s2: a(href='#tabHelp')#help Help
+                div#tabMedia.row
+                    div(data-tooltip='Select media for making changes').input-field.col.s12.m4.l3.tooltipped
+                        select#ID
+                        label Select communication media
+                    div(data-tooltip='Enter new communication media name or rename selected media. Media name will be a folder for media').input-field.col.s12.m4.l3.tooltipped
+                        input(type='text')#newMedia
+                        label(for='newMedia') New communication media
+                    div.input-field.col.s6.m4.l3
+                        label(data-tooltip='Delete selected media').tooltipped
+                            input(type='checkbox' disabled)#deleteMedia
+                            span Delete media
+                    div.col.s12
+                        textarea#mediaEditor.
+                            /*
+                            * Copyright © #{new Date().getFullYear()}. Alexandr Belov. Contacts: <asbel@alepiz.com>
+                            * Created on #{new Date().toLocaleString()}
+                            */
+                            var log = require('../../lib/log')(module);
+
+                            var media = {};
+                            module.exports = media;
+
+                            /*
+                            Send message
+                            param: {
+                                configID: <string> - configuration ID
+                                transport: <object> - configuration for transport for your media from config.json
+                                message: <object> - message template for your media from config.json
+                                sender: <array> - sender in array [{address: <sender address>, fullName: <full name>}]
+                                rcpt: <array> - recipients in array [{address: <address>, fullName: <full name>}, ...]
+                                text: <string> - message text
+                            }
+                            callback(err);
+                            */
+                            media.send = function (param, callback) {
+
+                                var message = param.message;
+                                // create address if not set in message template
+                                //if(!message.form && param.sender) message.from = createAddress(param.sender);
+                                //if(!message.to && param.rcpt) message.to = createAddress(param.rcpt);
+                                //if(!message.text && !message.html && param.text) message.text = param.text;
+
+                                // start your media here
+
+                                log.info('Message successfully sending for ', message);
+                                callback();
+                            };
+
+                            /*
+                            Return string with comma separated addresses
+                            users: array of objects [{address: <address>, fullName: <full name>}, ...]
+                             */
+                            function createAddress(users) {
+                                if(!Array.isArray(users) || !users.length) return callback();
+
+                                var addresses = [];
+                                users.forEach(function(user) {
+                                    if(!user.address) {
+                                        log.warn('Address ' + user.address + ' is not a valid address in ', users);
+                                        return;
+                                    }
+                                    // email address example
+                                    //if(user.fullName) addresses.push('"' + user.fullName.replace(/"/g, "'") + '" <'+ user.address +'>');
+                                    //else
+                                    addresses.push(user.address);
+                                });
+
+                                return addresses.join(', ');
+                            }
+
+                div#tabConf.row
+                    div.col.s12
+                        textarea#confEditor.
+                            {
+                                "description": "Communication media description",
+                                "address": "Communication media address description, f.e. E-mail address or Phone number",
+                                "re": "RegExp for checking address",
+                                "default": {
+                                    "transport": {
+                                    },
+                                    "message": {
+                                    }
+                                }
+                            }
+                div#tabHelp.row
+                    div.input-field.col.s2
+                        select#lang
+                        label Help page language
+                    div.input-field.col.s2
+                        input(type='text' data-tooltip='Add new help page translation')#addLang.tooltipped
+                        label(for='addLang') Add new language
+                    div.input-field.col.s1
+                        a(href='#addLangBtn')#addLangBtn.btn-floating.waves-effect.waves-light
+                            i.material-icons add
+                    div.col.s12
+                        textarea#helpEditor.
+                            //
+                                Copyright © #{new Date().getFullYear()}. Alexander Belov. Contacts: <asbel@alepiz.com>
+                                Created on #{new Date().toLocaleString()}
+                            doctype
+                            html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+                                head
+                                    title Media
+                                    link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+                                    link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+                                    meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+                                    meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+                                    script(src='/materialize-css/dist/js/materialize.js')
+                                    script(src='/javascripts/help.js')
+                                body
+                                    header
+                                        div.row
+                                            div.col.s12.m10.offset-m1
+                                                h1 Media
+                                                h5.light.
+                                                    You can sending message using Media
+
+                                    main
+                                        div.row
+                                            div.col.s12.m10.offset-m1
+
+                                                h2 Media description
+                                                p.
+                                                    You can sending message.
+
+                div#modalDeleteConfirm.modal
+                    div.modal-content
+                        h4 Delete confirmation
+                        p Do you really delete selected media?
+                    div.modal-footer
+                        a(href='#!')#modalDeleteConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                        a(href='#!')#modalDeleteConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+
+                div#modalRenameConfirm.modal
+                    div.modal-content
+                        h4 Rename confirmation
+                        p Do you really want to rename selected media?
+                    div.modal-footer
+                        a(href='#!')#modalRenameConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                        a(href='#!')#modalRenameConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+    footer
+        input(type="hidden" name="actionName" value= action.name)
+

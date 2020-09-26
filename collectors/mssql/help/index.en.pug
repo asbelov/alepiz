@@ -1,0 +1,106 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-9-18 16:13:42
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title MSSQL: making queries to MSSQL database engine
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 MSSQL
+                    h5.light.
+                        MSSQL used for making queries to MSSQL database engine
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 MSSQL description
+                    p.
+                        You can use the collector to retrieve data or to make
+                        changes to the MSSQL database. Various authorization methods are 
+                        supported, including standard username and password, NTLM, and Azure.
+                    h3 Array of values
+                    p.
+                        The MSSQL collector returns an array of rows from the SQL query. Each element in the array is
+                        an object that describes a row from the table. For example, for a table
+                    table
+                        thead
+                            tr
+                                th Num
+                                th Name
+                                th Age
+                            tr
+                                td 1
+                                td Alexander
+                                td 44
+                            tr
+                                td 2
+                                td Marina
+                                td 33
+                            tr
+                                td 3
+                                td Bullfinch
+                                td 1
+                    p.
+                        The following array will be created:
+                    div.card-panel
+                        span
+                            pre.
+                                [{
+                                    Num: 1
+                                    Name: "Alexander"
+                                    Age: 44
+                                }, {
+                                    Num: 2
+                                    Name: Marina
+                                    Age: 33
+                                }, {
+                                    Num: 3
+                                    Name: Bullfinch
+                                    Age: 1
+                                }]
+                    p.
+                        When receiving an array of values, ALEPIZ does the following:
+                    ul.browser-default
+                        li The array of values is converted to JSON text and saved to the history database
+                        li.
+                            If the counter has dependent counters, then ALEPIZ will call them as many times as there
+                            were values in the array and each time pass them as a variable %:PARENT_VALUE:% a new JSON
+                            row. You can work with the resulting value using the getValueFromJSONStr() function
+                            For example, the first time, for our example, the
+                            getValueFromJSONStr(%: PARENT_VALUE:%, "Name") function will return "Alexander",
+                            the second time - "Marina", the third time - "Bullfinch"
+                    h3 Parameters
+                    ul.browser-default
+                        li MSSQL server - Hostname to connect to
+                        li Port to connect - Port to connect to (default: 1433).
+                        li.
+                            Authentication method (default. ntlm, azure*) - Type of the authentication method, valid types are
+                            default, ntlm, azure-active-directory-password, azure-active-directory-access-token, 
+                            azure-active-directory-msi-vm, or azure-active-directory-msi-app-service
+                        li User name - User name to use for authentication.
+                        li.
+                            Password - Password to use for authentication. To ensure security, it is better to use authorization
+                            methods that do not require a password
+                        li Domain for ntlm authentication - Once you set domain for ntlm authentication type, driver will connect to SQL Server using domain login.
+                        li Database to connect - Database to connect to (default: dependent on server configuration).
+                        li.
+                            Encrypt connection (1|0 or empty) - Determining whether or not the connection will be encrypted.
+                            Set to 1 if you're on Windows Azure.
+                        li.
+                            Language (default us_english) - Specifies the language environment for the session. The session language determines the datetime 
+                            formats and system messages. (default: us_english).
+                        li MSSQL Query - SQL query
+                        li.
+                            Additional options in JSON format - If you need to specify any additional connection parameters, 
+                            you can specify them in this field in JSON format. Connection parameters can be found on the help page
+                            #[a(href="http://tediousjs.github.io/tedious/api-connection.html" target="__blank") tediousjs].
+                            Example {"camelCaseColumns": true, "connectTimeout" : 1000, "datefirst": true, "localAddress": "192.168.0.1"}
+

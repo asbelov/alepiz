@@ -1,0 +1,46 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-5-17 17:04:53
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title SNMP: получение данных по протоколу SNMP
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 SNMP
+                    h5.light.
+                        Выполняет запросы по протоколу SNMP и возвращает полученные значения
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание SNMP
+                    p.
+                        Сборщик выполняет запросы к сетевому хосту по протоколу SNMP и возвращает полученное значение.
+                    h3 Параметры
+                    ul.browser-default
+                        li.
+                            IP address or host name - IPv4 или IPv6 адрес или имя хоста, для получения данных
+                        li.
+                            SNMP community - SNMP комьюнити, обычно это public
+                        li.
+                            SNMP OID - OID, по которому планируется получать данные. Для проверки можно использовать
+                            1.3.6.1.2.1.1.1.0, возвращающий информацию о системе
+                        li.
+                            SNMP TCP port - TCP порт, обычно 161
+                        li.
+                            SNMP protocol version (1 or 2) - Версия SNMP протокола: 1 или 2
+                        li.
+                            Number of SNMP Request Attempts - количество попыток запросов, если хост не вернул данные
+                    h3 Возвращаемое значение
+                    p.
+                        Сборщик возвращает полученные при опросе значения
+
+

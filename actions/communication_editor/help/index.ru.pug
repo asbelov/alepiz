@@ -1,0 +1,436 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com.ru>
+    Created on 2020-6-20 11:29:12
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Media editor: разработка новых средств отправки сообщений. Документация по разработке
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Media editor
+                    h5.light.
+                        Позволяет создать или отредактировать компоненту для отправки сообщений
+
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h2 Описание Media editor
+                    p.
+                        Communication media editor служит для создания нового или редактирования существующего
+                        средства связи для формирования отправки сообщений пользователям. Например, это
+                        могут быть сообщения о различных событиях, либо об изменении статуса задач, либо сообщение
+                        об обработке администратором событий в dashboard либо какое-то общее оповещение, транслируемое
+                        через систему громкой связи и так далее.
+                    p.
+                        Каждому пользователю системы может быть назначен адрес для каждого средства связи. Например,
+                        для средства связи типа email пользователю можно назначить его email адрес. Для средства связи типа
+                        SMS пользователю, в качестве адреса, можно назначить номер мобильного телефона.
+                    p.
+                        Для каждого адреса можно установить приоритет, в соответствии с которым система будет
+                        выбирать средство связи для отправки сообщений пользователю. Например, для сообщений с
+                        нормальным и низким приоритетом можно можно установить средство связи email, а для сообщений с
+                        высоким приоритетом можно установить средство связи - SMS. Для каждого пользователя можно
+                        установить собственные приоритеты для каждого средства связи. Средства связи и приоритеты для
+                        них настраиваются в действии Administration\Users editor
+                    p.
+                        Компоненты системы, которым требуется отправить сообщения, будут отправлять их, устанавливая
+                        соответствующий приоритет каждому сообщению. Приоритеты для разных типов сообщений настраиваются
+                        администратором.
+                        Система, в зависимости от приоритета сообщения, будет выбирать соответствующее ему средство
+                        связи и выполнять отправку сообщений по соответствующему протоколу.
+                        Таким образом, например, важные сообщения могут быть
+                        отправлены по SMS, а сообщения с более низким приоритетом могут быть отправлены по email.
+                    p.
+                        Для удобства в Communication media Editor встроен редактор JavaScript и редактор шаблонов PUG.
+                        Communication media editor имеет все необходимые средства для разработки
+                        новых компонент для средств связи и не требует установки дополнительных сред
+                        разработки.
+
+
+                    h5.
+                        Возвращаемое значение: Communication media ID (имя папки, в которой расположено средство связи)
+
+                    h2 Описание интерфейса
+                    h3 Communication media
+                    img(src="./images/help.interface.png").materialboxed.card-panel.hoverable
+                    h4 Select communication media
+                    p Позволяет выбрать существующее средство связи из списка, либо создать новое.
+
+                    h4 New communication media
+                    p.
+                        Если вы создаете новое средство связи, то его название необходимо ввести в это поле.
+                        Название средства связи так же является это папкой, в которой хранятся его файлы.
+                        Если вы выбрали существующее средство связи, его название появится в этом поле.
+                        Если изменить название, папка будет переименована.
+
+                    h4 Delete media
+                    p.
+                        При выборе этого checkbox выбранное средство связи будет удалено. Информация, связанная с
+                        данным средством связи (адреса, приоритеты) так же будет удалена из базы данных.
+
+                    h4 Вкладки
+                    p.
+                        Вкладка SERVER позволяет создать или отредактировать исходный код компоненты для выбранного
+                        средства связи.
+                    p.
+                        Вкладка CONFIGURATION используется для создания или правки параметров выбранного средства связи
+                    p.
+                        Вкладка HELP используется для формирования или редактирования файла помощи для выбранного
+                        средства связи
+
+
+                    h3 Формирования файла помощи во вкладке HELP
+                        img(src="./images/help.helpSetup.png").materialboxed.card-panel.hoverable
+
+                    h4 Help page language
+                    p.
+                        Можно выбрать страницу помощи для требуемого языка. При выборе нового языка,
+                        все текущие изменения, сделанные на странице помощи, не сохраняются.
+                        Если страницы помощи не существовало, в этом поле будет установлен
+                        язык, используемый в браузере по умолчанию. Если существует страница помощи с языком,
+                        используемым в браузере по умолчанию, она будет отображена в первую очередь.
+                        Иначе отображается страница помощи на английском языке.
+                        Если страницы помощи на языке, установленном в браузере и страницы помощи на английском языке
+                        не существует, будет отображена первая попавшаяся страница помощи.
+
+                    h4 Add new language
+                    p.
+                        Если в это поле добавить новый язык и нажать на кнопку "+", он будет добавлен в список языков.
+                        Help page language. Затем можно создать страницу помощи на добавленном языке.
+
+                    h2 Использования средств связи в компонентах ALEPIZ
+                    p.
+                        Для использования средств связи необходимо подключить API с помощью команды require:
+                    div.card-panel
+                        pre.
+                            const communication = require(&apos;../../lib/communication&apos;);
+                    p.
+                        API экспортирует две функции: communication.getMedias и communication.send.
+
+                    h4 Функция communication.getMedias(callback)
+                    p.
+                        Через функцию callback можно получить список всех доступных в системе средств связи в виде
+                        объекта. Функция callback принимает параметры callback(err, medias), где:
+                    ul.browser-default
+                        li err - стандартный объект с ошибкой, если произошла ошибка
+                        li.
+                            medias - объект, содержащий сведения о доступных средствах связи в формате
+                            {&lt;mediaID1&gt;: { description: &lt;media description&gt;,  address: &lt;media address description&gt;,
+                                re: &lt;regExp for checking media address&gt; }, &lt;mediaID2&gt;: {...}, ...}.
+                    p Пример объекта medias:
+                    div.card-panel
+                        pre.
+                            {
+                                &quot;email&quot;: {
+                                    &quot;description&quot;: &quot;Sending emails via SMTP&quot;,
+                                    &quot;address&quot;: &quot;E-mail address&quot;,
+                                    &quot;re&quot;: &quot;^(([^&lt;&gt;()\\[\\].,;:\\s@\&quot;]+(\\.[^&lt;&gt;()\\[\\].,;:\\s@\&quot;]+)*)|(\&quot;.+\&quot;))@(([^&lt;&gt;()\\[\\].,;:\\s@\&quot;]+\\.)+[^&lt;&gt;()\\[\\].,;:\\s@\&quot;]{2,})$&quot;,
+                                },
+                                &quot;SMS&quot;: {
+                                    &quot;description&quot;: &quot;Sending SMS via SMS provider&quot;,
+                                    &quot;address&quot;: &quot;SMS phone number&quot;,
+                                    &quot;re&quot;: &quot;^+\\d{11}$&quot;,
+                                }
+                            }
+
+                    h4 Функция communication.send(param, callback)
+                    p.
+                        Функция служит для отправки сообщений через средства связи. Параметр param является объектом и
+                        служит для задания параметров отправляемому сообщению. Функция callback принимает параметр
+                        err - стандартный объект с ошибкой, если произошла ошибка.
+                    p Формат объекта param следующий:
+                    div.card-panel
+                        pre.
+                            {
+                                priorities: &lt;array&gt; [&lt;num1&gt;, &lt;num2&gt;,..] array of priorities ID from userCommunicationPriorities.priority.
+                                configID: &lt;string&gt; configID or don&apos;t set for default
+                                sender: &lt;string&gt; userName from users.name table
+                                rcpt: &lt;array&gt; array of userNames from users.name table
+                                text: &lt;string&gt; message text,
+                                variables: &lt;object&gt; {&lt;NAME1&gt;, &lt;value1&gt;,..} object with variables for replace in text and all message parameters
+                                mediaID: &lt;string&gt;. if set mediaID then priorities will be skipped
+                                message: {
+                                    &lt;message template&gt;
+                                }
+                            }
+                    p Описание параметров:
+                    ul.browser-default
+                        li.
+                            priorities: массив из идентификаторов приоритетов для выбора средств связи с помощью
+                            которых будет отправлено сообщение. Идентификатор приоритета должен быть в числовом формате.
+                            Доступные значения идентификаторов приоритетов можно посмотреть
+                            в действии Administration\Users editor
+                        li.
+                            configID: строка - идентификатор конфигурации для средства связи из файла конфигурации.
+                            Если не указан, берется идентификатор по умолчанию "default"
+                        li.
+                            sender: строка - имя пользователя (login), который является отправителем сообщения. Список
+                            имен пользователей можно посмотреть в действии Administration\Users editor
+                        li.
+                            rcpt: массив строк - имена пользователей (login), которые являются получателями сообщения.
+                            Список имен пользователей можно посмотреть в действии Administration\Users editor
+                        li.
+                            text: строка - текст сообщения
+                        li.
+                            variables: объект - переменные в формате
+                            {&lt;NAME1&gt;: &lt;val1&gt;, &lt;NAME2&gt;: &lt;val2&gt;, ...}. В параметре text и во всех
+                            строковых параметрах объекта message переменные виде %:NAME:% будут заменены на их
+                            значения, если они присутствуют в объекте variables
+                        li.
+                            mediaID: строка - если по какой-то причине необходимо отключить автоматический выбор
+                            средств связи, можно явно указать его идентификатор. Идентификатором средства связи
+                            является название каталога, в котором расположены файлы средства связи. Если указан
+                            параметр mediaID, параметр priorities не используется.
+                        li.
+                            message: объект - шаблон сообщения. Обычно используется, если известно, какое средство
+                            связи будет использовано, например, если указан параметр mediaID. В зависимости от выбранного
+                            средства связи параметры объекта message могут быть разными. Параметры объекта message
+                            описаны на его странице помощи средства связи
+
+                    h2 Файл конфигурации средства связи
+                    p.
+                        Конфигурации находится в файле config.json в формате json и может содержать
+                        следующие параметры:
+                    div.card-panel
+                        pre.
+                            {
+                                &quot;description&quot;: &quot;Communication media description&quot;,
+                                &quot;address&quot;: &quot;Communication media address description&quot;,
+                                &quot;re&quot;: &quot;Regular expression for validate address&quot;,
+                                &quot;default&quot;: {
+                                    &quot;transport&quot;: {
+                                        &lt;transport configuration1&gt;
+                                    }
+                                },
+                                &quot;anotherMessageTemplate&quot;: {
+                                    &quot;transport&quot;: &quot;default&quot;,
+                                    &quot;message&quot;: {
+                                        &lt;message template2&gt;
+                                    }
+                                }
+                            }
+                    p Описание параметров файла конфигурации:
+                    ul.browser-default
+                        li description: Описание средства связи, например "Sending email via SMTP"
+                        li address: Описание адреса средства связи, например "E-mail address" или ""Phone number"
+                        li.
+                            re: регулярное выражение с помощью которого можно проверить корректность адреса для
+                            средства связи
+                        li.
+                            &lt;configID&gt;: идентификатор конфигурации средства связи. Для одного средства связи можно
+                            сделать несколько конфигураций и в дальнейшем выбирать требуемую конфигурацию при отправке
+                            сообщения. Например, в разных конфигурациях одного и того же средства связи могут быть
+                            различные провайдеры для отправки СМС.
+                        ul.browser-default
+                            li.
+                                transport: объект с параметрами для средства связи. Предназначение параметров средства
+                                связи можно посмотреть на странице помощи средства связи.
+                                Если значение transport не объект, а строка, то она
+                                будет интерпретирована как ссылка на идентификатор конфигурации, из которого необходимо
+                                взять параметры средства связи. Это позволяет не дублировать одинаковые конфигурации
+                                для разных шаблонов сообщений.
+                                В примере выше, в конфигурации для идентификатора
+                                "anotherMessageTemplate", "transport" ссылается на идентификатор конфигурации "default"
+                            li.
+                                message: объект, который служит в качестве шаблона сообщения для средства связи.
+                                Параметр message может отсутствовать.
+                                Описание параметров шаблона сообщения средства связи можно посмотреть на странице
+                                помощи средства связи.
+
+                    h2 Разработка нового средства связи
+                    div.row
+                        div.col.s12.m6.l7
+                            p.
+                                Средство связи состоит из нескольких стандартных компонент:
+                            ul.browser-default
+                                li server.js - исполняемый код средства связи
+                                li config.json - файл с конфигурацией
+                                li help\index.ru.pug - статическая страница помощи
+                            p.
+                                В Communication media editor созданы готовые шаблоны, используя которые
+                                можно быстро разработать собственное средство связи.
+                        div.col.s12.m6.l5
+                            img(src="./images/help.files.png").materialboxed.card-panel.hoverable
+
+                    h4 Подключение дополнительных модулей nodejs
+                    p.
+                        Если требуется подключить внешний модуль nodejs, необходимо установить его в каталог
+                        node_modules, который должен находится в корневом каталоге разрабатываемой компоненты.
+                        Для этого можно воспользоваться утилитой npm и в корневом каталоге компоненты выполнить
+                        следующие шаги:
+                    ul.browser-default
+                        li создать файл package.json вручную либо запустить npm init и ответить на вопросы.
+                        li.
+                            выполнить nmp i <имя модуля>. Появится каталог node_modules в который будет установлен
+                            требуемый модуль
+                    h4 server.js - файл с исходным кодом средства связи
+                    p.
+                        Файл с исходным кодом средства связи является стандартным модулем nodejs и должен экспортировать
+                        объект с функцией send:
+                    div.card-panel
+                        pre.
+                            var media = {};
+                            module.exports = media;
+
+                            media.send = function (param, callback) {
+                                ...
+                            };
+                    p.
+                        param является объектом с параметрами для средства связи, а callback - функцией,
+                        принимающей параметр callback(err),
+                        err - стандартный объект с ошибкой, если произошла ошибка.
+                    p объект param содержит следующие параметры:
+                    ul.browser-default
+                        li.
+                            configID: строка - идентификатор конфигурации средства связи из файла конфигурации.
+                        li.
+                            transport: объект содержит параметры для средства связи. Объект формируются в зависимости от
+                            указанного идентификатора конфигурации configID из файла конфигурации средства связи.
+                            Для каждого средства связи используются свои параметры, описанные на странице помощи
+                            соответствующего средства связи.
+                        li.
+                            message: объект - шаблон формирования сообщения. В шаблоне могут быть указаны поля,
+                            специфичные для сообщения, использующегося в выбранном средстве связи.
+                            Шаблон будет сформирован из шаблона, расположенного в файле конфигурации
+                            средства связи с соответствующим идентификатором configID.
+                            Эти параметры будут дописаны или перезаписаны параметрами из шаблона, переданного в
+                            функцию communication.send() инициатором отправки сообщения.
+                            Обычно шаблон message не указывается, так как выбор средства связи происходит автоматически.
+                        li.
+                           sender: массив длинной в 1 элемент в котором находится объект с отправителем сообщения:
+                           [{address: &lt;address&gt;, fullName: &lt;user full name&gt;}]
+                        li.
+                            rcpt: массив в котором находятся объекты с получателями сообщения:
+                            [{address: &lt;address1&gt;, fullName: &lt;user1 full name&gt;},
+                            {address: &lt;address2&gt;, fullName: &lt;user2 full name&gt;}, ...]
+                        li.
+                            text: строка - текст сообщения
+                    p Пример объекта param для средства связи email:
+                    div.card-panel
+                        pre.
+                            {
+                                configID: "default",
+                                transport: {
+                                    host: "smtp.alepiz.com",
+                                    port: 465,
+                                    secure: true,
+                                    ignoreTLS: false,
+                                    requireTLS: false,
+                                    authMethod: "PLAIN",
+                                    auth: {
+                                        type: "login",
+                                        user: "alepizSMTPUser",
+                                        pass: "passwordForSMTP"
+                                    },
+                                    tls: {
+                                        rejectUnauthorized: false
+                                    },
+                                    name: "alepiz.com",
+                                    connectionTimeout: 120000,
+                                    greetingTimeout: 30000,
+                                    socketTimeout: 600000,
+                                    logger: false
+                                },
+                                message: {
+                                    subject: "Test message",
+                                    replyTo: "support@alepiz.com"
+                                },
+                                sender: [{
+                                    address: "admin@alepiz.com",
+                                    fullName: "Administrator of the system"
+                                }],
+                                rcpt: [{
+                                    address: "support@alepiz.com",
+                                    fullName: "Support"
+                                }, {
+                                    address: "admin@alepiz.com",
+                                    fullName: "Administrator of the system"
+                                }],
+                                text: "Message for test"
+                            }
+                    p.
+                        Пример исходного кода средства связи, отправляющего email сообщения по протоколу SMTP:
+                    div.card-panel
+                        pre.
+                            /* Copyright &copy; 2020. Alexander Belov. Contacts: &lt;asbel@alepiz.com&gt; */
+                            var nodeMailer = require(&apos;nodemailer&apos;);
+                            var log = require(&apos;../../lib/log&apos;)(module);
+
+                            var media = {}, transporter = {};
+                            module.exports = media;
+
+                            media.send = function (param, callback) {
+
+                                if(!transporter[param.configID]) {
+                                    transporter[param.configID] = nodeMailer.createTransport(param.transport);
+                                }
+
+                                var message = param.message || {};
+
+                                if(!message.form &amp;&amp; param.sender) message.from = createAddress(param.sender);
+                                if(!message.to &amp;&amp; param.rcpt) message.to = createAddress(param.rcpt);
+                                if(!message.text &amp;&amp; !message.html &amp;&amp; param.text) message.text = param.text;
+
+                                transporter[param.configID].sendMail(message, function(err, info, response) {
+                                    if(err) {
+                                        return callback(new Error(&apos;Can\&apos;t sent email for &apos; + JSON.stringify(message) +
+                                        &apos; : &apos; + err.message));
+                                    }
+
+                                    log.info(&apos;Email successfully sending for &apos;, message, &apos;; messageID: &apos;, info.messageId,
+                                        &apos;; response: &apos;, response);
+                                    callback();
+                                });
+                            };
+
+                            // users: array of objects [{address: &lt;address&gt;, fullName: &lt;full name&gt;}, ...]
+                            function createAddress(users) {
+                                if(!Array.isArray(users) || !users.length) return callback();
+
+                                var re = /^(([^&lt;&gt;()\[\].,;:\s@&quot;]+(\.[^&lt;&gt;()\[\].,;:\s@&quot;]+)*)|(&quot;.+&quot;))@(([^&lt;&gt;()\[\].,;:\s@&quot;]+\.)+[^&lt;&gt;()\[\].,;:\s@&quot;]{2,})$/i;
+
+                                var addresses = [];
+                                users.forEach(function (user) {
+                                    if(!user.address || !re.test(user.address)) {
+                                        log.warn(&apos;Address &apos; + user.address + &apos; is not a valid email address in &apos;, users);
+                                        return;
+                                    }
+                                    if(user.fullName) addresses.push(&apos;&quot;&apos; + user.fullName.replace(/&quot;/g, &quot;&apos;&quot;) + &apos;&quot; &lt;&apos;+ user.address +&apos;&gt;&apos;);
+                                    else addresses.push(user.address);
+                                });
+
+                                return addresses.join(&apos;, &apos;);
+                            }
+                    h4 help\index.ru.pug - страница помощи с описанием средства связи
+                    p.
+                        Для формирования страниц помощи используется
+                        #[a(href="https://pugjs.org/" target="_blank") шаблонизатор PUG ], который, используя
+                        препроцессор, формирует HTML страницу.
+                        Никаких специальных требований к странице помощи нет.
+                        Для того, чтобы все компоненты интерфейса ALEPIZ были созданы в одном стиле, желательно
+                        использовать готовый шаблон, предоставляемый Communication media editor и
+                        элементы фреймворка #[a(href="https://materializecss.com/" target="_blank") materializecss].
+                    p.
+                        Скрипт help.js, включенный в шаблон страницы помощи, автоматически сформирует оглавление документа из
+                        заголовков,
+                        добавит нижний колонтитул с информацией о copyright и плавающий элемент слева для перехода к
+                        верхней части страницы:
+                    ul.browser-default
+                        li Оглавление добавляется в первый элемент на странице с классом offset-m1
+                        li Нижний колонтитул будет добавлен в элемент с тегом body
+                        li.
+                            copyright формируется из элемента meta("author"), например
+                            meta(name=&quot;author&quot; content=&quot;Alexander Belov &lt;asbel@alepiz.com&gt;&quot;)
+                            добавит соответствующий copyright и ссылку для составления почтового сообщения.
+                            Год формируется из document.lastModified || document.lastModifiedDate
+                        li плавающий элемент слева для перехода к верхней части страницы будет добавлен в элемент с тегом main

@@ -1,0 +1,52 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Scheduler: генератор ежедневных событий
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Scheduler
+                    h5.light.
+                        Генератор ежедневных событий
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание Scheduler
+                    p.
+                        Сборщик генерирует ежедневные события в определенное параметром время. Он
+                        может использоваться для периодического запуска зависимых от него пассивных
+                        сборщиков, если требуется собирать данные ежедневно в определенное время. Обычно при
+                        настройке счетчиков на основе этого сборщика, время сохранения истории и трендов
+                        устанавливают в 0, чтобы не расходовать зря дисковое пространство.
+                    h3 Параметры
+                    ul.browser-default
+                        li.
+                            Schedule time -
+                            Время в формате HH:MM (например, 13:25), в которое будет генерироваться событие
+                    h3 Настройки
+                    p.
+                        Настройки сборщика хранятся в файле config/conf.json в секции collectors.timer
+                    ul.browser-default
+                        li.
+                            localAddress - IP адрес с которого производится подключение к серверу сборщика. Если null
+                            или не указано, то подключение будет производится с IP адреса, который выберет
+                            операционная система
+                        li.
+                            serverAddress - IP адрес, который слушает сборщик и к которому производится подключение
+                        li.
+                            port - TCP порт, который слушает сборщик
+                    h3 Возвращаемое значение
+                    p.
+                        Сборщик возвращает текущее время в миллисекундах, начиная с 1.1.1970
+
+

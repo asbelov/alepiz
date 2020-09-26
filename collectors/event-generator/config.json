@@ -1,0 +1,40 @@
+{
+    "name": "Event generator",
+    "description": "Generate new event, when something occurred",
+    "active": "",
+    "separate": "on",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "eventDescription": {
+            "description": "Description of event will be show on dashboard",
+            "type": "textInputLong"
+        },
+        "importance": {
+            "description": "Importance",
+            "checkAs": "Integer",
+            "type": "textInputMiddle",
+            "default": 5
+        },
+        "eventDuration": {
+            "description": "Event Duration (sec)",
+            "canBeEmpty": "on",
+            "checkAs": "Integer"
+        },
+        "problemTaskID": {
+            "description": "Task ID, which running when event occurred",
+            "canBeEmpty": "on",
+            "checkAs": "Integer",
+            "default": 1
+        },
+        "solvedTaskID": {
+            "description": "Task ID, which running when event solved",
+            "canBeEmpty": "on",
+            "default": "2"
+        },
+        "pronunciation": {
+            "description": "Pronunciation of event",
+            "canBeEmpty": "on",
+            "type": "textInputLong"
+        }
+    }
+}

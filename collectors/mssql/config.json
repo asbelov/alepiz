@@ -1,0 +1,60 @@
+{
+    "name": "MSSQL",
+    "description": "To execute MSSQL queries",
+    "active": "",
+    "separate": "",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "server": {
+            "description": "MSSQL server",
+            "checkAs": "hostOrIP",
+            "default": "127.0.0.1"
+        },
+        "port": {
+            "description": "Port to connect",
+            "checkAs": "TCPPort",
+            "default": 1433
+        },
+        "type": {
+            "description": "Authentication method (default. ntlm, azure*)",
+            "default": "default"
+        },
+        "userName": {
+            "description": "User name",
+            "canBeEmpty": "on"
+        },
+        "password": {
+            "description": "Password",
+            "canBeEmpty": "on",
+            "type": "textInputPassword"
+        },
+        "domain": {
+            "description": "Domain for ntlm authentication",
+            "canBeEmpty": "on"
+        },
+        "database": {
+            "description": "Database to connect"
+        },
+        "encrypt": {
+            "description": "Encrypt connection (1|0 or empty)",
+            "canBeEmpty": "on",
+            "checkAs": "Integer",
+            "default": 0
+        },
+        "language": {
+            "description": "Language (default us_english)",
+            "canBeEmpty": "on",
+            "default": "ru_russian"
+        },
+        "query": {
+            "description": "MSSQL Query",
+            "type": "textArea"
+        },
+        "options": {
+            "description": "Additional options in JSON format (ex. {\"datefirst\": true, \"requestTimeout\": 86400000})",
+            "canBeEmpty": "on",
+            "type": "jsonEditor",
+            "default": "{\n    \"datefirst\": 1, \n    \"requestTimeout\": 10000\n}"
+        }
+    }
+}

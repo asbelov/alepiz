@@ -1,0 +1,85 @@
+//
+    Copyright © 2019. Alexandr Belov. Contacts: <asbel@alepiz.com>
+    Created on 2019-3-7 17:16:34
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            div.col.s12
+                script(src= action.link + "/" + action.staticDir + "/" + "client.js")
+                div.row
+                    div.col.s12
+                        div.card
+                            div.card-content
+                                span.card-title Users editor
+                                p Select user from list for edit user properties, press 'x' for delete user.
+                                    div.row
+                                        div.col.s12.m4.l4.input-field
+                                            input(type="text" data-tooltip="Enter case insensitive user name").tooltipped#userName
+                                            label(for="userName") User name
+                                        div.col.s12.m8.l8.input-field
+                                            input(type="text" data-tooltip="Enter full user name or user description").tooltipped#fullUserName
+                                            label(for="fullUserName") Full user name or user description
+                                        div.col.s12.m4.l4.input-field
+                                            input(type="password" placeholder='*****' data-tooltip="Enter user password").tooltipped#userPassword1
+                                            label(for="userPassword1") User password
+                                        div.col.s12.m4.l4.input-field
+                                            input(type="password" placeholder='*****' data-tooltip="Confirm user password").tooltipped#userPassword2
+                                            label(for="userPassword2") Confirm password
+                                        div(data-tooltip="Select roles for user").col.s12.m4.l4.input-field.tooltipped
+                                            select(multiple)#userRoles
+                                            label(for="userRoles") User roles
+                                        div.row#communicationMedia
+                                        input(type="hidden" value="")#userID
+                                        input(type="hidden" value="")#removedUsers
+                                        div.col.s12.collection#userList
+
+                div#modalDeleteConfirm.modal
+                    div.modal-content
+                        h4 Delete confirmation
+                        p
+                            span Do you really delete users:&nbsp;
+                            span#usersNamesInModalDialog
+                            span ?
+                    div.modal-footer
+                        a(href='#!')#modalDeleteConfirmYes.modal-close.waves-effect.waves-green.btn-flat Yes
+                        a(href='#!')#modalDeleteConfirmNo.modal-close.waves-effect.waves-green.btn-flat No
+
+    footer
+        input(type="hidden" name="actionName" value= action.name)

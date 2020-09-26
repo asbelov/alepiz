@@ -1,0 +1,103 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-9-18 16:13:42
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title MSSQL: выполнение запросов к СУБД MSSQL
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 MSSQL
+                    h5.light.
+                        MSSQL используется для выполнения запросов к СУБД MSSQL
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание MSSQL
+                    p.
+                        Вы можете использовать сборщик для получения данных или для внесения изменений в базу данных MSSQL.
+                        Поддерживаются различные методы авторизации, в том числе стандартный по имени пользователя и паролю,
+                        NTLM и Azure.
+                    h3 Массив значений
+                    p.
+                        Коллектор MSSQL возвращает массив из строк таблицы SQL запроса. Каждый элемент массива -
+                        это объект, описывающий строку таблицы. Например, для таблицы
+                    table
+                        thead
+                            tr
+                                th Num
+                                th Name
+                                th Age
+                            tr
+                                td 1
+                                td Alexander
+                                td 44
+                            tr
+                                td 2
+                                td Marina
+                                td 33
+                            tr
+                                td 3
+                                td Bullfinch
+                                td 1
+                    p.
+                        Будет сформирован следующий массив:
+                    div.card-panel
+                        span
+                            pre.
+                                [{
+                                    Num: 1
+                                    Name: "Alexander"
+                                    Age: 44
+                                }, {
+                                    Num: 2
+                                    Name: Marina
+                                    Age: 33
+                                }, {
+                                    Num: 3
+                                    Name: Bullfinch
+                                    Age: 1
+                                }]
+                    p.
+                        При получении массива значений ALEPIZ выполняет следующие действия:
+                    ul.browser-default
+                        li Весь полученный массив значений преобразуется в текст JSON и сохраняется в базу истории значений
+                        li.
+                            Если у счетчика есть зависимые счетчики, то ALEPIZ будет вызывать их столько раз, сколько значений
+                            получено в массиве и каждый раз передавать в качестве переменной %:PARENT_VALUE:% новое значение
+                            из массива значений в формате JSON. Работать с полученным значением можно с помощью функции
+                            getValueFromJSONStr. Например первый раз для нашего примера функция
+                            getValueFromJSONStr( %:PARENT_VALUE:%, "Name" ) вернет "Alexander", второй раз - "Marina",
+                            третий раз - "Bullfinch"
+                    h3 Параметры
+                    ul.browser-default
+                        li MSSQL server - Имя или IP адрес сервера MSSQL
+                        li Port to connect - TCP port сервера MSSQL
+                        li.
+                            Authentication method (default. ntlm, azure*) - метод авторизации. Поддерживаются
+                            default, ntlm, azure-active-directory-password, azure-active-directory-access-token,
+                            azure-active-directory-msi-vm, or azure-active-directory-msi-app-service.
+                        li User name - имя пользователя для авторизации
+                        li.
+                            Password - пароль для авторизации. Для обеспечения безопасности лучше использовать методы 
+                            авторизации в которых не требуется указывать пароль
+                        li Domain for ntlm authentication - Если выбран метод авторизации NTLM, можно указать домен для авторизации
+                        li Database to connect - Имя базы данных, к которой будет выполнен запрос
+                        li Encrypt connection (1|0 или пусто) - Шифровать или не шифровать подключение к серверу MSSQL
+                        li Language (default us_english) - Задает язык. Язык определяет форматы даты и времени и системные сообщения. (по умолчанию: us_english).
+                        li.
+                            Additional options in JSON format - Если требуется указать какие-то дополнительные параметры
+                            подключения, их можно указать в этом поле в формате JSON. Параметры подключения можно посмотреть
+                            на странице помощи
+                            #[a(href="http://tediousjs.github.io/tedious/api-connection.html" target="__blank") драйвера tediousjs].
+                            Например, {"camelCaseColumns": 1, "connectTimeout" : 1000, "datefirst": 1, "localAddress": "192.168.0.1"}
+                        li MSSQL Query - SQL запрос
+

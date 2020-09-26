@@ -1,0 +1,274 @@
+//
+   Created by asbel on 25.07.2015.
+   Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        // used for object selector
+        link(rel='stylesheet', href='/stylesheets/actions.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        style.
+            /* for make possible scroll in tabs */
+            body {
+                overflow: auto !important;
+            }
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            div.col.s12
+                script(src='/javascripts/javaScriptEditor.js')
+                script(src='/javascripts/objectsSelector.js')
+                script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+                div#tabPanel.col.s12
+                    ul(style="overflow-x:hidden")#mainTabs.tabs
+                        li.tab.col.s4: a(href='#counterSettingsTab').active Counter
+                        li.tab.col.s4: a(href='#objectsLinksTab') Links
+                        li(style="overflow: auto").tab.col.s4: a(href='#variablesDefinitionsTab') Variables
+                div#counterSettingsTab
+                    div.row
+                        div.col.s12
+                            div.card-panel
+                                div.row
+                                    div.col.l6.m12.s12
+                                        div.row
+                                            div.input-field.col.s12
+                                                select#filterGroupID
+                                                label Filter counter by group
+                                            div.input-field.col.s12
+                                                select#counterIDSelector
+                                                    option New counter
+                                                label Counters selector
+                                            input(type='hidden')#counterID
+                                            input(type='hidden')#activeCollector
+                                    div.col.l6.m12.s12
+                                        select(title=""
+                                            description="Filter counters by objects"
+                                            no-border=1)#objectsIDs
+                                    div.col.s12
+                                        div.row
+                                            p.col.s3
+                                                label
+                                                    input(type='checkbox' value="1")#disabled
+                                                    span(data-position='top' data-tooltip='Do not collect data for this counter').tooltipped Disable
+                                            p.col.s3
+                                                label
+                                                    input(type='checkbox')#debug
+                                                    span(data-position='top' data-tooltip='Write debug information for this counter for "Variables" action').tooltipped Enable debug
+                                            p.col.s3
+                                                label
+                                                    input(type='checkbox')#taskCondition
+                                                    span(data-position='top' data-tooltip='The counter can be used as a condition for the task').tooltipped Condition for task
+                                            p.col.s3
+                                                label
+                                                    input(type='checkbox')#deleteCounter
+                                                    span(data-position='top' data-tooltip='Delete selected counter and unlink all linked objects from it').tooltipped Delete counter
+                            div.card-panel
+                                div.row
+                                    div.col.s11 If you change the name of the counter, please change links to this counter manually in all variables that used this counter.
+                                    div.col.s1
+                                        a(href="/help" data-position='top' data-tooltip='Help for selected collector parameters')#collectorHelpBtn.tooltipped
+                                            i.material-icons.right help_outline
+                                    div.input-field.col.s12.m4.l4
+                                        input(type='text')#name
+                                        label(for='name') Counter name
+                                    div.input-field.col.s5.m5.l3
+                                        select#groupID
+                                            option(disabled) Groups are not exists
+                                        label Counter group
+                                        input(type='hidden')#defaultGroup
+                                    div.input-field.col.s1.m1.l1.center-align
+                                        button(data-target='counterGroupsSettings')#groupsEditBtn.btn-floating.modal-trigger: i.material-icons playlist_add
+                                    div.input-field.col.s12.m4.l4
+                                        select#collectorID
+                                        label Collector type
+                                div.row#collectorParameters
+                                div.row
+                                    div.input-field.col.s5.m5.l3
+                                        select#unitID
+                                            option(selected) None
+                                        label Units
+                                    div.input-field.col.s1.m1.l1.center-align
+                                        button(data-target='unitsSettings')#unitsEditBtn.btn-floating.modal-trigger: i.material-icons playlist_add
+                                    div.input-field.col.s6.m6.l4
+                                        select(disabled)#sourceMultiplier
+                                            option None
+                                        label Multiplier (depending of units)
+                                    div.input-field.col.s6.m6.l2
+                                        input(type='text' value='90')#keepHistory
+                                        label(for='keepHistory') Keep history (days)
+                                    div.input-field.col.s6.m6.l2
+                                        input(type='text' value='365')#keepTrends
+                                        label(for='keepTrends') Keep trends (days)
+                                    div.input-field.col.s12
+                                        textarea(data-length="65535").materialize-textarea#description
+                                        label(for="description") Description
+                div#objectsLinksTab
+                    div.col.s12#updateEventsArea
+                    div.col.s1
+                        a.btn-floating#addUpdateEvent: i.material-icons add
+                    div.input-field.col.s11.
+                        Add an object and select counter, linked to the object for generating update event. You can use all variables from parent counter.
+                        Variables with same names with parent counter will be overwrite by variables values from this counter.
+                        Update event will be generated when counter will update his value and logical expression is empty or returned true.
+                    div.col.s12
+                        input(type="hidden" title="Objects linked to a counter"
+                            description="This objects will be linked to a edited counter and collecting data according counter settings with implementation to those objects. You can add objects from LINKS menu"
+                        )#linkedObjectsIDs
+
+                div#variablesDefinitionsTab
+                    div.row
+                        div.col.s12
+                            div.card-panel
+                                span Predefined variables, which you can use without definition here can be a:
+                                ul
+                                    li OBJECT_NAME - name of the current object;
+                                    li COUNTER_NAME - name of the current counter;
+                                    li PARENT_OBJECT_NAME - if counter has dependence from other object, then this variable will be set to a parent object name;
+                                    li PARENT_COUNTER_NAME - if counter has dependence from other object, then this variable will be set to a parent counter name;
+                                    li PARENT_VALUE - if counter has dependence from other object, then this variable will be set to a value, returned by counter of a parent object;
+                                    li UPDATE_EVENT_STATE - if counter has dependence from other object, then this variable will be set to update event state. Event state is 'SUCCESS' if 0 and 'PROBLEM' if 1
+                                    li UPDATE_EVENT_TIMESTAMP - if counter has dependence from other object, then this variable will be set to timestamp (ms from 1.1.1970) when state of update event was changed
+                                span If action returned some value you can use this value in "task maker" by %:PREV_ACTION_RESULT:% variable. Also you can use all variables from parent counter.
+                    div.row#variables
+                    div.input-field.col.s1.m1.l1
+                        a#addVariable.btn-floating: i.material-icons add_box
+                        span &nbsp;
+                        a#addVariableExpression.btn-floating: i.material-icons library_add
+
+        div#counterGroupsSettings.modal.modal-fixed-footer
+            div.modal-content
+                h4 Counter group settings
+                div.col.s12
+                    div
+                        label
+                            input(type='radio' name='groupsAction')#groupsActionNewGroup.with-gap
+                            span Add new group (and enter name of the new group bellow)
+                    div
+                        label
+                            input(type='radio' name='groupsAction')#groupsActionEditGroup.with-gap
+                            span Edit selected group name (and enter new name of the group bellow)
+                    div
+                        label
+                            input(type='radio' name='groupsAction')#groupsActionSetDefault.with-gap
+                            span Set selected group as initial in the group selector
+                    div
+                        label
+                            input(type='radio' name='groupsAction')#groupsRemoveGroup.with-gap
+                            span Remove selected group with all counters, included in this group
+                div.col.s12.input-field &nbsp;
+                div.col.s12.input-field
+                    input(type='text')#newGroupName
+                    label(for='newGroupName')#newGroupNameLabel New group name
+            div.modal-footer
+                a(href='#!')#applyGroupsChanges.modal-action.modal-close.btn-flat Apply
+                a(href='#!').modal-action.modal-close.btn-flat Cancel
+
+
+        div#unitsSettings.modal.modal-fixed-footer
+            div.modal-content
+                h4 Units settings
+                div.col.s12
+                    div
+                        label
+                            input(type='radio' name='unitsAction')#unitsActionNewUnit.with-gap
+                            span Add new unit (and enter parameters of the new unit bellow)
+                    div
+                        label
+                            input(type='radio' name='unitsAction')#unitsActionEditUnit.with-gap
+                            span Edit selected unit name (and enter parameters of the unit bellow)
+                    div
+                        label
+                            input(type='radio' name='unitsAction')#unitsRemoveUnit.with-gap
+                            span Remove selected unit with all counters, has this unit
+                div.col.s12 &nbsp;
+                div.col.s12.m8.l3.input-field
+                    input(type='text')#newUnitName
+                    label(for='newUnitName')#newUnitNameLabel New unit name
+                div.col.s12.m4.l2.input-field
+                    input(type='text')#newUnitAbbreviation
+                    label(for='newUnitAbbreviation')#newUnitAbbreviationLabel Abbreviation
+                div.col.s12.m12.l7.input-field
+                    input(type='text' value='n, μ, m, K, M, G, T')#newUnitPrefixes
+                    label(for='newUnitPrefixes')#newUnitPrefixesLabel Prefixes
+                div.col.s12.input-field
+                    input(type='text' value='0.0000000001, 0.000001, 0.001, 1000, 1000000, 1000000000, 1000000000')#newUnitMultipliers
+                    label(for='newUnitMultipliers')#newUnitMultipliersLabel Multipliers for each prefix
+                div.col.s12
+                    label
+                        input(type='checkbox')#newUnitOnlyPrefixes
+                        span Use prefix without abbreviation in name when multiply (f.e. for time)
+            div.modal-footer
+                a(href='#!')#applyUnitsChanges.modal-action.modal-close.btn-flat Apply
+                a(href='#!').modal-action.modal-close.btn-flat Cancel
+
+        div#modalDeleteConfirm.modal
+            div.modal-content
+                h4 Delete confirmation
+                p Do you really delete selected counter from database?
+            div.modal-footer
+                a(href='#!')#modalDeleteConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                a(href='#!')#modalDeleteConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+
+        div#modalAddUpdateEventConfirm.modal
+            div.modal-content
+                h4 Add update event to active collector confirmation
+                p Selected collector is active. It's usually mean, that this collector will be get data by himself using internal mechanism. Do you really want to add update event for this collector?
+            div.modal-footer
+                a(href='#!')#modalAddUpdateEventConfirmYes.modal-close.waves-effect.waves-green.btn-flat Yes
+                a(href='#!')#modalAddUpdateEventConfirmNo.modal-close.waves-effect.waves-green.btn-flat No
+
+        div#modalCounterNameChangedConfirm.modal
+            div.modal-content
+                input(type="hidden")#updateVariablesRef
+                h4 Confirmation of changing the name of the counter
+                p Counter name has been changed. Do you want to change the variables that refer to the name of this counter?
+                ul
+                    li Press "Yes" for replace counter name for all variables automatically and save changes for counter
+                    li Press "No" for skip automatically counter name replacement for variables and save changes for counter
+                    li Press "Cancel" for do not save changes for counter
+                p List of variables that refer to the old name of this counter:
+                ul#modalCounterNameChangedConfirmOldVariablesList
+                p List of variables, that will refer to the new name of this counter:
+                ul#modalCounterNameChangedConfirmNewVariablesList
+            div.modal-footer
+                a(href='#!')#modalCounterNameChangedConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                a(href='#!')#modalCounterNameChangedConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+                a(href='#!')#modalCounterNameChangedConfirmCancel.modal-action.modal-close.waves-effect.waves-green.btn-flat Cancel
+
+    footer
+        input(type="hidden" name="actionName" value= action.name)
+
+

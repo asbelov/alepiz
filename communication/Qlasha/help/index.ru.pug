@@ -1,0 +1,94 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-6-20 4:14:10
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title QLASHA: Система оповещения через громкую связь
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 QLASHA
+                    h5.light.
+                        Отправка сообщений на систему оповещения через громкую связь
+
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h2 Описание
+                    p.
+                        Средство связи QLASHA предназначено для формирования и отправки сообщений на систему
+                        оповещения через громкую связь. В качестве системы оповещения используется программный продукт
+                        #[a(href="https://github.com/asbelov/Qlasha/" target="__blank") QLASHA],
+                        распространяемый по лицензии открытого и свободного программного обеспечения
+                        #[a(href="https://github.com/asbelov/Qlasha/blob/master/LICENSE" target="__blank") MIT].
+                        Получить исполняемый файл Qlasha.exe можно по ссылке
+                        #[a(href="https://github.com/asbelov/Qlasha/blob/master/bin/Release/Qlasha.exe" target="__blank") https://github.com/asbelov/Qlasha/blob/master/bin/Release/Qlasha.exe].
+                        Поддерживается работа через HTTP прокси сервер.
+
+                    h3 Описание параметров файла конфигурации config.json
+                    ul.browser-default
+                        li description: Описание средства связи, например "Sending email via SMTP"
+                        li address: Описание адреса средства связи, например "E-mail address" или ""Phone number"
+                        li.
+                            re: регулярное выражение с помощью которого можно проверить корректность адреса для
+                            средства связи
+                        li.
+                            &lt;configID&gt;: идентификатор конфигурации средства связи. Для одного средства связи можно
+                            сделать несколько конфигураций и в дальнейшем выбирать требуемую конфигурацию при отправке
+                            сообщения. Например, в разных конфигурациях одного и того же средства связи могут быть
+                            различные провайдеры для отправки СМС.
+                        ul.browser-default
+                            li.
+                                transport: объект с параметрами для средства связи. Если значение transport не объект,
+                                а строка, то она будет интерпретирована как ссылка на идентификатор конфигурации, из
+                                которого необходимо взять параметры средства связи.
+                            li.
+                                message: объект, который служит в качестве шаблона сообщения для средства связи.
+                                Параметр message может отсутствовать.
+
+                    h4 Описание transport
+                    ul.browser-default
+                        li host: <string> - имя хоста на котором работает ПО QLASHA
+                        li localAddress: <IP> - если указан, то подключение будет осуществляться с указанного IP адреса
+                        li proxyHost: <string> - имя хоста HTTP прокси. Если не указан, то прокси не используется
+                        li proxyPort: <0-65536> - TCP порт HTTP прокси
+                        li.
+                            proxyUser: <string> - пользователь для авторизации на HTTP прокси сервере.
+                            Поддерживается Basic авторизация. Если не указан, авторизация не осуществляется
+                        li proxyPass: <string> - пароль для авторизации на HTTP прокси сервере
+
+                    h4 Описание message
+                    ul.browser-default
+                        li rate: <integer> -10 - 10 - скорость воспроизведения. Если не указано, то 1
+                        li volume: <integer> 0 - 100 - уровень громкости. Если не указано, то 100
+                        li.
+                            severity: <integer> - важность сообщения. Если сформирована очередь сообщений, более
+                            важные сообщения будут воспроизводится раньше менее важных. Если не указано, то 0
+                    h3 Пример конфигурации QLASHA
+                    div.card-panel
+                        pre.
+                            {
+                                "description": "Sending message to Qlasha",
+                                "address": "No address provided",
+                                "re": "^$",
+                                "default": {
+                                    "transport": {
+                                        "host": "localhost"
+                                    },
+                                    "message": {
+                                        "rate": 1,
+                                        "volume": 100,
+                                        "severity": 1
+                                    }
+                                }
+                            }

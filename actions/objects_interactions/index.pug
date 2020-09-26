@@ -1,0 +1,75 @@
+//
+  Created by asbel on 21.04.2015.
+   Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+  head
+    title= action.name
+    link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+    // used for object selector
+    link(rel='stylesheet', href='/stylesheets/actions.css')
+    link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+    meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+    script(src='/jquery/jquery.min.js')
+    script(src='/jquery-ui/jquery-ui.min.js')
+    script(src='/materialize-css/dist/js/materialize.js')
+    script.
+      var parameters = {
+        action: !{JSON.stringify(action)},
+        objects: !{JSON.stringify(objects)}
+      };
+
+      var entityMap = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+        '/': '&#x2F;',
+        '`': '&#x60;',
+        '=': '&#x3D;'
+      };
+
+      function escapeHtml(string) {
+        return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+          return entityMap[s];
+        });
+      }
+  body
+  main
+    div.row
+      div.col.s12
+        //h2= action.name
+        //p.right-align= action.description
+    div.row
+      div.col.s12
+        script(src='/javascripts/objectsSelector.js')
+        script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+
+        select(title="Objects list"
+          description="Interaction settings from table bellow will be performed to objects, listed here. You can select objects from 'OBJECTS' list at left navigation menu.")#objectsIDs
+        div.card
+          div.card-content
+            span.card-title Objects interactions setting
+            p You can add objects here from additional objects list, named 'INTERACTION' at left navigation menu
+            table.striped.responsive-table
+              thead
+                tr
+                  th
+                  th Object
+                  th(data-tooltip="Include this object in edited objects").tooltipped.center-align Include
+                  th(data-tooltip="Include edited objects in this object").tooltipped.center-align Included in
+                  th(data-tooltip="Result will be a similar included objects in this object and in edited").tooltipped.center-align Intersection
+                  th(data-tooltip="Result will be a different included objects in this object and in edited").tooltipped.center-align Exclusion
+                  //th(data-tooltip="Result will be an objects, which included in edited objects and not included in this objects").tooltipped.center-align Excluding
+                  th(data-tooltip="Result will be an objects, which included in this object and not included in edited objects").tooltipped.center-align.hide Excluded from
+                  th(data-tooltip="Different interactions for each object").tooltipped.center-align Different
+              tbody#interactions
+          div.card-action
+            a(href="#!")#addObjectsToInteractionTableBtn Add selected objects to interaction table
+
+        input(type="hidden")#interactions_description
+        input(type="hidden" value="1")#deleteOtherInteractions
+  footer
+    input(type="hidden" name="actionName" value= action.name)

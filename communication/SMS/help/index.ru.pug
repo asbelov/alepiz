@@ -1,0 +1,158 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-6-20 4:14:10
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title SMS: отправка сообщений через СМС сервис провайдеров
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 SMS
+                    h5.light.
+                        Отправка сообщений через СМС сервис провайдеров с помощью Rest API
+
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+
+                    h2 Описание
+                    p.
+                        Средство связи SMS предназначено для формирования и отправки СМС сообщений через провайдеров,
+                        поддерживающих отправку сообщений по протоколам HTTP\HTTPS. Поддерживается работа через HTTP
+                        прокси сервер, сжатие трафика, Basic авторизация.
+                        Компонента позволяет формировать HTTP GET или POST запросы
+                        с параметрами, необходимыми для работы с различными СМС сервис провайдерами.
+
+                    h3 Описание параметров файла конфигурации config.json
+                    ul.browser-default
+                        li description: Описание средства связи, например "Sending email via SMTP"
+                        li address: Описание адреса средства связи, например "E-mail address" или ""Phone number"
+                        li.
+                            re: регулярное выражение с помощью которого можно проверить корректность адреса для
+                            средства связи
+                        li.
+                            &lt;configID&gt;: идентификатор конфигурации средства связи. Для одного средства связи можно
+                            сделать несколько конфигураций и в дальнейшем выбирать требуемую конфигурацию при отправке
+                            сообщения. Например, в разных конфигурациях одного и того же средства связи могут быть
+                            различные провайдеры для отправки СМС.
+                        ul.browser-default
+                            li.
+                                transport: объект с параметрами для средства связи. Если значение transport не объект,
+                                а строка, то она будет интерпретирована как ссылка на идентификатор конфигурации, из
+                                которого необходимо взять параметры средства связи.
+                            li.
+                                message: объект, который служит в качестве шаблона сообщения для средства связи.
+                                Параметр message может отсутствовать.
+
+                    h4 Описание transport
+                    ul.browser-default
+                        li protocol: <string> - http или https. Если не указан, то используется http
+                        li method: <string> - GET или POST. Если не указан, то используется GET
+                        li host: <string> - имя хоста с помощью которого будут отправляться СМС сообщения
+                        li.
+                            port: <0-65536> - TCP порт сервиса для отправки сообщений СМС. Если не указано, то
+                            для протокола http будет выбран порт 80, а для http будет выбран порт 443
+                        li.
+                            path: <string> - путь в URL до сервиса СМС провайдера. Например в URL
+                            https://go.sms.com/services/send_sms/?user=smsUser&amp;pass=smsPass путь будет
+                            &quot;/services/send_sms/&quot;
+                        li.
+                            user: <string> - пользователь для авторизации на сервере СМС сервис провайдера
+                            Поддерживается Basic авторизация. Если не указан, авторизация не осуществляется
+                        li pass: <string> - пароль для авторизации на сервере СМС сервис провайдера
+                        li family: <4|6> - используется IPv4 или IPv6. Если не указано, используется доступный
+                        li localAddress: <IP> - если указан, то подключение будет осуществляться с указанного IP адреса
+                        li timeout: <number> - таймаут для сокета в миллисекундах. Инициализируется до установки соединения
+                        li proxyHost: <string> - имя хоста HTTP прокси. Если не указан, то прокси не используется
+                        li proxyPort: <0-65536> - TCP порт HTTP прокси
+                        li.
+                            proxyUser: <string> - пользователь для авторизации на HTTP прокси сервере.
+                            Поддерживается Basic авторизация. Если не указан, авторизация не осуществляется
+                        li proxyPass: <string> - пароль для авторизации на HTTP прокси сервере
+                        li.
+                            phonesDiv: <string> - если СМС сервис провайдер поддерживает одновременную отправку СМС
+                            на несколько телефонных номеров, объединенных в строку, с помощью этого параметра можно
+                            указать для них разделитель. Если не указан, то используется запятая ','
+                        li.
+                            phonePrefix: <number> префикс, который будет устанавливаться перед каждым телефонным номером.
+                            Например это может быть префикс выхода на линию '98' или внутренний префикс для междугородних
+                            номеров '8' и т.д.
+                        li.
+                            phoneLen: <number> - длина телефонного номера. Если в телефонном номере символов больше, чем
+                            указано в phoneLen, то лишние символы слева будут удалены. Пробелы и тире не считаются
+                            символами и будут удалены в любом случае.
+                            Если указан параметр phonePrefix,
+                            он будет добавлен в начало номера после удаления лишних символов. Таким образом, например если
+                            phonePrefix = 8, phoneLen = 10, то номер телефона "+7 913 988 01-23" будет преобразован в
+                            "89139880123".
+                        li.
+                            response: <string> - регулярное выражение для проверки значения, возвращаемого СМС сервис
+                            провайдером. Если в response есть переменная %:PHONE:%, она будет заменена на номер телефона,
+                            на который было отправлена СМС сообщение. В этом случае проверка возвращаемого значение будет
+                            осуществляться для каждого номера телефона, на который было отправлено СМС сообщение.
+
+                    h4 Описание message
+                    p.
+                        Объект message состоит из параметров и значений, которые будут превращены в GET запрос для
+                        отправки СМС сервис провайдеру. В значениях можно использовать следующие переменные:
+                    ul.browser-default
+                        li %:TEXT:% - заменяется на текст сообщения
+                        li %:SENDER_PHONE:% - заменяется на номер телефона отправителя
+                        li.
+                            %:PHONES:% - заменяется на номера телефонов получателей, соединенных между собой разделителем,
+                            указанным в transport.phonesDiv. По умолчанию это запятая ','
+                        li.
+                            %:PHONE:% - заменяется на один номер телефона получателя. Если получателей несколько и в
+                            message указана переменная %:PHONE:%, то для каждого получателя будет сформирован свой
+                            запрос СМС сервис провайдеру.
+                    h3 Пример конфигурации SMS
+                    p.
+                        Данная конфигурация сформирует следующий запрос СМС сервис провайдеру:
+                    pre.
+                        https://go.sms.com:443/services/send_sms/?user=userName&amp;pass=password&amp;action=post_sms&amp;sender=&lt;sender phone&gt;&amp;message=&lt;message&gt;&amp;target=&lt;phone1,phone2,phone3&gt;
+                    p.
+                        Отправка сообщения будет осуществлена через HTTP прокси сервер proxy.mydomain.com, порт 3128 с использованием
+                        Basic авторизации с пользователем proxyUserName и паролем proxyUserPassword
+                    div.card-panel
+                        pre.
+                            {
+                                "description": "Sending SMS via SMS provider",
+                                "address": "SMS phone number",
+                                "re": "^+\\d{11}$",
+                                "default": {
+                                    "transport": {
+                                        "protocol": "https",
+                                        "method": "GET",
+                                        "host": "go.sms.com",
+                                        "port": 443,
+                                        "path": "/services/send_sms",
+                                        "family": 4,
+                                        "localAddress": "192.168.0.1,
+                                        "timeout": 30000,
+                                        "proxyHost": "proxy.mydomain.com",
+                                        "proxyPort": 3128,
+                                        "proxyUser": "proxyUserName",
+                                        "proxyPass": "proxyUserPassword",
+                                        "phonesDiv": ",",
+                                        "phonePrefix": 8,
+                                        "phoneLen": 10,
+                                        "response": "phone=\"%:PHONE:%\" sms_res_count=\"1\""
+                                    },
+                                    "message": {
+                                        "user": "userName",
+                                        "pass": "password",
+                                        "action": "post_sms",
+                                        "sender": "%:SENDER_PHONE:%",
+                                        "message": "%:TEXT:%",
+                                        "target":  "%:PHONES:%"
+                                    }
+                                }
+                            }

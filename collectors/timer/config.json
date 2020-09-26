@@ -1,0 +1,14 @@
+{
+    "name": "Timer",
+    "description": "The collector for the generation of events based on time intervals",
+    "active": "on",
+    "separate": "",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "wakeupInterval": {
+            "description": "Events will be generated at this time interval",
+            "checkAs": "Integer",
+            "default": 30
+        }
+    }
+}

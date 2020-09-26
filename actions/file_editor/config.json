@@ -1,0 +1,28 @@
+{
+    "name": "File editor",
+    "description": "Edit configuration files",
+    "homePage": "index",
+    "ajaxServer": "../log_viewer/ajax.js",
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "launcherPrms": { "javaScript": "server.js" },
+    "staticDir": "static",
+    "callbackBeforeExec": "callbackBeforeExec",
+    "onChangeObjectMenuEvent": "fullreload",
+    "timeout": 60,
+    "outputFormat": "text",
+    "icon": "description",
+    "showOnlyForObjectsWithProperties": "SERVICE_PATH",
+    "options": {
+        "IDForm": "EditorForm",
+        "IDResult": "editorResult",
+        "IDChanges": "editorChanges",
+        "saveResult": true,
+        "replaceElm": true,
+        "reloadOnNewFile": true,
+        "filterFiles": "(\\.ini$)|(\\.xml$)|(\\.dsc$)|(\\.cmd$)|(\\.bat$)|(\\.cfg$)|(\\.data$)|(\\.tmpl$)|(\\.json$)",
+        "order": "conf.json,config,main",
+        "skipDirs": "old_version,sav,certs,!scripts",
+        "filePath": "CONFIG_FILES_PATH"
+    }
+}

@@ -1,0 +1,91 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-6-20 13:59:07
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title EMail: отправка сообщений по протоколу SMTP
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 EMail
+                    h5.light.
+                        Отправка email сообщений по протоколу SMTP
+
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+
+                    h2 Описание
+                    p.
+                        Компонента предназначена для формирования email сообщения и отправки его по протоколу SMTP.
+                        Поддерживается формирование HTML сообщения, вложения, авторизация, шифрование прокси и многое
+                        другое.
+
+                    h4 Описание параметров файла конфигурации config.json
+                    ul.browser-default
+                        li description: Описание средства связи, например "Sending email via SMTP"
+                        li address: Описание адреса средства связи, например "E-mail address" или ""Phone number"
+                        li.
+                            re: регулярное выражение с помощью которого можно проверить корректность адреса для
+                            средства связи
+                        li.
+                            &lt;configID&gt;: идентификатор конфигурации средства связи. Для одного средства связи можно
+                            сделать несколько конфигураций и в дальнейшем выбирать требуемую конфигурацию при отправке
+                            сообщения. Например, в разных конфигурациях одного и того же средства связи могут быть
+                            различные провайдеры для отправки СМС.
+                        ul.browser-default
+                            li.
+                                transport: объект с параметрами для средства связи. Если значение transport не объект,
+                                а строка, то она будет интерпретирована как ссылка на идентификатор конфигурации, из
+                                которого необходимо взять параметры средства связи.
+                            li.
+                                message: объект, который служит в качестве шаблона сообщения для средства связи.
+                                Параметр message может отсутствовать.
+
+                    p.
+                        Компонента работает на основе модуля nodeMailer, обеспечивающего формирование и отправку
+                        сообщения. Подробное описание параметров для объектов transport и message для nodeMailer можно
+                        посмотреть на сайте модуля #[a(href="https://nodemailer.com/" target="__blank") https://nodemailer.com].
+                        Все параметры из конфигурации компоненты будут в неизменном виде переданы модулю nodeMailer.
+                    h2 Пример настройки
+                    div.card-panel
+                        pre.
+                            {
+                                "description": "Sending emails via SMTP",
+                                "address": "E-mail address",
+                                "re": "^(([^<>()\\[\\].,;:\\s@\"]+(\\.[^<>()\\[\\].,;:\\s@\"]+)*)|(\".+\"))@(([^<>()\\[\\].,;:\\s@\"]+\\.)+[^<>()\\[\\].,;:\\s@\"]{2,})$",
+                                "default": {
+                                    "transport": {
+                                        "host": "xxx",
+                                        "port": 465,
+                                        "secure": true,
+                                        "ignoreTLS": false,
+                                        "requireTLS": false,
+                                        "authMethod": "PLAIN",
+                                        "auth": {
+                                            "type": "login",
+                                            "user": "xxx",
+                                            "pass": "xxx"
+                                        },
+                                        "tls": {
+                                            "rejectUnauthorized": false
+                                        },
+                                        "name": "alepiz.com",
+                                        "connectionTimeout": 120000,
+                                        "greetingTimeout": 30000,
+                                        "socketTimeout": 600000,
+                                        "logger": false
+                                    },
+                                    "message": {
+                                        "replyTo": "support@alepiz.com"
+                                    }
+                                }
+                            }

@@ -1,0 +1,121 @@
+//
+    Copyright © 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        link(rel='stylesheet', href='/stylesheets/actions.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            div.col.s12
+                script(src='/javascripts/objectsSelector.js')
+                script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+                div.row
+                    div.col.l6.m6.s12
+                        select(title="Source objects"
+                            description="Selected objects will be used as source (or templates) for clone counters links, properties and interaction")#sourceObjectsIDs
+                    div.col.l6.m6.s12
+                        select(title="Destination objects"
+                            description="Select objects or add a new objects for clone. If you add a new objects, this objects will be created"
+                            add-custom-object="a new objects")#cloneToObjectsIDs
+                    div.col.s12
+                        div.card
+                            div.card-content
+                                div.row.card-title Clone parameters
+                                div.row
+                                    div.input-field.col.s12.m12.l6
+                                        input(type='text' length="256" data-tooltip="Feeling this field will set equal description for all selected objects. Leave this field empty if you don't want to change current description")#objectsDescription.validate.tooltipped
+                                        label(for='objectsDescription') Description for objects
+                                    div.input-field.col.s12.m6.l4
+                                        select#objectsOrder
+                                            option(value="10") On top of the list
+                                            option(value="30") Between middle and top
+                                            option(value="50") At the middle of the list
+                                            option(value="70") Between middle and end
+                                            option(value="100") At the end of the list
+                                            option(value="1") On top and at up level
+                                            option(value="5") At the middle and at up level
+                                            option(value="9") At the end and at up level
+                                            option(value="0" selected) Current objects order will be unchanged
+                                        label Order in a objects menu for all selected objects
+                                    div.col.s12.m6.l2
+                                        label
+                                            input(type='checkbox' value="1")#disabledCB
+                                            span(data-tooltip="Prevent to collect data by object counters").tooltipped Disable objects
+                                        input(type="hidden")#disabled
+                                div.row
+                                    div.col.s12.m4.l4
+                                        div.row
+                                            div.col.s12
+                                                label
+                                                    input(type="checkbox" checked)#isCloneCounters
+                                                    span: b Link templates counters to objects
+                                        div.row
+                                            div.col.s12
+                                                label
+                                                    input(type="checkbox" checked)#cloneAllCounters
+                                                    span: b Link all counters, linking with templates
+                                            div.col.s12#counters
+                                    div.col.s12.m4.l4
+                                        div.row
+                                            div.col.s12
+                                                label
+                                                    input(type="checkbox" checked)#isCloneInteractions
+                                                    span: b Clone templates interactions
+                                        div.row
+                                            div.col.s12
+                                                label
+                                                    input(type="checkbox" checked)#cloneAllInteractions
+                                                    span: b Clone all templates interactions
+                                            div.col.s12#interactingObjects
+                                    div.col.s12.m4.l4
+                                        div.row
+                                            div.col.s12
+                                                label
+                                                    input(type="checkbox" checked)#isCloneProperties
+                                                    span: b Clone templates properties
+                                        div.row
+                                            div.col.s12
+                                                label
+                                                    input(type="checkbox" checked)#cloneAllProperties
+                                                    span: b Clone all templates properties (identical properties will be overwritten in the order of the list of object templates)
+                                            div.col.s12#properties
+                        select(title="New groups for destination objects"
+                            description="Select groups for destination objects or leave empty. It add 'include' objects interaction i.e. groups will be include a destination objects")#upLevelObjectsIDs
+
+    footer
+        input(type="hidden" name="actionName" value= action.name)

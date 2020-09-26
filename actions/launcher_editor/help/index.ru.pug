@@ -1,0 +1,187 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-4-28 11:29:12
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Launcher editor: разработка нового лаунчера. Документация по разработке
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Launcher editor
+                    h5.light.
+                        Позволяет создать или отредактировать существующий лаунчер
+
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h2 Описание Launcher editor
+                    p.
+                        Launcher editor служит для создания нового или редактирования существующего лаунчера. Для удобства
+                        в Launcher Editor встроен редактор JavaScript и редактор шаблонов PUG. Launcher editor имеет все
+                        необходимые средства для разработки лаунчеров и не требует установки дополнительных сред
+                        разработки.
+                        Лаунчер служит для запуска действий различными способами. Это может быть подключаемый через
+                        require стандартный JavaScript код nodejs, либо исполняемый скрипт perl, который запускается
+                        с использованием установленного интерпретатора perl, либо запуск команд на удаленном
+                        Microsoft Windows Server с использованием технологии WMI. Для каждого действия должен быть
+                        настроен лаунчер, с помощью которого действие будет запускаться.
+
+                    h5.
+                        Возвращаемое значение: Launcher ID (имя папки, в которой расположено редактируемый лаунчер)
+
+                    h2 Описание интерфейса
+                    h3 Launcher
+                    img(src="./images/help.launcherSetup.png").materialboxed.card-panel.hoverable
+
+                    h4 Select launcher
+                    p Позволяет выбрать существующий лаунчер из списка, либо создать новый.
+
+                    h4 New launcher
+                    p.
+                        Если вы создаете новый лаунчер, то его название необходимо ввести в это поле.
+                        Название лаунчера так же является это папкой, в которой хранятся файлы для лаунчера.
+                        Если вы выбрали существующий лаунчер, его название появится в этом поле.
+                        Если изменить название лаунчера, папка с лаунчером будет переименована.
+
+                    h4 Delete launcher
+                    p При выборе этого checkbox выбранный лаунчер будет удален.
+
+                    h3 Формирования файла помощи во вкладке HELP
+                        img(src="./images/help.helpSetup.png").materialboxed.card-panel.hoverable
+
+                    h4 Help page language
+                    p.
+                        Можно выбрать страницу помощи для требуемого языка. При выборе нового языка,
+                        все текущие изменения, сделанные на странице помощи, не сохраняются.
+                        Если страницы помощи не существовало, в этом поле будет установлен
+                        язык, используемый в браузере по умолчанию. Если существует страница помощи с языком,
+                        используемым в браузере по умолчанию, она будет отображена в первую очередь.
+                        Иначе отображается страница помощи на английском языке.
+                        Если страницы помощи на языке, установленном в браузере и страницы помощи на английском языке
+                        не существует, будет отображена первая попавшаяся страница помощи.
+
+                    h4 Add new language
+                    p.
+                        Если в это поле добавить новый язык и нажать на кнопку "+", он будет добавлен в список языков.
+                        Help page language. Затем можно создать страницу помощи на добавленном языке.
+
+                    h2 Разработка нового лаунчера
+                    div.row
+                        div.col.s12.m6.l7
+                            p.
+                                Лаунчер состоит из нескольких стандартных компонент:
+                            ul.browser-default
+                                li launcher.js - исполняемый код лаунчера
+                                li help\index.ru.pug - статическая страница помощи с описанием использования лаунчера
+                            p.
+                                В Launcher editor созданы готовые шаблоны, используя которые
+                                можно быстро разработать собственный лаунчер.
+                        div.col.s12.m6.l5
+                            img(src="./images/help.files.png").materialboxed.card-panel.hoverable
+
+                    h4 Подключение дополнительных модулей nodejs
+                    p.
+                        Если требуется подключить внешний модуль nodejs, необходимо установить его в каталог
+                        node_modules, который должен находится в корневом каталоге разрабатываемой компоненты.
+                        Для этого можно воспользоваться утилитой npm и в корневом каталоге компоненты выполнить
+                        следующие шаги:
+                    ul.browser-default
+                        li создать файл package.json вручную либо запустить npm init и ответить на вопросы.
+                        li.
+                            выполнить nmp i <имя модуля>. Появится каталог node_modules в который будет установлен
+                            требуемый модуль
+                    h4 launcher.js - файл с исходным кодом лаунчера
+                    p.
+                        Файл с исходным кодом лаунчера является стандартным модулем nodejs и должен экспортировать функцию
+                        типа function (param, args, callback) {...}, где аргументы функции означают:
+                    ul.browser-default
+                        li.
+                            param - параметры, которые передаются из пользовательского интерфейса действия
+                            в виде объекта {&lt;param1&gt;: &lt;value1&gt;, &lt;param2&gt;: &lt;value2&gt;, ....}
+                        li.
+                            args - Аргументы, которые передаются из настроек действия, объекта launcherPrms, в виде
+                            launcherPrms: {&lt;arg1&gt;: &lt;value1&gt;, &lt;arg2&gt;: &lt;value2&gt;, ....}
+                        li.
+                            callback - функция callback(err, result), где err - объект с ошибкой или null; result -
+                            результат, возвращаемый действием для использования в задачах.
+
+                    p.
+                        Пример исходного кода лаунчера, запускающего модули nodejs и принимающего в качестве аргументов
+                        параметр javaScript: &lt;Имя файла JavaScript&gt;
+                    div.card-panel
+                        pre.
+                            /*
+                             * Copyright (C) 2018. Alexandr Belov. Contacts: &lt;asbel@alepiz.com&gt;
+                            */
+
+                            var log = require('../../lib/log')(module);
+                            var conf = require('../../lib/conf');
+                            var path = require("path");
+
+                            var servers = {};
+
+                            module.exports = function(prms, args, callback){
+                                if(!prms || !prms.javaScript) {
+                                    return callback(new Error('Java script file is not specified for launcher "nodeModule"'));
+                                }
+
+                                var javaScript = path.join(__dirname, '..', '..', conf.get('actions:dir'), prms.actionID, prms.javaScript);
+
+                                if(!servers[javaScript] || prms.updateAction) {
+                                    try {
+                                        // delete old javaScript from require cache for reread
+                                        if(prms.updateAction && require.resolve(javaScript) &&
+                                            require.cache[require.resolve(javaScript)]) {
+                                                delete require.cache[require.resolve(javaScript)];
+                                        }
+
+                                        log.info('Attaching nodejs file ', javaScript,
+                                            (prms.updateAction ? '. Required action update. Cached data was deleted.' : ''));
+                                        servers[javaScript] = require(javaScript);
+                                    } catch (err) {
+                                        return callback(new Error('Can\'t attach source js file: ' + javaScript +
+                                            ' for launcher "nodeModule": ' + err.message));
+                                    }
+                                }
+
+                                try {
+                                    servers[javaScript](args, callback);
+                                } catch (err) {
+                                    callback(new Error('Error occurred while executing js file ' + javaScript +
+                                        ' for launcher "nodeModule": ' + err.message));
+                                }
+                            };
+
+                    h4 help\index.ru.pug - страница помощи с описанием лаунчера
+                    p.
+                        Для формирования страниц помощи используется
+                        #[a(href="https://pugjs.org/" target="_blank") шаблонизатор PUG ], который, используя
+                        препроцессор, формирует HTML страницу.
+                        Никаких специальных требований к странице помощи нет.
+                        Для того, чтобы все компоненты интерфейса ALEPIZ были созданы в одном стиле, желательно
+                        использовать готовый шаблон, предоставляемый Launcher editor и
+                        элементы фреймворка #[a(href="https://materializecss.com/" target="_blank") materializecss].
+                    p.
+                        Скрипт help.js, включенный в шаблон страницы помощи, автоматически сформирует оглавление документа из
+                        заголовков,
+                        добавит нижний колонтитул с информацией о copyright и плавающий элемент слева для перехода к
+                        верхней части страницы:
+                    ul.browser-default
+                        li Оглавление добавляется в первый элемент на странице с классом offset-m1
+                        li Нижний колонтитул будет добавлен в элемент с тегом body
+                        li.
+                            copyright формируется из элемента meta("author"), например
+                            meta(name=&quot;author&quot; content=&quot;Alexander Belov &lt;asbel@alepiz.com&gt;&quot;)
+                            добавит соответствующий copyright и ссылку для составления почтового сообщения.
+                            Год формируется из document.lastModified || document.lastModifiedDate
+                        li плавающий элемент слева для перехода к верхней части страницы будет добавлен в элемент с тегом main

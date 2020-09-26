@@ -1,0 +1,754 @@
+//
+  Created by asbel on 23.04.2020.
+   Copyright (C) 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Dashboard: средство просмотра и управления событиями системы мониторинга
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Dashboard
+                    h5.light.
+                        С помощью Dashboard вы можете просматривать и обрабатывать события.
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+                    h5.
+                        Возвращаемое значение: нет
+
+                    h3 Предназначение Dashboard
+                    p.
+                        Dashboard служит для просмотра и обработки событий, генерируемых сборщиком Event generator.
+                        Интерфейс Dashboard состоит из:
+                    ol
+                        li Message editor: окно формирования сообщения и обработки событий
+                        li Historical events: события, которые произошли или происходят и не были обработаны администратором
+                        li Current events: текущие события, которые происходят сейчас
+                        li Disabled events: отключенные события
+                        li Comments: события, обработанные администратором
+                    p.
+                        С помощью Dashboard можно организовать полноценный рабочий процесс с мониторингом и обработкой
+                        всех происходящих событий. Ниже приведен пример регламента такого рабочего процесса.
+
+                    ul.collapsible
+                        li
+                            div.collapsible-header #[i.material-icons group] Организация рабочего процесса (нажмите для того, чтобы развернуть)
+                            div.collapsible-body
+                                h4 Организация рабочего процесса
+                                ol
+                                    li.
+                                        В течение рабочей смены назначается администратор отвечающий за мониторинг. Мониторинг
+                                        является непрерывным процессом, поэтому если по какой-то причине администратор временно
+                                        не может исполнять обязанности, он должен их явно передать другому администратору.
+                                    li.
+                                        В начале рабочей смены администратор обрабатывает текущие события, которые происходят сейчас.
+                                        Такие события расположены в Current events
+                                    li.
+                                        После обработки текущих событий администратор начинает обрабатывать события, которые произошли
+                                        в нерабочий период. Эти события расположены в Historical events
+                                    li Процесс обработки событий повторяется в течение рабочей смены.
+
+                                h4 Обработка событий
+                                p.
+                                    Обработка событий заключается в его анализе и принятии решения о том, что дальше
+                                    делать с событием. Обработка событий выполняется через Message editor. Под формой
+                                    ввода сообщения располагаются необходимые элементы для обработки событий.
+                                ol
+                                    li.
+                                        Если событие сгенерировано из-за ошибки настройки системы мониторинга,
+                                        администратор устраняет ошибку и помечает событие соответствующим образом с
+                                        помощью соответствующего шаблона.
+                                        При необходимости, администратор принудительно помечает событие как решенное
+                                        с помощью Solve problems.
+                                    li.
+                                        Если событие сгенерировано из-за временного изменения регламента и в течение
+                                        какого-то периода реагировать на событие не нужно, администратор отключает
+                                        генерацию событий на этот период времени, либо устанавливает временной интервал
+                                        внутри суток в течение которого событие не будет генерироваться. Это можно
+                                        сделать с помощью Disable selected events until...
+                                        Если необходимо включить отключенное событие, используется
+                                        Enable disabled events.
+                                        Если необходимо удалить  временной интервал отключения события,
+                                        используется Delete time interval for disabled event
+                                    li.
+                                        Если известен способ решения проблемы, администратор вносит алгоритм решения
+                                        проблемы как подсказку для события, привязывая подсказку или ко всем объектам,
+                                        связанным с данным событием с помощью Use message as hint for selected events,
+                                        или к конкретному событию и объекту с помощью
+                                        Use message as hint for selected events and objects.
+                                    li.
+                                        В остальных случаях по администратор выбирает один из заранее настроенных
+                                        шаблонов, при необходимости дополняет автоматическое описание события своим
+                                        комментарием и отправляет событие для дальнейшей обработки в службу поддержки или
+                                        просто сохраняет обработанное событие в базу данных.
+
+
+                    ul.collapsible
+                        li
+                            div.collapsible-header #[i.material-icons settings] Настройки Dashboard (нажмите для того, чтобы развернуть)
+                            div.collapsible-body
+                                h4 Описание файла настроек config.json
+                                p.
+                                    Настройки Dashboard хранятся в файле config.json, в его корневой папке. Изменить
+                                    настройки можно с помощью действия
+                                    #[a(href="/actions/action_editor/help/") Action editor]
+                                img(src="./images/help.files.png").materialboxed.card-panel.hoverable
+                                h5 Параметры файла настроек:
+                                p Ниже описаны только параметры, относящиеся непосредственно к настройкам действия Dashboard
+                                ol
+                                    li updateInterval - интервал обновления Dashboard в секундах. По умолчанию 15 секунд
+                                    li.
+                                        monthNames - Массив с названиями месяцев.  ["January", "February", "March",
+                                        "April", "May", "June", "July", "August", "September", "October", "November",
+                                        "December"]
+                                    li.
+                                        actions - действия, которые можно вызвать для объекта, с которым произошло событие.
+                                        Ссылки на действия отображаются в столбце Info для таблиц Historical events,
+                                        Current events и Disabled events.
+                                        Для действия data_browser передаются параметры связанные со
+                                        временем события для отображения графика.
+                                        Элементами массива actions являются объекты:
+                                    ol
+                                        li ID - название каталога с действием в каталоге \actions\
+                                        li name - название действия, которое будет отображаться в столбце Info
+                                    ul.collapsible
+                                        li
+                                            div.collapsible-header #[i.material-icons settings] Пример actions (нажмите для того, чтобы развернуть)
+                                            div.collapsible-body
+                                                pre.
+                                                    "actions": [{
+                                                            "ID": "data_browser",
+                                                            "name": "graph"
+                                                        }, {
+                                                            "ID": "log_viewer",
+                                                            "name": "log"
+                                                            }, {
+                                                            "ID": "objects_properties",
+                                                            "name": "props"
+                                                        }, {
+                                                            "ID": "counter_settings",
+                                                            "name": "counter"
+                                                        }]
+                                    li importance - Объект, описывающий важность события. Чем меньше число, тем событие важнее.
+                                    ul.collapsible
+                                        li
+                                            div.collapsible-header #[i.material-icons settings] Пример объекта importance (нажмите для того, чтобы развернуть)
+                                            div.collapsible-body
+                                                pre.
+                                                    "importance": {
+                                                        "0": {
+                                                            "text": "Disaster",
+                                                            "color": "#E45959"
+                                                        },
+                                                        "1": {
+                                                            "text": "High",
+                                                            "color": "#E97659"
+                                                        },
+                                                        "2": {
+                                                            "text": "Average",
+                                                            "color": "#FFA059"
+                                                        },
+                                                        "3": {
+                                                            "text": "Warning",
+                                                            "color": "FFC859"
+                                                        },
+                                                        "4": {
+                                                            "text": "Information",
+                                                            "color": "#7499FF"
+                                                        },
+                                                        "5": {
+                                                            "text": "Harmless",
+                                                            "color": "#97AAB3"
+                                                        }
+                                                    }
+                                    li  rcptOptions - настройки поля ввода получателей
+                                        ol
+                                            li placeholder - подпись на пустом поле ввода, например "Add recipients"
+                                            li secondaryPlaceholder - подпись, когда в поле ввода уже есть получатели, например "Add next recipient"
+                                            li autocompleteOptions - параметры автоподстановки получателей:
+                                                ol
+                                                    li limit - максимальный размер списка автоподстановки
+                                                    li minLength - минимальная длина вводимой строки, после которой включится автоподстановка
+                                                    li data - объект со списком для автоподстановки:
+                                                    pre.
+                                                        "data": {
+                                                            "asbel@alepiz.com": null,
+                                                            "bill.gates@microsoft.com": null,
+                                                            "steve.jobs@apple.com": null
+                                                        }
+                                    li replyTo - Адрес отправителя, например "replyTo": "\"Bill Gates\" &lt;bill.gates@microsoft.com&gt;"
+                                    li messageTemplates - массив объектов с настройками шаблонов сообщений
+                                        ol
+                                            li name - Название шаблона, которое будет отображаться в Dashboard
+                                            li tip - Подсказка, которая будет появляться при наведении курсора на название шаблона
+                                            li.
+                                                importance - минимальная важность сообщения, при которой можно применять
+                                                этот шаблон. Если важность сообщения будет ниже (сообщение важнее),
+                                                при применении шаблона будет
+                                                выведено сообщение о том, что использовать этот шаблон невозможно.
+                                            li default [true|false] - является ли этот шаблон шаблоном, который появляется при запуске Dashboard
+                                            li subject - В начале темы сообщения будет подставляться то, что задано в этой настройке
+                                            li recipients - список получателей сообщения
+                                            ul.collapsible
+                                                li
+                                                    div.collapsible-header #[i.material-icons settings] Пример объекта messageTemplates (нажмите для того, чтобы развернуть)
+                                                    div.collapsible-body
+                                                        pre.
+                                                            "messageTemplates": [
+                                                                {
+                                                                    "name": "Information",
+                                                                    "tip": "Result of internal processes",
+                                                                    "importance": 2,
+                                                                    "default": true,
+                                                                    "subject": "[INFO]"
+                                                                }, {
+                                                                    "name": "Task",
+                                                                    "tip": "Task execution result",
+                                                                    "subject": "[TASK]",
+                                                                    "importance": 2
+                                                                }, {
+                                                                    "name": "Mistaken",
+                                                                    "tip": "Mistake in event",
+                                                                    "subject": "[MISTAKE]",
+                                                                    "importance": 2
+                                                                }, {
+                                                                    "name": "Support",
+                                                                    "tip": "Send support",
+                                                                    "recipients": ["\"ALEPIZ Support\" &lt;support@alepiz.com&gt;", "\"Microsoft support\" &lt;support@microsoft.com&gt;"],
+                                                                    "subject": "[Problem]"
+                                                                }
+                                                            ]
+                                    li actionsMessageTemplates - Шаблоны для действий.
+                                        ul
+                                            li.
+                                                Возможные действия: addAsHint, addAsHintForObject, addAsComment,
+                                                solveProblem, disableEvents, enableEvents
+                                            li subject - Текст, который будет вставлен в конец темы сообщения
+                                            li bodyHeader - Текст, который будет вставлен перед телом сообщения
+                                            li eventTemplate - Шаблон для строки текста про каждое событие в теле сообщения
+                                            li intervalsDivider - разделитель при повторяющихся событиях
+                                            li objectsListLength - максимальное количество объектов в списке
+                                            li countersListLength - максимальное количество счетчиков в списке
+                                            li tables - к каким таблицам Dashboard можно применять этот шаблон
+                                        ul.collapsible
+                                            li
+                                                div.collapsible-header #[i.material-icons settings] Пример объекта actionsMessageTemplates (нажмите для того, чтобы развернуть)
+                                                div.collapsible-body
+                                                    pre.
+                                                        "actionsMessageTemplates": {
+                                                            "addAsHint": {
+                                                                "subject": "Hint for %:COUNTERS_LIST:%",
+                                                                "bodyHeader": "\n\n",
+                                                                "eventTemplate": "%:COUNTER_NAME:% (%:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%)\n",
+                                                                "intervalsDivider": ",\n\t\t\tand "
+                                                            },
+                                                            "addAsHintForObject": {
+                                                                "subject": "Hint for %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+                                                                "bodyHeader": "\n\n",
+                                                                "eventTemplate": "%:OBJECT_NAME:%: %:COUNTER_NAME:%: (%:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%)\n",
+                                                                "intervalsDivider": ",\n\t\t\tand "
+                                                            },
+                                                            "addAsComment": {
+                                                                "subject": "%:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+                                                                "objectsListLength": 100,
+                                                                "countersListLength": 300,
+                                                                "bodyHeader": "\n\nEvents list:\n",
+                                                                "eventTemplate": "%:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
+                                                                "intervalsDivider": ",\n\t\t\tand "
+                                                            },
+                                                            "solveProblem": {
+                                                                "subject": "Events was marked as solved: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+                                                                "objectsListLength": 100,
+                                                                "countersListLength": 300,
+                                                                "tables": ["currentEvents"],
+                                                                "bodyHeader": "\n\nFollowing events was marked as solved:\n",
+                                                                "eventTemplate": "%:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
+                                                                "intervalsDivider": ",\n\t\t\tand "
+                                                            },
+                                                            "disableEvents": {
+                                                                "subject": "Disable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+                                                                "objectsListLength": 100,
+                                                                "countersListLength": 300,
+                                                                "bodyHeader": "\n\nFollowing events was disabled until %:DISABLE_UNTIL:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.\n",
+                                                                "eventTemplate": "%:ACTION:%: %:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
+                                                                "intervalsDivider": ",\n\t\t\tand "
+                                                            },
+                                                            "enableEvents": {
+                                                                "subject": "Enable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+                                                                "objectsListLength": 100,
+                                                                "countersListLength": 300,
+                                                                "tables": ["disabledEvents"],
+                                                                "bodyHeader": "\n\nFollowing events was enabled:\n",
+                                                                "eventTemplate": "%:ACTION:%: %:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
+                                                                "intervalsDivider": ",\n\t\t\tand "
+                                                            }
+                                                        }
+                                    li.
+                                        pronunciation - произношение события.
+                                        В тексте, который будет произносится голосом, ищется регулярное выражение и заменяется
+                                        на его значение.
+                                    ul.collapsible
+                                        li
+                                            div.collapsible-header #[i.material-icons settings] Пример объекта pronunciation (нажмите для того, чтобы развернуть)
+                                            div.collapsible-body
+                                                pre.
+                                                    "pronunciation": {
+                                                        "(\\d+).\\d+": "$1",
+                                                        "(\\d)Kb": "$1Килобайт",
+                                                        "(\\d)Mb": "$1Мегабайт",
+                                                        "(\\d)Gb": "$1Гигабайт"
+                                                    }
+                    ul.collapsible
+                        li
+                            div.collapsible-header #[i.material-icons code] Пример файла настроек (нажмите для того, чтобы развернуть)
+                            div.collapsible-body
+                                pre.
+                                    {
+                                        "name": "Dashboard",
+                                        "description": "Events status monitoring",
+                                        "homePage": "index",
+                                        "ajaxServer": "ajax.js",
+                                        "staticDir": "static",
+                                        "execMethod": "post",
+                                        "launcher": "nodeModule",
+                                        "launcherPrms": { "javaScript": "server.js" },
+                                        "showWhenNoObjectsSelected": true,
+                                        "onChangeObjectMenuEvent": "callback:onChangeObjects",
+                                        "callbackBeforeExec": "callbackBeforeExec",
+                                        "callbackAfterExec": "callbackAfterExec",
+                                        "timeout": 60,
+                                        "outputFormat": "text",
+                                        "icon": "event",
+                                        "updateInterval": 15,
+                                        "monthNames": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+                                        "actions": [{
+                                            "ID": "data_browser",
+                                            "name": "graph"
+                                        }, {
+                                            "ID": "log_viewer",
+                                            "name": "log"
+                                            }, {
+                                            "ID": "objects_properties",
+                                            "name": "props"
+                                        }, {
+                                            "ID": "counter_settings",
+                                            "name": "counter"
+                                        }],
+                                        "importance": {
+                                            "0": {
+                                                "text": "Disaster",
+                                                "color": "#E45959"
+                                            },
+                                            "1": {
+                                                "text": "High",
+                                                "color": "#E97659"
+                                            },
+                                            "2": {
+                                                "text": "Average",
+                                                "color": "#FFA059"
+                                            },
+                                            "3": {
+                                                "text": "Warning",
+                                                "color": "FFC859"
+                                            },
+                                            "4": {
+                                                "text": "Information",
+                                                "color": "#7499FF"
+                                            },
+                                            "5": {
+                                                "text": "Harmless",
+                                                "color": "#97AAB3"
+                                            }
+                                        },
+                                        "rcptOptions": {
+                                            "placeholder": "Add recipients",
+                                            "secondaryPlaceholder": "Add recipient",
+                                            "autocompleteOptions": {
+                                                "data": {
+                                                    "asbel@alepiz.com": null,
+                                                    "bill.gates@microsoft.com": null,
+                                                    "steve.jobs@apple.com": null
+                                                },
+                                                "limit": 100,
+                                                "minLength": 1
+                                            }
+                                        },
+                                        "replyTo": "\"Bill Gates\" &lt;bill.gates@microsoft.com&gt;",
+                                        "messageTemplates": [
+                                            {
+                                                "name": "Information",
+                                                "tip": "Result of internal processes",
+                                                "importance": 2,
+                                                "default": true,
+                                                "subject": "[INFO]"
+                                            }, {
+                                                "name": "Task",
+                                                "tip": "Task execution result",
+                                                "subject": "[TASK]",
+                                                "importance": 0
+                                            }, {
+                                                "name": "Mistaken",
+                                                "tip": "Mistake in event",
+                                                "subject": "[MISTAKE]",
+                                                "importance": 0
+                                            }, {
+                                                "name": "Support",
+                                                "tip": "Send to support",
+                                                "recipients": ["\"ALEPIZ support\" &lt;support@alepiz.com&gt;", "\"Microsoft support\" &lt;support@microsoft.com&gt;"],
+                                                "subject": "[Problem]"
+                                            }
+                                        ],
+                                        "actionsMessageTemplates": {
+                                            "addAsHint": {
+                                                "subject": "Hint for %:COUNTERS_LIST:%",
+                                                "bodyHeader": "\n\n",
+                                                "eventTemplate": "%:COUNTER_NAME:% (%:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%)\n",
+                                                "intervalsDivider": ",\n\t\t\tand "
+                                            },
+                                            "addAsHintForObject": {
+                                                "subject": "Hint for %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+                                                "bodyHeader": "\n\n",
+                                                "eventTemplate": "%:OBJECT_NAME:%: %:COUNTER_NAME:%: (%:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%)\n",
+                                                "intervalsDivider": ",\n\t\t\tand "
+                                            },
+                                            "addAsComment": {
+                                                "subject": "%:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+                                                "objectsListLength": 100,
+                                                "countersListLength": 300,
+                                                "bodyHeader": "\n\nEvents list:\n",
+                                                "eventTemplate": "%:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
+                                                "intervalsDivider": ",\n\t\t\tand "
+                                            },
+                                            "solveProblem": {
+                                                "subject": "Events was marked as solved: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+                                                "objectsListLength": 100,
+                                                "countersListLength": 300,
+                                                "tables": ["currentEvents"],
+                                                "bodyHeader": "\n\nFollowing events was marked as solved:\n",
+                                                "eventTemplate": "%:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
+                                                "intervalsDivider": ",\n\t\t\tand "
+                                            },
+                                            "disableEvents": {
+                                                "subject": "Disable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+                                                "objectsListLength": 100,
+                                                "countersListLength": 300,
+                                                "bodyHeader": "\n\nFollowing events was disabled until %:DISABLE_UNTIL:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.\n",
+                                                "eventTemplate": "%:ACTION:%: %:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
+                                                "intervalsDivider": ",\n\t\t\tand "
+                                            },
+                                            "enableEvents": {
+                                                "subject": "Enable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+                                                "objectsListLength": 100,
+                                                "countersListLength": 300,
+                                                "tables": ["disabledEvents"],
+                                                "bodyHeader": "\n\nFollowing events was enabled:\n",
+                                                "eventTemplate": "%:ACTION:%: %:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
+                                                "intervalsDivider": ",\n\t\t\tand "
+                                            }
+                                        },
+                                        "pronunciation": {
+                                            "(\\d+).\\d+": "$1",
+                                            "(\\d)Kb": "$1Килобайт",
+                                            "(\\d)Mb": "$1Мегабайт",
+                                            "(\\d)Gb": "$1Гигабайт"
+                                        }
+                                    }
+                    h3 Управление выбором событий
+                    p.
+                        В Current events, Historical events и Disabled events можно выбирать события для
+                        дальнейшей обработки.
+                    p.
+                        Если щелкнуть мышкой на событие, оно будет выбрано или, если оно было выбрано до этого, то
+                        выбор будет отменен.
+                    p.
+                        Для выбора нескольких событий необходимо щелкнуть на каждом из них
+                    p.
+                        Для выбора всех событий необходимо нажать на кнопку #[img(src="./images/help.selectAll.png")]
+                        в правом верхнем углу. Если часть событий или все события были выбраны, кнопка
+                        #[img(src="./images/help.selectAll.png")] снимет выделение со всех событий в элементе.
+                    p.
+                        Если требуется выбрать все события, которые относятся к определенному счетчику, необходимо
+                        щелкнуть на событии, удерживая клавишу Ctrl. Повторное нажатие на выделенном событии с
+                        удержанием клавиши Ctrl отменит выделение для всех событий этого счетчика
+                    p.
+                        Если требуется выбрать несколько событий, идущих в списке подряд, необходимо выбрать
+                        первое событие, а
+                        затем выбрать последнее, удерживая клавишу Shift.
+                        Если не выбрано ни одно событие и выбирается
+                        событие с удержанием клавиши Shift, будут выбраны все события, начиная с верхнего или нижнего
+                        события в списке, в зависимости от того, к какому краю списка ближе находится выбираемое событие.
+
+                    h3 Быстрое выполнение действий с событиями
+                    p.
+                        Ctrl+Enter в ALEPIZ запускает действие на выполнение. Если в Dashboard выбрать события и нажать
+                        на Ctrl+Enter, или просто выполнить действие через системную кнопку запуска
+                        (красного цвета), Dashboard автоматически выполнит команду Compose message для последнего
+                        выбранного действия в Message editor и предложит ввести комментарий.
+                    img(src="./images/help.quickSend.png").materialboxed.card-panel.hoverable
+                    p.
+                        Если ввести комментарий и нажать на Enter или кнопку SEND MESSAGE, выбранное действие с событиями
+                        будет выполнено. Если нажать на Esc или кнопку OPEN MESSAGE EDITOR, откроется Message Editor
+                        в котором можно будет скорректировать отправляемую информацию и выбранное действие.
+                    p.
+                        После выполнения любого действия над событиями, следующим действием всегда будет выбрано
+                        Add comment to selected events.
+
+                    h3 Элементы столбца Info
+                    p.
+                        В столбце Info всех Historical events, Current events, Disabled events у каждого события
+                        присутствует элементы, описанные в настройках Dashboard - actions. Это ссылки на действия,
+                        которые можно выполнить с объектом для которого произошло событие. При нажатии на ссылку
+                        открывается дополнительная вкладка с выбранным действием и объектом. Для действия
+                        Data Browser  открывается дополнительная вкладка, в которой отображаются исторические данные по
+                        родительскому счетчику из Update events для события в интервале +- 15 минут вокруг интервала
+                        события.
+                    p.
+                        Ссылка history находится в столбце Info у всех событий в таблицах Historical events,
+                        Current events, Disabled events.
+                        При нажатии на нее откроется окно с исторической информацией о выбранном событии для объекта с
+                        которым оно произошло.
+                    p.
+                        Для Historical events, Current events, Disabled events в столбце Info может присутствовать
+                        элемент Hint. Он появляется если по счетчику или по объекту и счетчику администратором
+                        была введена какая-то информация. При нажатии на Hint эта информация будет отображена.
+                    p.
+                        Для Current events, Disabled events и Comments в столбце Info может присутствовать
+                        элемент Info. При нажатии на него появится окно с информацией о событии, которую внес
+                        администратор при его обработке.
+                    p.
+                        В Comments присутствует элемент events: #. При нажатии на элемент появится окно с таблицей, в
+                        которой перечислены события, выбранные в момент обработки администратором.
+
+                    h3 Фильтрация событий
+                    p.
+                        В заголовке формы Historical events находится поле ввода Events filter, которое служит для
+                        фильтрации отображаемых событий. Фильтрация осуществляется одновременно по элементам таблиц
+                        Historical events, Current events, Disabled events и Comments. По всем полям таблиц
+                        производится поиск строки, введенной в Events filter. В результате в таблицах будут отображаться
+                        только элементы, содержащие введенную строку, без учета регистра.
+                    p.
+                        Если в Events filter установлен какой-то фильтр и нажать на клавишу Esc, поле ввода будет очищено.
+                    p.
+                        Если в системном меню Objects выбраны объекты, Dashboard будет отображать только события, привязанные
+                        к выбранным объектам. В заголовке Dashboard будет выведено предупреждение о том, что отображаются
+                        события только для выбранных объектов. "Attention: events are showed only for selected objects"
+                    p.
+                        Используя одновременно фильтрацию событий по выбранным объектам и Events filter можно гибко
+                        управлять отображением необходимых событий
+
+                    h3 Управление отображением таблиц
+                    p.
+                        При нажатии на заголовок Message editor или каждой из таблиц, можно показать или скрыть их
+                        содержимое. Если
+                        содержимое таблицы скрыто, обновление данных таблицы не будет производится. Это уменьшает трафик,
+                        нагрузку на браузер и нагрузку на сервер.
+                    p.
+                        Переключатель #[img(src="./images/help.showHideMessageEditor.png")] в заголовке формы Historical events
+                        позволяет убрать или отобразить Message editor.
+                        Отсутствие Message editor экономит пространство для просмотра таблиц с событиями.
+                    p.
+                        Показывать или скрывать содержимое таблиц можно с помощью комбинации клавиш:
+                    ul.browser-default
+                        li Alt+1 отображает или скрывает элемент Message editor
+                        li Alt+2 показывает содержимое таблицы Historical events и скрывает остальные таблицы
+                        li Alt+3 показывает содержимое таблицы Current events и скрывает остальные таблицы
+                        li Alt+4 показывает содержимое таблицы Disabled events и скрывает остальные таблицы
+                        li Alt+5 показывает содержимое таблицы Comments и скрывает остальные таблицы
+
+                    h3 Запуск и остановка обновления таблиц.
+                    p.
+                        В заголовке формы Historical events находится переключатель для запуска
+                        #[img(src="./images/help.startUpdate.png")] или приостановки
+                        #[img(src="./images/help.pauseUpdate.png")] обновления содержимого таблиц событий. С помощью него
+                        можно остановить обновления для удобства обработки текущих событий. При остановке обновления
+                        содержимого, заголовки элементов таблиц окрашиваются в розовый цвет. Запуск обновления
+                        содержимого таблиц можно осуществлять клавишей Esc.
+                    p.
+                        В заголовке формы Historical events после Events filter находится элемент, показывающий статус
+                        обновления информации о событиях в таблицах.
+                    ul.browser-default
+                        li.
+                            Start update at &lt;date and time&gt; (&lt;prev update time&gt;) означает, что данные начали обновляться в
+                            &lt;date and time&gt; и находятся в процессе обновления.
+                            Предыдущее обновление длилось &lt;prev update time&gt; секунд
+                        li.
+                            Last update at &lt;date time&gt; (&lt;prev update time&gt;) означает, что последний раз данные
+                            обновлялись в &lt;date and time&gt;.
+                            Предыдущее обновление длилось &lt;prev update time&gt; секунд
+
+                    h3 Включение и выключение голосового сопровождения событий.
+                    p.
+                        В заголовке формы Historical events находится переключатель для включения
+                        #[img(src="./images/help.enableVoiceAlert.png")] или отключения
+                        #[img(src="./images/help.disableVoiceAlert.png")] голосового сопровождения событий.
+                    p.
+                        Голосовое сопровождение служит для дублирование новых событий голосом. Настройка фраз,
+                        произносимых при возникновении событий, производится в Counter settings при выборе
+                        сборщика Event generator.
+                    p.
+                        Голосовое сопровождение поддерживается, если операционная система и браузер поддерживают
+                        функцию Text To Speech. Например, Microsoft Windows 10 и Google Chrome последних версий
+                        поддерживают функцию голосового сопровождения. Если голосовое сопровождение не поддерживается,
+                        будет воспроизводиться звуковой сигнал.
+
+                    h3 Управление Comments
+                    p.
+                        Таблица Comments содержит комментарии к событиям, данные администратором.
+                        Она не обновляется автоматически. Для обновления данных в Comments необходимо нажать на
+                        кнопку #[img(src="./images/help.updateComments.png")] в заголовке элемента Comments.
+                    p.
+                        Для выбора интервала отображения данных в Comments служат элементы с датами. Первый элемент -
+                        начальная дата, второй элемент - конечная дата.
+
+                    h3 Message editor
+                    p.
+                        Message editor предназначен для обработки событий. После выделения обрабатываемых событий
+                        необходимо:
+                    ol
+                        li.
+                            Выбрать действие, которое необходимо выполнить и, при необходимости, заполнить требуемые
+                            параметры. Действия находятся под формой ввода сообщения.
+                        li.
+                            Выбрать шаблон для сообщения. Шаблоны находятся справа от поля ввода получателей (Add recipients)
+                        li.
+                            Нажать на кнопку составления сообщения "COMPOSE MESSAGE".
+                        li.
+                            При необходимости дополнить сообщение комментарием и выполнить действие стандартным
+                            образом (системной кнопкой красного цвета для выполнения действия).
+                    p.
+                        После этого информация о событии будет записана в базу данных, если в поле Add recipients
+                        были получатели, им будет отправлено письмо. С событием будет выполнено
+                        выбранное действие (добавится комментарий, событие будет отключено или включено, добавится
+                        информация по решению проблемы в виде помощи и так далее)
+                    img(src="./images/help.messageEditor.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h4 Add recipients
+                    p.
+                        Add recipients используется для указания получателей для e-mail. Оно заполняется
+                        автоматически в зависимости от выбранного шаблона. При необходимости в него можно добавить или
+                        удалить получателей. От наличия или отсутствия получателей зависит, будет ли дополнительно
+                        отправлено письмо с комментариями к выбранным событиям
+
+                    img(src="./images/help.addRecipients.png").materialboxed.card-panel.hoverable
+                    p Для того, чтобы добавить получателя необходимо в строке ввести e-mail и нажать Enter.
+                    p Для того, чтобы удалить получателя, необходимо нажать на "x" на элементе с получателем
+
+                    h4 Шаблоны сообщений
+                    p.
+                        Шаблоны сообщений находятся справа от поля Add recipients. Шаблоны служат для быстрого
+                        составления сообщения в зависимости от ситуации. Например, если сообщение было сгенерировано
+                        в результате некорректно настроенной системы мониторинга, можно выбрать шаблон Mistaken. Все
+                        шаблоны можно настроить в файле конфигурации для Dashboard.
+
+                    h4 Subject
+                    p.
+                        Тема сообщения генерируется автоматически на основе выбранного шаблона. При необходимости тему
+                        можно отредактировать.
+
+                    h4 Compose message
+                    p Кнопка COMPOSE MESSAGE служит для составления сообщения на основе выбранного шаблона и событий
+
+                    h4 Clear
+                    p Кнопка CLEAR служит для очистки поля Subject и формы составления сообщения
+
+                    h4 Форма составления сообщения
+                    p.
+                        Тело сообщения заполняется автоматически на основе выбранного шаблона. При этом перед
+                        автоматически составленным сообщением оставляются две строки для того, чтобы администратор мог
+                        добавить свой комментарий к событию. Сообщение составляется в формате HTML. При необходимости
+                        можно пользоваться панелью управления в форме составления сообщения
+                        для придания тексту требуемого форматирования.
+
+                    h3  Действия, производимые с сообщением
+
+                    h5 Add comment to selected events
+                    p Служит для добавления комментария к выбранным событиям.
+
+                    h5 Use message as a hint to selected events
+                    p.
+                        Сообщение будет добавлено в качестве подсказки для выбранных событий. Подсказка будет появляться
+                        рядом с событием, когда событие будет происходить.
+
+                    h5 Use message as a hint to selected events and objects
+                    p.
+                        Сообщение будет добавлено в качестве подсказки для выбранных событий и объектов, с которыми
+                        произошли выбранные события.
+                        Подсказка будет появляться рядом с событием, когда событие будет происходить и с теми объектами,
+                        с которыми произошли события в момент создания подсказки.
+
+                    h5 Solve problem
+                    p.
+                        В некоторых случаях, не смотря на то, что событие уже не актуально, система не может пометить
+                        его соответствующим образом. Чаще всего это случается в следствии некорректно настроенной
+                        системы мониторинга. В этом случае можно воспользоваться Solve problem. Событие принудительно
+                        будет помечено как решенное.
+
+                    h5 Disable selected events until...
+                    p.
+                        Можно временно отключить генерацию события. Например, ночью выполняется резервное копирование
+                        сервера и дисковая подсистема в это время загружена выше нормы. Самый простой способ не получать
+                        сообщения каждую ночь о высокой загрузке дисковой подсистемы - это на время резервного
+                        копирования отключить такое событие.
+
+                    h6 Date
+                    p.
+                        Дата до которой событие будет отключено. Это обязательный элемент для заполнения.
+                        Возможно, в будущем расписание события поменяется и для того, чтобы возобновилось
+                        информирование служит дата окончания события
+
+                    h6 Time
+                    p.
+                        Время до которого событие будет отключено (с учетом указанной даты). Это обязательный
+                        элемент для заполнения.
+
+                    h6 In time interval per day &lt;From&gt; &lt;To&gt;
+                    p.
+                        Если указан временной интервал, то событие будет отключено только на указанный временной
+                        интервал внутри суток.
+                    p.
+                        Если временной интервал для выбранного события уже был установлен, новый временной интервал будет
+                        добавлен к предыдущему. Если временные интервалы пересекаются, система объединит интервалы
+                        и добавит один, включающий все пересечения.
+                    h5 Enable disabled events
+                    p.
+                        Для включения отключенного события используется элемент Enable disabled events. Он появляется
+                        если выбрать одно или несколько событий в таблице Disabled events.
+                    img(src="./images/help.deleteTimeInterval.png").materialboxed.card-panel.hoverable
+
+                    h5 Delete time interval for disabled event
+                    p.
+                        Для удаления временного интервала отключенного события, необходимо выбрать
+                        событие в таблице Disabled events. После этого в списке действий появятся элементы,
+                        позволяющие удалить временные интервалы. Далее необходимо выбрать интервалы, которые требуется
+                        удалить в Time intervals for delete и выполнить действие.
+
+                    h4 Ограничения действий, производимых с сообщением
+                    p.
+                        Шаблоны сообщений позволяют настроить ограничения на их использование. Например,
+                        можно настроить минимально возможную важность для сообщения, к которому можно применить
+                        данный шаблон. В этом случае, если шаблон будет применен к сообщению, имеющему важность ниже
+                        указанной в настройках шаблона, администратор получит сообщение об ошибке. Например, можно
+                        ограничить все шаблоны, которые не отправляют сообщения по e-mail, важностью не менее чем
+                        2 (Average).
+                        В этом случае администратор не сможет выбрать шаблон, который не отправляет сообщения по почте,
+                        если произошло событие у которого важность выше (значение важности меньше 2). Таким образом, для всех важных
+                        событий администратор будет вынужден в том числе отправлять сообщения по e-mail.
+                    img(src="./images/help.importanceComposeLimitation.png").materialboxed.card-panel.hoverable
+
+                    h4 Изменение действия
+                    p.
+                        Если сообщение уже составлено, но администратор решил изменить действие, он получит
+                        предупреждение о том, что сообщение было составлено для другого действия. В этом случае
+                        желательно, чтобы администратор составил сообщение заново. Оно будет более информативно,
+                        так как будет составлено с учетом выбранного действия
+                    img(src="./images/help.changeActionWarning.png").materialboxed.card-panel.hoverable

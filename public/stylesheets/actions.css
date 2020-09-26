@@ -1,0 +1,28 @@
+/*
+ * Copyright © 2019. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ */
+
+/* used for object selector */
+.mark-first-letter {
+    display: block !important;
+}
+.mark-first-letter::first-letter {
+    color: red !important;
+}
+
+/* used for remove strong definition in materialize.css (font-weight: 500) for enable bold text in quill editor*/
+strong {
+    font-weight: bold !important;;
+}
+
+.margin-0 {
+    margin: 0 !important;
+}
+
+.padding-0 {
+    padding: 0  !important;
+}
+
+.bold {
+    font-weight: bold !important;
+}

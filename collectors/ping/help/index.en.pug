@@ -1,0 +1,62 @@
+//
+  Created by asbel on 26.04.2020.
+   Copyright (C) 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Ping: check host availability over the network
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Ping
+                    h5.light.
+                        Ping is used to check host availability over the network.
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 What is Ping for?
+                    p.
+                        With Ping, you can organize a host network access check using ICMP. It is also possible to
+                        measure parameters such as packet loss percentage and packet round trip time (RTT). IPv4 and
+                        IPv6 are supported.
+                    p.
+                        The collector uses its own implementation of the Ping protocol. In case of packet loss, it
+                        additionally runs an external ping program to check the received values.
+                    h3 Parameters
+                    ul.browser-default
+                        li Target host name, IPv4 or IPv6 address (host) - name or IP address of the remote host
+                        li.
+                            Ping interval is a time between echo requests packets in seconds (pingInterval) -
+                            interval between sent packets in seconds
+                        li.
+                            Size of echo request packet (IP header + ICMP) in bytes from 48 to 4096 (packetSize) -
+                            packet size in bytes
+                        li.
+                            Number of echo requests to send. 0 is infinite (packetsCnt) - number of packets sent.
+                            0 - infinitely
+                        li.
+                            The packet wait timeout in a second, after which packet loss will be detected.
+                            Mast be greater then ping interval (timeout) - the timeout in seconds for the packet to
+                    h3 Settings
+                    p.
+                        Collector settings are stored in a file config/conf.json in the section collectors.ping
+                    ul.browser-default
+                        li.
+                            localAddress - The IP address from which the connection to the collector server is made.
+                            If null or not specified, then the connection will be made from the IP address that the
+                            operating system will select
+                        li.
+                            serverAddress - IP address that the collector listens to and is connected to
+                        li.
+                            port - TCP port that the collector listens on
+                    h3 Return value
+                    p The packet round trip time in milliseconds (RTT), or 0 if the host did not respond.
+

@@ -1,0 +1,47 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-5-16 20:50:30
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title JavaScript: обработка данных, используя свой JavaScript
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Javascript
+                    h5.light.
+                        Сборщик используется для преобразования данных с помощью Javascript
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание Javascript
+                    p.
+                        Вы можете написать собственный JavaScript код, используя переменные счетчика для
+                        обработки и преобразования данных.
+                    p.
+                        Для использования переменных, необходимо включить их в код JavaScript в стандартной
+                        для переменных ALEPIZ форме %:&lt;Variable&gt;:%. Перед запуском сборщика препроцессор
+                        заменит их имена на значения. Если переменная возвращает строку, ее нужно поместить в кавычки.
+                    p.
+                        Возвращаемое функцией значение будет результатом, возвращаемым счетчиком.
+                    div.card-panel
+                        pre.
+                            myFunc();
+
+                            function myFunc() {
+                                var objectName = "%:OBJECT_NAME:%";
+                                return 'NEW_' + objectName;
+                            }
+                    h3 Параметры
+                    ul.browser-default
+                        li javascript - код на JavaScript, который будет запущен при вызове сборщика
+                    h3 Возвращаемое значение
+                    p.
+                        Сборщик возвращает результат работы функции JavaScript

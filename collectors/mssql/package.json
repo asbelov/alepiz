@@ -1,0 +1,14 @@
+{
+  "name": "mssql",
+  "version": "1.0.0",
+  "description": "MSSQL ALEPIZ collector",
+  "main": "collector.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Alexander Belov <asbel@alepiz.com>",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "tedious": "^9.2.1"
+  }
+}

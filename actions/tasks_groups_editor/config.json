@@ -1,0 +1,21 @@
+{
+  "name": "Tasks groups editor",
+  "description": "Add, remove or edit tasks groups",
+  "homePage": "index",
+  "ajaxServer": "ajax.js",
+  "execMethod": "post",
+  "launcher": "nodeModule",
+  "launcherPrms": { "javaScript": "server.js" },
+  "staticDir": "static",
+  "timeout": 60,
+  "showWhenNoObjectsSelected": true,
+  "outputFormat": "text",
+  "descriptionTemplate": "Edit groups: %:o:%.",
+  "icon": "format_list_bulleted",
+  "hideObjectsList": true,
+  "parameters": {
+    "groupName": {
+      "description": "New group name fro selected or new group"
+    }
+  }
+}

@@ -1,0 +1,76 @@
+//
+    Copyright © 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-6-23 0:39:38
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+        script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+        main
+            div.row
+                div.col.s12
+                    div.card
+                        div.card-content
+                            span.card-title Send message
+                            p
+                                div.row
+                                    div.col.l8.m8.s12
+                                        div.row
+                                            div.col.l4.m6.s12.input-field
+                                                i.material-icons.prefix settings
+                                                input(type="text" value="default")#configID
+                                                label(for="configID") Config ID
+                                            div.col.l4.m6.s12.input-field
+                                                select(multiple)#priorities
+                                                    optgroup(label="Priorities")#prioritiesGrp
+                                                    optgroup(label="Medias")#mediasGrp
+                                                label Priorities or media
+                                            div.col.l4.m12.s12.input-field
+                                                select#sender
+                                                label Sender
+                                            div.col.s12.input-field
+                                                i.material-icons.prefix email_outline
+                                                select(multiple)#rcpt
+                                                label Recipients
+                                            div.col.s12.input-field
+                                                i.material-icons.prefix mode_edit
+                                                textarea(data-length="4096" rows=10).materialize-textarea#text
+                                                label(for="text") message
+                                    div.col.l4.m4.s12
+                                        div.row
+                                            div.col.s10.input-field
+                                                input(type="text")#newField
+                                                label(for="newField") New filed name
+                                            div.col.s2.input-field
+                                                a.btn-floating.waves-effect#addNewFieldBtn
+                                                    i.material-icons add
+                                            div.col.s12.no-padding#additionalFields

@@ -1,0 +1,13 @@
+{
+  "name": "Restart server",
+  "description": "Restarting collected counters data server",
+  "homePage": "index",
+  "execMethod": "post",
+  "launcher": "nodeModule",
+  "launcherPrms": { "javaScript": "server.js" },
+  "staticDir": "static",
+  "timeout": 60,
+  "showWhenNoObjectsSelected": true,
+  "outputFormat": "text",
+  "descriptionTemplate": "Restarting server"
+}

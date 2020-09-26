@@ -1,0 +1,27 @@
+{
+    "name": "Schedule viewer",
+    "description": "View service schedule",
+    "homePage": "index",
+    "ajaxServer": "ajax.js",
+    "staticDir": "static",
+    "showWhenNoObjectsSelected": false,
+    "onChangeObjectMenuEvent": "callback:onChangeObjects",
+    "showOnlyForObjectsWithProperties": "SERVICE_NAME",
+    "startTimeCounterName": "I: Service start time",
+    "stopTimeCounterName": "I: Service stop time",
+    "serviceStatus": "I: Service state",
+    "historyDataNum": 7,
+    "startTimeOutlier": 240000,
+    "stopTimeOutlier": 120000,
+    "serviceStates": {
+        "0": "running",
+        "1": "paused",
+        "2": "start pending",
+        "3": "pause pending",
+        "4": "continue pending",
+        "5": "stop pending",
+        "6": "stopped",
+        "7": "unknown",
+        "255": "no such service"
+    }
+}

@@ -1,0 +1,22 @@
+{
+    "name": "Connect by TCP\\IP",
+    "description": "Check IP addresses and port using TCP connect",
+    "active": "",
+    "separate": "",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "hosts": {
+            "description": "Comma separated IPv4 or IPv6 addresses or host names",
+            "type": "textInputLong"
+        },
+        "port": {
+            "description": "TCP port",
+            "checkAs": "TCPPort"
+        },
+        "localAddress": {
+            "description": "Source  IPv4 or IPv6 address or host name",
+            "canBeEmpty": "on",
+            "checkAs": "hostOrIP"
+        }
+    }
+}

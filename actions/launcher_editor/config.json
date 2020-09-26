@@ -1,0 +1,16 @@
+{
+  "name": "Launcher editor",
+  "description": "Create new or edit existing launcher",
+  "homePage": "index",
+  "launcher": "nodeModule",
+  "launcherPrms": { "javaScript": "server.js" },
+  "ajaxServer": "ajax.js",
+  "staticDir": "static",
+  "callbackBeforeExec": "callbackBeforeExec",
+  "onChangeObjectMenuEvent": "nothing",
+  "cleanInputIDs": "deleteLauncher",
+  "icon": "directions_run",
+  "timeout": 60,
+  "showWhenNoObjectsSelected": true,
+  "outputFormat": "text"
+}

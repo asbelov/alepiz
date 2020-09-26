@@ -1,0 +1,72 @@
+//
+    Copyright © 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-8-9 23:19:40
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;',
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+        script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+        main
+            // example of action starts from here
+            div.row
+                div.col.s12
+                    div.card-panel
+                        div.row
+                            div.col.s7
+                                h3 Schedule viewer
+                            div.col.s2.input-field.switch
+                                label
+                                    span expand
+                                    input(type="checkbox" id="collapse" disabled checked)
+                                    span.lever
+                                    span collapse
+                            div.col.s2.input-field
+                                input(type="text" value="7")#dataNum
+                                label(for='dataNum') Number of historical values
+                            div.col.s1.input-field
+                                a.btn-floating.waves-effect.waves-light#reload: i.material-icons loop
+                        table.bordered.highlight.responsive-table
+                            thead
+                                tr
+                                    td#name: a(href='#!') Name
+                                    td#date: a(href='#!') Timestamp
+                                    td#time: a(href='#!') Action time
+                                    td#action: a(href='#!') Action
+                                    td#status: a(href='#!') Status
+                            tbody#tbody
+                                tr
+                                    td(colspan="5").center Loading data from history...
+
+            div.row
+                div.col.l6.m6.s12
+
+            // end example of action

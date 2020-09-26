@@ -1,0 +1,110 @@
+{
+    "description": "Sending emails via SMTP",
+    "address": "E-mail address",
+    "re": "^(([^<>()\\[\\].,;:\\s@\"]+(\\.[^<>()\\[\\].,;:\\s@\"]+)*)|(\".+\"))@(([^<>()\\[\\].,;:\\s@\"]+\\.)+[^<>()\\[\\].,;:\\s@\"]{2,})$",
+    "default": {
+        "transport": {
+            "helpURL": "https://nodemailer.com/smtp/",
+            "host": "smtp.domain.com",
+            "port": 465,
+            "secure": true,
+            "ignoreTLS": false,
+            "requireTLS": false,
+            "authMethod": "PLAIN",
+            "auth": {
+                "type": "login",
+                "user": "userName",
+                "pass": "smpt_password"
+            },
+            "tls": {
+                "rejectUnauthorized": false
+            },
+            "name": "myhost.domain.com",
+            "connectionTimeout": 120000,
+            "greetingTimeout": 30000,
+            "socketTimeout": 600000,
+            "logger": false
+        },
+        "message": {
+            "replyTo": "support@domain.com"
+        }
+    },
+    "createTask": {
+        "transport": "default",
+        "message": {
+            "subject": "#%:TASK_ID:%: %:TASK_NAME:%",
+            "messageId": "<%:TASK_ID:%.createTask@alepiz.com>",
+            "replyTo": "root@domain.com",
+            "text": {
+                "path": "templates/newTask.txt"
+            },
+            "html": {
+                "path": "templates/newTask.html"
+            }
+        }
+    },
+    "checkTask": {
+        "transport": "default",
+        "message": {
+            "subject": "Re: #%:TASK_ID:%: %:TASK_NAME:%",
+            "messageId": "<%:TASK_ID:%.checkTask@alepiz.com>",
+            "inReplyTo": "<%:TASK_ID:%.createTask@alepiz.com>",
+            "references": "<%:TASK_ID:%.createTask@alepiz.com>",
+            "replyTo": "root@domain.com",
+            "text": {
+                "path": "templates/newTask.txt"
+            },
+            "html": {
+                "path": "templates/replayTask.html"
+            }
+        }
+    },
+    "approveTask": {
+        "transport": "default",
+        "message": {
+            "subject": "Re: #%:TASK_ID:%: %:TASK_NAME:%",
+            "messageId": "<%:TASK_ID:%.approveTask@alepiz.com>",
+            "inReplyTo": "<%:TASK_ID:%.checkTask@alepiz.com>",
+            "references": "<%:TASK_ID:%.createTask@alepiz.com> <%:TASK_ID:%.checkTask@alepiz.com>",
+            "replyTo": "root@domain.com",
+            "text": {
+                "path": "templates/newTask.txt"
+            },
+            "html": {
+                "path": "templates/replayTask.html"
+            }
+        }
+    },
+    "cancelTask": {
+        "transport": "default",
+        "message": {
+            "subject": "Re: #%:TASK_ID:%: %:TASK_NAME:%",
+            "messageId": "<%:TASK_ID:%.cancelTask@alepiz.com>",
+            "inReplyTo": "<%:TASK_ID:%.approveTask@alepiz.com>",
+            "references": "<%:TASK_ID:%.createTask@alepiz.com> <%:TASK_ID:%.checkTask@alepiz.com> <%:TASK_ID:%.approveTask@alepiz.com>",
+            "replyTo": "root@domain.com",
+            "text": {
+                "path": "templates/newTask.txt"
+            },
+            "html": {
+                "path": "templates/replayTask.html"
+            }
+        }
+    },
+    "executeTask": {
+        "transport": "default",
+        "message": {
+            "subject": "Re: #%:TASK_ID:%: %:TASK_NAME:%",
+            "messageId": "<%:TASK_ID:%.executeTask@alepiz.com>",
+            "inReplyTo": "<%:TASK_ID:%.approveTask@alepiz.com>",
+            "references": "<%:TASK_ID:%.createTask@alepiz.com> <%:TASK_ID:%.checkTask@alepiz.com> <%:TASK_ID:%.approveTask@alepiz.com>",
+            "replyTo": "root@domain.com",
+            "text": {
+                "path": "templates/newTask.txt"
+            },
+            "html": {
+                "path": "templates/replayTask.html"
+            }
+        }
+    }
+}

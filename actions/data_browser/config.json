@@ -1,0 +1,10 @@
+{
+  "name": "Data browser",
+  "description": "Browse data and draw graph from history and trend",
+  "homePage": "index",
+  "ajaxServer": "ajax.js",
+  "staticDir": "static",
+  "onChangeObjectMenuEvent": "fullreload",
+  "timeout": 60,
+  "outputFormat": "text"
+}

@@ -1,0 +1,128 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-5-16 19:37:53
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Objects discovery: обнаруживает хосты в сетях различными методами
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Objects discovery
+                    h5.light.
+                        Проверяет существование хостов в указанных сетях различными методами
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание Objects discovery
+                    p.
+                        Сборщик позволяет организовать обнаружение хостов в сетях для автоматического формирования
+                        системы мониторинга для инфраструктуры.
+                    h3 Параметры
+                    ul.browser-default
+                        li.
+                            IP addresses ranges, separated by comma -
+                            Список диапазонов IPv4 или IPv6 адресов для обнаружения хостов в формате
+                             &lt;firstIP1&gt;-&lt;lastID1&gt;, &lt;firstIP2&gt;-&lt;lastID2&gt;, &lt;IP3&gt;, ... Например,
+                            192.168.0.1-192.168.0.252, 192.168.0.254, 172.10.0.1-172.10.5.254
+                        li.
+                            Sleep time between query to the new IP in the range in sec -
+                            Пауза в секундах между попытками поиска хостов. Служит для распределения задач по времени.
+                            В случае обнаружения нескольких объектов подряд, если за паузу задачи для обработки
+                            данных выполниться не успели,
+                            они продолжат выполняться вместе с задачами, запущенными после обнаружения следующего хоста.
+                            Нагрузка может возрасти, что может привести к задержкам в работе системы.
+                            Для того, чтобы этого избежать, рекомендуется устанавливать временные паузы между обнаружениями
+                            новых хостов.
+                        li.
+                            Time (in sec) to repeat scan after completed  -
+                            Пауза в секундах между повторным сканированием диапазона. 0 - сканировать один раз
+                        li.
+                            Use ICMP echo reply (PING) for scan -
+                            Проверять доступность хоста по протоколу ICMP (ping). Для проверки отправляется 2
+                            пакета, используется внешняя программа ping
+                        li Resolve host name for each IP using OS resolve method - Пытаться определить имя хоста
+                        li Use zabbix-agent query for scan - Пытаться выполнить запрос к Zabbix агенту, установленному на хосте
+                        ul.browser-default
+                            li Zabbix-agent TCP port - TCP порт Zabbix агента
+                            li.
+                                Comma separated Zabbix items with parameters -
+                                Список ключей и параметров через запятую, по которым будут
+                                запрашиваться данные у Zabbix агентов
+                        li Use SNMP query for scan - Пытаться сделать запрос к хосту по протоколу SNMP
+                        ul.browser-default
+                            li SNMP community - SNMP коммунити (обычно public)
+                            li.
+                                Comma separated SNMP OIDs. Result will ba a string for one OID and object
+                                {<OID1>: <result1>, <OID2>: <result2>} for multiple -
+                                OID или несколько OID'ов SNMP, перечисленных через запятую
+                    h3 Настройки
+                    p.
+                        Настройки сборщика хранятся в файле config/conf.json в секции collectors.discovery
+                    ul.browser-default
+                        li.
+                            localAddress - IP адрес с которого производится подключение к серверу сборщика. Если null
+                            или не указано, то подключение будет производится с IP адреса, который выберет
+                            операционная система
+                        li.
+                            serverAddress - IP адрес, который слушает сборщик и к которому производится подключение
+                        li.
+                            port - TCP порт, который слушает сборщик
+                        li.
+                            discoveryIP - путь до файлов в которых сохраняется текущее состояние счетчиков. В качестве
+                            суффикса к файлам добавляется идентификатор objectCounterID счетчиков.
+                    h3 Возвращаемое значение
+                    p.
+                        Сборщик последовательно опрашивает каждый IP адрес из диапазонов и возвращает объект,
+                        содержащий найденную информацию о каждом хосте:
+                    ul.browser-default
+                        li.
+                            hostname - если указан параметр getHostname и удалось определить название хоста, то параметр
+                            будет содержать название хоста
+                        li.
+                            SNMP - если указан useSNMP и от хоста пришел ответ на SNMP запрос, параметр будет содержать
+                            этот ответ. Если SNMP OID было несколько, то параметр будет содержать объект, где в качестве
+                            ключей будут OID'ы, а в качестве их значений - полученные по SNMP ответы.
+                        li.
+                            zabbix - если указан useZabbix и от хоста пришел ответ на запрос к Zabbix агенту, параметр
+                            будет содержать этот ответ. Если ключей для Zabbix агента было несколько, то параметр будет
+                            содержать объект, где в качестве ключей будут ключи Zabbix агента, а в качестве их значений
+                            - полученные от Zabbix агента ответы.
+                        li ping - если указан параметр usePing, то 1 если хост ответил на ping, 0 если нет.
+                        li IP - IP адрес проверяемого хоста
+                    p.
+                        По окончанию сканирования диапазона адресов сборщик возвратит объект:
+                        {"scanTime": &lt;Время сканирования в миллисекундах&gt;}
+                    p.
+                        Пример возвращаемого значения для следующих настроек
+                        сканирования:
+                    img(src="./images/help.settingsExample.png" width="1024").materialboxed.card-panel.hoverable
+                    div.card-panel
+                        pre.
+                            {
+                                "hostname": "alepiz.com",
+                                "SNMP": "Hardware: Intel64 Family 6 Model 85 Stepping 4 AT/AT COMPATIBLE - Software: Windows Version 6.3 (Build 14393 Multiprocessor Free)",
+                                "zabbix": {
+                                    "system.hostname": "ALEPIZ",
+                                    "system.uname": "Windows ALEPIZ 10.0.14393 Microsoft Windows Server 2016 Standard x64"
+                                },
+                                "ping": 1,
+                                "IP": "192.168.0.1"
+                            }
+                    p.
+                        В работать с полученным объектом JSON, можно с помощью встроенной в ALEPIZ функции
+                        getValueFromJSOMStr(JSONStr, keys):
+                    ul.browser-default
+                        li getValueFromJSONStr(%:PARENT_VALUE:%, "hostname") = alepiz.com
+                        li getValueFromJSONStr(%:PARENT_VALUE:%, "IP") = 192.168.0.1
+                        li getValueFromJSONStr(%:PARENT_VALUE:%, 'zabbix:system.hostname') = ALEPIZ
+
+
+

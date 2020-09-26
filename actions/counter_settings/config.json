@@ -1,0 +1,18 @@
+{
+    "name": "Counter settings",
+    "description": "Edit counter settings for objects",
+    "homePage": "index",
+    "ajaxServer": "ajax.js",
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "launcherPrms": { "javaScript": "server.js" },
+    "staticDir": "static",
+    "showWhenNoObjectsSelected": true,
+    "onChangeObjectMenuEvent": "callback:onChangeObjects",
+    "callbackBeforeExec": "callbackBeforeExec",
+    "callbackAfterExec": "callbackAfterExec",
+    "cleanInputIDs": "deleteCounter",
+    "timeout": 60,
+    "outputFormat": "text",
+    "icon": "settings"
+}

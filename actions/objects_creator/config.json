@@ -1,0 +1,34 @@
+{
+    "name": "Objects creator",
+    "description": "Create a new objects",
+    "homePage": "index",
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "launcherPrms": {
+        "javaScript": "server.js"
+    },
+    "staticDir": "static",
+    "onChangeObjectMenuEvent": "callback:onChangeObjects",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": true,
+    "outputFormat": "text",
+    "icon": "library_add",
+    "descriptionTemplate": "A new object or objects \"%:objectsNames:%\" will be created {{%:objectsDescription:% ?? with a description \"%:objectsDescription:%\" ::}}, the sort order of objects will be %:objectsOrder:% {{%:objectsOrder:% == 10 ?? (On top of the list) ::}}{{%:objectsOrder:% == 30 ?? (Between middle and top) :: }}{{%:objectsOrder:% == 50 ?? (At the middle of the list) :: }}{{%:objectsOrder:% == 70 ?? (Between middle and end) :: }}{{%:objectsOrder:% == 100 ?? (At the end of the list) :: }}{{%:objectsOrder:% == 1 ?? (On top and at up level) :: }}{{%:objectsOrder:% == 5 ?? (At the middle and at up level) :: }}{{%:objectsOrder:% == 9 ?? (At the end and at up level) :: }}. {{%:groupsDescription:% ?? New objects will be include in a groups \"%:o:%\". ::}}{{%:disabled:% ?? Objects will be disabled to collect data from counters ::}}",
+    "parameters": {
+        "o": {
+            "description": "Parent groups for created objects"
+        },
+        "objectsNames": {
+            "description": "Comma-separated names of new objects"
+        },
+        "objectsDescription": {
+            "description": "Description for new objects"
+        },
+        "objectsOrder": {
+            "description": "Sort order of new objects"
+        },
+        "disabled": {
+            "description": "It is forbidden (1) or allowed (empty) to collect data from object counters"
+        }
+    }
+}

@@ -1,0 +1,333 @@
+/*
+ * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ */
+
+/**
+ * Created by asbel on 24.07.2015.
+ * https://www.zabbix.com/documentation/3.0/ru/manual/appendix/items/activepassive
+ * https://www.zabbix.com/documentation/4.0/ru/manual/appendix/items/activepassive
+ */
+var net = require('net');
+var log = require('../../lib/log')(module);
+var throttling = require('../../lib/throttling');
+var async = require('async');
+var conf = require('../../lib/conf');
+conf.file('config/conf.json');
+
+var collector = {};
+module.exports = collector;
+
+var counters = {};
+var countersIDX = {};
+var countersParameters = {};
+var agentSessions = {};
+var headerLength = String('ZBXD').length + 1 + 8;
+var errorMessage = 'Zabbix agent active check error: ';
+var serverPort = 10051;
+var server;
+var isServerRunning = false;
+var stopServerInProgress = false;
+var logZabbixAgentErrors = conf.get('collectors:zabbix-active:logZabbixAgentErrors');
+
+collector.get = function(param, callback) {
+
+    if(!param || !param.zabbixHostname) return callback();
+
+    if(!isServerRunning) {
+        log.info('Staring active check server');
+        isServerRunning = true;
+        createServer();
+    }
+
+    var zabbixHostname = param.zabbixHostname.toLowerCase();
+    var key = param.itemParameters ? param.item+'['+param.itemParameters+']' : param.item;
+
+    if(!countersParameters[zabbixHostname]) countersParameters[zabbixHostname] = {};
+    countersParameters[zabbixHostname][key.toLowerCase()] = {
+        callback: callback,
+        onlyNumeric: !!param.onlyNumeric
+    };
+    throttling.init(zabbixHostname + '-' + key.toLowerCase(), param, collector);
+
+    if(!counters[zabbixHostname] || !counters[zabbixHostname].length)	counters[zabbixHostname] = [];
+    else if(Number(param.$id) && countersIDX[param.$id]) {
+        var num = countersIDX[param.$id].num;
+
+        if(num !== undefined && counters[zabbixHostname][num]) {
+            //delete countersParameters[zabbixHostname][counters[zabbixHostname][num].key.toLowerCase()];
+
+            counters[zabbixHostname][num] = {
+                key: key,
+                delay: Number(param.pollingFreq),
+                lastlogsize: 0,
+                mtime: 0
+            };
+
+            log.debug('Request to getting data from existing OCID ', param.$id, ', hostname "', zabbixHostname, '": ', counters[zabbixHostname][num]);
+            return;
+        }
+    }
+
+    countersIDX[param.$id] = {
+        num: counters[zabbixHostname].length,
+        zabbixHostname: zabbixHostname
+    };
+    counters[zabbixHostname].push({
+		key: key,
+		delay: Number(param.pollingFreq),
+        lastlogsize: 0,
+        mtime: 0
+    });
+    log.info('Adding a new counter with OCID ', param.$id,' for hostname "', zabbixHostname, '": ', counters[zabbixHostname][counters[zabbixHostname].length-1]);
+};
+
+collector.init = function(newServerPort) {
+    serverPort = newServerPort;
+};
+
+collector.removeCounters = function(OCIDs, callback) {
+    if(!OCIDs.length) return callback();
+
+    var existingOCIDs = [];
+    OCIDs.forEach(function(OCID) {
+        if(!countersIDX[OCID]) return;
+        var num = countersIDX[OCID].num;
+        var zabbixHostname = countersIDX[OCID].zabbixHostname;
+        if(num === undefined) return;
+
+        // typeof null === 'object'
+        if(counters[zabbixHostname][num] && typeof counters[zabbixHostname][num] === 'object') {
+            existingOCIDs.push(OCID + ':' + zabbixHostname + '(' + counters[zabbixHostname][num].key + ')');
+            delete countersParameters[zabbixHostname][counters[zabbixHostname][num].key.toLowerCase()];
+            counters[zabbixHostname][num] = null; // don't delete array item for saving order of 'num'
+        }
+        delete countersIDX[OCID];
+    });
+    throttling.remove(OCIDs);
+
+    if(existingOCIDs.length) log.info('Removed ', existingOCIDs.length, ' counters: ', existingOCIDs.join('; '));
+
+    callback();
+};
+
+collector.destroy = stopServer;
+
+function stopServer(callback){
+    if(!server || stopServerInProgress) return callback();
+    stopServerInProgress = true;
+
+    log.info('Stopping Zabbix active collector');
+    server.close(function(err) {
+        server = null;
+        counters = {};
+        countersParameters = {};
+        agentSessions = {};
+        isServerRunning = false;
+        stopServerInProgress = false;
+        throttling.remove();
+        callback(err);
+    });
+}
+
+function createServer() {
+    server = net.createServer(function(socket){
+		// 'connection' listener
+		log.debug('Client connected: ', socket.remoteAddress, ':', socket.remotePort, '->', socket.localAddress, ':', socket.localPort);
+
+        var data = Buffer.alloc(0);
+        var isHeaderOK = false;
+        var dataLength = 0;
+
+        socket.on('data', function(dataPart){
+            data = Buffer.concat([data, Buffer.from(dataPart)]);
+
+            // checking is header correct or not and get length of received data
+            if(!isHeaderOK && data.length >= headerLength) {
+                var header = data.toString('utf8', 0, 4);
+				var version = data.readInt8(4);
+
+				if (header !== "ZBXD" || version !== 1){
+                    socket.destroy();
+					return log.error(errorMessage + 'incorrect header: ' + header + ':' + version);
+                }
+
+                dataLength = data.readUInt32LE(5);
+                if(dataLength === 0) {
+                    socket.destroy();
+                    return log.error(errorMessage + 'data length in header (', dataLength,') is too small');
+                }
+
+                isHeaderOK = true;
+
+                //log.debug('ZBX: header ok, data length: ', dataLength);
+            }
+
+            if(data.length === dataLength+headerLength){
+
+                //log.debug('ZBX: header + data length: ', (dataLength + headerLength), ', real data length: ', data.length, ', data: ', data);
+
+                var resultStr = data.toString('utf8', headerLength);
+
+                var result;
+                try {
+                    result = JSON.parse(resultStr);
+                } catch(err) {
+                    socket.destroy();
+                    return log.error(errorMessage + 'can\'t parse JSON in response: '+err.message);
+                }
+
+                if(!result || !result.request){
+                    socket.destroy();
+                    return log.error(errorMessage + 'error in request');
+                }
+
+                if(result.request.toLowerCase() === 'active checks'){
+                    reqActiveChecks(result.host, function(err, data) {
+                        sendToZabbix(err, data, socket);
+                        socket.pipe(socket);
+                        socket.destroy();
+                    });
+                } else if(result.request.toLowerCase() === 'agent data') {
+                    reqAgentData(result, function(err, data){
+                        sendToZabbix(err, data, socket);
+                    });
+                } else {
+                    log.error(errorMessage, 'unknown request: ', result.request, ': ', result);
+                    socket.destroy();
+                }
+            } else if(data.length > dataLength+headerLength) {
+                socket.destroy();
+                return log.error(errorMessage + 'received data length (', data.length,') is more then specified in header (',(dataLength+headerLength),')');
+            }
+
+            log.debug('ZBX recv ',socket.remoteAddress, ':', socket.remotePort,': length: ',data.length,', data: ', data.toString());
+        });
+
+        socket.on('error', function(err){
+            log.warn('Active check socket error: ', err.message, ' for: ', socket.remoteAddress, ':', socket.remotePort, '->', socket.localAddress, ':', socket.localPort);
+        });
+	});
+
+	server.on('error', function(err) {
+		log.error('Active check server error: ', err.message, '. Try to restart');
+
+        setTimeout(function(){
+            stopServer(function(err){
+                if(err) log.error('Error while stopping server: ', err.message);
+                isServerRunning = true;
+                createServer();
+            });
+        }, 1000);
+	});
+
+    server.listen(serverPort, function() {
+        log.info('Server bound to TCP port: ', serverPort);
+    });
+}
+
+function sendToZabbix(err, data, socket){
+    if(err) {
+        log.error(errorMessage, err.message);
+        data = JSON.stringify({response: 'error'});
+    }
+
+    if(!data || typeof data !== 'string') {
+        log.error(errorMessage, 'try to return undefined or not string data');
+        data = JSON.stringify({response: 'error'});
+    }
+
+    var zabbixData = Buffer.from('ZBXDVLLLLLLLL');
+    zabbixData.writeInt8(1, 4);
+    zabbixData.writeUInt32LE(data.length, 5);
+    zabbixData.writeUInt32LE(0, 9);
+    zabbixData = Buffer.concat([zabbixData, Buffer.from(data)]);
+
+    log.debug('ZBX send ', socket.remoteAddress, ':', socket.remotePort,': length: ',data.length,', data: ', zabbixData.toString());
+
+    socket.write(zabbixData);
+    //socket.pipe(socket);
+    //socket.destroy();
+}
+
+function reqActiveChecks(host, callback) {
+    if(!host) return callback(new Error('host not defined for active check request'));
+
+    host = host.toLowerCase();
+
+    if(!counters[host] || !counters[host].length) return callback(new Error('active check not defined for host ' + host));
+
+    callback(null, JSON.stringify({
+        response: 'success',
+        data: counters[host].filter(function(obj) { return obj !== null; } ) // filter removed counters. we don't splice removed counters array for save order
+    }));
+}
+
+function reqAgentData(result, callback){
+    if(!result.data || !result.data.length) return callback(new Error('unknown result for agent data'));
+
+    var errCnt = 0;
+    var timestamp = Date.now();
+    async.each(result.data, function(data, callback){
+
+        if(!data.host || !data.key  || data.value === undefined /* || !data.clock || !data.ns */){
+            log.error('Error while received zabbix data, not all required parameters are defined: host: ', data.host,
+                    ', key: ', data.key, ', clock: ', data.clock, ', ns: ', data.ns, ', value: ', data.value, ': ', data);
+            errCnt++;
+            return callback();
+        }
+
+        if(result.session && data.id !== undefined) {
+            if(!agentSessions[result.session]) agentSessions[result.session] = data.id;
+            else {
+                if(agentSessions[result.session] < data.id) agentSessions[result.session] = data.id;
+                else {
+                    log.warn('Duplicate data received: ', data ,'; received ID (', result.session, ':', data.id,
+                        '), <= previous ID (', result.session , ':', agentSessions[result.session], ')');
+                    return callback();
+                }
+            }
+        }
+
+        var zabbixHost = data.host.toLowerCase();
+        var zabbixKey = data.key.toLowerCase();
+        
+        if(!countersParameters[zabbixHost] || !countersParameters[zabbixHost][zabbixKey] ||
+            typeof countersParameters[zabbixHost][zabbixKey].callback !== 'function'
+        ){
+            log.debug('Callback not defined or callback type is not a function for ', zabbixHost, '; key ',  zabbixKey);
+            errCnt++;
+            return callback();
+        }
+
+        if(data.state && logZabbixAgentErrors)
+            log.info('Zabbix agent returned error for active check ', data.host, ':', data.key, ': ', data.value);
+
+        // return only numeric values
+        if(countersParameters[zabbixHost][zabbixKey].onlyNumeric) {
+            data.value = Number(data.value);
+            if(isNaN(parseFloat(String(data.value))) || !isFinite(data.value)) return callback();
+        }
+        if(!throttling.check(zabbixHost + '-' + zabbixKey, data.value)) return callback();
+
+        if (data.clock && data.ns &&
+            Number(data.clock) === parseInt(String(data.clock), 10) &&
+            Number(data.ns) === parseInt(String(data.ns), 10)) {
+
+            countersParameters[zabbixHost][zabbixKey].callback(null, {
+                value: data.value,
+                timestamp: Math.round(Number(data.clock) * 1000 + (Number(data.ns) / 1000000)) // convert to milliseconds
+            });
+        } else countersParameters[zabbixHost][zabbixKey].callback(null, data.value);
+
+        callback();
+
+    }, function(err){
+        if(err) return callback(err);
+
+        return callback(null, JSON.stringify({
+            response: 'success',
+            info: 'processed: '+(result.data.length - errCnt)+'; failed: '+errCnt+'; total: '+result.data.length+' seconds spent: '+
+                String((Date.now() - timestamp)/1000)
+        }));
+    });
+}

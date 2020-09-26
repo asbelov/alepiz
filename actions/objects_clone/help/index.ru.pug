@@ -1,0 +1,203 @@
+//
+  Created by asbel on 18.04.2020.
+   Copyright (C) 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+head
+    title Objects clone: клонирование свойств объектов, подключений объектов к счетчикам и взаимодействий
+    link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+    link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+    meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+    meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+    script(src='/materialize-css/dist/js/materialize.js')
+    script(src='/javascripts/help.js')
+body
+    header
+        div.row
+            div.col.s12.m10.offset-m1
+                h1 Objects clone
+                h5.light.
+                    С помощью Objects clone можно клонировать свойства объектов, подключение объектов к счетчикам,
+                    взаимодействия объектов, описание объектов, порядок их отображения в списке Objects и аттрибут
+                    объекта Disable, отвечающий за необходимость сбора данных счетчиками
+
+    main
+        div.row
+            div.col.s12.m10.offset-m1
+                img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+
+                h2 Предназначение Objects clone
+                p.
+                    Objects clone позволяет копировать параметры одних объектов другим объектам.
+                    Таким образом можно быстро настроить обслуживание большого количества объектов, обладающих
+                    одинаковыми свойствами. Можно автоматизировать установку параметров объектов на основе
+                    используемых в качестве шаблонов, предварительно настроенных объектов.
+                h5.
+                    Возвращаемое значение: разделенными запятыми object ID (идентификаторы объектов в которые
+                    копируются свойства из базы данных).
+
+                h2 Описание полей ввода
+                h3 Source objects
+                p.
+                    В этом элементе перечислены объекты, с которых будут копироваться свойства.
+                    Для того, чтобы добавить объекты в Source objects, нужно выбрать объекты в системном меню
+                    Objects и нажать на ADD SELECTED OBJECTS. Если нажать на крестик справа от объекта в
+                    Source objects, объект будет удален. Удалить все объекты из Source objects можно нажав на
+                    REMOVE ALL OBJECTS.
+
+                h3 Destination objects
+                p.
+                    В этом элементе перечислены объекты которым будут скопированы свойства объектов, перечисленных
+                    в Source objects.
+                    Для того, чтобы добавить объекты в Destination objects, нужно выбрать объекты в системном меню
+                    Objects и нажать на ADD SELECTED OBJECTS. Если нажать на крестик справа от объекта в
+                    Destination objects, объект будет удален. Удалить все объекты из Destination objects можно нажав на
+                    REMOVE ALL OBJECTS. При нажатии на ADD NEW OBJECT можно создать новый объект, которому буду
+                    скопированы свойства объектов из Source objects. Для этого в появившемся поле необходимо ввести
+                    имя нового объекта. Имя объекта должно быть уникальным и не может повторяться.
+
+                h3 Clone parameters
+                p.
+                    Clone parameters позволяет установить, какие свойства необходимо скопировать из объектов в Source objects
+                    в объекты, расположенные в Destination objects
+                img(src="./images/help.cloneParameters.png" width="1024").materialboxed.card-panel.hoverable
+
+                h4 Description for objects
+                p.
+                    Если это поле не пустое, объектам из Destination objects будет присвоено описание объекта из этого поля.
+                    Подсказка с описанием объекта появится, если в системном меню Objects навести курсор на объект.
+                img(src="./images/help.objectDescription.png").materialboxed.card-panel.hoverable
+
+                h4 Order in a objects menu for all selected objects
+                p.
+                    Поле позволяет установить сортировку, которая влияет на порядок отображения объектов в
+                    системном меню Objects.
+                    Если для объектов установлена одинаковая сортировка, они сортируются по алфавиту.
+                    Если выбрано несколько объектов,
+                    и выбрана сортировка Current objects order will be unchanged, сортировка
+                    объектов не изменятся.
+                img(src="./images/help.objectOrder.png").materialboxed.card-panel.hoverable
+                p Объекты с разной сортировкой сортируются по следующим правилам:
+                    h5 Сортировка объектов, находящихся на верхнем уровне
+                    p.
+                        Объекты с сортировкой из таблицы ниже будут располагаться на самом верхнем уровне
+                        списка объектов. Для того, чтобы увидеть эти объекты в списке нужно в системном меню Objects
+                        нажать на "TO TOP". Если эти объекты включить в группу, они также будут
+                        отображаться в этой группе.
+                    table
+                        thead
+                            tr
+                                th Сортировка
+                                th Описание
+                        tbody
+                            tr
+                                td On top and at up level
+                                td На самом верху списка объектов и на самом верхнем уровне объектов
+                            tr
+                                td At the middle and at up level
+                                td В середине списка и на самом верхнем уровне объектов
+                            tr
+                                td At the end at up level
+                                td В конце списка и на самом верхнем уровне объектов
+                    h5 Сортировка объектов, включенных в другие объекты
+                    p.
+                        Объекты с сортировкой из таблицы ниже должны быть включены
+                        в какую-то группу. Для доступа к такому объекту необходимо в системном меню Objects
+                        зайти в группу объектов, в которой находится требуемый объект. Если такому объекту не присвоить
+                        никакую группу, объект невозможно будет найти с помощью навигации по системному меню Objects.
+                        В этом случае объект может быть отображен в списке только если ввести его имя в строке поиска объектов.
+                        Строка поиска объектов находится над системным меню Objects и активируется когда активна вкладка OBJECT.
+                    table
+                        thead
+                            tr
+                                th Сортировка
+                                th Описание
+                        tbody
+                            tr
+                                td On top of the list
+                                td На самом верху списка объектов
+                            tr
+                                td Between middle and top
+                                td Между верхними объектами и объектами в середине списка
+                            tr
+                                td At the middle of the list
+                                td В середине списка объектов
+                            tr
+                                td Between middle and end
+                                td Между объектами в середине списка и объектами в конце списка
+                            tr
+                                td At the end of the list
+                                td Внизу списка объектов
+                h4 Disable object
+                p.
+                    Можно отключить объекты из Destination objects. В этом случае сбор данных со счетчиков,
+                    подключенных к объектам,
+                    производиться не будет. В системном меню Objects отключенные объекты обозначаются курсивом.
+                img(src="./images/help.disabledObjects.png" width="1024").materialboxed.card-panel.hoverable
+
+                h4 Link templates counters to objects
+                p.
+                    Подключить счетчики, подключенные к объектам из Destination objects к объектам из Source objects.
+                    Этот checkbox
+                    означает, что необходимо скопировать подключение счетчиков к объектам из Destination objects. Копировать
+                    все подключения или только определенные настраивается ниже.
+                img(src="./images/help.counters.png").materialboxed.card-panel.hoverable
+
+                h5 Link all counters, linked with templates
+                p.
+                    Подключить все счетчики, подключенные к объектам из Destination objects к объектам из Source objects.
+                    Если выбран этот checkbox, выбор счетчиков будет невозможен
+
+                h5 <Имя счетчика>
+                p.
+                    Если не выбран checkbox Link all counters, linked with templates, то можно выбрать только
+                    определенные счетчики, которые нужно подключить к объектам из Source objects.
+
+                h4 Clone templates interactions
+                p.
+                    Копировать взаимодействия объектов, настроенных для Destination objects в объекты из Source objects.
+                    Этот checkbox означает, что необходимо скопировать взаимодействия объектов, настроенных для
+                    Destination objects. Копировать все взаимодействия или только определенные настраивается ниже.
+                img(src="./images/help.interactions.png").materialboxed.card-panel.hoverable
+
+                h5 Clone all templates interactions
+                p.
+                    Копировать все взаимодействия объектов, настроенных для Destination objects к объектам из
+                    Source objects. Если выбран этот checkbox, выбор конкретных взаимодействий будет невозможен.
+
+                h5 <Описание взаимодействия>
+                p.
+                    Если не выбран checkbox Clone all templates interactions, то можно выбрать только
+                    определенные взаимодействия, которые нужно скопировать к объектам из Source objects.
+
+                h4 Clone templates properties
+                p.
+                    Копировать свойства объектов, настроенных для Destination objects в объекты из Source objects.
+                    Этот checkbox означает, что необходимо скопировать свойства объектов, настроенных для
+                    Destination objects. Копировать все свойства или только определенные настраивается ниже.
+                img(src="./images/help.properties.png").materialboxed.card-panel.hoverable
+
+                h5.
+                    Clone all templates properties (identical properties will be overwritten in the order of the
+                    list of object templates)
+                p.
+                    Копировать все свойства объектов, настроенных для Destination objects в объекты из
+                    Source objects. Если выбран этот checkbox, выбор конкретных свойств будет невозможен. Одинаковые
+                    свойства для Destination objects и Source objects будут перезаписаны свойствами из Source
+                    objects
+
+                h5 <Свойство>
+                p.
+                    Если не выбран checkbox Clone all templates properties...., то можно выбрать
+                    свойства объектов, которые нужно скопировать к объектам из Source objects.
+
+                h4 New groups for destination objects
+                p.
+                    В этом элементе перечислены объекты в которые будут включены объекты из Destination objects
+                    Можно добавить объекты в New groups for destination objects. Для этого нужно выбрать объекты
+                    в системном меню Objects и нажать на ADD SELECTED OBJECTS. Если нажать на крестик справа от
+                    объекта в New groups for destination objects, объект будет удален. Удалить все объекты из
+                    New groups for destination objects можно нажав на REMOVE ALL OBJECTS.
+                img(src="./images/help.newGroup.png" width="1024").materialboxed.card-panel.hoverable
+                p

@@ -1,0 +1,12 @@
+{
+  "name": "Variables",
+  "description": "Variables debugging",
+  "homePage": "index",
+  "ajaxServer": "ajax.js",
+  "staticDir": "static",
+  "showWhenNoObjectsSelected": true,
+  "onChangeObjectMenuEvent": "callback:onChangeObjects",
+  "timeout": 60,
+  "outputFormat": "text",
+  "icon": "settings"
+}

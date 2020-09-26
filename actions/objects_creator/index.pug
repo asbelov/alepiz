@@ -1,0 +1,83 @@
+//
+  Created by asbel on 21.04.2015.
+   Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            div.col.s12
+                script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+                div.row
+                    div.col.s12
+                        div.card
+                            div.card-content
+                                span.card-title New objects parameters
+                                div.row
+                                    div.input-field.col.s12.m8.l10
+                                        input(type='text' data-tooltip="Enter unique new comma separated object names")#objectsNames.tooltipped
+                                        label(for='objectsNames') New object names
+                                    p.col.s12.m4.l2
+                                        label
+                                            input(type='checkbox' value="1")#disabled
+                                            span(data-tooltip="Prevent to collect data by object counters").tooltipped Create disabled objects
+
+                                    div.input-field.col.s12.m6.l8
+                                        input(type='text' length="256" data-tooltip="Description for a new objects")#objectsDescription.validate.tooltipped
+                                        label(for='objectsDescription') Description for all new objects
+                                    div.input-field.col.s12.m6.l4
+                                        select#objectsOrder
+                                            option(value="10") On top of the list
+                                            option(value="30") Between middle and top
+                                            option(value="50") At the middle of the list
+                                            option(value="70" selected) Between middle and end
+                                            option(value="100") At the end of the list
+                                            option(value="1") On top and at up level
+                                            option(value="5") At the middle and at up level
+                                            option(value="9") At the end and at up level
+                                        label Order in a objects menu for a new objects
+                    div.col.s12
+                        div.card
+                            div.card-content
+                                span.card-title Groups for new objects:&nbsp;
+                                    b#groupsDescription
+                                p New objects will be included into the objects, which you select from objects menu. If no one objects are selected, you will find a new objects using "Search" button in an objects menu by typing object name. Or select 'up level' object order for set object at the up level of the object list.
+                                p Additional objects interactions you can set using "Objects interactions" action after creating new objects.
+                                p Action returned string with comma separated objects IDs. You can use this in "task maker" using %:PREV_ACTION_RESULT:% variable
+    footer
+        input(type="hidden" name="actionName" value= action.name)

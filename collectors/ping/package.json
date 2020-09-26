@@ -1,0 +1,15 @@
+{
+  "name": "alepiz.collector.ping",
+  "version": "1.0.0",
+  "description": "Alepiz ping collector",
+  "main": "collector.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Alexander Belov <asbel@alepiz.com>",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "net-ping": "^1.2.3",
+    "raw-socket": "^1.7.0"
+  }
+}

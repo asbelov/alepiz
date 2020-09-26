@@ -1,0 +1,41 @@
+{
+    "name": "Objects properties",
+    "description": "Edit objects properties",
+    "homePage": "index",
+    "ajaxServer": "ajax.js",
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "launcherPrms": { "javaScript": "server.js" },
+    "staticDir": "static",
+    "onChangeObjectMenuEvent": "callback:onChangeObjects",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": true,
+    "outputFormat": "text",
+    "icon": "style",
+    "canAddParametersToAction": true,
+    "descriptionTemplate": "New properties will be set for \"%:o:%\". All other properties will {{%:deleteOtherProperties:% ==  ?? not ::}} be deleted. New properties: {{name: \"%:property*name:%\", value: \"%:property*value:%\", description: \"%:property*description:%\", mode \"%:property*mode:%\":: and ::\"\"}}. Hint for the modes: 0 - not calculated text field, 1 - checkbox, 2 - not calculated text area, 3 - calculated expression",
+    "parameters": {
+        "o": {
+            "description": "Edited objects"
+        },
+        "deleteOtherProperties": {
+            "description": "All other properties will be deleted (when not 0)"
+        },
+        "property*name": {
+            "description": "Property name",
+            "canBeDeleted": true
+        },
+        "property*value": {
+            "description": "Property value or expression",
+            "canBeDeleted": true
+        },
+        "property*description": {
+            "description": "Property description",
+            "canBeDeleted": true
+        },
+        "property*mode": {
+            "description": "Property mode: 0 - not calculated text field, 1 - checkbox, 2 - not calculated text area, 3 - calculated expression",
+            "canBeDeleted": true
+        }
+    }
+}

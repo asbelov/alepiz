@@ -1,0 +1,63 @@
+//
+  Created by asbel on 26.04.2020.
+   Copyright (C) 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Ping: проверка доступности хоста в сети
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Ping
+                    h5.light.
+                        Ping используется для проверки доступности хоста в сети.
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Предназначение Ping
+                    p.
+                        С помощью Ping можно организовать проверку сетевой доступности хоста по протоколу ICMP. Так же
+                        можно измерять такие параметры, как процент потерь пакетов и время прохождения пакетов (RTT).
+                        Поддерживаются протоколы IPv4 и IPv6.
+                    p.
+                        Сборщик использует собственную реализацию протокола Ping. При потерях пакетов он дополнительно
+                        запускает внешнюю программу ping для проверки полученных значений.
+                    h3 Параметры
+                    ul.browser-default
+                        li Target host name, IPv4 or IPv6 address (host) - имя или IP адрес удаленного хоста
+                        li.
+                            Ping interval is a time between echo requests packets in seconds (pingInterval) -
+                            интервал между отправляемыми пакетами в секундах
+                        li.
+                            Size of echo request packet (IP header + ICMP) in bytes from 48 to 4096 (packetSize) -
+                            размер пакета в байтах
+                        li.
+                            Number of echo requests to send. 0 is infinite (packetsCnt) - количество отправляемых пакетов.
+                            0 - бесконечно
+                        li.
+                            The packet wait timeout in a second, after which packet loss will be detected.
+                            Mast be greater then ping interval (timeout) - время ожидания пакета в секундах, пока он не будет
+                            помечен как потерянный. Должно быть больше чем Ping interval
+                    h3 Настройки
+                    p.
+                        Настройки сборщика хранятся в файле config/conf.json в секции collectors.ping
+                    ul.browser-default
+                        li.
+                            localAddress - IP адрес с которого производится подключение к серверу сборщика. Если null
+                            или не указано, то подключение будет производится с IP адреса, который выберет
+                            операционная система
+                        li.
+                            serverAddress - IP адрес, который слушает сборщик и к которому производится подключение
+                        li.
+                            port - TCP порт, который слушает сборщик
+                    h3 Возвращаемое значение
+                    p.
+                        Время прохождения пакета в миллисекундах (RTT) или 0, если хост не ответил.

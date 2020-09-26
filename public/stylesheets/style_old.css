@@ -1,0 +1,158 @@
+/*
+ * Copyright ? 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ */
+
+main.main, footer.main {
+  padding-left: 300px;
+}
+
+@media only screen and (max-width : 992px) {
+  header.main, main.main, footer.main {
+    padding-left: 0;
+  }
+}
+
+/*
+.nohover:hover {
+  color: #000000
+}
+*/
+
+/*
+div.float_center
+    ul.float_center_child
+        li: a(href='#') link1
+        li: a(href='#') link2
+        li: a(href='#') link3
+*/
+.float_center {
+    float: right  !important;
+    position: relative !important;
+    left: -50% !important;
+    text-align: left !important;
+}
+
+.float_center > .float_center_child {
+    position: relative !important;
+    left: 50% !important;
+}
+
+.float_center_child > li {
+    float: left !important;
+}
+
+.toolbox {
+    line-height: 1.6em !important;
+    /*color: #000000 !important;*/
+    font-size: 1.6rem !important;
+}
+div.toolbox {
+    height: 2.1em !important;
+}
+
+a.toolbox {
+    height: 1.6em !important;
+    width: 1.6em !important;
+    /*background-color: #FFFFFF !important;*/
+    padding: 0 !important;
+    margin: 7px 5px 0 5px !important;
+    float: left !important;
+}
+
+a.toolbox-rooler {
+    height:15px !important;
+    line-height: 10px !important;
+    width:100% !important;
+    margin: 5px 5px 15px 5px !important;
+    text-align: center;
+    padding-bottom: 15px !important;
+    border-bottom: 1px solid #e0e0e0;
+    float: none !important;
+    color: #cccccc !important;
+}
+.search-input {
+    line-height: 1.6em !important;
+    min-height: 1.6rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+.search-wrapper {
+    display: block;
+    width: 95%;
+    min-height: 48px !important;
+    height: auto !important;
+    margin: 8px 5px 0 5px;
+    padding: 15px 15px 0 15px;
+    border: 0;
+    color: #000000;
+}
+
+.objectList {
+    margin: 0 !important;
+}
+
+a.objectList {
+    padding: 0 !important;
+    color: #FF0000 !important;
+}
+
+label.objectList {
+    color: #000000 !important;
+    width: 100% !important;
+}
+
+li.objectList {
+    padding: 0 !important;
+}
+
+ul.tabsOnMenu {
+    margin-top: 12px !important;
+}
+
+div.logRecord {
+    padding: 0 30px 0 30px
+}
+
+.logColorDefault {
+    color:grey !important;
+}
+
+.logColor01m {
+    color: grey !important;
+}
+
+.logColor30m {
+    color: black !important;
+}
+
+.logColor31m {
+    color: red !important;
+}
+
+.logColor32m {
+    color: green !important;
+}
+
+.logColor33m {
+    color: brown !important;
+}
+
+.logColor34m {
+    color: blue !important;
+}
+
+.logColor35m {
+    color: magenta !important;
+}
+
+.logColor36m {
+    color: cyan !important;
+}
+
+.logColor37m {
+    color: white !important;
+}
+
+.logColor38m {
+    color: grey !important;
+}

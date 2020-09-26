@@ -1,0 +1,15 @@
+{
+  "name": "Collector editor",
+  "description": "Edit collector settings or create a new collector",
+  "homePage": "index",
+  "ajaxServer": "ajax.js",
+  "launcher": "nodeModule",
+  "launcherPrms": { "javaScript": "server.js" },
+  "staticDir": "static",
+  "callbackBeforeExec": "callbackBeforeExec",
+  "onChangeObjectMenuEvent": "nothing",
+  "icon": "mode_edit",
+  "timeout": 60,
+  "showWhenNoObjectsSelected": true,
+  "outputFormat": "text"
+}

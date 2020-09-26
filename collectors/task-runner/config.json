@@ -1,0 +1,13 @@
+{
+    "name": "Task runner",
+    "description": "Run specific task",
+    "active": "",
+    "separate": "",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "taskID": {
+            "description": "Task ID (you can find this information in \"Task maker\" action)",
+            "checkAs": "Integer"
+        }
+    }
+}

@@ -1,0 +1,40 @@
+//
+  Created by asbel on 25.04.2020.
+   Copyright (C) 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Restart server: перезапуск сервера сбора данных и серверных компонент
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Restart server
+                    h5.light.
+                        Restart server выполняет перезапуск компонентов отвечающих за сбор данных
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+                    h5.
+                        Возвращаемое значение: нет
+
+                    h3 Предназначение Restart server
+                    p.
+                        Restart server выполняет перезапуск части серверных компонент:
+                    ol
+                        li Сервера отвечающего за построение очередей для сбора данных по счетчикам
+                        li Процессов, вычисляющих параметры счетчиков и собирающие с данные
+                        li Активных счетчиков, собирающих данные на основе своих алгоритмов
+                        li Процесса, осуществляющего запуск действий
+                    p.
+                        При рестарте сервера в окне логирования появятся ошибки, сигнализирующие о том, что система
+                        обмена данными между процессами не может корректно выполнять свои функции, потому что часть
+                        процессов отсутствует. После запуска всех компонент ошибки пропадут.

@@ -1,0 +1,412 @@
+//
+   Created by asbel on 21.04.2015.
+   Copyright © 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            div.col.s12
+                script(src='/javascripts/javaScriptEditor.js')
+                script(src='/javascripts/pugEditor.js')
+                script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+                div.col.s12.m12.l12
+                    ul#mainTabs.tabs
+                        li.tab.col.s2: a(href='#tabServer')#serverJSEditorTab Server
+                        li.tab.col.s2: a(href='#tabAjax')#ajaxJSEditorTab Ajax
+                        li.tab.col.s2: a(href='#tabClient')#clientJSEditorTab Client
+                        li.tab.col.s2: a(href='#tabIndex')#indexPugEditorTab Home page
+                        li.tab.col.s2: a(href='#tabConf')#confEditorTab Configuration
+                        li.tab.col.s2: a(href='#tabHelp')#help Help
+                div#tabServer.row
+                    div(data-tooltip='Select action for making changes').input-field.col.s12.m6.l3.tooltipped
+                        select#ID
+                        label Select action
+                    div(data-tooltip='Enter new action ID for new action or rename selected action. Action ID will be a folder for action').input-field.col.s12.m6.l2.tooltipped
+                        input(type='text')#newActionID
+                        label(for='newActionID') New action ID
+                    div(data-tooltip='Select action group. Action will be stayed in selected group in system Action menu').input-field.col.s6.m4.l2.tooltipped
+                        select#actionsGroup
+                        label Select action group
+                    div(data-tooltip='Enter new action group for system Action menu').input-field.col.s6.m4.l2.tooltipped
+                        input(type='text')#newActionGroup
+                        label(for='newActionGroup') New action group
+                    div.input-field.col.s6.m2.l1
+                        label(data-tooltip='Delete selected action').tooltipped
+                            input(type='checkbox' disabled)#deleteAction
+                            span Delete action
+                    div(data-tooltip='Reset action parameter to default').input-field.col.s6.m1.l1.tooltipped
+                        a(href='#!')#resetBtn.btn.waves-effect.waves-light Reset
+                    div.col.s12
+                        textarea#serverJSEditorParent.
+                            /*
+                            * Copyright © #{new Date().getFullYear()}. Alexandr Belov. Contacts: <asbel@alepiz.com>
+                            * Created on #{new Date().toLocaleString()}
+                            */
+                            var log = require('../../lib/log')(module);
+
+                            module.exports = function(args, callback) {
+                                log.info('Starting action server "', args.actionName, '" with parameters', args);
+
+                                /* Enter your server code here */
+                                if(!args.o) return callback(new Error('Objects are not selected'));
+
+                                var selectedObjects;
+                                try {
+                                    selectedObjects = JSON.parse(args.o); // [{"id": "XX", "name": "name1"}, {..}, ...]
+                                } catch(err) {
+                                    return callback(new Error('Can\'t parse JSON string with a objects parameters "' + args.o + '": ' + err.message));
+                                }
+
+                                var selectedObjectsIDs = selectedObjects.map(function(obj) {
+                                    if(obj.id) return Number(obj.id);
+                                    else return 0;
+                                }).filter(function(id) {
+                                    return (id && id === parseInt(id, 10)); // return only integer IDs > 0
+                                });
+
+                                if(!selectedObjectsIDs.length || selectedObjectsIDs.length !== selectedObjects.length) {
+                                    return callback(new Error('Incorrect objects IDs ' + args.o));
+                                }
+
+                                var objectsIDsFromObjectSelector = args.objectsIDs ? args.objectsIDs.split(',') : []; // "id1,id2,id3,..."
+
+                                if(selectedObjectsIDs.length !== objectsIDsFromObjectSelector.length) {
+                                    log.warn('Selected objects number in system menu (', selectedObjectsIDs.length,
+                                        ') are not equal to objects number in objectSelector element (', objectsIDsFromObjectSelector.length, ')');
+                                }
+
+                                log.info('Selected objects IDs: ', selectedObjectsIDs, '; objects from objectSelector: ', args.objectsIDs);
+                                callback(null, selectedObjectsIDs);
+                            };
+
+
+                div#tabAjax.row
+                    div.col.s12
+                        textarea#ajaxJSEditorParent.
+                            /*
+                            * Copyright © #{new Date().getFullYear()}. Alexandr Belov. Contacts: <asbel@alepiz.com>
+                            * Created on #{new Date().toLocaleString()}
+                            */
+                            var log = require('../../lib/log')(module);
+
+                            module.exports = function(args, callback) {
+                                log.info('Starting ajax ', __filename, ' with parameters', args);
+
+                                if(args.func === 'functionOne') {
+                                    log.debug('Starting ajax ', __filename, ' function ', args.func);
+                                    var result1 = {
+                                        timestamp: Date.now(),
+                                        result: 'Hello from server!!!'
+                                    };
+                                    return callback(null, result1);
+                                }
+
+                                return callback(new Error('Ajax function is not set or unknown function "' + args.func + '"'));
+                            };
+
+                div#tabClient.row
+                    div.col.s12
+                        textarea#clientJSEditorParent.
+                            /*
+                            * Copyright © #{new Date().getFullYear()}. Alexandr Belov. Contacts: <asbel@alepiz.com>
+                            * Created on #{new Date().toLocaleString()}
+                            */
+                            function onChangeObjects(objects){
+                                JQueryNamespace.onChangeObjects(objects);
+                            }
+
+                            function callbackBeforeExec(callback) {
+                                JQueryNamespace.beforeExec(callback);
+                            }
+
+                            function callbackAfterExec(data, callback) {
+                                JQueryNamespace.afterExec(data, callback);
+                            }
+
+                            var JQueryNamespace = (function ($) {
+                                $(function () {
+                                    init(); // Will run after finishing drawing the page
+                                });
+
+                                var serverURL = parameters.action.link+'/ajax'; // path to ajax
+                                var objects = parameters.objects; // initialize the variable "objects" for the selected objects on startup
+                                var objectsSelectorElm, objectSelectorIDElm, ajaxResult1Elm;
+
+                                return {
+                                    onChangeObjects: _onChangeObjects,
+                                    beforeExec: _beforeExec,
+                                    afterExec: _afterExec
+                                };
+
+                                function _onChangeObjects (_objects) {
+                                    objects = _objects; // set variable "objects" for selected objects
+                                    initObjectsSelector(objects);
+                                    objectSelectorIDElm.text('Objects IDs: ' + objectsSelectorElm.val().join(', '));
+                                }
+
+                                function _beforeExec(callback) {
+                                    // get an array of object names from the objectSelector element
+                                    var objectsNames = objectsSelectorElm.children('option').get().map(function(optionElm) {
+                                        return $(optionElm).text();
+                                    });
+
+                                    $('#selectedObjectsNames').text(objectsNames.join(', '));
+                                    var modalDeleteConfirmInstance = M.Modal.init(document.getElementById('modalRunConfirm'), {dismissible: false});
+                                    modalDeleteConfirmInstance.open();
+                                    $('#modalRunConfirmNo').unbind('click').click(function(){
+                                        callback(new Error('Action has been canceled for objects ' + objectsNames.join(';') + '. server.js didn\'t start'));
+                                    });
+
+                                    $('#modalRunConfirmYes').unbind('click').click(function(){
+                                        callback();
+                                    });
+                                }
+
+                                function _afterExec(data, callback) {
+                                    $('#resultTitle').text('Action result');
+                                    $('#objectSelectorID').text('Action returned object IDs: ' + data.join(', '));
+                                    console.log('The action completed successfully. Action returned: ', data);
+                                    callback();
+                                }
+
+                                function init() {
+                                    objectsSelectorElm = $('#objectsIDs');
+                                    objectSelectorIDElm = $('#objectSelectorID');
+                                    ajaxResult1Elm = $('#ajaxResult');
+                                    $('#resultTitle').text('Object selector results');
+                                    initObjectsSelector(objects);
+                                    getDataByAjax();
+                                }
+
+                                function getDataByAjax() {
+                                    $.post(serverURL, {func: 'functionOne'}, function(data) {
+                                        if(data && data.result && data.timestamp) { // print result returned from ajax
+                                            ajaxResult1Elm.text('Result from ajax: "' + data.result +
+                                                '", generated at ' + new Date(data.timestamp).toLocaleString() +
+                                                '. Query time: ' + (Date.now() - data.timestamp) + 'ms');
+                                        } else {
+                                            ajaxResult1Elm.val('Error in ajax result from "functionOne". Press F12 for debug');
+                                            console.log('Result from ajax: ', data); // debug result returned from ajax
+                                        }
+                                    });
+                                }
+
+                                function initObjectsSelector (objects) {
+                                    /*
+                                    The objectsSelector callback will only be called when objectsSelector changes.
+                                    It is not called when the objectsSelector is initialized
+                                     */
+                                    objectsSelectorElm.objectsSelector (objects, function(selectElm) {
+                                        objectSelectorIDElm.html('Objects IDs: ' + selectElm.val().join(', ') +
+                                            '; Object selector element options source: "' + escapeHtml(selectElm.html()));
+                                    });
+                                }
+                            })(jQuery); // end of jQuery name space
+                div#tabIndex.row
+                    div.col.s12
+                        textarea#indexPugEditorParent.
+                            //
+                                Copyright © #{new Date().getFullYear()}. Alexandr Belov. Contacts: <asbel@alepiz.com>
+                                Created on #{new Date().toLocaleString()}
+                            doctype
+                            html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+                                head
+                                    title= action.name
+                                    link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+                                    link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+                                    meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+                                    script(src='/jquery/jquery.min.js')
+                                    script(src='/jquery-ui/jquery-ui.min.js')
+                                    script(src='/materialize-css/dist/js/materialize.js')
+                                    script.
+                                        var parameters = {
+                                            action: #{'!{JSON.stringify(action)}'},
+                                            objects: #{'!{JSON.stringify(objects)}'}
+                                        };
+
+                                        var entityMap = {
+                                            '&': #{"'&amp;'"},
+                                            '<': #{"'&lt;'"},
+                                            '>': #{"'&gt;'"},
+                                            '"': #{"'&quot;'"},
+                                            "'": #{"'&#39;'"},
+                                            '/': #{"'&#x2F;'"},
+                                            '`': #{"'&#x60;'"},
+                                            '=': #{"'&#x3D;'"},
+                                        };
+
+                                        function escapeHtml(string) {
+                                            return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                                                return entityMap[s];
+                                            });
+                                        }
+                                body
+                                    script(src='/javascripts/objectsSelector.js')
+                                    script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+                                    main
+                                        // example of action starts from here
+                                        div.row
+                                            div.col.s12
+                                                div.card-panel
+                                                    h3 New Action Template
+                                        div.row
+                                            div.col.l6.m6.s12
+                                                select(title="Object list"
+                                                    description="You can select objects from the Objects system menu and objects will be added or removed from the object selector.")#objectsIDs
+                                            div.col.l6.m6.s12
+                                                div.card
+                                                    div.card-content
+                                                        span.card-title Result returned from ajax
+                                                        p#ajaxResult
+                                                div.card
+                                                    div.card-content
+                                                        span#resultTitle.card-title Object selector results
+                                                        p#objectSelectorID Waiting while "Object list" or "Object Selector" are changed...
+
+                                    div#modalRunConfirm.modal
+                                        div.modal-content
+                                            h4 Action run confirmation
+                                            p Do you really want to run action for objects:
+                                                span#selectedObjectsNames
+                                                span ? Action will do nothing. Press F12 after run to view action result.
+                                        div.modal-footer
+                                            a(href='#!')#modalRunConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                                            a(href='#!')#modalRunConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+                                        // end example of action
+
+                div#tabConf.row
+                    div.col.s12
+                        textarea#confEditorParent.
+                            {
+                                "name": "Action name",
+                                "description": "Action description",
+                                "homePage": "index",
+                                "ajaxServer": "ajax.js",
+                                "execMethod": "post",
+                                "launcher": "nodeModule",
+                                "launcherPrms": { "javaScript": "server.js" },
+                                "staticDir": "static",
+                                "timeout": 60,
+                                "showWhenNoObjectsSelected": true,
+                                "onChangeObjectMenuEvent": "callback:onChangeObjects",
+                                "callbackBeforeExec": "callbackBeforeExec",
+                                "callbackAfterExec": "callbackAfterExec",
+                                "outputFormat": "text",
+                                "descriptionTemplate": "Make some action with objects %:o:%",
+                                "icon": "settings",
+                                "canAddParametersToAction": true,
+                                "parameters": {
+                                    "objects": {
+                                        "description": "List of objects IDs, used as templates"
+                                    }
+                                }
+                            }
+                div#tabHelp.row
+                    div.input-field.col.s2
+                        select#lang
+                        label Help page language
+                    div.input-field.col.s2
+                        input(type='text' data-tooltip='Add new help page translation')#addLang.tooltipped
+                        label(for='addLang') Add new language
+                    div.input-field.col.s1
+                        a(href='#addLangBtn')#addLangBtn.btn-floating.waves-effect.waves-light
+                            i.material-icons add
+                    div.col.s12
+                        textarea#helpEditor.
+                            //
+                                Copyright © #{new Date().getFullYear()}. Alexander Belov. Contacts: <asbel@alepiz.com>
+                                Created on #{new Date().toLocaleString()}
+                            doctype
+                            html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+                                head
+                                    title Action name
+                                    link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+                                    link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+                                    meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+                                    meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+                                    script(src='/materialize-css/dist/js/materialize.js')
+                                    script(src='/javascripts/help.js')
+                                body
+                                    header
+                                        div.row
+                                            div.col.s12.m10.offset-m1
+                                                h1 Action name
+                                                h5.light.
+                                                    You can make some actions using Action name
+
+                                    main
+                                        div.row
+                                            div.col.s12.m10.offset-m1
+                                                img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+
+                                                h2 Action name description
+                                                p.
+                                                    You can make some actions with some objects using Action name actions
+
+                                                h5.
+                                                    Returned value: ObjectID used in action
+
+                                                h2 Interface description
+                                                h3 Objects list
+                                                p.
+                                                    You can add objects to Objects list. To do this, select the
+                                                    objects in the Objects system menu and click on
+                                                    ADD SELECTED OBJECTS. If you click on the "x" to the right of
+                                                    the object in Objects list, the object will be deleted.
+                                                    You can delete all objects from Objects list by clicking on
+                                                    REMOVE ALL OBJECTS.
+                div#modalDeleteConfirm.modal
+                    div.modal-content
+                        h4 Delete confirmation
+                        p Do you really delete selected action?
+                    div.modal-footer
+                        a(href='#!')#modalDeleteConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                        a(href='#!')#modalDeleteConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+
+                div#modalRenameConfirm.modal
+                    div.modal-content
+                        h4 Rename confirmation
+                        p Do you really want to rename selected action?
+                    div.modal-footer
+                        a(href='#!')#modalRenameConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                        a(href='#!')#modalRenameConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+    footer
+        input(type="hidden" name="actionName" value= action.name)
+

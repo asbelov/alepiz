@@ -1,0 +1,74 @@
+<!--
+  ~ Copyright © 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+  -->
+
+<html lang="ru">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Create a new task</title>
+    <style>
+        html {
+            line-height: 1.5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+            font-weight: normal;
+            color: rgba(0, 0, 0, 0.87);
+            font-size: 15px;
+        }
+        p {
+            line-height: 1.5em;
+            margin: 0;
+            padding: 0;
+        }
+        .bold {
+            font-weight: bold;
+        }
+        .task-action-name {
+            font-weight: bold;
+            display:block;
+            float:left;
+        }
+        .task-action-name {
+            font-weight: bold;
+            display:inline-block;
+        }
+        .task-action-startup {
+            font-style:italic;
+            display:inline-block;
+        }
+        .task-action-startup[data-startup-option="0"]::after {
+            content: "(Run if previous action completed without errors):";
+        }
+        .task-action-startup[data-startup-option="1"]::after {
+            content: "(Run if someone of previous actions executed with an errors):";
+        }
+        .task-action-startup[data-startup-option="2"]::after {
+            content: "(Run and don't wait until the previous action will be completed):";
+        }
+        .task-action-description {
+            display:block;
+            margin: 20px 0;
+            padding-left: 1.5rem;
+            border-left: 2px solid #ee6e73;
+        }
+        .quoted {
+            display:block;
+            margin: 20px 0;
+            padding: 0.5rem 0 1rem 1rem;
+            border-left: 2px solid blue;
+        }
+    </style>
+</head>
+<body>
+<p><span class="bold">Action</span>: %:ACTION:%</p>
+
+<div class="quoted">
+<h3>%:TASK_NAME:%</h3>
+%:ACTIONS_DESCRIPTION_HTML:%
+
+<hr/>
+<p><span class="bold">Created by:</span> %:TASK_CREATOR_FULL_NAME:%</p>
+<p><span class="bold">Condition:</span> %:EXECUTE_CONDITION:%</p>
+</div>
+</body>
+</html>
+

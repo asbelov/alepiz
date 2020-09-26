@@ -1,0 +1,49 @@
+//
+  Created by asbel on 22.04.2020.
+   Copyright (C) 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Tasks groups editor: редактирование групп для задач
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Tasks groups editor
+                    h5.light.
+                        Tasks groups editor служит для создания, редактирования и удаления групп для задач
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+                    h5.
+                        Возвращаемое значение: нет
+
+                    h3 Описание полей ввода
+
+                    h4 Group name
+                    p Поле служит для ввода названия новой группы или редактирования названия существующей
+
+                    h4 User roles
+                    p.
+                        Поле служит для ввода ролей, которым будет доступна данная группа задач в действии Task maker.
+                        Назначение для задачи определенной группы влияет на доступ к ней пользователей.
+
+                    h4 Список групп
+                    p В списке групп можно создать, удалить или отредактировать название существующей группы
+
+                    h5 New group
+                    p Если необходимо добавить новую группу, выберите New group и введите название группы в Group name
+
+                    h5 <Группа>
+                    p Если требуется отредактировать название группы, выберите группу и измените ее название в Group name
+                    p Если необходимо удалить группу, нажмите на "x" рядом с названием группы
+
+                    p Все изменения вступят в силу только после запуска действия.

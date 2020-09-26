@@ -1,0 +1,5 @@
+Task status: %:ACTION:%
+Created by: %:TASK_CREATOR_FULL_NAME:%
+Condition: %:EXECUTE_CONDITION:%
+
+%:ACTIONS_DESCRIPTION:%

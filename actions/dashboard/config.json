@@ -1,0 +1,162 @@
+{
+    "name": "Dashboard",
+    "description": "Events status monitoring",
+    "homePage": "index",
+    "ajaxServer": "ajax.js",
+    "staticDir": "static",
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "launcherPrms": { "javaScript": "server.js" },
+    "showWhenNoObjectsSelected": true,
+    "onChangeObjectMenuEvent": "callback:onChangeObjects",
+    "callbackBeforeExec": "callbackBeforeExec",
+    "callbackAfterExec": "callbackAfterExec",
+    "timeout": 60,
+    "icon": "event",
+    "updateInterval": 15,
+    "monthNames": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    "actions": [{
+        "ID": "data_browser",
+        "name": "graph"
+    }, {
+        "ID": "sched_viewer",
+        "name": "schedule"
+    }, {
+        "ID": "log_viewer",
+        "name": "log"
+    }, {
+        "ID": "objects_properties",
+        "name": "props"
+    }, {
+        "ID": "counter_settings",
+        "name": "counter"
+    }],
+    "importance": {
+        "0": {
+            "text": "Disaster",
+            "color": "#E45959"
+        },
+        "1": {
+            "text": "High",
+            "color": "#E97659"
+        },
+        "2": {
+            "text": "Average",
+            "color": "#FFA059"
+        },
+        "3": {
+            "text": "Warning",
+            "color": "FFC859"
+        },
+        "4": {
+            "text": "Information",
+            "color": "#7499FF"
+        },
+        "5": {
+            "text": "Harmless",
+            "color": "#97AAB3"
+        }
+    },
+    "rcptOptions": {
+        "placeholder": "Add recipients",
+        "secondaryPlaceholder": "Add recipient",
+        "autocompleteOptions": {
+            "data": {
+                "root@domain.com": null,
+                "support@domain.com": null,
+                "business@domain.com": null
+            },
+            "limit": 100,
+            "minLength": 1
+        }
+    },
+    "replyTo": "\"Admins\" <root@domain.com>",
+    "messageTemplates": [
+        {
+            "name": "Information",
+            "tip": "Result of internal processes",
+            "importance": 0,
+            "default": true,
+            "subject": "[INFO]"
+        }, {
+            "name": "Task",
+            "tip": "Task execution result",
+            "subject": "[TASK]",
+            "importance": 0
+        }, {
+            "name": "Mistaken",
+            "tip": "Mistake in event",
+            "subject": "[MISTAKE]",
+            "importance": 0
+        }, {
+            "name": "Admins and support",
+            "tip": "Send to administrators and support",
+            "recipients": ["\"Admins\" <root@domain.com>", "\"support\" <support@domain.com>"],
+            "subject": "[Problem]"
+        }, {
+            "name": "Admins",
+            "tip": "Send to administrators",
+            "recipients": ["\"Admins\" <root@domain.com>"],
+            "subject": "[Admins]"
+        }, {
+            "name": "Send to support",
+            "tip": "Send to support",
+            "recipients": ["\"Support\" <support@domain.com>"],
+            "subject": "[Support]"
+        }
+    ],
+    "actionsMessageTemplates": {
+        "addAsHint": {
+            "subject": "Hint for %:COUNTERS_LIST:%",
+            "bodyHeader": "\n\n",
+            "eventTemplate": "%:COUNTER_NAME:% (%:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%)\n",
+            "intervalsDivider": ",\n\t\t\tand "
+        },
+        "addAsHintForObject": {
+            "subject": "Hint for %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+            "bodyHeader": "\n\n",
+            "eventTemplate": "%:OBJECT_NAME:%: %:COUNTER_NAME:%: (%:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%)\n",
+            "intervalsDivider": ",\n\t\t\tand "
+        },
+        "addAsComment": {
+            "subject": "%:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+            "objectsListLength": 100,
+            "countersListLength": 300,
+            "bodyHeader": "\n\nEvents list:\n",
+            "eventTemplate": "%:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
+            "intervalsDivider": ",\n\t\t\tand "
+        },
+        "solveProblem": {
+            "subject": "Events was marked as solved: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+            "objectsListLength": 100,
+            "countersListLength": 300,
+            "tables": ["currentEvents"],
+            "bodyHeader": "\n\nFollowing events was marked as solved:\n",
+            "eventTemplate": "%:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
+            "intervalsDivider": ",\n\t\t\tand "
+        },
+        "disableEvents": {
+            "subject": "Disable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+            "objectsListLength": 100,
+            "countersListLength": 300,
+            "bodyHeader": "\n\nFollowing events was disabled until %:DISABLE_UNTIL:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.\n",
+            "eventTemplate": "%:ACTION:%: %:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
+            "intervalsDivider": ",\n\t\t\tand "
+        },
+        "enableEvents": {
+            "subject": "Enable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
+            "objectsListLength": 100,
+            "countersListLength": 300,
+            "tables": ["disabledEvents"],
+            "bodyHeader": "\n\nFollowing events was enabled:\n",
+            "eventTemplate": "%:ACTION:%: %:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
+            "intervalsDivider": ",\n\t\t\tand "
+        }
+    },
+    "pronunciation": {
+        "(\\d+).\\d+": "$1",
+        "(\\d)Kb": "$1Килобайт",
+        "(\\d)Mb": "$1Мегабайт",
+        "(\\d)Gb": "$1Гигабайт"
+    }
+}

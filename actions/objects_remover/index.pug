@@ -1,0 +1,73 @@
+//
+  Created by asbel on 21.04.2015.
+   Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            div.col.s12
+                script(src='/javascripts/objectsSelector.js')
+                script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+                div.row
+                    div.col.s12
+                        div.card
+                            div.card-content
+                                span.card-title Objects list to remove
+                                p Select objects to remove. All selected objects will be removed with history data, tasks and all other linked information
+                                p Objects list:&nbsp
+                                    b#objectsNamesInObjectsList
+                                p Please be attention: if you remove objects without children objects, some children objects can stay zombie. You can access to children using "SEARCH" panel at the top of the objects list
+                                p &nbsp;
+                                p
+                                    label
+                                        input(type="checkbox" checked)#deleteWithChildren
+                                        span Delete selected objects with children objects
+
+                div#modalDeleteConfirm.modal.modal-fixed-footer
+                    div.modal-content
+                        h4 Delete confirmation
+                        p Do you really delete selected objects from database?
+                        p#objectsNamesInModalDialog
+                    div.modal-footer
+                        a(href='#!')#modalDeleteConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                        a(href='#!')#modalDeleteConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+
+
+    footer
+        input(type="hidden" name="actionName" value= action.name)

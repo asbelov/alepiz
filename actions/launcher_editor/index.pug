@@ -1,0 +1,139 @@
+//
+   Created by asbel on 21.04.2015.
+   Copyright © 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            div.col.s12
+                script(src='/javascripts/javaScriptEditor.js')
+                script(src='/javascripts/pugEditor.js')
+                script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+                div.col.s12.m12.l12
+                    ul#mainTabs.tabs
+                        li.tab.col.s2: a(href='#tabLauncher')#launcher Launcher
+                        li.tab.col.s2: a(href='#tabHelp')#help Help
+                div#tabLauncher.row
+                    div(data-tooltip='Select launcher for making changes').input-field.col.s12.m4.l3.tooltipped
+                        select#ID
+                        label Select launcher
+                    div(data-tooltip='Enter new launcher name or rename selected launcher. Launcher name will be a folder for launcher').input-field.col.s12.m4.l3.tooltipped
+                        input(type='text')#newLauncher
+                        label(for='newLauncher') New laucher
+                    div.input-field.col.s6.m4.l3
+                        label(data-tooltip='Delete selected launcher').tooltipped
+                            input(type='checkbox' disabled)#deleteLauncher
+                            span Delete launcher
+                    div.col.s12
+                        textarea#launcherEditor.
+                            /*
+                            * Copyright © #{new Date().getFullYear()}. Alexandr Belov. Contacts: <asbel@alepiz.com>
+                            * Created on #{new Date().toLocaleString()}
+                            */
+                            module.exports = function(prms, args, callback) {
+                                if(!prms) return callback(new Error('Parameters are not set for launcher ' + __dirname));
+
+                                try {
+                                    // start your launcher here
+                                    callback();
+                                } catch (err) {
+                                    callback(new Error('Error occurred while executing' + __dirname + ': ' + err.message));
+                                }
+                            };
+
+                div#tabHelp.row
+                    div.input-field.col.s2
+                        select#lang
+                        label Help page language
+                    div.input-field.col.s2
+                        input(type='text' data-tooltip='Add new help page translation')#addLang.tooltipped
+                        label(for='addLang') Add new language
+                    div.input-field.col.s1
+                        a(href='#addLangBtn')#addLangBtn.btn-floating.waves-effect.waves-light
+                            i.material-icons add
+                    div.col.s12
+                        textarea#helpEditor.
+                            //
+                                Copyright © #{new Date().getFullYear()}. Alexander Belov. Contacts: <asbel@alepiz.com>
+                                Created on #{new Date().toLocaleString()}
+                            doctype
+                            html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+                                head
+                                    title Launcher
+                                    link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+                                    link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+                                    meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+                                    meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+                                    script(src='/materialize-css/dist/js/materialize.js')
+                                    script(src='/javascripts/help.js')
+                                body
+                                    header
+                                        div.row
+                                            div.col.s12.m10.offset-m1
+                                                h1 Launcher
+                                                h5.light.
+                                                    You can execute something using Launcher
+
+                                    main
+                                        div.row
+                                            div.col.s12.m10.offset-m1
+
+                                                h2 Launcher description
+                                                p.
+                                                    You can execute something.
+
+                div#modalDeleteConfirm.modal
+                    div.modal-content
+                        h4 Delete confirmation
+                        p Do you really delete selected launcher?
+                    div.modal-footer
+                        a(href='#!')#modalDeleteConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                        a(href='#!')#modalDeleteConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+
+                div#modalRenameConfirm.modal
+                    div.modal-content
+                        h4 Rename confirmation
+                        p Do you really want to rename selected launcher?
+                    div.modal-footer
+                        a(href='#!')#modalRenameConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                        a(href='#!')#modalRenameConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+    footer
+        input(type="hidden" name="actionName" value= action.name)
+

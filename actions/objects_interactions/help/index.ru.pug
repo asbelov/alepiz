@@ -1,0 +1,331 @@
+//
+  Created by asbel on 17.04.2020.
+   Copyright (C) 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Objects interactions: управление взаимодействиями между объектами. Подробное описание взаимодействий
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Objects interactions
+                    h5.light.
+                        С помощью Objects interactions можно устанавливать взаимодействия между объектами.
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+                    h5.
+                        Возвращаемое значение: ничего не возвращает
+
+                    h3 Предназначение Objects interactions и описание возможных взаимодействий объектов
+                    p.
+                        Objects interactions предназначен для настройки взаимодействия объектов между собой в
+                        системном меню Objects. Правильно настроенное взаимодействие позволяет удобно фильтровать
+                        и отображать объекты в системном меню Objects. Ниже описаны варианты взаимодействий между
+                        объектами.
+                    h4 Включение (группировка) объектов
+                    p.
+                        Включение (inclusion) объектов означает, что объект включает в себя другие объекты и является для них группой.
+                        При нажатии на имени такого объекта появится список
+                        вложенных объектов. Если выбрать несколько объектов у которых нет настроенного
+                        взаимодействия между собой, при этом каждый их них включает в себя другие
+                        объекты и нажать на любой из выбранных объектов, появится список всех вложенных объектов во все группы.
+                    blockquote.
+                        Например, Parent object 1 содержит Object1, Object2, Object3, а Parent object 2 содержит
+                        Object2, Object3, Object4. Результатом взаимодействия Parent object 1 и Parent object 2 будет
+                        Object1, Object2, Object3, Object4
+
+                    h4 Пересечение объектов
+                    p.
+                        Если объекты включают в себя вложенные объекты и для них настроено "пересечение" (intersection), то
+                        если выбрать пересекающиеся объекты нажать на любой из выбранных объектов, появится список,
+                        содержащий только пересекающиеся вложенные объекты.
+                    blockquote.
+                        Например, Parent object 1 содержит Object1, Object2, Object3, а Parent object 2 содержит
+                        Object2, Object3, Object4. Результатом взаимодействия с пересечением для
+                        Parent object 1 и Parent object 2 будет Object2, Object3.
+
+                    h4 Исключение объектов
+                    p.
+                        Если объекты включают в себя вложенные объекты и для них настроено "исключение" (exclude), то
+                        если выбрать эти объекты и нажать на любой из выбранных объектов, появится список вложенных объектов
+                        за исключением пересекающихся.
+                    blockquote.
+                        Например, Parent object 1 содержит Object1, Object2, Object3, а Parent object 2 содержит
+                        Object2, Object3, Object4. Результатом взаимодействия с исключением для
+                        Parent object 1 и Parent object 2 будет Object1, Object4.
+
+                    h3 Описание полей ввода
+                    h4 Objects list
+                    p.
+                        Настройки взаимодействий будут применяться к объектам, перечисленным в этом поле. Если в
+                        системном меню Objects выбрать объекты, а затем запустить Objects interactions,
+                        выбранные объекты появятся в поле Objects list. При необходимости можно добавить объекты в
+                        поле Objects list. Для этого нужно выбрать объекты в системном меню Objects и нажать на
+                        ADD SELECTED OBJECTS. Если нажать на крестик справа от объекта в поле Objects list, объект
+                        будет удален. Удалить все объекты из Objects list можно нажав на REMOVE ALL OBJECTS.
+                    img(src="./images/help.objectsList.png").materialboxed.card-panel.hoverable
+
+                    h4 Objects interactions setting
+                    p.
+                        Объекты из поля Objects list будут взаимодействовать с объектами из поля Objects interactions
+                        setting. При необходимости можно добавить объекты в поле Objects interactions setting.
+                        Для этого нужно выбрать объекты в системном меню Objects и нажать на
+                        ADD SELECTED OBJECTS TO INTERACTION TABLE. Если нажать на корзину слева от объекта в поле
+                        Objects interactions setting, объект будет удален.
+                        Для настройки взаимодействий между объектами нужно отметить соответствующие взаимодействия в
+                        таблице поля Objects interactions setting.
+                    img(src="./images/help.objectsInteractionsList.png").materialboxed.card-panel.hoverable
+
+                    h5 Настройка взаимодействия объектов
+                    table
+                        thead
+                            tr
+                                th Взаимодействие
+                                th Описание
+                        tbody
+                            tr
+                                td Include
+                                td.
+                                    Объекты из Objects list будут включать объект из строки таблицы Objects
+                                    interactions setting
+                            tr
+                                td Included In
+                                td.
+                                    Объект из строки таблицы Objects interactions setting будет включать объекты из
+                                    Objects list
+                            tr
+                                td Intersection
+                                td.
+                                    Будут отображаться только общие объекты, включенные в Objects list и в объект из
+                                    строки таблицы Objects interactions setting
+                            tr
+                                td Exclusion
+                                td.
+                                    Будут отображаться не общие объекты, включенные в Objects list и в объект из
+                                    строки таблицы Objects interactions setting
+                            tr
+                                td Different
+                                td.
+                                    Если для объектов из Objects list застроены несовпадающие взаимодействия с объектом
+                                    из строки Objects interactions setting, будет выбрано взаимодействие Different. После
+                                    выполнения действия несовпадающие взаимодействия между объектами меняться не будут.
+
+                    h3 Примеры взаимодействий объектов и детальное описание
+                    h4 Алгоритм вычисления взаимодействий
+                    p.
+                        В случае, если выбрано несколько объектов, их взаимодействие строится по следующему
+                        алгоритму:
+                    ol
+                        li.
+                            Если для группы объектов настроен одинаковый тип взаимодействия таким
+                            образом, что все эти объекты взаимодействуют "каждый с каждым", то создается
+                            группа из таких объектов и вычисляется требуемое взаимодействие для вложенных
+                            объектов всей этой группы.
+                        li.
+                            Если для группы объектов настроен одинаковый тип взаимодействия, но эти
+                            объекты не взаимодействуют "каждый с каждым", то вычисляется требуемое
+                            взаимодействие для
+                            каждой пары объектов, а потом полученные результаты объединяются.
+                        li.
+                            Если для объектов настроены разные типы взаимодействий, то вычисляются
+                            требуемые взаимодействия для
+                            каждой пары объектов, а потом полученные результаты объединяются.
+
+                    h4 Пример простого взаимодействия
+                    p.
+                        Ниже приведен пример взаимодействия трех объектов Parent object 1, Parent object 2
+                        и Parent object 3, для которых не настроено
+                        взаимодействие друг с другом. Результатом является объединение всех вложенных
+                        объектов.
+                    table
+                        thead
+                            tr
+                                th Parent object 1
+                                th Parent object 2
+                                th Parent object 3
+                        tbody
+                            tr
+                                td Object 1
+                                td Object 3
+                                td Object 4
+                            tr
+                                td Object 2
+                                td Object 4
+                                td Object 5
+                            tr
+                                td Object 3
+                                td Object 5
+                                td Object 6
+                            tr
+                                td Object 4
+                                td Object 6
+                                td Object 7
+                            tr
+                                td Object 5
+                                td
+                                td Object 8
+                            tr
+                                td
+                                td
+                                td Object 9
+                            tr
+                                td(colspan=3).
+                                    #[b Result:] Object1, Object2, Object3, Object4, Object5, Object6,
+                                    Object7, Object8, Object9
+
+                    h4 Пример пересечения объектов
+                    p.
+                        Ниже приведен пример взаимодействия трех объектов Parent object 1, Parent object 2
+                        и Parent object 3, для которых настроено пересечение по типу "каждый с каждым".
+                        То есть для Parent object 1 настроено пересечение с Parent object 2, Parent object 2
+                        настроено пересечение с Parent object 3 и Parent object 1 настроено пересечение
+                        с Parent object 3. Результатом является список пересекающихся вложенных объектов.
+                    table
+                        thead
+                            tr
+                                th Parent object 1
+                                th Parent object 2
+                                th Parent object 3
+                        tbody
+                            tr
+                                td Object 1
+                                td Object 3
+                                td Object 4
+                            tr
+                                td Object 2
+                                td Object 4
+                                td Object 5
+                            tr
+                                td Object 3
+                                td Object 5
+                                td Object 6
+                            tr
+                                td Object 4
+                                td Object 6
+                                td Object 7
+                            tr
+                                td Object 5
+                                td
+                                td Object 8
+                            tr
+                                td
+                                td
+                                td Object 9
+                            tr
+                                td(colspan=3) #[b Result:] Object4, Object5
+
+                    h4 Пример исключения объектов
+                    p.
+                        Ниже приведен пример взаимодействия трех объектов Parent object 1, Parent object 2
+                        и Parent object 3, для которых настроено исключение по типу "каждый с каждым".
+                        То есть для Parent object 1 настроено исключение с Parent object 2, Parent object 2
+                        настроено исключение с Parent object 3 и Parent object 1 настроено исключение
+                        с Parent object 3. Результатом является список не пересекающихся вложенных объектов.
+                    table
+                        thead
+                            tr
+                                th Parent object 1
+                                th Parent object 2
+                                th Parent object 3
+                        tbody
+                            tr
+                                td Object 1
+                                td Object 3
+                                td Object 4
+                            tr
+                                td Object 2
+                                td Object 4
+                                td Object 5
+                            tr
+                                td Object 3
+                                td Object 5
+                                td Object 6
+                            tr
+                                td Object 4
+                                td Object 6
+                                td Object 7
+                            tr
+                                td Object 5
+                                td
+                                td Object 8
+                            tr
+                                td
+                                td
+                                td Object 9
+                            tr
+                                td(colspan=3) #[b Result:] Object1, Object2, Object3, Object6, Object7, Object8, Object9
+                    h4 Пример исключения и объединения объектов
+                    p.
+                        Ниже приведен пример взаимодействия трех объектов Parent object 1, Parent object 2,
+                        Parent object 3, Parent object 4 и Parent object 5.
+                        Для Parent object 1, Parent object 2, Parent object 3 настроено исключение по
+                        типу "каждый с каждым". Для Parent object 4 и Parent object 5 настроено пересечение
+                        между собой.
+                        То есть для Parent object 1 настроено исключение с Parent object 2, Parent object 2
+                        настроено исключение с Parent object 3 и Parent object 1 настроено исключение
+                        с Parent object 3, Parent object 4 настроено пересечение с Parent object 5
+
+                        Результатом является объединение списка не пересекающихся вложенных объектов для
+                        Parent object 1, Parent object 2, Parent object 3 и списка пересекающихся
+                        объектов для Parent object 4 и Parent object 5
+                    table
+                        thead
+                            tr
+                                th Parent object 1
+                                th Parent object 2
+                                th Parent object 3
+                                th Parent object 4
+                                th Parent object 5
+                        tbody
+                            tr
+                                td Object 1
+                                td Object 3
+                                td Object 4
+                                td Object 10
+                                td Object 11
+                            tr
+                                td Object 2
+                                td Object 4
+                                td Object 5
+                                td Object 11
+                                td Object 12
+                            tr
+                                td Object 3
+                                td Object 5
+                                td Object 6
+                                td Object 12
+                                td Object 13
+                            tr
+                                td Object 4
+                                td Object 6
+                                td Object 7
+                                td
+                                td
+                            tr
+                                td Object 5
+                                td
+                                td Object 8
+                                td
+                                td
+                            tr
+                                td
+                                td
+                                td Object 9
+                                td
+                                td
+                            tr
+                                td(colspan=5).
+                                    #[b Result:] Object1, Object2, Object3, Object6, Object7, Object8, Object9,
+                                    Object11, Object12
+
+

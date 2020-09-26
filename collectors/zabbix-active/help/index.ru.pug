@@ -1,0 +1,116 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-5-17 19:40:53
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Zabbix active: получает данные от Zabbix агентов в активном режиме. Порт 10051
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Zabbix active
+                    h5.light.
+                        Получает данные от Zabbix агентов в активном режиме работы агентов
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание Zabbix active
+                    p.
+                        Сборщик используется для получения данных от Zabbix агентов, работающих в активном режиме.
+                        Активный режим работы Zabbix агентов означает, что агент инициирует подключение к ALEPIZ
+                        на TCP порт 10051,
+                        запрашивает информацию о том, какие данные и с какой периодичностью требуется собирать и
+                        начинает сбор данных, передавая их в ALEPIZ.
+                        Zabbix agent разрабатывается компанией #[a(href="https://www.zabbix.com/" target="_blank") Zabbix SIA],
+                        разрабатывающей решения для мониторинга. Zabbix агент можно скачать как с сайта компании
+                        #[a(href="https://www.zabbix.com/ru/download_agents" target="_blank") Zabbix SIA],
+                        так и специально адаптированный пакет под ALEPIZ со страницы
+                        #[a(href="https://alepiz.com/download/" target="_blank") https://alepiz.com/download/].
+                    h3 Throttling
+                    p.
+                        Для того, чтобы уменьшить нагрузку на ALEPIZ и не засорять базу данных, в сборщике
+                        реализована система пропусков для одинаковых или похожих значений. Например, если
+                        состояние Windows сервиса длительное время раз в 30 секунд возвращает 0 (запущен), то сборщик
+                        может не отправлять все эти значения в ALEPIZ, а отправлять только часть из них, пропуская промежуточные
+                        данные. Как только значение поменяется на 6 (остановлен), это значение сразу же будет отправлено
+                        в систему. Кроме точного сравнения значений для пропуска, можно использовать так же отклонения, когда
+                        следующее значение почти такое же, как и предыдущее
+                        (параметр "Values deviation for skip 0-100%. 0 - values must be equal (throttling)").
+                        Например, если объем свободной памяти за 30
+                        секунд изменился не более чем на 5%, значение тоже не будет передано в ALEPIZ.
+                    p.
+                        Для ограничения количества значений, которые не передаются в систему, устанавливаются параметры
+                        "Number of values that can be skipped (throttling)" и
+                        "Time interval when values can be skipped (throttling)", которые ограничивают соответственно
+                        максимальное количество пропущенных значений и максимальный интервал времени, в течение которого
+                        значения могут быть пропущены.
+                    p.
+                        Если вы делаете счетчики, которые будут зависеть от счетчиков с настроенным пропуском значений
+                        нужно понимать, что зависимые счетчики так же не будут срабатывать в случае, если сборщик не отправил
+                        пропущенное значение в систему.
+                    h3 Параметры
+                    ul.browser-default
+                        li.
+                            Value of parameter "hostname" from zabbix_agentd.conf - Идентификатор, с которым Zabbix
+                            агент будет возвращать данные. Его значение можно посмотреть в параметре "hostname"
+                            файла конфигурации Zabbix агента "zabbix_agentd.conf". Значение чувствительно к регистру
+                            символов
+                        li.
+                            Zabbix item key - ключ Zabbix агента. Информацию о ключах Zabbix агента можно получить
+                            на сайте компании #[a(href="https://www.zabbix.com/" target="_blank") Zabbix SIA]
+                        li.
+                            Parameters for Zabbix item key - параметры ключа Zabbix агента. Информацию о параметрах
+                            Zabbix агента можно получить на сайте компании
+                            #[a(href="https://www.zabbix.com/" target="_blank") Zabbix SIA]
+                        li.
+                            Polling frequency for item in seconds - временной интервал в секундах, с которым Zabbix
+                            агент будет отправлять данные в ALEPIZ
+                        li.
+                            Return only numeric values - Указывает сборщику, что необходимо принимать только данные в
+                            виде числовых значений. Все остальные значения, возвращаемые Zabbix агентом, будут игнорироваться.
+                        li.
+                            Number of values that can be skipped (throttling) - Максимальное количество похожих значений,
+                            которые не будут передаваться в ALEPIZ. Если 0, то пропуск значений отключается для этого счетчика.
+                        li.
+                            Time interval when values can be skipped (throttling) - Максимальный интервал времени
+                            (в миллисекундах), в течение которого похожие значения не будут передаваться в ALEPIZ.
+                            Если 0, то пропуск значений отключается для этого счетчика.
+                        li.
+                            Values deviation for skip 0-100%. 0 - values must be equal (throttling) - процент отклонений,
+                            для значений. Если следующее полученное значение отличаеся от предыдущего не более, чем на
+                            этот процент и включен пропуск значений, то значение не будет передано в ALEPIZ.
+                    p.
+                        Пример параметров счетчика, используемого для сбора данных о свободной памяти сервера,
+                        на котором установлен ALEPIZ:
+                    img(src="./images/help.parameters.png" width="1024").materialboxed.card-panel.hoverable
+                    h3 Настройки
+                    p.
+                        Настройки сборщика хранятся в файле config/conf.json в секции collectors.zabbix-active
+                    ul.browser-default
+                        li.
+                            localAddress - IP адрес с которого производится подключение к серверу сборщика. Если null
+                            или не указано, то подключение будет производится с IP адреса, который выберет
+                            операционная система
+                        li.
+                            serverAddress - IP адрес, который слушает сборщик и к которому производится подключение
+                        li.
+                            port - TCP порт, который слушает сборщик
+                        li.
+                            logZabbixAgentErrors - писать ли в лог ошибки от Zabbix agent типа
+                             "Zabbix agent returned error for active check...", , например когда невозможно
+                             собрать какие-то данные. В некоторых случаях ошибок может быть много и это усложняет
+                             чтение лога.
+                    h3 Возвращаемое значение
+                    p.
+                        Сборщик возвращает данные, которые вернул Zabbix агент. Подробную информацию о возвращаемых
+                        данных и об объектах LDD можно получить на сайте компании
+                        #[a(href="https://www.zabbix.com/" target="_blank") Zabbix SIA]
+
+

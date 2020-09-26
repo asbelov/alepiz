@@ -1,0 +1,173 @@
+//
+  Created by asbel on 17.04.2020.
+   Copyright (C) 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Object editor: редактирование параметров объекта. Подключение и отключение счетчиков от объекта
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Object editor
+                    h5.light.
+                        С помощью Object editor можно редактировать некоторые свойства
+                         объектов и управлять подключением счетчиков к объектам
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h5.
+                        Возвращаемое значение: разделенными запятыми object ID (идентификаторы редактируемых объектов
+                        из базы данных).
+
+                    h3 Описание полей ввода
+                    h4 Objects list
+                    p.
+                        Для редактирования вам необходимо выбрать один или несколько объектов в системном меню Objects.
+                        Выбранные объекты отобразятся в поле Objects list
+
+                    h4 New object name и Regular expression for objects batch rename (для нескольких объектов)
+                    p.
+                        Если вы выбрали один объект и хотите его переименовать, измените его имя во поле New object name.
+                        На примере ниже объект SYSTEM [PAD-ASBEL] переименовывается в объект SYSTEM [PAD-ASBEL_OLD]
+                    img(src="./images/help.renameOneObject.png").materialboxed.card-panel.hoverable
+                    p.
+                        Если вы выбрали несколько объектов, их так же можно переименовать с помощью регулярного выражения.
+                        Синтаксис регулярного выражения для замены имен объектов аналогичен синтаксису функции
+                        #[a(href="https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Global_Objects/String/replace" target="_blank") replace(regExp, newSubstr)]
+                        в JavaScript.
+                    p.
+                        В поле Regular expression for objects batch rename водится первый аргумент функции -
+                        регулярное выражение regExp, соответствующее именам выбранных объектов.
+                        Регулярное выражение будет дополнено флагами "i" (игнорирование регистра при сопоставлении)
+                        и "g" (глобальное сопоставление).
+                    p.
+                        Поле New object name заполняется вторым аргументом функции - newSubstr. В этом поле можно
+                        использовать специальные шаблоны замены:
+                    table
+                        thead
+                            tr
+                                th Шаблон
+                                th Замена
+                        tbody
+                            tr
+                                td $$
+                                td Вставляет символ доллара «$».
+                            tr
+                                td $&
+                                td Вставляет сопоставившуюся подстроку.
+                            tr
+                                td $`
+                                td Вставляет часть строки, предшествующую сопоставившейся подстроке.
+                            tr
+                                td $'
+                                td Вставляет часть строки, следующую за сопоставившейся подстрокой.
+                            tr
+                                td $n или $nn
+                                td Символы n или nn являются десятичными цифрами, вставляет n-ную сопоставившуюся подгруппу из объекта RegExp в первом параметре.
+                    p.
+                        На примере ниже объекты NETWORK INTERFACES [PAD-ASBEL], VOLUMES [PAD-ASBEL],
+                        CPU [PAD-ASBEL] с помощью регулярного выражения replace(/^(.+?) \[PAD-ASBEL\]$/ig, "$1 [PAD-ASBEL_OLD]").
+                        переименовываются в объекты NETWORK INTERFACES [PAD-ASBEL_OLD], VOLUMES [PAD-ASBEL_OLD],
+                        CPU [PAD-ASBEL_OLD]
+                    img(src="./images/help.renameSomeObjects.png" width="1024").materialboxed.card-panel.hoverable
+                    p.
+                        После запуска действия с переименованием нескольких объектов появится окно, в котором можно
+                        проверить правильность составления регулярного выражения. Только после нажатия кнопки "YES"
+                        будет выполнено переименование объектов.
+                    img(src="./images/help.renameSomeObjectsConfirmation.png").materialboxed.card-panel.hoverable
+
+                    h4 Disable object
+                    p.
+                        Можно отключить объекты. В этом случае сбор данных со счетчиков, подключенных к объектам,
+                        производиться не будет.
+                        В системном меню Objects отключенные объекты обозначаются курсивом.
+                    img(src="./images/help.disabledObjects.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h4 Description for objects
+                    p.
+                        С помощью этого поля можно ввести описание для новых объектов. Подсказка с описанием объекта появится,
+                        если в системном меню Objects навести курсор на объект. Если выбрано несколько объектов и это поле
+                        оставить пустым, описание объектов не изменится
+                    img(src="./images/help.objectDescription.png").materialboxed.card-panel.hoverable
+
+                    h4 Order in a objects menu for all selected objects
+                    p.
+                        Поле позволяет установить сортировку, которая влияет на порядок отображения объектов в
+                        системном меню Objects.
+                        Если для объектов установлена одинаковая сортировка, они сортируются по алфавиту.
+                        Если выбрано несколько объектов,
+                        и выбрана сортировка Current objects order will be unchanged, сортировка
+                        объектов не изменятся.
+                    img(src="./images/help.objectOrder.png").materialboxed.card-panel.hoverable
+                    p Объекты с разной сортировкой сортируются по следующим правилам:
+                        h5 Сортировка объектов, находящихся на верхнем уровне
+                        p.
+                            Объекты с сортировкой из таблицы ниже будут располагаться на самом верхнем уровне
+                            списка объектов. Для того, чтобы увидеть эти объекты в списке нужно в системном меню Objects
+                            нажать на "TO TOP". Если эти объекты включить в группу, они также будут
+                            отображаться в этой группе.
+                        table
+                            thead
+                                tr
+                                    th Сортировка
+                                    th Описание
+                            tbody
+                                tr
+                                    td On top and at up level
+                                    td На самом верху списка объектов и на самом верхнем уровне объектов
+                                tr
+                                    td At the middle and at up level
+                                    td В середине списка и на самом верхнем уровне объектов
+                                tr
+                                    td At the end at up level
+                                    td В конце списка и на самом верхнем уровне объектов
+                        h5 Сортировка объектов, включенных в другие объекты
+                        p.
+                            Объекты с сортировкой из таблицы ниже должны быть включены
+                            в какую-то группу. Для доступа к такому объекту необходимо в системном меню Objects
+                            зайти в группу объектов, в которой находится требуемый объект. Если такому объекту не присвоить
+                            никакую группу, объект невозможно будет найти с помощью навигации по системному меню Objects.
+                            В этом случае объект может быть отображен в списке только если ввести его имя в строке поиска объектов.
+                            Строка поиска объектов находится над системным меню Objects и активируется когда активна вкладка OBJECT.
+                        table
+                            thead
+                                tr
+                                    th Сортировка
+                                    th Описание
+                            tbody
+                                tr
+                                    td On top of the list
+                                    td На самом верху списка объектов
+                                tr
+                                    td Between middle and top
+                                    td Между верхними объектами и объектами в середине списка
+                                tr
+                                    td At the middle of the list
+                                    td В середине списка объектов
+                                tr
+                                    td Between middle and end
+                                    td Между объектами в середине списка и объектами в конце списка
+                                tr
+                                    td At the end of the list
+                                    td Внизу списка объектов
+                    h4 Shared to selected objects linked counters
+                    p.
+                        В этом поле перечислены общие счетчики, подключенные ко всем выбранным объектам. Если
+                        выбран только один объект, будут показаны все подключенные к нему счетчики.
+                    img(src="./images/help.linkedCounters.png" width="1024").materialboxed.card-panel.hoverable
+                    p.
+                        Нажав на крестик рядом с названием счетчика можно отключить его от объекта. Если начать вводить
+                        в строку ввода имя счетчика, появится контекстное меню с названиями счетчиков.
+                        Если выбрать один из них, то после выполнения действия он будет подключен к выбранным объектам.
+                    img(src="./images/help.addCounter.png" width="1024").materialboxed.card-panel.hoverable
+                    p.

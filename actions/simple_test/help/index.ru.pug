@@ -1,0 +1,43 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-4-28 1:38:00
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Simple test: тестирования работы действий и задач
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Simple test
+                    h5.light.
+                        Simple test используется для тестирования
+
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h2 Описание Simple test
+                    p.
+                        Действие служит для организации процесса тестирования автоматизаций.
+                        Simple test ничего не выполняет, но может сгенерировать ошибку выполнения действия либо
+                        выполниться без ошибок и вернуть введенное значение.
+
+                    h5.
+                        Возвращаемое значение: значение, введенное в поле "Return value"
+
+                    h2 Описание интерфейса
+                    h5 Error message for generate error
+                    p.
+                        Если в это поле ввести какой-нибудь текст, будет сгенерирована ошибка с этим текстом.
+                        Если поле оставить пустым, Simple test просто выполнится.
+                    h5 Return value
+                    p.
+                        Значение, введенное в это поле, будет возвращено действием Simple test

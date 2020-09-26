@@ -1,0 +1,16 @@
+/*
+ * Copyright © 2019. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ */
+
+var log = require('../../lib/log')(module);
+var server = require('../../lib/server');
+server.connect();
+
+
+module.exports = function(args, callback) {
+    log.debug('Starting action server \"'+args.actionName+'\" with parameters', args);
+
+    log.info('OK, I warned you. Sending message to restart server...');
+    server.sendMsg({restart: 1});
+    callback();
+};

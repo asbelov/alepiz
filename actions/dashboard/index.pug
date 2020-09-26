@@ -1,0 +1,323 @@
+//
+    Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/quill/quill.snow.css')
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        // it really used. Don\'t remove
+        link(rel='stylesheet', href='/stylesheets/actions.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        style.
+            tr {
+                line-height: 1em !important;
+            }
+            .collapsible-body {
+                padding: 3px 1em 1em 1em !important;
+            }
+            a {
+                margin-right: 5px !important;
+            }
+            div.small-chip {
+                height: 20px !important;
+                line-height: 20px !important;
+                margin-bottom: 3px !important;
+                cursor: pointer !important; /* for event comments table*/
+            }
+            td.small-padding {
+                padding: 5px 5px; !important;
+            }
+            div.comment-body {
+                height: 5em !important;
+                overflow-y: hidden;
+            }
+            p.comment-header {
+                font-weight: bold !important;
+                margin: 8px 0;
+            }
+            /* used for remove strong definition in materialize.css (font-weight: 500) for enable bold text in quill editor*/
+            strong {
+                font-weight: bold !important;
+            }
+            .no-margin {
+                margin: 0 !important;
+            }
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/quill/quill.js')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        //div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            //div.col.s12
+            script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+
+            div.col.s12
+                div.card-panel.center-align.hide#filteredByObjects
+                    strong Attention: events are showed only for selected objects
+                ul#collapsible.collapsible
+                    li#createMessage.hide
+                        div(data-tooltip="Enable &lt;Alt&gt;+&lt;1&gt;" data-position="bottom").tooltipped.collapsible-header
+                            i.material-icons email
+                            span Message editor
+                        div.collapsible-body
+                            //div.card-panel.z-depth-1
+                            div.row
+                                div.col.l7.m6.s12
+                                    div(data-tooltip='Add recipient and press enter or leave blank to save the message text without sending' style="margin:0")#rcpt_chips.chips.chips-initial.chips-placeholder.chips-autocomplete.tooltipped
+                                    input(type="hidden")#recipients
+                                    input(type="hidden")#replyTo
+                                div#messageButtons.col.l5.m6.s12
+                                div.col.s9
+                                    div(data-tooltip='Add subject to message').input-field.tooltipped
+                                        input(type='text')#subject
+                                        label(for='subject') Subject
+                                p.col.s3.right-align
+                                    a(data-tooltip="Compose message based on selected events and selected action. Text will be inserted to cursor position")#composeMessage.waves-effect.waves-light.btn.tooltipped Compose message
+                                    a(data-tooltip="Clear subject and text in editor")#clearMessage.waves-effect.waves-light.btn.tooltipped Clear
+                            div(style="height:30em")#editor
+                            input(type="hidden")#message
+                            //div.card-panel.z-depth-1#controlPanel
+                            div.row.margin-0
+                                p(data-tooltip="The message will be sent and added as a comment to the selected events. Events are leave the event historical table" data-position="top").col.s3.tooltipped
+                                    label
+                                        input(type="radio" name="action" value="addAsComment" checked)#addAsComment.with-gap
+                                        span Add comment to selected events
+                                p(data-tooltip="The message will be sent and will be displayed as a hint for all objects of selected events. The events does not leave the event historical table" data-position="top").col.s3.tooltipped
+                                    label
+                                        input(type="radio" name="action" value="addAsHint")#addAsHint.with-gap
+                                        span Use message as a hint for selected events
+                                p(data-tooltip="The message will be sent and will be displayed as a hint for selected events only if those events occurred with selected object. The events does not leave the event historical table" data-position="top").col.s4.tooltipped
+                                    label
+                                        input(type="radio" name="action" value="addAsHintForObject")#addAsHintForObject.with-gap
+                                        span Use message as a hint for selected events and objects
+                                p(data-tooltip="The message will be sent. Selected events will be marked as solved" data-position="top").col.s2.tooltipped
+                                    label
+                                        input(type="radio" name="action" value="solveProblem")#solveProblem.with-gap
+                                        span Solve problems
+                            div.row.margin-0.hide#disabledEventsControl
+                                p(data-tooltip="The message will be sent. Disabled selected events will be enabled").col.s3.tooltipped
+                                    label
+                                        input(type="radio" name="action" value="enableEvents")#enableEvents.with-gap
+                                        span Enable disabled events
+                                p(data-tooltip="Delete time intervals for one selected disabled event. This does not apply to multiple selected events.").col.s3.tooltipped
+                                    label
+                                        input(type="radio" name="action" value="removeTimeIntervals" disabled)#removeTimeIntervals.with-gap
+                                        span Delete time intervals for disabled event
+                                p(data-tooltip="Select one ore more time intervals for delete. If you deleting all time intervals then event will be disabled permanently until specific time" data-position="top").input-field.col.s6.margin-0.tooltipped
+                                    select(multiple disabled)#timeIntervalsForRemove
+                                    label Time intervals for delete
+                            div.row.margin-0
+                                p(data-tooltip="The message will be sent. Selected events will be disabled until specific date and time for time interval if specified").col.s3.tooltipped
+                                    label
+                                        input(type="radio" name="action" value="disableEvents")#disableEvents.with-gap
+                                        span Disable selected events until
+                                p(data-tooltip="Disable events until specific date").input-field.col.s3.margin-0.tooltipped
+                                    input(type="text" value="07 November, 1975")#disableUntilDate.datepicker
+                                    label(for="disableUntilDate") Date
+                                p(data-tooltip="Disable events until specific time").input-field.col.s2.margin-0.tooltipped
+                                    input(type="text" value="18:00")#disableUntilTime.timepicker
+                                    label(for="disableUntilTime") Time
+                                p.col.s2 in the time interval per day
+                                p(data-tooltip="Disable events at specific time interval in day. New time interval will be added to existed time intervals").input-field.col.s1.margin-0.tooltipped
+                                    input(type="text")#disableTimeIntervalFrom.timepicker
+                                    label(for="disableTimeIntervalFrom") From
+                                p(data-tooltip="Disable events at specific time interval in day. New time interval will be added to existed time intervals").input-field.col.s1.margin-0.tooltipped
+                                    input(type="text")#disableTimeIntervalTo.timepicker
+                                    label(for="disableTimeIntervalTo") To
+                                input(type="hidden")#disableUntil
+                                input(type="hidden")#disableTimeInterval
+                    li#historyEvents
+                        div(data-tooltip="Enable &lt;Alt&gt;+&lt;2&gt;" data-position="bottom").tooltipped.collapsible-header.active.lighten-4
+                            i.material-icons history
+                            div.col.margin-0 Historical&nbsp;events
+                            div.col.s5
+                                input(type="text" style="margin:0; height:2em;" placeholder="Events filter"
+                                    data-tooltip='Enter filter for events. Filter will applied to all fields of tables and update events will be paused')#eventsFilter.tooltipped
+                            div.col.s4.secondary-content.right-align
+                                span#lastUpdate
+                                span#updateTime
+                            div.col.s3
+                                a(href="#!" uncheckSelected data-tooltip='Select or unselect all events').secondary-content.tooltipped
+                                    i.material-icons playlist_add_check
+                                a(href="#!" data-tooltip='Enable\\disable sound')#sound.secondary-content.tooltipped
+                                    i#soundIcon.red-text.material-icons volume_off
+                                a(href="#!" data-tooltip='Start\\Pause update events &lt;Esc&gt;')#reload.secondary-content.tooltipped
+                                    i.material-icons play_arrow
+                                //a(href="#!" data-tooltip='Show\\hide commented events &lt;Alt&gt;+&lt;4&gt;')#showCommented.secondary-content.tooltipped
+                                    i.material-icons view_headline
+                                //a(href="#!" data-tooltip='Show\\hide disabled events &lt;Alt&gt;+&lt;3&gt;')#showDisabled.secondary-content.tooltipped
+                                    i.material-icons cancel
+                                //a(href="#!" data-tooltip='Show\\hide current active events &lt;Alt&gt;+&lt;2&gt;')#showCurrent.secondary-content.tooltipped
+                                    i.material-icons alarm
+                                a(href="#!" data-tooltip='Show\\hide message editor &lt;Alt&gt;+&lt;0&gt;')#showEditor.secondary-content.tooltipped
+                                    i.material-icons email
+                        div.collapsible-body
+                            table.bordered.highlight.responsive-table
+                                thead
+                                    tr
+                                        th(var="EVENT_UD").hide
+                                        th(var="OCID").hide
+                                        th(var="COUNTER_NAME").hide
+                                        th(var="OBJECT_NAME") Object
+                                        th(var="EVENT_DESCRIPTION") Description
+                                        th(var="IMPORTANCE").hide Importance
+                                        th(var="START_TIME") From
+                                        th(var="END_TIME") To
+                                        th(var="DURATION") Duration
+                                        th(var="LAST_TIME") Last time
+                                        th Info
+                                        th Select
+                                tbody#historyEventsTable
+                                    tr
+                                        td(colspan=12 style="text-align: center;") Waiting for initializing...
+                    li#currentEvents.active
+                        div(data-tooltip="Enable &lt;Alt&gt;+&lt;3&gt;" data-position="bottom").tooltipped.collapsible-header.active.lighten-4
+                            i.material-icons alarm
+                            div.col.s11.margin-0  Current events
+                            div.col.s1
+                                a(href="#!" uncheckSelected data-tooltip='Check all or uncheck selected events').right.secondary-content.tooltipped
+                                    i.material-icons playlist_add_check
+                        div.collapsible-body
+                            table.bordered.highlight.responsive-table
+                                thead
+                                    tr
+                                        th(var="EVENT_UD").hide
+                                        th(var="OCID").hide
+                                        th(var="COUNTER_NAME").hide
+                                        th(var="OBJECT_NAME") Object
+                                        th(var="EVENT_DESCRIPTION") Description
+                                        th(var="IMPORTANCE").hide Importance
+                                        th(var="START_TIME") From
+                                        th(var="DURATION") Duration
+                                        th(var="LAST_TIME") Last time
+                                        th Info
+                                        th Select
+                                tbody#eventsTable
+                                    tr
+                                        td(colspan=11 style="text-align: center;") Waiting for initializing...
+                    li#disabledEvents
+                        div(data-tooltip="Enable &lt;Alt&gt;+&lt;4&gt;" data-position="bottom").tooltipped.collapsible-header.lighten-4
+                            i.material-icons cancel
+                            div.col.s11.margin-0 Disabled events
+                            div.col.s1
+                                a(href="#!" uncheckSelected data-tooltip='Check all or uncheck selected events').right.secondary-content.tooltipped
+                                    i.material-icons playlist_add_check
+                        div.collapsible-body
+                            table.bordered.highlight.responsive-table
+                                thead
+                                    tr
+                                        th(var="EVENT_UD").hide
+                                        th(var="OCID").hide
+                                        th(var="COUNTER_NAME").hide
+                                        th(var="OBJECT_NAME") Object
+                                        th(var="EVENT_DESCRIPTION") Description
+                                        th(var="IMPORTANCE").hide Importance
+                                        th(var="START_TIME") From
+                                        th(var="END_TIME") To
+                                        th(var="DISABLED_UNTIL") Disabled until
+                                        th(var="DISABLED_INTERVALS") Disabled intervals
+                                        th(var="DISABLED_USER") Disabled by user
+                                        th Info
+                                        th Select
+                                tbody#disabledEventsTable
+                                    tr
+                                        td(colspan=15 style="text-align: center;") Waiting for initializing...
+                    li#historyCommentedEvents
+                        div(data-tooltip="Enable &lt;Alt&gt;+&lt;5&gt;" data-position="bottom").tooltipped.collapsible-header.lighten-4
+                            i.material-icons view_headline
+                            div.col.s1.margin-0 Comments
+                            div.col.s2
+                                input(type="text" style="margin:0; height:2em;" placeholder="From")#commentsFrom
+                                //label(for="commentsFrom") From
+                            div.col.s2
+                                input(type="text" style="margin:0; height:2em;" placeholder="To")#commentsTo
+                                //label(for="commentsTo") To
+                            div.col.s6
+                                a(href="#!" data-tooltip='Reload comments')#reloadComments.right.secondary-content.tooltipped
+                                    i.material-icons replay
+                        div.collapsible-body
+                            table.bordered.responsive-table
+                                thead
+                                    tr
+                                        th(var="COMMENT_ID").hide
+                                        th(var="SUBJECT") Subject
+                                        th(var="USER") User
+                                        th(var="RECIPIENTS") Recipients
+                                        th(var="TIME") Time
+                                        th Info
+                                tbody#historyCommentedEventsTable
+                                    tr
+                                        td(colspan=12 style="text-align: center;") Waiting for initializing...
+
+                div#whatDoWeDoDialog.modal
+                    div.modal-content
+                        h5 What do we do?
+                        p.
+                            The message was created automatically according to the selected events,
+                            message template and action. You can continue to edit the message or use
+                            the automatically generated message to complete the action.
+                        p You can also add a short comment to the generated message.
+                        p
+                            label
+                                input(type="text")#modalAdditionalComment
+                                span Enter additional comment for composed message
+                    div.modal-footer
+                        a(href="#!")#modalOpenEditor.modal-close.waves-effect.waves-green.btn-flat Open message editor
+                        a(href="#!")#modalSendMessage.modal-close.waves-effect.waves-green.btn-flat Send message
+
+                div#hintDialog.modal.modal-fixed-footer
+                    div.modal-content
+                        h5#hintSubject
+                        p#hintComment
+                    div.modal-footer
+                        a(href="#!").modal-close.waves-effect.waves-green.btn-flat Close
+
+                div#prevCommentDialog.modal
+                    div.modal-content
+                        h5 Previous events information will be overwritten
+                        p.
+                            Some selected events have previously added comments or hints.
+                            When you add a new comment or hints, the old information will be overwritten.
+                            Please add the required information manually.
+                    div.modal-footer
+                        a(href="#!").modal-close.waves-effect.waves-green.btn-flat Close
+
+                div#actionChangeDialog.modal
+                    div.modal-content
+                        h5 Message has been generated for another action
+                        p A current message has been generated for another action. Verify that the current message corresponds to the new action.
+                    div.modal-footer
+                        a(href="#!").modal-close.waves-effect.waves-green.btn-flat Close
+    footer
+        input(type="hidden" name="actionName" value= action.name)
+

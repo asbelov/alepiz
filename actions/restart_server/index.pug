@@ -1,0 +1,22 @@
+//
+    Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+    body
+    main
+        div.row
+            div.col.s12
+                div.card
+                    div.card-content
+                        span.card-title Restart server
+                        p Server will be restarted. Please be attended before run this action. Probably nothing will be happened, but you mast be scared.
+    footer
+        input(type="hidden" name="actionName" value= action.name)

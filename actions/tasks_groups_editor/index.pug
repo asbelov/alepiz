@@ -1,0 +1,64 @@
+//
+   Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            div.col.s12
+                script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+                div.row
+                    div.col.s12
+                        div.card
+                            div.card-content
+                                span.card-title Groups list for tasks
+                                p Select a "New group" and enter new group name for add a new tasks group. Select existing group and change name for rename existing group. Press on "x" button for remove group and all tasks in this group
+                                div.row
+                                    div.col.s12.m8.l8.input-field
+                                        input(type="text")#groupName
+                                        label(for="groupName" data-tooltip="Enter new group name or edit existing selected group").tooltipped Group name
+                                    div(data-tooltip="Select roles for task groups").col.s12.m4.l4.input-field.tooltipped
+                                        select(multiple)#userRoles
+                                        label(for="userRoles") User roles
+                                        input(type="hidden" value="0")#groupID
+                                        input(type="hidden" value="")#removingGroupsNames
+                                    div.col.s12.collection#groupsList
+                                        a(href="#!").collection-item.active#00 New group
+
+    footer
+        input(type="hidden" name="actionName" value= action.name)

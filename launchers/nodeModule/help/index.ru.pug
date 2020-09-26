@@ -1,0 +1,70 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-5-17 0:28:38
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title nodeModule: запуск подключаемых модулей nodejs
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 nodeModule
+                    h5.light.
+                        nodeModule позволяет запускать действия, разработанные как модули для nodejs.
+
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+
+                    h2 Описание nodeModule
+                    p.
+                        Лаунчер запускает стандартные действия, исполняемая компонента которых разработана как модуль
+                        для nodejs. Он подключает соответствующий файл, обычно с именем server.js через встроенную
+                        функцию nodejs require() и, затем, запускает его, передавая параметры, полученные из страницы
+                        пользовательского интерфейса действия.
+                    p.
+                        Для подключения nodeModule необходимо прописать в файле config.json с параметрами действия:
+                    div.card-panel
+                        pre.
+                            {
+                                ....
+                                "launcher": "nodeModule",
+                                "launcherPrms": {
+                                        "javaScript": "server.js"
+                                    }
+                                ....
+                            }
+                    p.
+                        Значением параметра javaScript может быть любой JavaScript файл, не обязательно server.js.
+                        nodeModule будет искать этот файл в каталоге с действием.
+                    p.
+                        Исполняемый файл действия server.js должен экспортировать функцию, которая принимает два параметра:
+                    ul.browser-default
+                        li.
+                            args - объект с параметрами, полученными из пользовательского
+                            интерфейса в виде {&lt;param1&gt;: &lt;value1&gt;, &lt;param2&gt;: &lt;value2&gt;, ....}
+                        li.
+                            callback - функция callback(err, result), где err - объект с ошибкой или null; result -
+                            результат, возвращаемый действием для использования в задачах.
+                    p.
+                        server.js может выглядеть следующим образом:
+                    div.card-panel
+                        pre.
+                            var log = require('../../lib/log')(module);
+
+                            module.exports = function(args, callback) {
+                                log.debug('Starting action server "', args.actionName, '" with parameters', args);
+
+                                if(!args.o) return callback(new Error('Objects are not selected'));
+                                callback(null, args.o);
+                            }
+                    p.
+                        Подробнее о разработке действия можно прочитать на странице помощи
+                        #[a(href="/actions/action_editor/help/") Action editor]

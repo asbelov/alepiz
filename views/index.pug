@@ -1,0 +1,103 @@
+//
+   Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflow-y: hidden")
+    head
+        title alepiz
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        link(rel='stylesheet', href='/stylesheets/index.css')
+        script(src='/jquery/jquery.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/init.js')
+    //meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+    meta(name="viewport" content='width=480, user-scalable=no')
+    body
+        header.main
+            nav
+                div.nav-wrapper
+                    ul.left
+                        li: a(href='#' data-target='slide-out').sidenav-trigger: i.material-icons menu
+                        //li: div.row: a(style="padding-left:20px")#brand-logo.brand-logo.truncate.col.s10
+                    ul.right
+                        li: a(href='/' target="_blank" data-tooltip='Open a new tab or window for ALEPIZ')#openInNewWindow.tooltipped
+                            i.material-icons open_in_new
+                        li: a(href='#modal-log-window' data-tooltip='Show log window')#logWindowBtn.modal-trigger.tooltipped
+                            i.material-icons file_upload
+                        li: a(href='#modal-login' data-tooltip='Login as a GUEST')#loginBtn.modal-trigger.tooltipped.yellow-text
+                            i.material-icons account_box
+                        li: a(href='/' data-tooltip='Open a new tab with a context help')#helpBtn.tooltipped
+                            i.material-icons help_outline
+                        li: a(href='https://www.alepiz.com' data-tooltip='Web site alepiz.com' target="__blank").tooltipped
+                            i.material-icons home
+
+                    div.fixed-action-btn#actionButton
+                        a.btn-floating.btn-large.waves-effect.waves-circle.waves-light.orange.darken-1: i.material-icons.large more_horiz
+                        ul
+                            li: a#walletBtn.btn-floating.waves-effect.waves-light.blue.hide: i.material-icons card_travel
+                            li: a#selectAllObjBtn.btn-floating.waves-effect.waves-light.purple.darken-1.hide: i.material-icons done_all
+                            li: a#reloadBtn.btn-floating.waves-effect.waves-light.green: i.material-icons cached
+                            li: a#makeTaskBtn.btn-floating.waves-effect.waves-light.yellow.darken-2: i.material-icons playlist_add
+                            li: a#runActionBtn.btn-floating.waves-effect.waves-light.red: i.material-icons play_arrow
+
+            //ul(style="overflow-y:hidden;display:flex;flex-direction:column")#slide-out.side-nav.fixed
+            ul(style="overflow-y:hidden;display:flex;flex-direction:column")#slide-out.sidenav.sidenav-fixed.width-400
+                li
+                    div.user-view.row
+                        div.background
+                            img(src="images/background.jpg" width="100%")
+                        div.col.s10.input-field
+                            textarea#searchObjects.search-textarea.materialize-textarea.black-text.hide
+                            input(type="text")#searchActions.autocomplete.black-text.no-padding
+                            label
+                        div.col.s1.input-field
+                            i(style="cursor: pointer")#searchTip.material-icons search
+                    ul(style="overflow-x: hidden;-webkit-user-select: none;-moz-user-select: none;-ms-user-select: none;")#tabs.tabs.tabs-fixed-width
+                        li.tab.col.s6.truncate: a(href="#actionsList").tab-padding#actionsTabSwitch ACTIONS
+                        li.tab.col.s6.truncate: a(href="#objectsList").tab-padding#objectsTabSwitch OBJECTS
+                        li.tab.col.s6.truncate.hide: a(href="#objectsList").tab-padding#additionalObjectsTabSwitch OBJECTS
+                li(style="overflow-y:auto;position:relative;-webkit-user-select: none;-moz-user-select: none;-ms-user-select: none;").no-padding
+                    ul#objectsList
+                    ul#actionsList.collapsible.collapsible-accordion
+
+
+        main.main
+            div(style="height: 93vh")
+                iframe(id="actionObject" style='width:100%; height:100%; border:none' allow="autoplay")
+
+        //footer.main
+
+        div#modal-login.modal
+            div.modal-content
+                h4.red-text Login
+                div.row
+                    div.col.s0.m1.l1.input-field
+                    div.col.s12.m10.l9.input-field
+                        i.material-icons.prefix.small.red-text account_box
+                        input(type="text")#userName
+                        label(for="userName") User name
+                div.row
+                    div.col.s0.m1.l1.input-field
+                    div.col.s12.m10.l9.input-field
+                        i.material-icons.prefix.small.red-text security
+                        input(type="password")#userPass
+                        label(for="userPass") Password
+            div.modal-footer
+                a(href="#!")#login.modal-action.modal-close.waves-effect.waves-green.btn-flat Login
+                a(href="#!")#logout.modal-action.modal-close.waves-effect.waves-green.btn-flat Logout
+
+        div#modal-log-window.bottom-sheet.modal
+            div.modal-content
+                div.row
+                    div.col.s12.right-align#last-update
+                    div.col.s12
+                        div.divider
+                    ul#collapsible-log-body.collapsible.z-depth-0
+
+        div#modal-log.modal
+            div.modal-content
+                h4#modalLogHeader
+                p#modalLogMessage
+            div.modal-footer
+                a(href="#!").modal-action.modal-close.waves-effect.waves-green.btn-flat Close

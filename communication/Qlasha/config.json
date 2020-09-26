@@ -1,0 +1,15 @@
+{
+    "description": "Sending message to Qlasha",
+    "address": "No address provided",
+    "re": "^$",
+    "default": {
+        "transport": {
+            "host": "localhost"
+        },
+        "message": {
+            "rate": 1,
+            "volume": 100,
+            "severity": 1
+        }
+    }
+}

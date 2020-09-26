@@ -1,0 +1,66 @@
+{
+    "name": "Objects discovery",
+    "description": "Searching a new objects or objects parameters, using ICMP echo reply (ping), query for zabbix-agent and snmp. Return JSON object",
+    "active": "on",
+    "separate": "",
+    "runCollectorSeparately": "on",
+    "parameters": {
+        "ranges": {
+            "description": "IP addresses ranges, separated by comma",
+            "default": "10.172.0.1-10.172.0.251, 127.0.0.1"
+        },
+        "sleep": {
+            "description": "Sleep time between query to the new IP in the range in sec",
+            "checkAs": "Integer",
+            "default": 30
+        },
+        "scanRepetitionTime": {
+            "description": "Time (in sec) to repeat scan after completed ",
+            "checkAs": "Integer",
+            "default": 300
+        },
+        "usePing": {
+            "description": "Use ICMP echo reply (PING) for scan",
+            "canBeEmpty": "on",
+            "type": "checkbox",
+            "default": "1"
+        },
+        "getHostname": {
+            "description": "Resolve host name for each IP using OS resolve method",
+            "canBeEmpty": "on",
+            "type": "checkbox",
+            "default": "1"
+        },
+        "useZabbix": {
+            "description": "Use zabbix-agent query for scan",
+            "canBeEmpty": "on",
+            "type": "checkbox",
+            "default": "1"
+        },
+        "zabbixPort": {
+            "description": "Zabbix-agent TCP port",
+            "checkAs": "TCPPort",
+            "default": 10050
+        },
+        "zabbixItems": {
+            "description": "Comma separated Zabbix items with parameters",
+            "type": "textArea",
+            "default": "system.uname,system.hostname"
+        },
+        "useSNMP": {
+            "description": "Use SNMP query for scan",
+            "canBeEmpty": "on",
+            "type": "checkbox",
+            "default": "1"
+        },
+        "SNMPCommunity": {
+            "description": "SNMP community",
+            "default": "public"
+        },
+        "SNMPOIDs": {
+            "description": "Comma separated SNMP OIDs. Result will ba a string for one OID and object {&lt;OID1&gt;: &lt;result1&gt;, &lt;OID2&gt;: &lt;result2&gt;} for multiple",
+            "type": "textArea",
+            "default": "1.3.6.1.2.1.1.1.0"
+        }
+    }
+}

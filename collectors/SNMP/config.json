@@ -1,0 +1,36 @@
+{
+    "name": "SNMP",
+    "description": "SNMP v1 implementation",
+    "active": "",
+    "separate": "",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "host": {
+            "description": "IP address or host name",
+            "checkAs": "hostOrIP",
+            "default": "127.0.0.1"
+        },
+        "community": {
+            "description": "SNMP community",
+            "default": "public"
+        },
+        "OID": {
+            "description": "SNMP OID"
+        },
+        "port": {
+            "description": "SNMP TCP port",
+            "checkAs": "TCPPort",
+            "default": 161
+        },
+        "version": {
+            "description": "SNMP protocol version (1 or 2)",
+            "checkAs": "Integer",
+            "default": 1
+        },
+        "retries": {
+            "description": "Number of SNMP Request Attempts",
+            "checkAs": "Integer",
+            "default": 1
+        }
+    }
+}

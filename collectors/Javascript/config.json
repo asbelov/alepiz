@@ -1,0 +1,13 @@
+{
+    "name": "Javascript",
+    "description": "Simple javascript",
+    "active": "",
+    "separate": "",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "javascript": {
+            "description": "Javascript",
+            "type": "javaScriptEditor"
+        }
+    }
+}

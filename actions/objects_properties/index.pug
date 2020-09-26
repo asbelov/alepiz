@@ -1,0 +1,61 @@
+//
+    Copyright © 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+    Created on 2018-4-27 21:44:09
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;'
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+    main
+        div.row
+            div.col.s12
+                //h2= action.name
+                //p.right-align= action.description
+        div.row
+            div.col.s12
+                script(src= action.link + "/" + action.staticDir + "/" + "client.js")
+                div.row
+                    div.col.s12
+                        div.card
+                            div.card-content
+                                span.card-title Objects list
+                                p Select object to edit all object properties. Select multiple objects for edit shared properties for selected objects with same names, display modes and and values. For one object, object will have only properties that are displayed. For multiple objects, displayed properties will be replaced or added to existing properties for each objects. Initially for multiple objects are displayed only shared properties
+                                p Objects list:&nbsp;
+                                    span(style="font-weight: bold")#objectsNames
+                                input(type="hidden" value="1")#deleteOtherProperties
+                    div.col.s1
+                        a(href='#!')#addProperty.btn-floating.waves-effect.waves-light
+                            i.material-icons add
+                    div.col.s12#propertiesField
+
+    footer
+        input(type="hidden" name="actionName" value= action.name)

@@ -1,0 +1,24 @@
+//
+    Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+    body
+    main
+        div(style="margin: 1em").row.card-panel
+            div.col.s12
+                p Module for testing task actions sequence. If you set something in Error field, action will generate error after execution. If you don't want error generation, leave this field empty
+            div.col.s12.input-field
+                input(type="text")#error
+                label(for="error") Error message for generate error
+            div.col.s12.input-field
+                input(type="text")#returnValue
+                label(for="returnValue") Return value
+    footer
+        input(type="hidden" name="actionName" value= action.name)
