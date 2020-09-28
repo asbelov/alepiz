@@ -4,10 +4,13 @@
 
 
 var path = require('path');
-var fs = require('fs');
+
 // for windows service.
-// Default working directory is windows\system32, __dirname is the directory name of the current module (www.js)
+// Default working directory is windows\system32, __dirname is the directory name of the current module (alepiz.js)
 process.chdir(path.join(__dirname, '..'));
+
+var installService = require('../lib/installService');
+if(installService.init()) return;
 
 var service = require('os-service');
 
@@ -39,35 +42,6 @@ service.run (function () {
     });
 });
 
-
-/*
-  Command line:
-  --install, -i - install service
-  --remove, -r - remove service
-*/
-var serviceName = conf.get('serviceName') || 'ALEPIZ';
-if (process.argv[2] === "--install" || process.argv[2] === "-i") {
-    var options = {
-        displayName: conf.get('serviceDisplayName') || 'ALEPIZ',
-        nodePath: path.isAbsolute(conf.get('nodePath')) ? conf.get('nodePath') : path.join(__dirname, '..', conf.get('nodePath')),
-        nodeArgs: ['--experimental-worker', '--expose-gc', '--max-old-space-size='+String(conf.get('maxMemSize') || 4096)],
-        programArgs: ["--runAsService"], // if this argument passed, then program running as service
-    };
-
-    service.add (serviceName, options, function(err) {
-        if (err) console.error('Error while install service', serviceName, ': ', err);
-        else console.log('Service', serviceName,'installed successfully');
-
-        process.exit(0);
-    });
-} else if (process.argv[2] === "--remove" || process.argv[2] === "-r") {
-    service.remove (serviceName, function(err) {
-        if (err) console.error('Error while remove service', serviceName, ': ', err);
-        else console.log('Service', serviceName,'removed successfully');
-
-        process.exit(0);
-    });
-} /* else if (process.argv[2] === "--run") {// Run service program code...} else {// Show usage...}*/
 
 start(function() {
     scheduleRestart();

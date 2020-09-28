@@ -25,13 +25,13 @@ SolidCompression=yes
 PrivilegesRequired=admin
 
 [Files]
-Source: "C:\Users\asbel\WebstormProjects\alepiz\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: ".*, config\*, logs\*, DB\*, tests\*, *.zip, *.7z, alepizSetup*.exe, *.iss, *.~is, bin\install_build_tools.cmd"
+Source: "C:\Users\asbel\WebstormProjects\alepiz\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: ".*, config\*, logs\*, DB\*, private\*, tests, *.zip, *.7z, mk7z*.bat, alepizSetup*.exe, *.iss, *.~is, bin\install_build_tools.cmd, actions\qmonitor, collectors\qmz"
 Source: "C:\Users\asbel\WebstormProjects\alepiz\.distr\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 
 [Run]
-Filename: "{app}\nodejs\alepiz.exe"; Parameters: "bin\alepiz.js --install"; WorkingDir: "{app}"; Description: "Install as service"; Flags: postinstall runhidden
-Filename: "{sys}\net.exe"; Parameters: "start alepiz"; Description: "Launch ALEPIZ"; Flags: postinstall runhidden
+Filename: "{app}\nodejs\alepiz.exe"; Parameters: "bin\alepiz.js --install"; WorkingDir: "{app}"; Description: "Install as service"; Flags: postinstall runhidden runascurrentuser
+Filename: "{sys}\net.exe"; Parameters: "start alepiz"; Description: "Launch ALEPIZ"; Flags: postinstall runhidden runascurrentuser
 Filename: "{win}\explorer.exe"; Parameters: "http://localhost/"; Description: "Launch a browser and connect to ALEPIZ (http://localhost)"; Flags: postinstall shellexec skipifsilent runasoriginaluser
 
 [UninstallRun]

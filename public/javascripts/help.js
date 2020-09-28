@@ -2,9 +2,16 @@
  * Copyright © 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
  */
 
-var sites = ['pad-asbel', 'www.alepiz.com'];
+var sites = ['pad-asbel', 'www.alepiz.com', 'alepiz.cloudno.de'];
 
 document.addEventListener('DOMContentLoaded', function () {
+    // similar behavior as an HTTP redirect
+    if(window.location.hostname === 'alepiz.cloudno.de') {
+        var newLocation = window.location.href.replace('http://', 'https://').replace('alepiz.cloudno.de', 'www.alepiz.com');
+        window.location.replace(newLocation);
+    }
+
+    initGA();
     addClassFrSkipTranslateIcons();
     var divElm = document.getElementsByTagName('header')[0].childNodes[0].querySelectorAll('div.col')[0];
     makeTableOfContents(divElm);
@@ -16,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function () {
     //M.Collapsible.init(document.querySelectorAll('.collapsible'), {});
     M.AutoInit();
     var elems = document.querySelectorAll('.slider');
-    var sliderInstances = M.Slider.init(elems, {
+    M.Slider.init(elems, {
         height: 700,
         interval: 20000,
     });
@@ -121,14 +128,15 @@ function makeFooter() {
 function makeNavBar(headerElm) {
     if(!headerElm) return;
 
-    var location = window.location.href;
+    var target = sites.indexOf(window.location.hostname) !== -1 ? '' : ' target="__blank"';
 
     var html = '\
     <nav>\
         <div class="nav-wrapper">\
-            <a href="https://www.alepiz.com" class="brand-logo hide-on-med-and-down skiptranslate" style="margin-left: 15px">ALEPIZ</a>\
+            <a href="https://www.alepiz.com" class="brand-logo hide-on-med-and-down skiptranslate"' + target +
+                    ' style="margin-left: 15px">ALEPIZ</a>\
             <ul class="left show-on-medium-and-down hide-on-large-only">\
-                <li><a href="https://www.alepiz.com"><i class="material-icons skiptranslate left">home</i></a></li>\
+                <li><a href="https://www.alepiz.com"' + target + '><i class="material-icons skiptranslate left">home</i></a></li>\
             </ul>\
             <ul class="right show-on-small">\
                 <li class=" show-on-site-only"><a href="/help/contents.pug"><i class="material-icons skiptranslate">toc</i></a></li>\
@@ -159,6 +167,19 @@ function initTranslation() {
     document.head.appendChild(scriptElm1);
 
     waitForGoogle(20);
+}
+
+function initGA() {
+    if(sites.indexOf(window.location.hostname) === -1) return;
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'UA-179080448-1', 'auto'); // https://www.alepiz.com
+    ga('create', 'UA-179080448-2', 'auto'); // http://alepiz.cloudno.de
+    ga('create', 'UA-179080448-3', 'auto'); // https://alepiz.cloudno.de
+    ga('send', 'pageview');
 }
 
 function waitForGoogle(cnt) {

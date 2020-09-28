@@ -1,5 +1,6 @@
 {
-    "port": 80,
+    "httpPort": 80,
+    "httpsPort": 443,
     "serviceName": "ALEPIZ",
     "serviceDisplayName": "Alepiz",
     "maxMemSize": 6144,
@@ -14,6 +15,10 @@
     "reloadRightsIntervalSec": 180,
     "IPCClientMaxReconnectAttempts": 10,
     "serviceStopTimeout": 600000,
+    "privatePath": "private",
+    "webSecretFile": "webSecret.json",
+    "httpsKeyFile": "key.pem",
+    "httpsCertFile": "cert.pem",
     "log": {
         "localAddress": "127.0.0.1",
         "serverAddress": "127.0.0.1",
@@ -226,7 +231,6 @@
                 "simple_test": {}
             },
             "Services": {
-                "qmonitor": {},
                 "log_viewer": {},
                 "file_editor": {},
 		"sched_viewer": {}
@@ -307,11 +311,6 @@
             "discoveryIP": "db/discoveryIP.txt"
         },
         "scheduler": {
-            "localAddress": "127.0.0.1",
-            "serverAddress": "127.0.0.1",
-            "port": 10170
-        },
-        "qmz": {
             "localAddress": "127.0.0.1",
             "serverAddress": "127.0.0.1",
             "port": 10170

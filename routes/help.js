@@ -35,7 +35,11 @@ router.get('/:page', function(req, res) {
 router.get('/help/*', function(req, res) {
     var dir = path.join(__dirname, '..', 'views');
 
-    renderHelp(dir, req, res);
+    if(req.params[0].indexOf('contents') === 0) {
+        getTableOfContents(req, res, function (err, result) {
+            renderHelp(dir, req, res, result);
+        });
+    } else renderHelp(dir, req, res);
 });
 
 // Initializing action
@@ -48,8 +52,6 @@ router.post('/:action', function(req, res) {
             err: 'Action is not set',
         });
     }
-
-    if(actionID === 'contents') return getTableOfContents(req, res);
 
     // first letter in uppercase
     actionID = actionID.charAt(0).toUpperCase() + actionID.slice(1);
@@ -104,7 +106,7 @@ router.get('/communication/:communicationDir/help/*', function(req, res) {
     renderHelp(communicationDir, req, res);
 });
 
-function getTableOfContents(req, res) {
+function getTableOfContents(req, res, callback) {
 
     try {
         var commonDir = path.join(__dirname, '..', 'views');
@@ -164,8 +166,10 @@ function getTableOfContents(req, res) {
     }, function (err, result) {
         if(err) {
             log.error('Error getting table of contents: ', err.message);
+            if(typeof callback === 'function') return callback(err);
             return res.render(errorFile);
         }
+        if(typeof callback === 'function') return callback(null, result);
         res.json(result);
     });
 }
@@ -241,7 +245,7 @@ function getContentsFromDir(dir, helpFile, req, callback) {
     });
 }
 
-function renderHelp(dir, req, res) {
+function renderHelp(dir, req, res, param) {
     var helpFile = req.params[0];
 
     help.getLanguages(dir, helpFile, function(err, languages) {
@@ -262,7 +266,7 @@ function renderHelp(dir, req, res) {
 
             var extension = path.extname(fullPathToHelpFile).toLowerCase().substring(1);
             if(extension === 'pug' || extension === 'html'  || extension === 'htm' || extension === 'css'  || extension === 'txt') {
-                res.render(fullPathToHelpFile);
+                res.render(fullPathToHelpFile, param);
             } else {
                 var contentType;
                 switch(extension){

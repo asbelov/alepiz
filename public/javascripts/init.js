@@ -395,7 +395,7 @@ var initJQueryNamespace = (function($){
             var helpWindowsHeight = Math.floor(screen.height - screen.height / 3);
             var helpWindowLeft = (screen.width - helpWindowWidth) / 2;
             var helpWindowTop = (screen.height - helpWindowsHeight) / 2;
-            var url = activeActionLink ? (activeActionLink + '/help/') : '/help/';
+            var url = activeActionLink ? (activeActionLink + '/help/') : '/help/contents.pug';
             window.open(url, 'ALEPIZ help window',
         'toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width=' +
                 helpWindowWidth + ', height=' + helpWindowsHeight + ', top=' + helpWindowTop + ', left=' + helpWindowLeft);
@@ -1245,10 +1245,22 @@ var initJQueryNamespace = (function($){
         if(!html) {
             html = '<html lang="en-US"><body style="background:#cccccc">' +
                 '<div style="text-align: center; position: relative; top: 50%; transform: translateY(-50%); font-family: sans-serif;">' +
-                '<a href="/help/contents.pug" style="color: #ee6e73; text-decoration: none">' +
+                '<a href="#!" style="color: #ee6e73; text-decoration: none" onclick="showHelpWindow()">' +
                 '<h4 onmouseover="this.style.textDecoration=\'underline\';" onmouseout="this.style.textDecoration=\'none\';">' +
                 'For help click here</h4></a>' +
-                '</div>'
+                '</div>' +
+                '<script>' +
+                '   function showHelpWindow(e) {\n' +
+                '            //e.preventDefault();  // prevent default\n' +
+                '            var helpWindowWidth = Math.floor(screen.width - screen.width / 3);\n' +
+                '            var helpWindowsHeight = Math.floor(screen.height - screen.height / 3);\n' +
+                '            var helpWindowLeft = (screen.width - helpWindowWidth) / 2;\n' +
+                '            var helpWindowTop = (screen.height - helpWindowsHeight) / 2;\n' +
+                '            window.open(\'/help/install.pug#bookmark4\', \'ALEPIZ help window\',\n' +
+                '        \'toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width=\' +\n' +
+                '                helpWindowWidth + \', height=\' + helpWindowsHeight + \', top=\' + helpWindowTop + \', left=\' + helpWindowLeft);\n' +
+            '        }' +
+                '</script>'
                 '</body></html>';
             sessionID = undefined;
         }
