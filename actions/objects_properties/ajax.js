@@ -1,5 +1,5 @@
 /*
- * Copyright © 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 var log = require('../../lib/log')(module);
 var objectsDB = require('../../rightsWrappers/objectsPropertiesDB');

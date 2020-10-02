@@ -1,5 +1,9 @@
+/*
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+ */
+
 /**
- * Created by asbel on 28.04.2020
+ * Created by Alexander Belov on 28.04.2020
  */
 
 var fs = require('fs');

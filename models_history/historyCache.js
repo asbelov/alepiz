@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
- * Created by asbel on 25.09.2016.
+ * Created by Alexander Belov on 25.09.2016.
  */
 
 /*
@@ -27,6 +27,8 @@ var cacheServiceIsRunning = 0;
 var terminateCacheService = 0;
 var recordsFromCacheCnt = 0;
 var recordsFromStorageCnt = 0;
+var storageRetrievingDataComplete = 0;
+var storageRetrievingDataIncomplete = 0;
 
 historyCache.terminateHousekeeper = false;
 
@@ -52,8 +54,11 @@ historyCache.init = function (initParameters, callback){
 
             setInterval(cacheService, parameters.cacheServiceInterval * 1000); // sec
             setInterval(function() {
-                log.info('Records returned from cache\\storage: ', recordsFromCacheCnt, '\\', recordsFromStorageCnt);
+                log.info('Records returned from cache\\storage: ', recordsFromCacheCnt, '\\', recordsFromStorageCnt,
+                    '; Retrieving data for processing using history functions complete\\failure: ', storageRetrievingDataComplete,
+                    '\\', storageRetrievingDataIncomplete);
                 recordsFromCacheCnt = recordsFromStorageCnt = 0;
+                storageRetrievingDataComplete = storageRetrievingDataIncomplete = 0;
             }, 60000);
 
             callback();
@@ -61,13 +66,15 @@ historyCache.init = function (initParameters, callback){
     });
 };
 
+historyCache.startCacheService = cacheService;
+
 historyCache.cacheServiceIsRunning = function(val) {
     if(val !== undefined) cacheServiceIsRunning = val;
     return cacheServiceIsRunning;
 }
-historyCache.terminateCacheService = function () {
+historyCache.terminateCacheService = function (val) {
     if(cacheServiceIsRunning) log.exit('Terminating cache service');
-    terminateCacheService = 1;
+    terminateCacheService = val === undefined ? 1 : val;
 };
 
 function loadDataFromDumpToCache(dumpPath, callback) {
@@ -123,23 +130,14 @@ function loadDataFromDumpToCache(dumpPath, callback) {
     newRecord: {timestamp: ..., record: ...}
  */
 historyCache.add = function (id, newRecord){
-
-    if(newRecord.data === undefined || newRecord.data === null) return;
-    if(!newRecord.timestamp || newRecord.timestamp < 1477236595310 || newRecord.timestamp > Date.now() + 60000) { // 1477236595310 = 01/01/2000)
-        log.error('Error in record timestamp ',
-            (newRecord.timestamp ? new Date(newRecord.timestamp).toLocaleString() : ''), '(', newRecord, ') for object: ', id);
-        return;
-    }
-
-    if(typeof newRecord.data === 'object') newRecord.data =  JSON.stringify(newRecord.data);
+    // the record was checked on the client side using the history.add () function
 
     //log.debug('Adding data to history: id ', id, ' newRecord: ', newRecord);
-
     if(!cache[id]) {
         cache[id] = {
             cachedRecords: parameters.initCachedRecords,
             savedCnt: 0, // Count of saved records, 'records' is an array of the last data returned from counters
-            records: [newRecord]
+            records: [newRecord],
         };
         //log.debug('Inserting newRecord for new object to history. id: ', id, ' newRecord: ', newRecord);
     } else {
@@ -149,20 +147,25 @@ historyCache.add = function (id, newRecord){
         // if throttling is enabled for this objectID
         // Don't create new record for a new data which equal to  data from last record in a cache.
         // Only change last record timestamp
-        if(cache[id].throttling && recordsInCacheCnt > 2 && cache[id].records[recordsInCacheCnt-1].data === newRecord.data && cache[id].records[recordsInCacheCnt-2].data === newRecord.data) {
+        if(cache[id].throttling &&
+            recordsInCacheCnt > 2 &&
+            cache[id].records[recordsInCacheCnt-1].data === newRecord.data &&
+            cache[id].records[recordsInCacheCnt-2].data === newRecord.data
+        ) {
             cache[id].records[recordsInCacheCnt-1].timestamp = newRecord.timestamp;
             //log.debug('Inserting new timestamp for newRecord, equal to previous to history. id: ', id, ' newRecord: ', newRecord, ' records in cache: ', cache[id].records);
-        } else { // create a new record in a cache otherwise
+        } else { // add a new record to the cache otherwise
           //log.debug('Inserting new newRecord to history. id: ', id, ' newRecord: ', newRecord);
 
             if(!recordsInCacheCnt || cache[id].records[recordsInCacheCnt-1].timestamp < newRecord.timestamp) cache[id].records.push(newRecord);
             else {
                 if(recordsInCacheCnt === 1) cache[id].records.unshift(newRecord);
                 else if(cache[id].records[0].timestamp > newRecord.timestamp) {
-                    log.warn('Don\'t add record for object ', id, ' with a timestamp (',
-                        new Date(newRecord.timestamp).toLocaleString(), ') less then latest record (',
-                        new Date(cache[id].records[0].timestamp).toLocaleString(),
-                        ') in the cache. New record: ', newRecord, ', cache: ', cache[id]);
+                    log.warn('Don\'t add a record for the object ', id, ' with a timestamp (',
+                        new Date(newRecord.timestamp).toLocaleString() + '.' + newRecord.timestamp % 1000,
+                        ') less then latest record (',
+                        new Date(cache[id].records[0].timestamp).toLocaleString() + '.' + cache[id].records[0].timestamp % 1000,
+                        ') in the cache. New record: ', newRecord, ', latest in cache: ', cache[id].records[0]);
                 } else {
                     // inserting new record into the cache in position according to new record timestamp for save correct records order
                     for (var i = recordsInCacheCnt - 2; i >= 0; i--) {
@@ -268,23 +271,96 @@ historyCache.getByValue = function(id, value, callback) {
     callback(err, records), where records: [{data:.., timestamp:..}, ....]
 
  */
-historyCache.get = function (id, shift, num, callback) {
+historyCache.get = function (id, shift, num, recordsType, callback) {
 
     if(String(num).charAt(0) === '#') {
         var getFromHistory = historyCache.getByIdx;
         num = num.slice(1);
+        var isTime = false;
     }
 
     if(String(shift).charAt(0) === '#') {
         getFromHistory = historyCache.getByIdx;
         shift = shift.slice(1);
+        isTime = false;
     }
 
-    if(getFromHistory === undefined) getFromHistory = historyCache.getByTime;
+    if(getFromHistory === undefined) {
+        getFromHistory = historyCache.getByTime;
+        isTime = true;
+    }
 
-    getFromHistory(id, shift, num, 0, function (err, records) {
-        if(err || !Array.isArray(records) || !records.length) return callback(err);
-        callback(null, records);
+    getFromHistory(id, shift, num, 0, recordsType, function (err, rawRecords, isGotAllRecords) {
+        if(err) {
+            ++storageRetrievingDataIncomplete;
+            Array.isArray(rawRecords) ? rawRecords.push(err.message) : rawRecords = err.message;
+            return callback(err, null, rawRecords);
+        }
+
+        // convert numeric to Number
+        if(recordsType < 2) {
+            var records = rawRecords.map(function (record) {
+                if (!isNaN(parseFloat(record.data)) && isFinite(record.data)) {
+                    return {
+                        timestamp: record.timestamp,
+                        data: Number(record.data),
+                    }
+                } else return record;
+            });
+        } else records = rawRecords;
+
+        // when recordsType is null, return received records in any cases
+        if(recordsType === null ) {
+            ++storageRetrievingDataComplete;
+            return callback(null, records);
+        }
+
+        // used in a history functions, if not got all required records, return nothing
+        if(!isGotAllRecords) {
+            ++storageRetrievingDataIncomplete;
+            rawRecords.push('No data from the database');
+            return callback(null, null, rawRecords);
+        }
+
+        if(!isTime) {
+            // return less the 90% of requirement records
+            if(!num || records.length / num < 0.9) {
+                ++storageRetrievingDataIncomplete;
+                rawRecords.push('records: ' + records.length + '; num: ', num);
+                return callback(null, null, rawRecords);
+            }
+            ++storageRetrievingDataComplete;
+            return callback(null, records);
+        } else {
+            if(records.length === 0) {
+                ++storageRetrievingDataIncomplete;
+                rawRecords.push('Returned 0 records');
+                return callback(null, null, rawRecords);
+            }
+
+            if(records.length === 1) {
+                ++storageRetrievingDataComplete;
+                return callback(null, records);
+            }
+
+            // calculating an avg time interval between the record timestamps
+            for(var i = 2, avgTimeInterval = records[1].timestamp - records[0].timestamp; i < records.length; i++) {
+                avgTimeInterval = (avgTimeInterval + records[i].timestamp - records[i-1].timestamp) / 2;
+            }
+
+            // checking for the 1477236595310 = 01/01/2000. shift is a timeFrom or timeShift; num is a timeTo or timeInterval
+            var timeFrom = shift > 1477236595310 ? shift : Date.now() - shift - num;
+
+            // checking for the last record timestamp is near the timeFrom timestamp
+            // r.timestamp = 14:05:00, avgInterval = 30, timeFrom = 14:04:25
+            if(records[0].timestamp - avgTimeInterval * 1.2 > timeFrom) {
+                ++storageRetrievingDataIncomplete;
+                rawRecords.push('avgInterval + 20%: ' + Math.round(avgTimeInterval * 1.2 / 1000) +'; timestamp - timeFrom: ' + Math.round((records[0].timestamp - timeFrom) / 1000));
+                return callback(null, null, rawRecords);
+            }
+            ++storageRetrievingDataComplete;
+            return callback(null, records);
+        }
     });
 };
 
@@ -306,7 +382,7 @@ historyCache.getLastValues = function(IDs, callback) {
         if(records[id]) return callback();
 
         records[id] = {};
-        historyCache.getByIdx(id, 0, 1, 0, function (err, record) {
+        historyCache.getByIdx(id, 0, 1, 0, 0,function (err, record) {
             if(err) {
                 if(!historyCache.terminateHousekeeper) {
                     log.warn('Can\'t get last value for ', id, ': ', err.message);
@@ -336,11 +412,12 @@ historyCache.getLastValues = function(IDs, callback) {
     callback(err, records), where records: [{data:.., timestamp:..}, ....]
 
  */
-historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, callback) {
+historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, callback) {
     if(typeof callback !== 'function') return log.error('[getByIdx]: callback is not a function');
 
+    if(recordsType === undefined) recordsType = 0;
     offset = Number(offset); cnt = Number(cnt); id = Number(id);
-    if(cnt === 0) return callback(null, []);
+    if(cnt === 0) return callback(null, [], false);
     if(Number(id) !== parseInt(String(id), 10) || !id) return callback(new Error('[getByIdx] incorrect object ID '+id));
     if(Number(offset) !== parseInt(String(offset), 10) || offset < 0) return callback(new Error('[getByIdx] incorrect "offset" parameter ('+offset+') for objectID '+id));
     if(Number(cnt) !== parseInt(String(cnt), 10) || cnt < 1) return callback(new Error('[getByIdx] incorrect "cnt" parameter ('+cnt+') for objectID '+id));
@@ -353,7 +430,7 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, callback) {
 
         if(recordsFromCache.length === cnt) {
             calculateCacheSize(cacheObj, 0, recordsFromCache);
-            return callback(null, recordsFromCache);
+            return callback(null, recordsFromCache, true);
         }
     } else {
         recordsFromCache = [];
@@ -398,29 +475,10 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, callback) {
         }
     }
 
-    storage.getRecordsFromStorageByIdx(id, storageOffset, storageCnt, storageTimestamp, maxRecordsCnt, function(err, recordsFromStorage) {
-        if (err || !Array.isArray(recordsFromStorage)) {
-            if(!historyCache.terminateHousekeeper) {
-                log.warn('Can\'t get data from storage for ', id, '; from position: ', storageOffset, ', count: ', storageCnt,
-                    '; timestamp: ', (new Date(storageTimestamp)).toLocaleString(), ' (', storageTimestamp, ')',
-                    ' maxRecordsCnt: ', maxRecordsCnt, ', try again. Error: ', err || 'return no data');
-            }
-            storage.getRecordsFromStorageByIdx(id, storageOffset, storageCnt, storageTimestamp, maxRecordsCnt, processDataFromStorage);
-        } else processDataFromStorage(err, recordsFromStorage);
-    });
-
-    function processDataFromStorage(err, recordsFromStorage) {
-        if (err || !Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
-            if(err || !Array.isArray(recordsFromStorage)) {
-                if(!historyCache.terminateHousekeeper) {
-                    log.warn('Can\'t get data from storage for ', id, '; from position: ', storageOffset, ', count: ', storageCnt,
-                        '; timestamp: ', (new Date(storageTimestamp)).toLocaleString(), ' (', storageTimestamp, ')',
-                        ' maxRecordsCnt: ', maxRecordsCnt, ', return only data from cache. Error: ', err || 'return no data',
-                        '; data from cache: ', recordsFromCache);
-                }
-            }
-            return callback(err, recordsFromCache);
-        }
+    storage.getRecordsFromStorageByIdx(id, storageOffset, storageCnt, storageTimestamp, maxRecordsCnt, recordsType,
+        function(err, recordsFromStorage) {
+        if (err) return callback(err);
+        if(!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) return callback(err, recordsFromCache, false);
 
         recordsFromStorageCnt += recordsFromStorage.length;
         calculateCacheSize(cacheObj, recordsFromStorage);
@@ -428,8 +486,8 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, callback) {
 
         Array.prototype.push.apply(recordsFromStorage, recordsFromCache);
 
-        callback(null, recordsFromStorage);
-    }
+        callback(null, recordsFromStorage, true);
+    });
 };
 
 /*
@@ -441,18 +499,23 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, callback) {
         2. timeShift - time in ms from last record. timeInterval - time interval in ms from timeShift
     callback(err, records), where records: [{data:.., timestamp:..}, ....]
  */
-historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, callback) {
+historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, recordsType, callback) {
 
     //log.debug('[getByTime]: ',id, ', ', timeShift, ', ', timeInterval, ', ', maxRecordsCnt);
     if (typeof callback !== 'function') return log.error('[getByTime]: callback is not a function');
 
+    if(recordsType === undefined) recordsType = 0;
     id = Number(id); timeShift = Number(timeShift); timeInterval = Number(timeInterval);
     if (id !== parseInt(String(id), 10) || !id) return callback(new Error('[getByTime] incorrect ID ' + id));
-    if (timeShift !== parseInt(String(timeShift), 10) || timeShift < 0) return callback(new Error('[getByTime] incorrect "timeShift" parameter (' + timeShift + ') for objectID ' + id));
-    if (timeInterval !== parseInt(String(timeInterval), 10) || timeInterval < 0) return callback(new Error('[getByTime] incorrect "timeInterval" parameter (' + timeInterval + ') for objectID ' + id));
+    if (timeShift !== parseInt(String(timeShift), 10) || timeShift < 0) {
+        return callback(new Error('[getByTime] incorrect "timeShift" parameter (' + timeShift + ') for objectID ' + id));
+    }
+    if (timeInterval !== parseInt(String(timeInterval), 10) || timeInterval < 0) {
+        return callback(new Error('[getByTime] incorrect "timeInterval" parameter (' + timeInterval + ') for objectID ' + id));
+    }
 
     // return last value
-    if(timeInterval === 0) return historyCache.getByIdx(id, 0, 1, 0, callback);
+    if(timeInterval === 0) return historyCache.getByIdx(id, 0, 1, 0, 0, callback);
 
     // return empty array for small time interval
     //if(timeInterval < 60000) return callback(null, []);
@@ -476,7 +539,7 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, c
      */
     if(cacheObj && cacheObj.records) {
         // last record timestamp in cache less then required timestamp in timeFrom. History have not data for required time interval
-        if(cacheObj.records.length && timeFrom > cacheObj.records[cacheObj.records.length - 1].timestamp) return callback(null, []);
+        if(cacheObj.records.length && timeFrom > cacheObj.records[cacheObj.records.length - 1].timestamp) return callback(null, [], false);
         // checking for present required records in cache.
         // timestamps: [10:00, 10:05, 10:10, 10:15, 10:20]. timeTo 10:05 - present; timeTo 09:50 - not present in cache
         if(cacheObj.records.length && timeTo > cacheObj.records[0].timestamp) {
@@ -501,7 +564,7 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, c
             //log.debug(id, ': !!! records form cache: ', recordsFromCache, '; firstRecordIdxInCache: ', firstRecordIdxInCache, '; lastRecordIdxInCache: ', lastRecordIdxInCache, '; ', cacheObj);
             if (firstRecordIdxInCache) { // firstRecordIdxInCache !== 0
                 calculateCacheSize(cacheObj, 0, recordsFromCache);
-                return callback(null, recordsFromCache);
+                return callback(null, recordsFromCache, true);
             }
         } else recordsFromCache = [];
     } else {
@@ -519,50 +582,34 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, c
     Use recordsFromCache[0].timestamp - 1 because the SQL BETWEEN operator is inclusive
     */
     var storageTimeTo = recordsFromCache.length ? recordsFromCache[0].timestamp - 1 : timeTo;
-    storage.getRecordsFromStorageByTime(id, timeFrom, storageTimeTo, maxRecordsCnt, function(err, recordsFromStorage, isThisDataFromTrends) {
-        if (err || !Array.isArray(recordsFromStorage)) {
-            if(!historyCache.terminateHousekeeper) {
-                log.warn('Can\'t get data from storage for ', id, ': ', (new Date(timeFrom)).toLocaleString(),
-                    '-', (new Date(storageTimeTo)).toLocaleString(), ' (', timeFrom, '-', storageTimeTo, ')',
-                    '; maxRecordsCnt: ', maxRecordsCnt, ', try again. Error: ', err || 'return no data');
-            }
-            storage.getRecordsFromStorageByTime(id, timeFrom, storageTimeTo, maxRecordsCnt, processDataFromStorage);
-        } else processDataFromStorage(err, recordsFromStorage, isThisDataFromTrends);
-    });
+    storage.getRecordsFromStorageByTime(id, timeFrom, storageTimeTo, maxRecordsCnt, recordsType,
+        function(err, recordsFromStorage, isThisDataFromTrends) {
 
-    function processDataFromStorage(err, recordsFromStorage, isThisDataFromTrends) {
-        if (err || !Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
-            if(err || !Array.isArray(recordsFromStorage)) {
-                if(!historyCache.terminateHousekeeper) {
-                    log.warn('Can\'t get data from storage for ', id, ': ', (new Date(timeFrom)).toLocaleString(),
-                        '-', (new Date(storageTimeTo)).toLocaleString(), ' (', timeFrom, '-', storageTimeTo, ')',
-                        '; maxRecordsCnt: ', maxRecordsCnt, ', return only data from cache. Error: ', err || 'return no data',
-                        '; data from cache: ', recordsFromCache);
+            if (err) return callback(err);
+            if(!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) return callback(err, recordsFromCache, false);
+
+            recordsFromStorageCnt += recordsFromStorage.length;
+            //log.debug(id, ': !!! records form storage: ', recordsFromStorage);
+
+            if(!isThisDataFromTrends) {
+                calculateCacheSize(cacheObj, recordsFromStorage);
+                addDataToCache(cacheObj, recordsFromStorage);
+            }
+
+            if(recordsFromCache.length &&
+                recordsFromStorage[recordsFromStorage.length-1].timestamp >= recordsFromCache[0].timestamp) {
+                log.warn('Timestamp in last record from storage: ', recordsFromStorage[recordsFromStorage.length-1],
+                    ' more then timestamp in first record from cache: ', recordsFromCache[0], '; storage: ...',
+                    recordsFromStorage.slice(-5), '; cache: ', recordsFromCache.slice(0, 5), '...');
+
+                var lastRecord = recordsFromStorage.pop(), firstCachedRecordTimestamp = recordsFromCache[0].timestamp;
+                while(lastRecord && lastRecord.timestamp >= firstCachedRecordTimestamp) {
+                    lastRecord = recordsFromStorage.pop();
                 }
             }
-            return callback(err, recordsFromCache);
-        }
-
-        recordsFromStorageCnt += recordsFromStorage.length;
-        //log.debug(id, ': !!! records form storage: ', recordsFromStorage);
-
-        if(!isThisDataFromTrends) {
-            calculateCacheSize(cacheObj, recordsFromStorage);
-            addDataToCache(cacheObj, recordsFromStorage);
-        }
-
-        /* deep debug */
-        if(recordsFromCache.length && recordsFromStorage[recordsFromStorage.length-1].timestamp >= recordsFromCache[0].timestamp) {
-            log.warn('Timestamp in last record from storage: ', recordsFromStorage[recordsFromStorage.length-1], ' more then timestamp in first record from cache: ', recordsFromCache[0], '; storage: ...', recordsFromStorage.slice(-5), '; cache: ', recordsFromCache.slice(0, 5), '...');
-
-            var lastRecord = recordsFromStorage.pop(), firstCachedRecordTimestamp = recordsFromCache[0].timestamp;
-            while(lastRecord && lastRecord.timestamp >= firstCachedRecordTimestamp) {
-                lastRecord = recordsFromStorage.pop();
-            }
-        }
-        Array.prototype.push.apply(recordsFromStorage, recordsFromCache);
-        callback(null, recordsFromStorage);
-    }
+            Array.prototype.push.apply(recordsFromStorage, recordsFromCache);
+            callback(null, recordsFromStorage, true);
+    });
 };
 
 /*

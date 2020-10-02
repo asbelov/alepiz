@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
- * Created by asbel on 13.05.2015.
+ * Created by Alexander Belov on 13.05.2015.
  */
 
 

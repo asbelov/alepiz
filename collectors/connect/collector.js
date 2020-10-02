@@ -1,3 +1,7 @@
+/*
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+ */
+
 var net = require('net');
 var dns = require('dns');
 var async = require('async');

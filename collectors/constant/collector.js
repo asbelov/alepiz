@@ -1,3 +1,7 @@
+/*
+ * Copyright © 2017. Alexander Belov. Contacts: <asbel@alepiz.com>
+ */
+
 var collector = {};
 module.exports = collector;
 /*

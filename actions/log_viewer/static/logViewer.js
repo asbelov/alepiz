@@ -1,3 +1,7 @@
+/*
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+ */
+
 function LogViewer(initCfg) {
 
     var script = parameters.action.link + '/ajax';

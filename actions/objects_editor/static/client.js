@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 function onChangeObjects(objects){
@@ -47,11 +47,11 @@ function callbackBeforeExec(callback) {
 
     $('#modalRenameConfirm').modal({dismissible: false}).modal('open');
 
-    $('#modalRenameConfirmNo').click(function() {
+    $('#modalRenameConfirmNo').unbind('click').click(function() {
         callback(new Error('Rename operation is canceled'));
     });
 
-    $('#modalRenameConfirmYes').click(function(){
+    $('#modalRenameConfirmYes').unbind('click').click(function(){
         $('#rulesForRenameObjects').val(JSON.stringify(renameRules));
         callback();
     });

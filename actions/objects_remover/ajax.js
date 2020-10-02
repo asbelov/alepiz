@@ -1,10 +1,7 @@
 /*
- * Copyright © 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
-/*
-* Copyright © 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
-* Created on 2018-9-23 21:22:50
-*/
+
 var log = require('../../lib/log')(module);
 var objectsFilterDB = require('../../models_db/objectsFilterDB');
 var prepareUser = require('../../lib/utils/prepareUser');

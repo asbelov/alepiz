@@ -1,7 +1,6 @@
 /*
- * Copyright © 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
-* Created on Mon Apr 09 2018 17:26:59 GMT+0700
-*/
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+ */
 var log = require('../../lib/log')(module);
 var countersDB = require('../../rightsWrappers/countersDB');
 var objectsDB = require('../../rightsWrappers/objectsDB');

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 var log = require('../lib/log')(module);
@@ -21,18 +21,14 @@ functions.avg = function(id, parameters, callback){
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
 
-    cache.get(id, shift, num,function(err, records) {
+    cache.get(id, shift, num,1,function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "avg('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records) return callback();
+        if(!records) return callback(null, {records: rawRecords});
 
         for(var i = 0, sum = 0, count = 0; i < records.length; i++) {
-            var data = Number(records[i].data);
-            // check whether record is a number
-            if(!isNaN(parseFloat(String(data))) && isFinite(data)) {
-                sum += data;
-                count++;
-            }
+            sum += records[i].data;
+            count++;
         }
 
         var result = sum / count;
@@ -40,7 +36,7 @@ functions.avg = function(id, parameters, callback){
 
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -64,18 +60,19 @@ functions.change = function(id, parameters, callback){
 
     var num = parameters[0] ? parameters[0] : '#2';
     var shift = parameters[1] ? parameters[1] : 0;
-    var isAbs = parameters[2];
+    var recordsType = parameters[2] ? 2: 1;
+    var isAbs = parameters[3];
 
-    if(String(num).charAt(0) === '#' && Number(num.slice(1)) < 2) return callback();
+    if(String(num).charAt(0) === '#' && Number(num.slice(1)) < 2) return callback(null, {records: 'require only one record: ' + num});
 
-    cache.get(id, shift, num, function(err, records) {
+    cache.get(id, shift, num, recordsType,function(err, records, rawRecords) {
         if(err) return callback(new Error('Error occurred while getting data from history for "change('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records) return callback();
+        if(!records) return callback(null, {records: rawRecords});
 
         if(records.length < 2 || !records[0] || !records[records.length-1] || records[0].data === undefined || records[records.length-1].data === undefined)
             //return callback(new Error('No first or last records returned for "change('+parameters.join(', ')+')" function for objectID: '+ id));
-            return callback();
+            return callback(null, {records: rawRecords});
 
         var first = records[0].data;
         var last = records[records.length-1].data;
@@ -92,24 +89,27 @@ functions.change = function(id, parameters, callback){
         log.debug('FUNC: [abs]change(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
 
 functions.change.description = 'The amount of difference between first and last values in specific interval.\n' +
     '\n' +
-    'change([<period>], [<timeShift>])\n' +
+    'change([<period>], [<timeShift>], [<dataType>])\n' +
     'period: evaluation period in milliseconds, default #2 records\n'  +
     'timeShift: evaluation point is moved the number of milliseconds\n' +
+    'dataType: [0|1] data type for compare: number(0) - default or string(1)\n' +
     '\n' +
-    'change(<timestampFrom>, <timestampTo>)\n' +
+    'change(<timestampFrom>, <timestampTo>, [<dataType>])\n' +
     'timestampFrom: timestamp in milliseconds from 1970 - begin of time\n' +
     'timestampTo: timestamp in milliseconds from 1970 - end of time\n'  +
+    'dataType: [0|1] data type for compare: number(0) - default or string(1)\n' +
     '\n' +
-    'change([#<recordsCnt>], [#<recordsShift>])\n' +
+    'change([#<recordsCnt>], [#<recordsShift>], [<dataType>])\n' +
     'recordsCnt: count of records from the recordsShift, , default #2 records\n' +
     'recordsShift: evaluation point is moved the number of records back\n' +
+    'dataType: [0|1] data type for compare: number(0) - default or string(1)\n' +
     '\n' +
     'if parameters are not specified, then will be comparing last and previous values\n' +
     'For strings used case sensitive (for case insensitive use absChange) compare and return:\n' +
@@ -117,23 +117,26 @@ functions.change.description = 'The amount of difference between first and last 
     ' 1 - values differ';
 
 functions.absChange = function(id, parameters, callback){
-    parameters[2] = 'absolute';
+    parameters[3] = 'absolute';
     functions.change(id, parameters, callback);
 };
 
 functions.absChange.description = 'The amount of absolute difference between first and last values in specific interval.\n' +
     '\n' +
-    'absChange([<period>], [<timeShift>])\n' +
+    'absChange([<period>], [<timeShift>], [<dataType>])\n' +
     'period: evaluation period in milliseconds\n'  +
     'timeShift: evaluation point is moved the number of milliseconds\n' +
+    'dataType: [0|1] data type for compare: number(0) - default or string(1)\n' +
     '\n' +
-    'abschange(<timestampFrom>, <timestampTo>)\n' +
+    'abschange(<timestampFrom>, <timestampTo>, [<dataType>])\n' +
     'timestampFrom: timestamp in milliseconds from 1970 - begin of time\n' +
     'timestampTo: timestamp in milliseconds from 1970 - end of time\n'  +
+    'dataType: [0|1] data type for compare: number(0) - default or string(1)\n' +
     '\n' +
-    'abschange([#<recordsCnt>], [#<recordsShift>])\n' +
+    'abschange([#<recordsCnt>], [#<recordsShift>], [<dataType>])\n' +
     'recordsCnt: count of records from the recordsShift\n' +
     'recordsShift: evaluation point is moved the number of records back\n' +
+    'dataType: [0|1] data type for compare: number(0) - default or string(1)\n' +
     '\n' +
     'if parameters are not specified, then will be comparing last and previous values\n' +
     'For strings used case insensitive (for case sensitive use change()) compare and return:\n' +
@@ -147,6 +150,8 @@ var compare  = {
     'ge': function(x,y) {return x >= y},
     'lt': function(x,y) {return x < y},
     'le': function(x,y) {return x <= y},
+    'eqstr': function(x,y) {return x === y},
+    'ieqstr': function(x,y) {return x.toUpperCase() === y.toUpperCase()},
     'like': function(x,y) {return String(x).indexOf(String(y)) !== -1},
     'ilike': function(x,y) {return String(x).toUpperCase().indexOf(String(y).toUpperCase()) !== -1},
     'regexp': function(x,y) { return (new RegExp(y)).test(x); },
@@ -174,11 +179,13 @@ functions.count = function(id, parameters, callback){
         if(!(operator in compare)) return callback(new Error('Invalid compare operator "'+operator+'" in function count('+parameters.join(', ')+') for objectID '+id));
     }
 
-    cache.get(id, shift, num, function(err, records) {
+    var recordsType = ['eqstr', 'ieqstr', 'like', 'ilike', 'regexp', 'iregexp'].indexOf(operator) === -1 ? 1 : 2;
+
+    cache.get(id, shift, num, recordsType, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "count('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        var result = 0;
         if(records && records.length) {
+            var result = 0;
             if (pattern === undefined || pattern === null) result = records.length;
             else {
                 records.forEach(function (record) {
@@ -194,7 +201,7 @@ functions.count = function(id, parameters, callback){
         log.debug('FUNC: count(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -221,6 +228,8 @@ functions.count.description = 'Number of values within the defined evaluation pe
     'ge - greater or equal\n' +
     'lt - less\n' +
     'le - less or equal\n' +
+    'eqstr - strings are equal (case-sensitive)\n' +
+    'ieqstr - strings are equal (case-insensitive)\n' +
     'like - matches if contains pattern (case-sensitive)\n' +
     'ilike - matches if contains pattern (case-insensitive)\n' +
     'regexp - case sensitive match of regular expression given in pattern\n' +
@@ -234,25 +243,22 @@ functions.delta = function(id, parameters, callback) {
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
 
-    cache.get(id, shift, num, function(err, records) {
+    cache.get(id, shift, num, 1, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "delta('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records) return callback();
+        if(!records) return callback(null, {records: rawRecords});
 
         var max = null, min = null;
         records.forEach(function(record) {
-            var data = Number(record.data);
-            if(!isNaN(parseFloat(String(data))) && isFinite(data)) {
-                if (max === null || max < data) max = data;
-                if (min === null || min > data) min = data;
-            }
+            if (max === null || max < record.data) max = record.data;
+            if (min === null || min > record.data) min = record.data;
         });
 
         var result = min !== null && max !== null ? max - min : 0;
         log.debug('FUNC: delta(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -282,18 +288,19 @@ functions.last = function(id, parameters, callback) {
         num = String(parameters[0]).charAt(0) === '#' ? 1 : parameters[1] || parameters[0];
     }
 
-    cache.get(id, shift, num, function(err, records) {
+    // set recordsType to null for get last record in any cases (see cache.get())
+    cache.get(id, shift, num, null, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "last('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records) return callback();
+        if(!records || !records[0]) return callback(null, {records: rawRecords});
 
-        if(!records[0]) return callback(new Error('Error in records returned for "last('+parameters.join(', ')+')" function for objectID: '+ id + ': ' + JSON.stringify(records)));
+        //if(!records[0]) return callback(new Error('Error in records returned for "last('+parameters.join(', ')+')" function for objectID: '+ id + ': ' + JSON.stringify(records)));
 
         var result = records[0].data;
         log.debug('FUNC: last(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -314,21 +321,20 @@ functions.max = function(id, parameters, callback) {
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
 
-    cache.get(id, shift, num, function(err, records) {
+    cache.get(id, shift, num, 1, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "max('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records) return callback();
+        if(!records) return callback(null, {records: rawRecords});
 
         var result = null;
         records.forEach(function(record) {
-            var data = Number(record.data);
-            if(!isNaN(parseFloat(String(data))) && isFinite(data) && (result === null || result < data)) result = data;
+            if(result === null || result < record.data) result = record.data;
         });
 
         log.debug('FUNC: max(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -353,21 +359,20 @@ functions.min = function(id, parameters, callback) {
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
 
-    cache.get(id, shift, num, function(err, records) {
+    cache.get(id, shift, num, 1, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "min('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records) return callback();
+        if(!records) return callback(null, {records: rawRecords});
 
         var result = null;
         records.forEach(function(record) {
-            var data = Number(record.data);
-            if(!isNaN(parseFloat(String(data))) && isFinite(data) && (result === null || result > data)) result = data;
+            if(result === null || result > record.data) result = record.data;
         });
 
         log.debug('FUNC: min(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -395,14 +400,15 @@ functions.nodata = function(id, parameters, callback) {
                 ')" function for objectID: ' + id + ': parameter mast be a pure time interval without "#"'));
     }
     // get last history record
-    cache.getByIdx(id, 0, 1, 0, function (err, records) {
+    cache.getByIdx(id, 0, 1, 0, 0,function (err, records) {
         if(err) {
             return callback(new Error('Error occurred while getting data from history for "nodata('+ period || '' +
                 ')" function for objectID: '+ id +': ' + err.message));
         }
 
-        var result = records && records[0] ? Date.now() - records[0].timestamp : 0;
-        if(result && period) result = result > period ? 1 : 0
+        if(period) var result = records && records[0] && Date.now() - records[0].timestamp > period ? 1 : 0;
+        else result = records && records[0] ? Date.now() - records[0].timestamp : Date.now();
+
         log.debug('FUNC: nodata() = ', result, '; records: ', records);
         callback(null, {
             data: result,
@@ -418,8 +424,9 @@ functions.nodata.description = 'Checking for no data received.\n' +
     'If no period is specified, the timestamp of the last record is returned\n\n' +
     'Returns:\n' +
     '1 - if period specified and NO data received during the defined period of time\n' +
+    '0 - if the period is specified and the data was received in the specified period\n' +
     '<time> - if the period is not specified, the time until the last record is returned\n' +
-    '0 - otherwise'
+    '         if no record found return time before 01.01.1970';
 
 functions.regexp =  function(id, parameters, callback) {
     if(parameters.length < 2) return callback(new Error('Error in parameters for "regexp('+parameters.join(', ')+')" function for objectID: '+ id));
@@ -435,10 +442,10 @@ functions.regexp =  function(id, parameters, callback) {
         return callback(new Error('Incorrect regular expression "'+pattern+'" in "regexp('+parameters.join(', ')+')" function for objectID: '+ id + ': ' + err.message))
     }
      
-    cache.get(id, shift, num, function(err, records) {
+    cache.get(id, shift, num, 2,function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "regexp('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records) return callback();
+        if(!records) return callback(null, {records: rawRecords});
 
         for(var i = 0, result = 0; i < records.length; i++) {
             var record = records[i];
@@ -452,7 +459,7 @@ functions.regexp =  function(id, parameters, callback) {
         log.debug('FUNC: regexp(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -487,21 +494,20 @@ functions.sum = function(id, parameters, callback){
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
 
-    cache.get(id, shift, num, function(err, records) {
+    cache.get(id, shift, num, 1, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "sum('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records) return callback();
+        if(!records) return callback(null, {records: rawRecords});
 
         var result = 0;
         records.forEach(function(record) {
-            var data = Number(record.data);
-            if(!isNaN(parseFloat(String(data))) && isFinite(data)) result += data;
+            result += record.data;
         });
 
         log.debug('FUNC: sum(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -534,14 +540,12 @@ functions.outliersBrd = function(id, parameters, callback) {
         return callback(new Error('Error in parameters for "outliersBrd('+parameters.join(', ')+')" function for objectID: '+
             id + ': ' + parameters[2] + ' can be "min" or "max"'));
 
-    cache.get(id, shift, num,function(err, records) {
+    cache.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "borderTF('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records || !records.length || records.length < 3) return callback();
+        if(!records || !records.length || records.length < 3) return callback(null, {records: rawRecords});
 
-        var numericRecords = records.filter(function (record) {
-            return !isNaN(parseFloat(String(record.data))) && isFinite(record.data)
-        }).sort(function(a, b) {
+        var numericRecords = records.sort(function(a, b) {
             return a.data - b.data; // inc sort
         });
 
@@ -550,7 +554,7 @@ functions.outliersBrd = function(id, parameters, callback) {
             I3 = len * 0.75, I3_floor = Math.floor(I3), I3_ceil = Math.ceil(I3);
 
         if(!numericRecords[I1_ceil] || !numericRecords[I1_floor] || !numericRecords[I3_ceil] || !numericRecords[I3_floor])
-            return callback();
+            return callback(null, {records: rawRecords});
 
         var Q1 = I1 !== I1_ceil ? numericRecords[I1_ceil].data : ( numericRecords[I1_floor].data + numericRecords[I1_ceil].data ) / 2,
             Q3 = I3 !== I3_ceil ? numericRecords[I3_ceil].data : ( numericRecords[I3_floor].data + numericRecords[I3_ceil].data ) / 2,
@@ -560,7 +564,7 @@ functions.outliersBrd = function(id, parameters, callback) {
 
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -601,14 +605,12 @@ functions.lastRob = function(id, parameters, callback) {
     var shift = parameters[1] ? parameters[1] : 0;
     var recordIdx = Number(parameters[2]) === parseInt(String(parameters[2]), 10) ? Number(parameters[2]) : 0;
 
-    cache.get(id, shift, num,function(err, records) {
+    cache.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "lastRob('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records || !records.length || records.length < 3) return callback();
+        if(!records || !records.length || records.length < 3) return callback(null, {records: rawRecords});
 
-        var numericRecords = records.filter(function (record) {
-            return !isNaN(parseFloat(String(record.data))) && isFinite(record.data)
-        }).sort(function(a, b) {
+        var numericRecords = records.sort(function(a, b) {
             return a.data - b.data; // inc sort
         });
 
@@ -617,7 +619,7 @@ functions.lastRob = function(id, parameters, callback) {
             I3 = len * 0.75, I3_floor = Math.floor(I3), I3_ceil = Math.ceil(I3);
 
         if(!numericRecords[I1_ceil] || !numericRecords[I1_floor] || !numericRecords[I3_ceil] || !numericRecords[I3_floor])
-            return callback();
+            return callback(null, {records: rawRecords});
 
         var Q1 = I1 !== I1_ceil ? numericRecords[I1_ceil].data : ( numericRecords[I1_floor].data + numericRecords[I1_ceil].data ) / 2,
             Q3 = I3 !== I3_ceil ? numericRecords[I3_ceil].data : ( numericRecords[I3_floor].data + numericRecords[I3_ceil].data ) / 2,
@@ -642,7 +644,7 @@ functions.lastRob = function(id, parameters, callback) {
 
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -684,16 +686,14 @@ functions.avgTF = function(id, parameters, callback) {
     var shift = parameters[1] ? parameters[1] : 0;
     var avgCnt= Number(parameters[2]) === parseInt(String(parameters[2]), 10) ? Number(parameters[2]) : 0;
 
-    cache.get(id, shift, num,function(err, records) {
+    cache.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "avgTF('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records) return callback();
+        if(!records) return callback(null, {records: rawRecords});
 
         if(records.length < 3) return functions.avg(id, parameters, callback);
 
-        var numericRecords = records.filter(function (record) {
-            return !isNaN(parseFloat(String(record.data))) && isFinite(record.data)
-        }).sort(function(a, b) {
+        var numericRecords = records.sort(function(a, b) {
             return a.data - b.data; // inc sort
         });
 
@@ -734,7 +734,7 @@ functions.avgTF = function(id, parameters, callback) {
 
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -780,10 +780,10 @@ functions.avgMed = function(id, parameters, callback) {
         return callback(new Error('Error in parameters for "avgMed('+parameters.join(', ')+')" function for objectID: '+
             id + ': outliersPercent not number or less then 1% or more then 99%'));
 
-    cache.get(id, shift, num,function(err, records) {
+    cache.get(id, shift, num,1,function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "avgMed('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records || !records.length || records.length < 3) return callback();
+        if(!records || !records.length || records.length < 3) return callback(null, {records: rawRecords});
 
         var outliersCount = Math.round(records.length / 100 * outliersPercent),
             sum = 0,
@@ -795,10 +795,8 @@ functions.avgMed = function(id, parameters, callback) {
 
         for(var i = outliersCount; i < records.length - outliersCount; i++) {
             var record = records[i];
-            if(!isNaN(parseFloat(String(record.data))) && isFinite(record.data)) {
-                sum += Number(record.data);
-                count++;
-            }
+            sum += record.data;
+            count++;
         }
 
         var result = sum / count;
@@ -806,7 +804,7 @@ functions.avgMed = function(id, parameters, callback) {
 
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -848,10 +846,10 @@ functions.avgNear = function(id, parameters, callback) {
         return callback(new Error('Error in parameters for "avgNear('+parameters.join(', ')+')" function for objectID: '+
             id + ': outliers is not number: ' + outliers));
 
-    cache.get(id, shift, num,function(err, records) {
+    cache.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "avgNear('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records) return callback();
+        if(!records) return callback(null, {records: rawRecords});
 
         var maxValue = nearestValue + outliers,
             minValue = nearestValue - outliers,
@@ -859,9 +857,8 @@ functions.avgNear = function(id, parameters, callback) {
             count = 0;
 
         records.forEach(function (record) {
-            var value = Number(record.data);
-            if(!isNaN(parseFloat(String(value))) && isFinite(value) && value >= minValue && value <= maxValue) {
-                sum += value;
+            if(record.data >= minValue && record.data <= maxValue) {
+                sum += record.data;
                 count++;
             }
         });
@@ -871,7 +868,7 @@ functions.avgNear = function(id, parameters, callback) {
 
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -909,15 +906,12 @@ function linearApprox(records, time, threshold) {
     var sumX = 0, sumY = 0, sumX2 = 0, sumXY = 0, len = 0;
 
     records.forEach(function (record) {
-        var data = Number(record.data);
-        if (isNaN(parseFloat(String(data))) || !isFinite(data)) return;
-
         ++len;
         var timestamp = record.timestamp;
         sumX += timestamp;
-        sumY += data;
+        sumY += record.data;
         sumX2 += timestamp * timestamp;
-        sumXY += timestamp * data;
+        sumXY += timestamp * record.data;
     });
 
     if(!len) return;
@@ -937,17 +931,17 @@ functions.forecast = function(id, parameters, callback){
     var shift = parameters[1] ? parameters[1] : 0;
     var forecastTime = parameters[2] + Date.now();
 
-    cache.get(id, shift, num,function(err, records) {
+    cache.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "forecast('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records) return callback();
+        if(!records) return callback(null, {records: rawRecords});
 
         var result = linearApprox(records, forecastTime);
         log.debug('FUNC: forecast(', parameters.join(', '), ') = ', result, '; records: ', records);
 
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };
@@ -977,17 +971,17 @@ functions.timeLeft = function(id, parameters, callback){
     var shift = parameters[1] ? parameters[1] : 0;
     var threshold = parameters[2];
 
-    cache.get(id, shift, num,function(err, records) {
+    cache.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "timeLeft('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records) return callback();
+        if(!records) return callback(null, {records: rawRecords});
 
         var result = Math.round(linearApprox(records, null, threshold));
         log.debug('FUNC: timeLeft(', parameters.join(', '), ') = ', result, '(', (new Date(result)).toLocaleString(), '); records: ', records);
 
         callback(null, {
             data: result,
-            records: records
+            records: records || rawRecords
         });
     });
 };

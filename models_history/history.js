@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
- * Created by asbel on 16.10.2016.
+ * Created by Alexander Belov on 16.10.2016.
  */
 
 var fs = require('fs');
@@ -59,7 +59,10 @@ function initServerCommunication() {
             history[tmp_funcName] = function (/* id, parameter1, parameter2, ..., callback */) {
                 var args = Array.prototype.slice.call(arguments); // create array from objects of arguments
 
-                if(!args || args.length < 2) return log.error('Try to run function with name "', tmp_funcName, '" with unexpected parameters "', args, '"');
+                if(!args || args.length < 2) {
+                    return log.error('Try to run function with name "', tmp_funcName, '" with unexpected parameters "',
+                        args, '"');
+                }
 
                 var id = args.splice(0, 1)[0];
                 var callback = args.splice(-1, 1)[0];
@@ -173,32 +176,61 @@ function initServerCommunication() {
     history.dump = cache.dumpData;
     history.cacheServiceIsRunning = cache.cacheServiceIsRunning;
 
-    history.add = function(id, data) {
-        if(Number(id) !== parseInt(id, 10) || !Number(id)) {
-            log.error('Try to add object to history with not integer objectCounterID: ', id);
+    history.add = function(initID, data) {
+        // don't add empty value
+        if(data === undefined || data === null) return;
+
+        // checking for correct OCID
+        var id = Number(initID);
+        if(id !== parseInt(String(id), 10) || !id) {
+            log.error('Try to add data to history for not integer objectCounterID: ', initID, ', data: ', data);
             return;
         }
 
         var record = {};
-        if(data && data.timestamp && data.value !== undefined &&
-            Number(data.timestamp) === parseInt(String(data.timestamp), 10)) {
-            record.data = data.value;
-            record.timestamp = Number(data.timestamp);
-        } else {
-            record.data = data;
-            record.timestamp = Date.now();
+        if(typeof data === 'object') {
+            // data is a prepared history record {timestamp:..., value:...}
+            if(data.timestamp && 'value' in data) {
+                // don't add empty value
+                if(data.value === undefined || data.value === null) return;
+
+                // checking timestamp
+                var timestamp = Number(data.timestamp);
+                if(!timestamp || timestamp !== parseInt(String(timestamp), 10) ||
+                    timestamp < 1477236595310 || timestamp > Date.now() + 60000) { // 1477236595310 01/01/2000
+                    log.error('Try to add data to history with invalid timestamp or very old timestamp or timestamp ' +
+                        'from a future: ', id, ', data: ', data, '; now: ', Date.now());
+                    return;
+                }
+
+                record = {
+                    timestamp: timestamp,
+                    data: data.value,
+                }
+            } else { // stringify object and add to the history
+                record = {
+                    timestamp: Date.now(),
+                    data: JSON.stringify(data), // do stringify once and here and skip stringify on server side
+                }
+            }
+        } else if( typeof data === 'number' || typeof 'data' === 'string' || typeof data === 'boolean') {
+            record = {
+                timestamp: Date.now(),
+                data: data,
+            }
+        } else { // data is not an object, number, string or boolean
+            log.error('Can\'t add this type of data to history: ', id, ', type: ', typeof data, ', data: ', data);
+            return;
         }
 
-        //console.log('Add record ', id, data, record)
-        if(record.data !== undefined && record.data !== null) {
-            clientIPC.send({
-                msg: 'add',
-                id: Number(id),
-                record: record
-            }, function (err) {
-                if (err) log.error(err.message);
-            });
-        }
+        clientIPC.send({
+            msg: 'add',
+            id: id,
+            record: record
+        }, function (err) {
+            if (err) log.error(err.message);
+        });
+
         return {
             value: record.data,
             timestamp: record.timestamp,
@@ -259,7 +291,8 @@ function initServerCommunication() {
             id: Number(id),
             last: Number(offset),
             cnt: Number(cnt),
-            maxRecordsCnt: Number(maxRecordsCnt)
+            maxRecordsCnt: Number(maxRecordsCnt),
+            recordsType: 0,
         }, callback);
     };
 
@@ -280,7 +313,8 @@ function initServerCommunication() {
             id: Number(id),
             time: Number(time),
             interval: Number(interval),
-            maxRecordsCnt: Number(maxRecordsCnt)
+            maxRecordsCnt: Number(maxRecordsCnt),
+            recordsType: 0,
         }, callback);
     };
 
@@ -339,13 +373,19 @@ function runServerProcess() {
 
         if(message.msg === 'getLastValues') return cache.getLastValues(message.IDs, callback);
 
-        if(message.msg === 'getByIdx') return cache.getByIdx (message.id, message.last, message.cnt, message.maxRecordsCnt, function(err, records) {
-            callback(err, thinOutRecords(records, message.maxRecordsCnt))
-        });
+        if(message.msg === 'getByIdx') {
+            return cache.getByIdx (message.id, message.last, message.cnt, message.maxRecordsCnt, message.recordsType,
+                function(err, records) {
+                callback(err, thinOutRecords(records, message.maxRecordsCnt))
+            });
+        }
 
-        if(message.msg === 'getByTime') return cache.getByTime (message.id, message.time, message.interval, message.maxRecordsCnt, function(err, records) {
-            callback(err, thinOutRecords(records, message.maxRecordsCnt))
-        });
+        if(message.msg === 'getByTime') {
+            return cache.getByTime (message.id, message.time, message.interval, message.maxRecordsCnt,
+                message.recordsType, function(err, records) {
+                callback(err, thinOutRecords(records, message.maxRecordsCnt))
+            });
+        }
 
         if(message.msg === 'getByValue') return cache.getByValue (message.id, message.value, callback);
 
@@ -438,27 +478,53 @@ function runServerProcess() {
             parameters.restartHistoryInterval *= 1000;
 
             setInterval(function () {
+
+                if(!parameters.restartHistory && parameters.restartStorageQueryProcesses) {
+                    log.info('Scheduled restarting history storage query processes...');
+                    storage.restartStorageQueryProcesses(function(err) {
+                        if(err) {
+                            log.error('Error while restarting storage query processes: ' + err.message);
+                            historyProcess.stop(12); // exitCode: process.exit(12)
+                        }
+                    });
+                }
+
+                if(!parameters.restartHistory && !parameters.restartStorageModifier) return;
+
                 cache.terminateHousekeeper = true;
                 log.info('Preparing to scheduled restart history storage process...');
-                var scheduleDelay = 0;
 
                 if(cache.cacheServiceIsRunning() === 1) {  // 1 mean that scheduled restart in progress
                     log.warn('The previous scheduled restart time of the history storage process has expired. Restart now...');
                     cache.terminateCacheService();
                 } else if(cache.cacheServiceIsRunning()) { // cache service is running now
-                    log.info('It is planned to restart history storage  after the end of the cache maintenance...');
+                    log.info('It is planned to restart history storage after the end of the cache maintenance...');
                 } else { // cache service is not running now
-                    cache.terminateCacheService();
-                    // delay for restarting at the scheduled time
-                    scheduleDelay = Math.round(parameters.restartHistoryInterval / 5);
+                    log.info('Saving data from cache to history storage before restart...')
+                    cache.startCacheService();
                 }
 
                 restartMode = true;
                 cache.cacheServiceIsRunning(1); // 1 mean that restart occurred
-                setTimeout(function() {
-                    if(scheduleDelay) log.warn('Scheduled restart of the history storage process started on time...');
-                    historyProcess.stop(12); // exitCode: process.exit(12)
-                }, scheduleDelay);
+                if(!parameters.restartHistory && parameters.restartStorageModifier) {
+                    storage.restartStorageModifierProcess(function(err) {
+                        if(err) {
+                            log.error('Error while restarting storage modifier process: ' + err.message);
+                            historyProcess.stop(12); // exitCode: process.exit(12)
+                            return;
+                        }
+
+                        setTimeout(function() {
+                            cache.cacheServiceIsRunning(0);
+                            cache.terminateCacheService(0);
+                            restartMode = false;
+                            cache.terminateHousekeeper = 0;
+                            log.warn('Unpause the cache service and the housekeeper');
+                        }, 180000);
+                    });
+                }
+
+                if(parameters.restartHistory) historyProcess.stop(12); // exitCode: process.exit(12)
 
             }, Math.round(parameters.restartHistoryInterval - parameters.restartHistoryInterval / 5));
         }

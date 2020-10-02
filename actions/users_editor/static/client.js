@@ -1,5 +1,5 @@
 /*
- * Copyright © 2019. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 var removedUsersNames = [];
@@ -28,11 +28,11 @@ function callbackBeforeExec(callback) {
     var userNamesInModalDialogInstance = M.Modal.init(document.getElementById('modalDeleteConfirm'), {dismissible: false});
     userNamesInModalDialogInstance.open();
 
-    $('#modalDeleteConfirmNo').click(function(){
+    $('#modalDeleteConfirmNo').unbind('click').click(function(){
         callback(new Error('Delete operation for users ' + removedUsersNames.join(', ') + ' was canceled'));
     });
 
-    $('#modalDeleteConfirmYes').click(function(){
+    $('#modalDeleteConfirmYes').unbind('click').click(function(){
         callback();
     });
 }

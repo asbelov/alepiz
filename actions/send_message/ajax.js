@@ -1,7 +1,6 @@
 /*
-* Copyright © 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
-* Created on 2020-6-23 0:39:38
-*/
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+ */
 var log = require('../../lib/log')(module);
 async = require('async');
 var usersDB = require('../../models_db/usersDB');

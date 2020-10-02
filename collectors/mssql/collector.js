@@ -1,7 +1,6 @@
 /*
-* Copyright © 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
-* Created on 2020-9-18 16:13:42
-*/
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+ */
 
 var Connection = require('tedious').Connection;
 var Request = require('tedious').Request;

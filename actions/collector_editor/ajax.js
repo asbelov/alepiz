@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
- * Created by asbel on 25.07.2015.
+ * Created by Alexander Belov on 25.07.2015.
  */
 var log = require('../../lib/log')(module);
 var collectors = require('../../lib/collectors');

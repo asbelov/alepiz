@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 function onChangeObjects(objects){
@@ -16,11 +16,11 @@ function callbackBeforeExec(callback) {
     var modalDeleteConfirmInstance = M.Modal.init(document.getElementById('modalDeleteConfirm'), {dismissible: false});
     modalDeleteConfirmInstance.open();
 
-    $('#modalDeleteConfirmNo').click(function(){
+    $('#modalDeleteConfirmNo').unbind('click').click(function(){
         callback(new Error('Delete operation is canceled'));
     });
 
-    $('#modalDeleteConfirmYes').click(function(){
+    $('#modalDeleteConfirmYes').unbind('click').click(function(){
         callback();
     });
 }

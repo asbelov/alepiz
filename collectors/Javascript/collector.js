@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright (C) 2015. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 var collector = {};

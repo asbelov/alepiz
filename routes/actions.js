@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 var express = require('express');

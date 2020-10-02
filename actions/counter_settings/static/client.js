@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
- * Created by asbel on 28.07.2015.
+ * Created by Alexander Belov on 28.07.2015.
  */
 
 function onChangeObjects(objects){
@@ -21,11 +21,11 @@ function callbackBeforeExec(callback) {
         modalDeleteConfirmInstance.open();
         //    $('deleteCounter').prop('checked', false);
 
-        $('#modalDeleteConfirmNo').click(function(){
+        $('#modalDeleteConfirmNo').unbind('click').click(function(){
             callback(new Error('Delete operation is canceled'));
         });
 
-        $('#modalDeleteConfirmYes').click(function(){
+        $('#modalDeleteConfirmYes').unbind('click').click(function(){
             $('#counterID').val(counterIDSelectorElm.val());
 
             callback();

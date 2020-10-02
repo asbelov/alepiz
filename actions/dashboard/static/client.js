@@ -1,5 +1,5 @@
 /*
- * Copyright © 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /*
@@ -479,8 +479,8 @@ var JQueryNamespace = (function ($) {
         var sendMessageBtnElm = $('#modalSendMessage');
         var openEditorBtnElm = $('#modalOpenEditor');
 
-        addCommentElm.keyup(function(e) {
-            if(!modal) return; // when focus in element, but modal was closed()
+        addCommentElm.unbind('keyup').keyup(function(e) {
+            if(!modal) return; // when focus in the element, but modal was closed()
             if(e.which === 13) {
                 whatDoWeDoDialogBtn = sendMessageBtnElm[0];
                 modal.close();
@@ -506,12 +506,12 @@ var JQueryNamespace = (function ($) {
                 onCloseEnd: function() {
                     if(!whatDoWeDoDialogBtn || $(whatDoWeDoDialogBtn).attr('id') === 'modalOpenEditor') {
                         quill.focus();
-                        callback(new Error('Execution of the action was canceled'));
+                        callback(new Error('Action canceled'));
                     } else continueCheck();
                 }
             });
-            openEditorBtnElm.click(function() { whatDoWeDoDialogBtn = this; });
-            sendMessageBtnElm.click(function() { whatDoWeDoDialogBtn = this; });
+            openEditorBtnElm.unbind('click').click(function() { whatDoWeDoDialogBtn = this; });
+            sendMessageBtnElm.unbind('click').click(function() { whatDoWeDoDialogBtn = this; });
 
             setTimeout(function() {
                 modal.open();

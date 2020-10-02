@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
- * Created by asbel on 13.05.2017.
+ * Created by Alexander Belov on 13.05.2017.
  */
 
 
@@ -333,7 +333,7 @@ var initJQueryNamespace = (function($){
                 createFilteredObjectsList(null, function() {
                     setBrowserHistory();
                     redrawIFrameDataOnChangeObjectsList();
-                });
+                 });
                  */
                 useGlobalSearch = false;
                 return;
@@ -1443,7 +1443,7 @@ var initJQueryNamespace = (function($){
     }
 
     /*
-    Processing "click" event for runAction and makeTask button:
+        Processing "click" event for runAction and makeTask button:
         * running callback before action execution if specified
         * collecting data from form elements with tags "input", "select" and "textarea"
         * validate collecting data according attributes "validator"=<regExp> and length=<integer>

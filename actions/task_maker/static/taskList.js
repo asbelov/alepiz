@@ -1,6 +1,6 @@
 
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 function initTaskList(taskListAreaElm, taskListParameters, callback) {

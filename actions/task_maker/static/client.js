@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
- * Created by asbel on 25.03.2017.
+ * Created by Alexander Belov on 25.03.2017.
  */
 function onChangeObjects(objects){
     JQueryNamespace.setSharedCounters(objects);
@@ -26,11 +26,11 @@ function callbackBeforeExec(callback) {
             modalTimePassedConfirmElm.modal({dismissible: false});
             modalTimePassedConfirmElm.modal('open');
 
-            modalTimePassedConfirmNoElm.click(function () {
+            modalTimePassedConfirmNoElm.unbind('click').click(function () {
                 callback(new Error('Operation is canceled because task start time has passed: ' +
                     new Date(timeToRun).toLocaleString()));
             });
-            modalTimePassedConfirmYesElm.click(function () {
+            modalTimePassedConfirmYesElm.unbind('click').click(function () {
                 callback();  // modalTimePassedConfirmYesElm.click(callback) will return an event as callback argument
             });
             return;

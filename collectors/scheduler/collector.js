@@ -1,5 +1,5 @@
 /*
-* Copyright © 2020. Alexandr Belov. Contacts: <asbel@alepiz.com>
+* Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
 * Created on 2020-7-14 23:33:05
 */
 var log = require('../../lib/log')(module);

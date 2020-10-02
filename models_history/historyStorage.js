@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 var async = require('async');
@@ -7,7 +7,7 @@ var path = require('path');
 
 var log = require('../lib/log')(module);
 var proc = require('../lib/proc');
-
+var exitHandler = require('../lib/exitHandler');
 var sqlite = require('../lib/sqlite');
 var countersDB = require('../models_db/countersDB');
 var parameters = require('../models_history/historyParameters');
@@ -276,7 +276,20 @@ function loadDataToCache(db, cache, callback) {
     });
 }
 
- */
+*/
+
+storage.restartStorageModifierProcess = function(callback) {
+    storageModifyingProcess.sendAndReceive({
+        restart: 'storage modifier',
+        waitForCallback: true,
+    }, callback);
+}
+
+storage.restartStorageQueryProcesses = function(callback) {
+    storageQueryingProcesses.sendToAll({
+        restart: 'storage query processor'
+    }, callback);
+}
 
 storage.stop = function(callback) {
     async.series([
@@ -488,13 +501,21 @@ function runProcessForQueries(isTransactionProcess) {
         slowRecords.recordsNum += recordsNum;
     }
 
-    if(isTransactionProcess && isTransactionProcess === transProcessArgID) var dbReplication = repl;
-    else dbReplication = function(initDB, id, callback) { callback(null, initDB); };
+    if(isTransactionProcess && isTransactionProcess === transProcessArgID) {
+        var dbReplication = function(initDB, id, callback) {
+            log.warn('Truncate WAL journal file...');
+            initDB.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(err) {
+                if (err) log.error('Can\'t truncate WAL journal file: ', err.message);
+                repl(initDB, id, callback);
+            });
+        };
+    } else dbReplication = function(initDB, id, callback) { callback(null, initDB); };
 
     sqlite.init(dbPath, function (err, initDB) {
         if (err) {
             log.exit('Can\'t initialize storage database ' + dbPath + ': ' + err.message);
             setTimeout(process.exit, 500, 2);
+            return;
         }
 
         dbReplication(initDB, 'history', function (err, replicationDB) {
@@ -537,6 +558,21 @@ function runProcessForQueries(isTransactionProcess) {
     });
 
     function onMessage(message, callback) {
+        if (message && message.restart) {
+            log.warn('Receiving message for restart history ', message.restart,'...');
+            onStop(function (err) {
+                if(err) log.error('Error when preparing to stop history ', message.restart,': ', err.message);
+                else log.warn('History ', message.restart ,' successfully stopped, starting...');
+
+                if(message.waitForCallback) callback();
+
+                setTimeout(function() {
+                    exitHandler.exit(12); // process.exit(12)
+                }, 10000);
+            });
+            return;
+        }
+
         if (!message || !message.funcName || !functions[message.funcName] || !message.arguments)
             return log.error('Incorrect message: ', message);
 
@@ -560,14 +596,11 @@ function runProcessForQueries(isTransactionProcess) {
             // prevent to run transaction
             transactionInProgress = true;
             callbackOnStop = function(err) { if (err) log.error('Error while commit transaction: ' + err.message); };
-            log.warn('No transaction in progress. Closing database...');
-            // but in any cases try to rollback transaction
-            db.exec('ROLLBACK', function() {
-                db.close(function (err) {
-                    if (err) log.error('Error while close storage DB: ' + err.message);
-                    else log.warn('Storage DB closed successfully');
-                    db.sendReplicationData(callback);
-                });
+            log.warn('Closing database...');
+            db.close(function (err) {
+                if (err) log.error('Error while close storage DB: ' + err.message);
+                else log.warn('Storage DB closed successfully');
+                db.sendReplicationData(callback);
             });
             setTimeout(function () {
                 log.error('Can\'t close database without transactions in 15sec.');
@@ -596,21 +629,18 @@ function runProcessForQueries(isTransactionProcess) {
                     if (err) log.error('Can\'t truncate WAL journal file: ', err.message);
 
                     log.warn('Closing database...');
-                    // but in any cases try to rollback transaction
-                    db.exec('ROLLBACK', function() {
-                        db.close(function (err) {
-                            if (err) log.error('Error while close storage DB: ' + err.message);
-                            else log.warn('Storage DB closed successfully');
-                            log.warn('Sending cached transaction to replication server...');
-                            db.sendReplicationData(function (err) {
-                                if (err) log.error('Error while sending transaction: ' + err.message);
-                                else log.warn('Sending transaction successfully. Exiting');
-                                callback();
-                            });
+                    db.close(function (err) {
+                        if (err) log.error('Error while close storage DB: ' + err.message);
+                        else log.warn('Storage DB closed successfully');
+                        log.warn('Sending cached transaction to replication server...');
+                        db.sendReplicationData(function (err) {
+                            if (err) log.error('Error while sending transaction: ' + err.message);
+                            else log.warn('Sending transaction successfully. Exiting');
+                            callback();
                         });
                     });
                     setTimeout(function () {
-                        log.warn('Can\'t close database with transactions, but it committed in 30sec.');
+                        log.warn('Can\'t close database with transactions, but it committed in 60sec.');
                         db.sendReplicationData(callback);
                         callback = null;
                     }, 60000);
@@ -623,34 +653,66 @@ function runProcessForQueries(isTransactionProcess) {
     SELECT * FROM table LIMIT 3 OFFSET 4 will skipping first 4 and get next 3 records
     [1  2  3  4  5 6 7 8 9] => [5 6 7]
     [13 12 11 10 9 8 7 6 5 4 3 2 1] => [9 8 7]
+
+    recordsType: [0|1|2]: 0 - number and string, 1 number, 2 - string
      */
-    functions.getRecordsFromStorageByIdx = function (id, offset, cnt, firstTimestamp, maxRecordsCnt, callback) {
+    functions.getRecordsFromStorageByIdx = function (id, offset, cnt, firstTimestamp, maxRecordsCnt, recordsType, callback) {
 
         var startTime = Date.now();
         var timeStampCondition = firstTimestamp ? 'AND timestamp < $firstTimestamp ' : '';
-        if(cnt > parameters.queryMaxResult) cnt = parameters.queryMaxResult;
-        db.all('SELECT data, timestamp FROM numbers WHERE objectID=$id ' + timeStampCondition +
-            'UNION ALL ' +
-            'SELECT data, timestamp FROM strings WHERE objectID=$id ' + timeStampCondition +
+
+        if(recordsType < 2) {
+            var tableType = 'numbers';
+            if(cnt > parameters.queryMaxResultNumbers) cnt = parameters.queryMaxResultNumbers;
+        } else {
+            tableType = 'strings';
+            if(cnt > parameters.queryMaxResultStrings) cnt = parameters.queryMaxResultStrings;
+        }
+
+        db.all('SELECT data, timestamp FROM ' + tableType + ' WHERE objectID=$id ' + timeStampCondition +
             'ORDER BY timestamp DESC LIMIT $count OFFSET $offset', {
             $id: id,
             $offset: offset,
             $count: cnt,
             $firstTimestamp: firstTimestamp || undefined
-        }, function (err, records) {
+        }, function (err, records1) {
 
-            if (err) {
-                //return callback(new Error('Can\'t get records for object id: ' + id + ', from position: ' + offset + ', count: ' + cnt + ': ' + err.message));
-                return callback(err);
-            }
-
+            if (err) return callback(err);
             if (Date.now() - startTime > parameters.slowQueueSec * 1000) {
-                //log.warn('Getting records ', (Date.now() - startTime), ' ms for object id: ' + id + ', from position: ' + offset + ', count: ' + cnt + ': ', records);
-                addSlowRecord(Date.now() - startTime, records.length);
-            } else {
-                log.debug('Getting records for object id: ' + id + ', from position: ' + offset + ', count: ' + cnt + ': ', records);
+                addSlowRecord(Date.now() - startTime, records1.length);
             }
-            callback(null, records.reverse());
+            /*
+            log.debug('Getting records for object id: ' + id + ', from '+ tableType +', position: ' + offset + ', count: ' + cnt + ': ', records1);
+             */
+
+            if(recordsType > 0) return callback(null, records1.reverse());
+
+            if(cnt > parameters.queryMaxResultStrings) cnt = parameters.queryMaxResultStrings;
+            db.all('SELECT data, timestamp FROM strings WHERE objectID=$id ' + timeStampCondition +
+                'ORDER BY timestamp DESC LIMIT $count OFFSET $offset', {
+                $id: id,
+                $offset: offset,
+                $count: cnt,
+                $firstTimestamp: firstTimestamp || undefined
+            }, function (err, records2) {
+
+                if (err) return callback(err);
+                if (Date.now() - startTime > parameters.slowQueueSec * 1000) {
+                    addSlowRecord(Date.now() - startTime, records2.length);
+                }
+
+                if(!records2.length) return callback(null, records1.reverse());
+
+                Array.prototype.push.apply(records1, records2);
+                records1.sort(function (a, b) {
+                    return a.timestamp - b.timestamp; // inc sorting
+                });
+
+                /*
+                log.debug('Getting records for object id: ' + id + ', from strings, position: ' + offset + ', count: ' + cnt + ': ', records2);
+                 */
+                callback(null ,records1);
+            });
         });
     };
 
@@ -659,55 +721,77 @@ function runProcessForQueries(isTransactionProcess) {
 
  id: object ID
 
+ recordsType: [0|1|2]: 0 - number and string, 1 number, 2 - string
+
  callback(err, records, type), where
  records: [{data:.., timestamp:..}, ....], sorted by ascending timestamp
  */
-    functions.getRecordsFromStorageByTime = function (id, timeFrom, timeTo, maxRecordsCnt, callback) {
+    functions.getRecordsFromStorageByTime = function (id, timeFrom, timeTo, maxRecordsCnt, recordsType, callback) {
 
         var startTime = Date.now();
-        if(maxRecordsCnt > parameters.queryMaxResult) maxRecordsCnt = parameters.queryMaxResult;
-        var tableNameForNumbers = getTableNameForNumbers(timeFrom, timeTo, maxRecordsCnt);
+        if(recordsType < 2) {
+            if(maxRecordsCnt > parameters.queryMaxResultNumbers) maxRecordsCnt = parameters.queryMaxResultNumbers;
+            var tableType = getTableNameForNumbers(timeFrom, timeTo, maxRecordsCnt);
+            var cnt = parameters.queryMaxResultNumbers;
+        } else {
+            tableType = 'strings';
+            cnt = parameters.queryMaxResultStrings;
+        }
 
         /*
         Note that the BETWEEN operator is inclusive. It returns true when the test_expression is less than or equal
         to high_expression and greater than or equal to the value of low_expression:
         test_expression >= low_expression AND test_expression <= high_expression
         */
-        db.all('SELECT data, timestamp FROM ' + tableNameForNumbers + ' WHERE objectID=$id AND timestamp BETWEEN $timeFrom AND $timeTo ' +
-            'UNION ALL ' +
-            'SELECT data, timestamp FROM strings WHERE objectID=$id AND timestamp BETWEEN $timeFrom AND $timeTo ' +
+        db.all('SELECT data, timestamp FROM ' + tableType + ' WHERE objectID=$id AND timestamp BETWEEN $timeFrom AND $timeTo ' +
             'ORDER BY timestamp LIMIT $queryMaxResult', {
             $id: id,
             $timeFrom: timeFrom,
             $timeTo: timeTo,
-            $queryMaxResult: parameters.queryMaxResult,
-        }, function (err, records) {
+            $queryMaxResult: cnt,
+        }, function (err, records1) {
 
-            if (err) {
-                /*
-                return callback(new Error('Can\'t get records from ' + tableNameForNumbers + ' for object id: ' + id +
-                    ', from: ' + (new Date(timeFrom)).toLocaleString() + '(' + timeFrom + ')' +
-                    ' to: ' + (new Date(timeTo)).toLocaleString() + '(' + timeTo + '): ' + err.message));
-                 */
-                return callback(err);
-            }
-
+            if (err) return callback(err);
             if (Date.now() - startTime > parameters.slowQueueSec * 1000) {
-                /*
-                log.warn('Getting records ', (Date.now() - startTime),
-                    ' ms from ' + tableNameForNumbers + ' for object id: ', id, ', from: ',
-                    (new Date(timeFrom)).toLocaleString(), '(', timeFrom, ')',
-                    ' to: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, '): ', records);
-                 */
-
-                addSlowRecord(Date.now() - startTime, records.length);
-            } else {
-                log.debug('Getting records from ' + tableNameForNumbers + ' for object id: ', id, ', from: ',
-                    (new Date(timeFrom)).toLocaleString(), '(', timeFrom, ')',
-                    ' to: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, '): ', records);
+                addSlowRecord(Date.now() - startTime, records1.length);
             }
+            /*
+            log.debug('Getting records from ' + tableType + ' for object id: ', id, ', from: ',
+                (new Date(timeFrom)).toLocaleString(), '(', timeFrom, ')',
+                ' to: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, '): ', records1);
+            */
+            if(recordsType > 0) return callback(null, records1, tableType !== 'numbers');
 
-            callback(null, records, tableNameForNumbers !== 'numbers');
+            if(cnt > parameters.queryMaxResultStrings) cnt = parameters.queryMaxResultStrings;
+
+            db.all('SELECT data, timestamp FROM strings WHERE objectID=$id AND timestamp BETWEEN $timeFrom AND $timeTo ' +
+                'ORDER BY timestamp LIMIT $queryMaxResult', {
+                $id: id,
+                $timeFrom: timeFrom,
+                $timeTo: timeTo,
+                $queryMaxResult: cnt,
+            }, function (err, records2) {
+
+                if (err) return callback(err);
+                if (Date.now() - startTime > parameters.slowQueueSec * 1000) {
+                    addSlowRecord(Date.now() - startTime, records2.length);
+                }
+
+                if(!records2.length) return callback(null, records1, tableType !== 'numbers');
+
+                Array.prototype.push.apply(records1, records2);
+                records1.sort(function (a, b) {
+                    return a.timestamp - b.timestamp; // inc sorting
+                });
+
+                /*
+                log.debug('Getting records from strings for object id: ', id, ', from: ',
+                    (new Date(timeFrom)).toLocaleString(), '(', timeFrom, ')',
+                    ' to: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, '): ', records2);
+                */
+                callback(null ,records1, tableType !== 'numbers');
+            });
+
         });
     };
 

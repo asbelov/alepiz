@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
- * Created by asbel on 08.08.2015.
+ * Created by Alexander Belov on 08.08.2015.
  */
 
 // set stylesheet in HTML head and javascripts

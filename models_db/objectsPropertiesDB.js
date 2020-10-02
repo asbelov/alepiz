@@ -1,5 +1,5 @@
 /*
- * Copyright © 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 

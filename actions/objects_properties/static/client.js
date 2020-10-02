@@ -1,6 +1,5 @@
 /*
- * Copyright © 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
- * Created on 2018-4-28 13:41:50
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 function onChangeObjects(objects){

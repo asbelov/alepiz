@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
- * Created by asbel on 24.07.2015.
+ * Created by Alexander Belov on 24.07.2015.
  * https://www.zabbix.com/documentation/3.0/ru/manual/appendix/items/activepassive
  * https://www.zabbix.com/documentation/4.0/ru/manual/appendix/items/activepassive
  */

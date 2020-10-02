@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
- * Created by asbel on 15.10.2016.
+ * Created by Alexander Belov on 15.10.2016.
  */
 var log = require('../lib/log')(module);
 
@@ -14,6 +14,9 @@ var parameters = {
     serverPort: 10163,
     cacheServiceInterval: 600, //sec
     restartHistoryInterval: 5400, // sec = 1 hour 30 minutes
+    restartStorageModifier: false,
+    restartStorageQueryProcesses: true,
+    restartHistory: false,
     // hh:mm:ss.msc 1234567890123456\n = 30 ~ 32.
     // js Numeric is a double precision-64 bit approx 16 digits, https://en.wikipedia.org/wiki/IEEE_754-1985
     // set both block sizes multiple to a file system block size
@@ -21,7 +24,8 @@ var parameters = {
     numberType: 0,
     textType: 1,
     initCachedRecords: 5,
-    queryMaxResult: 1000,
+    queryMaxResultNumbers: 1000,
+    queryMaxResultStrings: 50,
     dbPath: 'db',
     dbFile: 'storage.db',
     dumpFileName: 'unsavedData.json',

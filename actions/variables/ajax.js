@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright (C) 2019. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 var log = require('../../lib/log')(module);

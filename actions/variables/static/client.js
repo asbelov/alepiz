@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2018. Alexandr Belov. Contacts: <asbel@alepiz.com>
+ * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
- * Created by asbel on 28.07.2015.
+ * Created by Alexander Belov on 28.07.2015.
  */
 
 function onChangeObjects(objects){
@@ -166,7 +166,12 @@ var JQueryNamespace = (function ($) {
                             ) + '); result: ' + f.result);
                         } else if(f.timestamp) {
                             return (new Date(f.timestamp)).toLocaleString().replace(/\.\d\d\d\d,/, '') + ': ' + escapeHtml(f.data);
+                        } else if(typeof f === 'string' || typeof f === 'number' || typeof f === 'boolean') {
+                            return f;
+                        } else if(typeof f === 'object') {
+                            return JSON.stringify(f);
                         }
+
                     }).join('<br/>')) : 'none';
 
                     if(variables[name].important) var color = ' style="background-color:#f0ffff"';

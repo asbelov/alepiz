@@ -1,3 +1,6 @@
+/*
+ * Copyright © 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
+ */
 var async = require('async');
 var log = require('../../lib/log')(module);
 
