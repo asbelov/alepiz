@@ -1,0 +1,40 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-10-2 2:33:37
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Events aggregator: агрегация произошедших событий
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Events aggregator
+                    h5.light.
+                        Events aggregator используется для вычисления агрегированного процента для произошедших событий.
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание Events aggregator
+                    p.
+                        Events aggregator используется для вычисления процента объектов из группы объектов для которых
+                        произошло событие. Например, можно отправлять экстренные оповещения администраторам, если
+                        определенный процент серверов из кластера, предоставляющего сервис, перестал быть доступным.
+                    h3 Параметры
+                    ul.browser-default
+                        li.
+                            Object group name or objectID of group - имя группы объектов или идентификатор группы объектов,
+                            для которой будет производится агрегированная проверка
+                        li.
+                            Event counter name or counterID - имя счетчика с событием или его идентификатор, для которого
+                            будет производится агрегированная проверка. В качестве сборщика для этого счетчика должен
+                            быть обязательно установлен Event generator.
+                    h3 Возвращаемое значение
+                    p.
+                        Процент объектов от общего количества объектов в группе для которых произошло событие.

@@ -21,15 +21,14 @@
             "checkAs": "Integer"
         },
         "problemTaskID": {
-            "description": "Task ID, which running when event occurred",
-            "canBeEmpty": "on",
-            "checkAs": "Integer",
-            "default": 1
+            "description": "Task ID, which running when event occurred (0 - no task)",
+            "checkAs": "UInteger",
+            "default": 0
         },
         "solvedTaskID": {
-            "description": "Task ID, which running when event solved",
-            "canBeEmpty": "on",
-            "default": "2"
+            "description": "Task ID, which running when event solved (0 - no task)",
+            "checkAs": "UInteger",
+            "default": 0
         },
         "pronunciation": {
             "description": "Pronunciation of event",

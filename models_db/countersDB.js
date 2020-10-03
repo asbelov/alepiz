@@ -204,17 +204,6 @@ countersDB.getVariablesExpressions = function(counterID, callback) {
     else db.all('SELECT * FROM variablesExpressions WHERE variablesExpressions.counterID = ?', counterID, callback);
 };
 
-
-countersDB.getParentOCIDs = function(OCIDs, callback) {
-    log.debug('Getting parent OCIDs for OCIDs: ', OCIDs);
-
-    db.all('SELECT parentObjectsCounters.id AS OCID FROM objectsCounters parentObjectsCounters ' +
-        'JOIN countersUpdateEvents ON parentObjectsCounters.counterID = countersUpdateEvents.parentCounterID AND ' +
-        'parentObjectsCounters.objectID=IFNULL(countersUpdateEvents.parentObjectID, objectsCounters.objectID) ' +
-        'JOIN objectsCounters ON countersUpdateEvents.counterID = objectsCounters.counterID ' +
-        'WHERE objectsCounters.id IN(', (new Array(OCIDs.length)).fill('?').join(',') ,')', OCIDs, callback);
-};
-
 /*
     get objectsCountersID, collectors and countersID for first calculation for all counters
 
@@ -339,42 +328,6 @@ countersDB.getObjectCounterIDForCounter = function (counterID, callback){
 
     // callback(err, rows) where rows [{id: <OCID1>, objectID:..}, ...]
     db.all('SELECT id, objectID FROM objectsCounters WHERE counterID=?', [counterID], callback)
-};
-
-countersDB.getParentOCIDs = function(countersIDs, callback) {
-    log.debug('Getting parent counters IDs from counters IDs: ', countersIDs);
-
-    // for small count of OCIDs
-    if(countersIDs.length < db.maxVariableNumber) {
-        db.all('SELECT parentObjectsCounters.id AS parentOCID FROM objectsCounters parentObjectsCounters\n' +
-            'JOIN countersUpdateEvents ON parentObjectsCounters.counterID = countersUpdateEvents.parentCounterID\n' +
-            'JOIN objects ON objects.id=parentObjectsCounters.objectID AND objects.disabled != "1"\n' +
-            'JOIN counters ON counters.id=parentObjectsCounters.counterID AND counters.disabled != "1"\n' +
-            'WHERE countersUpdateEvents.counterID IN(' +
-            (new Array(countersIDs.length)).fill('?').join(',') + ')', countersIDs, callback);
-        return;
-    }
-
-    var rows = [];
-    var stmt = db.prepare(
-        'SELECT parentObjectsCounters.id AS parentOCID FROM objectsCounters parentObjectsCounters\n' +
-        'JOIN countersUpdateEvents ON parentObjectsCounters.counterID = countersUpdateEvents.parentCounterID\n' +
-        'JOIN objects ON objects.id=parentObjectsCounters.objectID AND objects.disabled != "1"\n' +
-        'JOIN counters ON counters.id=parentObjectsCounters.counterID AND counters.disabled != "1"\n' +
-        'WHERE countersUpdateEvents.counterID = ?', function(err) {
-            if(err) return callback(err);
-
-            async.eachLimit(countersIDs, 100,function(counterID, callback) {
-                stmt.all(counterID, function(err, res) {
-                    if(err) return callback(err);
-                    rows.push.apply(rows, res);
-                    callback();
-                })
-            }, function(err) {
-                stmt.finalize();
-                callback(err, rows);
-            })
-        });
 };
 
 /*

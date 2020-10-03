@@ -185,7 +185,7 @@ objectsDB.getObjectsByIDs = function(IDs, callback) {
     getObjectsByX(IDs, 'id=', callback);
 };
 
-objectsDB.getObjectsByNames = function(names, callback) {
+    objectsDB.getObjectsByNames = function(names, callback) {
     // SELECT * FROM objects WHERE name=?
     getObjectsByX(names, 'name=', callback);
 };

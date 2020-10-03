@@ -1,0 +1,39 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-10-2 2:33:37
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Events aggregator: aggregation of occurred events
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Events aggregator
+                    h5.light.
+                        Events aggregator used to calculate the aggregated percentage for events that have occurred.
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Events aggregator description
+                    p.
+                        Events aggregator used to calculate the percentage of objects from a group of objects for which 
+                        an event occurred. For example, you can send emergency notifications to administrators when a certain 
+                        percentage of servers in a cluster providing a service are no longer available.
+                    h3 Parameters
+                    ul.browser-default
+                        li.
+                            Object group name or objectID of group - the name of the object group or the group objectID for 
+                            which the aggregated check will be performed
+                        li.
+                            Event counter name or counterID - the name of the event counter or counterID for which the 
+                            aggregated check will be performed. Event generator must be installed as a collector for this counter.
+                    h3 Returned value
+                    p.
+                        The percentage of objects from the total number of objects in the group for which the event occurred.

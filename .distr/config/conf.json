@@ -300,6 +300,13 @@
             "dbPath": "db",
             "dbFile": "events.db",
             "saveRepeatEventsCacheInterval": 15,
+            "runTaskOnProblem": true,
+            "runTaskOnSolve": true,
+            "localAddress": "127.0.0.1",
+            "serverAddress": "127.0.0.1",
+            "port": 10170
+        },
+        "events-aggregator": {
             "localAddress": "127.0.0.1",
             "serverAddress": "127.0.0.1",
             "port": 10170

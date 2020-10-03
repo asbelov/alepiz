@@ -1,0 +1,49 @@
+{{Infobox software
+| name                   = ALEPIZ
+| screenshot             = [[File:ALEPIZ data browser.png|thumb|Screenshot of ALEPIZ action with historical monitoring data]]
+| released               = {{start date and age|2016|11}}
+| latest_release_version = 0.0.6<ref>{{cite web|url=http://www.alepiz.com/help/download.pug|title=Information about the latest version of ALEPIZ}}</ref>
+| latest_release_date    = {{start date and age|2020|09|26}}
+| operating_system       = [[Microsoft Windows]]
+| programming_language   = [[Node.js]], [[JavaScript]]
+| genre                  = [[Network management system]], [[System monitor]], [[Comparison of network monitoring systems]], [[Systems_management]]
+| license                = [[GNU General Public License#Version 3|GPLv3]]
+| website                = {{URL|https://www.alepiz.com}}
+}}
+
+'''ALEPIZ'''<ref>{{cite web|url=http://www.alepiz.com/help/overview.pug|title=Description of ALEPIZ}}</ref> is an [[open-source software|open-source]] [[free software]] designed for managing [[Software as a service|SaaS]] environments for [[System monitor|monitoring]] and [[Systems_management|managing]] IT components. ALEPIZ allows to configure infrastructure monitoring and link monitoring events with management actions. As a result, actions will be performed automatically, depending on the monitoring events that have occurred. ALEPIZ contains most of the necessary components and adapters for monitoring and managing infrastructure. The modular architecture allows the development of additional extensions for collecting information for monitoring or performing control actions. ALEPIZ includes a database, a web server and does not require installation of additional software.
+
+ALEPIZ is released under the [[GNU General Public License version 3]]. ALEPIZ is [[free software]].
+{{TOC limit}}
+
+==History==
+* 2014-05 start of development
+* 2016-11 first public release
+* 2020-09 first stable release
+
+==Features==
+* Organization of monitoring
+* Infrastructure management
+* Creation of workflows in the organization
+* Ability to develop your own modules
+* Auto detection of IT components
+* High performance
+* Web interface
+* Monitoring capabilities with or without agents
+* Support for various protocols for collecting information
+
+== References ==
+<!-- Inline citations added to your article will automatically display here. See en.wikipedia.org/wiki/WP:REFB for instructions on how to add citations. -->
+{{reflist}}
+
+==External links==
+* {{official website|https://www.alepiz.com}}
+* {{github|https://github.com/asbelov/alepiz}}
+
+[[Category:Network management]]
+[[Category:Internet Protocol based network software]]
+[[Category:Free network management software]]
+[[Category:Multi-agent systems]]
+[[Category:System monitors]]
+[[Category:Management systems]]
+[[Category:Systems management]]

@@ -1,0 +1,16 @@
+{
+    "name": "Events aggregator",
+    "description": "Fires if many events have occurred with objects from a certain group and with certain counters",
+    "active": "",
+    "separate": "on",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "objectName": {
+            "description": "Object group name or objectID for group",
+            "default": "%:OBJECT_NAME:%"
+        },
+        "counterName": {
+            "description": "Event counter name or counterID for event"
+        }
+    }
+}
