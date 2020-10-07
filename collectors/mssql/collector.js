@@ -2,10 +2,11 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var Connection = require('tedious').Connection;
-var Request = require('tedious').Request;
-//var TYPES = require('tedious').TYPES;
+const mssql = require("msnodesqlv8");
 var log = require('../../lib/log')(module);
+var conf = require('../../lib/conf');
+conf.file('config/conf.json');
+
 
 var collector = {};
 module.exports = collector;
@@ -40,139 +41,83 @@ module.exports = collector;
 
 collector.get = function(param, callback) {
 
-    var password = param.password;
+    for(var key in param) {
+        if(!param.hasOwnProperty(key)) continue;
+        if(typeof param[key] === 'string' && param[key].indexOf(';') !== -1) {
+            return callback(new Error('Parameter ' + key + ' contain incorrect symbol ";"' + JSON.stringify(param)));
+        }
+    }
+
+    var config = [],
+        password = param.password;
     param.password = '*****';
 
-    if(!/^[0-9a-zA-Z-_]+$/.test(param.server) && // for incorrect host name can contain '_', can beginning from digit and not contain domain name
-        !/^(([a-zA-Z]|[a-zA-Z][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9])$/.test(param.server) &&
-        !/^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/.test(param.server) &&
-        !/^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/.test(param.server)
-    ) {
-        log.error('Incorrect host MSSQL server name or IP address: ', param.server, ': ', param);
-        return callback();
-    }
-
-    if(!param.type || ['default', 'ntlm', 'azure-active-directory-password', 'azure-active-directory-access-token',
-        'azure-active-directory-msi-vm', 'azure-active-directory-msi-app-service'].indexOf(param.type.toLowerCase()) === -1
-    ) {
-        log.error('Incorrect type of the authentication method (' , param.type, '), valid types are default, ntlm, azure-active-directory-password, azure-active-directory-access-token, azure-active-directory-msi-vm, or azure-active-directory-msi-app-service');
-        return callback();
-    }
-    param.type = param.type.toLowerCase();
+    /*
+    Ctrl+Q, type ODBC, Run ODBC Date Sources (64-bit). Select "Drivers" tab, choose one of drives for MSSQL. f.e.
+    Driver={SQL Server Native Client 11.0}
+    Driver={SQL Server Native Client 10.0}
+    Driver={ODBC Driver 13for SQL Server}
+    Driver={SQL Server}
+     */
+    if(param.driver) config.push('Driver={' + param.driver.replace(/^{(.+?)}$/, '$1') + '}');
+    else config.push('Driver={SQL Server}');
 
     param.port = Number(param.port);
-    if(param.port !== parseInt(String(param.port), 10) || param.port < 1 || param.port > 65535) {
+    if(param.port && (param.port !== parseInt(String(param.port), 10) || param.port < 1 || param.port > 65535)) {
         log.error('Incorrect TCP port: ', param.port, ': ', param);
         return callback();
     }
 
-    if(!param.query) {
-        log.error('MSSQL query is not set: ', param.query, ': ', param);
+    if(!param.server) {
+        log.error('MSSQL server not specified: ', param.server, ': ', param);
         return callback();
+    } else config.push('Server=' + param.server + (param.port ? ',' + String(param.port) : ''));
+
+    if(param.userName) {
+        config.push('Uid=' + param.userName);
+        if(password) config.push('Pwd=' + password);
     }
 
-    var config = {
-        server: param.server,
-        authentication: {
-            type: param.type,
-            options: {}
-        },
-        options: {
-            port: param.port,
-            validateBulkLoadParameters: false,
-            rowCollectionOnDone: true,
-        }
-    };
-    
-    if(param.userName) config.authentication.options.userName = param.userName;
-    if(password) config.authentication.options.password = password;
-    if(param.domain) config.authentication.options.domain = param.domain;
-    if(param.database) config.options.database = param.database;
-    if(param.language) config.options.language = param.language;
-    config.options.encrypt = !!Number(param.encrypt);
-    
-    if(param.options) {
-        try {
-            var options = JSON.parse(param.options);
-        } catch(e) {
-            log.error('Can\'t parse addition options ', param.options, ' for connect to MSSQL: ', e.message,
-                ': ', param);
-            return callback();
-        }
-        
-        for(var key in options) {
-            config.options[key] = options[key];
-        }
-    }
+    if(param.database) config.push('Database={' + param.database.replace(/^{(.+?)}$/, '$1') + '}');
+    if(param.trusted) config.push('Trusted_Connection=' + (param.trusted ? 'yes' : 'no'));
 
-    var connection = new Connection(config);
-    if(password) config.authentication.options.password = '*****';
+    var connectionTimeout = Number(conf.get('collectors:mssql:connectionTimeoutSec')) || 2;
+    var queryTimeout = Number(conf.get('collectors:mssql:queryTimeoutSec')) || 2;
 
+    if(connectionTimeout !== parseInt(String(connectionTimeout), 10) || connectionTimeout < 1) connectionTimeout = 2;
+    if(queryTimeout !== parseInt(String(queryTimeout), 10) || queryTimeout < 1) queryTimeout = 2;
 
-    connection.connect(function(err) {
+    var connectionString = config.join('; ');
+    mssql.open({
+        conn_str: connectionString,
+        conn_timeout: connectionTimeout, // specified in seconds.
+    }, function (err, con) {
+
         if(err) {
-            log.error('Can\'t connect to MSSQL ', param.server, ', user: ', param.userName, ', DB: ', param.database ,
-                ' : ', err.message, '; config: ', config)
-            return callback();
+            if(!param.query) return callback(null, 0);
+            return callback(null, JSON.stringify({unableToConnect: err.message}));
         }
-        log.debug('Connected to ', param.server, 'using ', config);
+        //log.debug('Connected to ', param.server, 'using ', param);
+        if(!param.query) return callback(null, 1);
 
-        var request = new Request(param.query, function(err) {
-            if(err) {
-                log.error('Can\'t execute query "', param.query, '" to DB ', param.database, ' : ', err.message, ': ', config);
-                callback();
-            }
-            connection.close();
-        });
+        var q = con.query({
+            query_str: param.query,
+            query_timeout: queryTimeout, // specified in seconds.
+        }, function (err, rows) {
+            if(err) return callback(new Error('Error in query "' + param.query + '": ' + err.message));
 
-        var callbackAlreadyCalled = false;
-        request.on('done', function (rowCount, more, rows) {
-            parseResult(param, rowCount, more, rows, function(err, result) {
-                if(!callbackAlreadyCalled && Array.isArray(result)) {
-                    callbackAlreadyCalled = true;
-                    callback(null, result);
-                }
+            con.close(function(err) {
+                if(err) log.error('Can\'t close connection: ', err, ': ', param);
             });
+            callback(null, rows);
         });
 
-        request.on('doneInProc', function (rowCount, more, rows) {
-            parseResult(param, rowCount, more, rows, function(err, result) {
-                if(!callbackAlreadyCalled && Array.isArray(result)) {
-                    callbackAlreadyCalled = true;
-                    callback(null, result);
-                }
-            });
+        q.on('error', function(err) {
+            log.error('Query error: ', err.message, '; ', param);
         });
 
-        request.on('doneProc', function (rowCount, more, rows) {
-            parseResult(param, rowCount, more, rows, function(err, result) {
-                if(!callbackAlreadyCalled && Array.isArray(result)) {
-                    callbackAlreadyCalled = true;
-                    callback(null, result);
-                }
-            });
+        q.on('info', function(err) {
+            log.info('Query info: ', err.message, '; ', param);
         });
-
-        connection.execSql(request);
     });
 };
-
-function parseResult(param, rowCount, more, rawRows, callback) {
-    //log.debug('Query returned ', rawRows);
-
-    if(!Array.isArray(rawRows)) {
-        //log.info('Query ', param.query, 'to DB ', param.database ,' returned nodata: ', rawRows);
-        return callback();
-    }
-
-    var rows = rawRows.map(function (columns) {
-        var row = {};
-        columns.forEach(function (column) {
-            if(column.metadata && column.metadata.colName) {
-                row[column.metadata.colName] = column.value;
-            }
-        });
-        return row;
-    });
-    callback(null, rows);
-}

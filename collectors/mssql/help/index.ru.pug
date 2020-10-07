@@ -79,25 +79,34 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                             третий раз - "Bullfinch"
                     h3 Параметры
                     ul.browser-default
-                        li MSSQL server - Имя или IP адрес сервера MSSQL
+                        li.
+                            MSSQL driver (run ODBC Data Source (64-bit), tab "Drivers") - драйвер для доступа до MSSQL.
+                            Для того, чтобы посмотреть список установленных драйверов, необходимо запустить приложение
+                            "ODBC Data Source (64-bit)" (например через Ctrl+Q и набрать ODBC), перейти на вкладку
+                            Drivers и выбрать один из драйверов MSSQL, которые там представлены.
+                        li.
+                            MSSQL server - Имя, IP адрес, имя инстанса (myServerName\theInstanceName) или
+                            сетевой путь (.\SQLExpress) до сервера MSSQL. Подробнее можно прочитать в документации на
+                            используемый драйвер MSSQL
                         li Port to connect - TCP port сервера MSSQL
                         li.
-                            Authentication method (default. ntlm, azure*) - метод авторизации. Поддерживаются
-                            default, ntlm, azure-active-directory-password, azure-active-directory-access-token,
-                            azure-active-directory-msi-vm, or azure-active-directory-msi-app-service.
-                        li User name - имя пользователя для авторизации
+                            Use Windows integrated (trusted) authentication - Включите этот параметр для подключения с
+                            использованием встроенной проверки подлинности Windows либо укажите пользователя и пароль
+                            для подключения с использованием проверки подлинности SQL Server.
                         li.
-                            Password - пароль для авторизации. Для обеспечения безопасности лучше использовать методы 
+                            User name (for SQL Server authentication) - имя пользователя для авторизации, если
+                            используется проверка подлинности SQL Server
+                        li.
+                            Password (SQL Server authentication) - пароль для авторизации, если
+                            используется проверка подлинности SQL Server.
+                            Для обеспечения безопасности лучше использовать методы
                             авторизации в которых не требуется указывать пароль
-                        li Domain for ntlm authentication - Если выбран метод авторизации NTLM, можно указать домен для авторизации
                         li Database to connect - Имя базы данных, к которой будет выполнен запрос
-                        li Encrypt connection (1|0 или пусто) - Шифровать или не шифровать подключение к серверу MSSQL
-                        li Language (default us_english) - Задает язык. Язык определяет форматы даты и времени и системные сообщения. (по умолчанию: us_english).
                         li.
-                            Additional options in JSON format - Если требуется указать какие-то дополнительные параметры
-                            подключения, их можно указать в этом поле в формате JSON. Параметры подключения можно посмотреть
-                            на странице помощи
-                            #[a(href="http://tediousjs.github.io/tedious/api-connection.html" target="__blank") драйвера tediousjs].
-                            Например, {"camelCaseColumns": 1, "connectTimeout" : 1000, "datefirst": 1, "localAddress": "192.168.0.1"}
-                        li MSSQL Query - SQL запрос
+                            MSSQL Query - SQL запрос. Если запрос отсутствует, проверяется возможность подключения
+                            к MSSQL серверу.
+                            В случае успешного подключения возвращается 1, в случае неуспешного - 0.
+                            Если SQL запрос указан, но подключиться к серверу не удалось, возвращается JSON в виде
+                            {"unableToConnect": "&lt;error message&gt;"}
+
 

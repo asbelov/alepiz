@@ -18,7 +18,7 @@ module.exports = function(prms, args, callback){
             // delete old javaScript from require cache for reread
             if(prms.updateAction && require.resolve(javaScript) && require.cache[require.resolve(javaScript)]) delete require.cache[require.resolve(javaScript)];
 
-            log.warn('Attaching nodejs file ', javaScript, (prms.updateAction ? '. Required action update. Cached data was deleted.' : ' at a first time'));
+            log.info('Attaching nodejs file ', javaScript, (prms.updateAction ? '. Required action update. Cached data was deleted.' : ' at a first time'));
             servers[javaScript] = require(javaScript);
         } catch (err) {
             return callback(new Error('Can\'t attach source js file: ' + javaScript + ' for launcher "nodeModule": ' + err.message));

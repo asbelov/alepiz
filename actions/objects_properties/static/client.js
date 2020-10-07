@@ -40,7 +40,11 @@ var JQueryNamespace = (function ($) {
                 addProperty(property);
             });
             M.updateTextFields();
-            M.textareaAutoResize($('textarea'));
+            setTimeout(function() {
+                $('textarea').each(function() {
+                    M.textareaAutoResize($(this));
+                });
+            }, 500);
         });
     }
 

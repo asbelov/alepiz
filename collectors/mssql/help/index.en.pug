@@ -79,28 +79,31 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                             the second time - "Marina", the third time - "Bullfinch"
                     h3 Parameters
                     ul.browser-default
-                        li MSSQL server - Hostname to connect to
-                        li Port to connect - Port to connect to (default: 1433).
                         li.
-                            Authentication method (default. ntlm, azure*) - Type of the authentication method, valid types are
-                            default, ntlm, azure-active-directory-password, azure-active-directory-access-token, 
-                            azure-active-directory-msi-vm, or azure-active-directory-msi-app-service
-                        li User name - User name to use for authentication.
+                            MSSQL driver (run ODBC Data Source (64-bit), tab "Drivers") - driver for access to MSSQL.
+                            To see the list of installed drivers, you need to launch the "ODBC Data Source (64-bit)"
+                            application (for example, via Ctrl+Q and type "ODBC"), go to the Drivers tab and select
+                            one of the MSSQL drivers that are presented there.
                         li.
-                            Password - Password to use for authentication. To ensure security, it is better to use authorization
-                            methods that do not require a password
-                        li Domain for ntlm authentication - Once you set domain for ntlm authentication type, driver will connect to SQL Server using domain login.
-                        li Database to connect - Database to connect to (default: dependent on server configuration).
+                            MSSQL server - Host name, IP address, instance name (myServerName\theInstanceName) or
+                            network path (.\ SQLExpress) to the MSSQL server. More details can be found in the
+                            documentation for the used MSSQL driver
+                        li Port to connect - TCP port of MSSQL server
                         li.
-                            Encrypt connection (1|0 or empty) - Determining whether or not the connection will be encrypted.
-                            Set to 1 if you're on Windows Azure.
+                            Use Windows integrated (trusted) authentication - Enable this option to connect using
+                            Integrated Windows Authentication, or provide a user and password to connect using
+                            SQL Server Authentication.
                         li.
-                            Language (default us_english) - Specifies the language environment for the session. The session language determines the datetime 
-                            formats and system messages. (default: us_english).
-                        li MSSQL Query - SQL query
+                            User name (for SQL Server authentication) - username for authorization if using
+                            SQL Server Authentication
                         li.
-                            Additional options in JSON format - If you need to specify any additional connection parameters, 
-                            you can specify them in this field in JSON format. Connection parameters can be found on the help page
-                            #[a(href="http://tediousjs.github.io/tedious/api-connection.html" target="__blank") tediousjs].
-                            Example {"camelCaseColumns": true, "connectTimeout" : 1000, "datefirst": true, "localAddress": "192.168.0.1"}
+                            Password (SQL Server authentication) - password for authorization if using
+                            SQL Server Authentication
+                            To ensure security, it is better to use authorization methods that do not require a password.
+                        li Database to connect - The name of the database to which the query will be made
+                        li.
+                            MSSQL Query - SQL query. If there is no query, a connection to the MSSQL server is checked.
+                            In case of successful connection, 1 is returned, in case of unsuccessful returned 0.
+                            If a SQL query is specified, but the connection to the server failed, JSON is returned
+                            {"unableToConnect": "&lt;error message&gt;"}
 

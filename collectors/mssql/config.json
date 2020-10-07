@@ -5,55 +5,46 @@
     "separate": "",
     "runCollectorSeparately": "",
     "parameters": {
+        "driver": {
+            "description": "MSSQL driver (run ODBC Data Source (64-bit), tab \"Drivers\")",
+            "canBeEmpty": "on",
+            "default": "SQL Server"
+        },
         "server": {
             "description": "MSSQL server",
             "default": "127.0.0.1"
         },
         "port": {
             "description": "Port to connect",
+            "canBeEmpty": "on",
             "checkAs": "TCPPort",
             "default": 1433
         },
-        "type": {
-            "description": "Authentication method (default. ntlm, azure*)",
-            "default": "default"
+        "trusted": {
+            "description": "Use Windows integrated (trusted) authentication",
+            "canBeEmpty": "on",
+            "type": "checkbox",
+            "default": "yes"
         },
         "userName": {
-            "description": "User name",
-            "canBeEmpty": "on"
+            "description": "User name (for SQL Server authentication)",
+            "canBeEmpty": "on",
+            "default": "sa"
         },
         "password": {
-            "description": "Password",
+            "description": "Password (SQL Server authentication)",
             "canBeEmpty": "on",
             "type": "textInputPassword"
         },
-        "domain": {
-            "description": "Domain for ntlm authentication",
-            "canBeEmpty": "on"
-        },
         "database": {
-            "description": "Database to connect"
-        },
-        "encrypt": {
-            "description": "Encrypt connection (1|0 or empty)",
+            "description": "Database to connect",
             "canBeEmpty": "on",
-            "checkAs": "Integer",
-            "default": 0
-        },
-        "language": {
-            "description": "Language (default us_english)",
-            "canBeEmpty": "on",
-            "default": "ru_russian"
+            "default": "master"
         },
         "query": {
-            "description": "MSSQL Query",
-            "type": "textArea"
-        },
-        "options": {
-            "description": "Additional options in JSON format (ex. {\"datefirst\": true, \"requestTimeout\": 86400000})",
+            "description": "MSSQL Query (check connection when empty)",
             "canBeEmpty": "on",
-            "type": "jsonEditor",
-            "default": "{\n    \"datefirst\": 1, \n    \"requestTimeout\": 10000\n}"
+            "type": "textArea"
         }
     }
 }

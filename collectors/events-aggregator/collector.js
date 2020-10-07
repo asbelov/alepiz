@@ -70,11 +70,15 @@ collector.get = function(param, callback) {
 
                         if(!objectsIDs.length) return callback();
 
-                        var foundEventsNum = 0;
+                        var foundEventsNum = 0, copyObjectsIDs = objectsIDs.slice();
                         eventsRows.forEach(function(eventRow) {
-                            if(objectsIDs.indexOf(eventRow.objectID)) ++foundEventsNum;
+                            var pos = copyObjectsIDs.indexOf(eventRow.objectID);
+                            if(pos !== -1) {
+                                ++foundEventsNum;
+                                copyObjectsIDs[pos] = null;
+                            }
                         });
-
+                        //log.info('Events found: ', eventsRows.length, ', objects in group: ', objectsIDs.length)
                         callback(null, Math.round(foundEventsNum * 100 / objectsIDs.length));
                     });
                 });

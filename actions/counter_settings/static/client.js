@@ -33,6 +33,10 @@ function callbackBeforeExec(callback) {
         return;
     }
 
+    $('[data-variable-name]').each(function() {
+        $(this).val($(this).val().replace(/^ *(.+?) *$/, '$1'));
+    });
+
     // Save JS editors content to textareas
     for(var i=0; i<editor.length; i++){
         try{  editor[i].save(); }
@@ -322,7 +326,7 @@ var JQueryNamespace = (function ($) {
                 $('[data-textarea-update-event]').each(function() {
                     M.textareaAutoResize($(this));
                 });
-            }, 1000);
+            }, 500);
         });
     }
 
@@ -609,14 +613,16 @@ It will happened independently form update mode settings \
                             }
                         }
 
-                        if (rawValue === undefined || rawValue === null) {
+                        // rawValue can be a null f.e. for unchecked checkbox
+                        if (rawValue === undefined/* || rawValue === null*/) {
                             if(parameter.default !== undefined) {
                                 rawValue = parameter.default;
                                 labelClass = ' class="active" ';
                             } else rawValue = '';
                         }
 
-                        var value = escapeHtml(rawValue);
+                        // replace null value to ''
+                        var value = rawValue !== null ? escapeHtml(rawValue) : '';
 
                         if (!parameter.type) parameter.type = 'textinput';
                         else parameter.type = parameter.type.toLowerCase();
@@ -951,9 +957,8 @@ It will happened independently form update mode settings \
                 $('[data-textarea-variable]').each(function() {
                     M.textareaAutoResize($(this));
                 });
-            }, 1000);
+            }, 500);
         });
-
     }
 
     function setVariablesDefinitionsTab(counterID, callback) {
@@ -1009,7 +1014,7 @@ It will happened independently form update mode settings \
         <i class="material-icons">help_outline</i>\
     </a>\
     <div class="input-field col s12 m6 l4 tooltipped" data-tooltip="You can use this variable name in collector parameters">\
-      <input type="text" id="' + variableID + '_name" value="' + variableName + '"/>\
+      <input type="text" id="' + variableID + '_name" value="' + variableName + '" data-variable-name/>\
       <label for="' + variableID + '_name">Variable name</label>\
     </div>\
     <div class="input-field col s12 tooltipped" data-tooltip="Variable expression">\
@@ -1072,7 +1077,7 @@ It will happened independently form update mode settings \
       </a>\
     </div>\
     <div class="input-field col s12 m12 l4 tooltipped" data-tooltip="You can use this variable name in collector parameters">\
-      <input type="text" id="' + variableID + '_name"/>\
+      <input type="text" id="' + variableID + '_name" data-variable-name/>\
       <label for="' + variableID + '_name">Variable name</label>\
     </div>\
     <div class="input-field col s12 m12 l4">\

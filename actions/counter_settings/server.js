@@ -116,7 +116,7 @@ module.exports = function(args, callback) {
             JSON.stringify(preparedVariables[num])));
 
         // convert to upper case, remove "%:", ":%" and spaces from begin and end of variable name
-        name = preparedVariables[num].name.toUpperCase().replace(/^%:(.+):%$/, '$1').replace(/^\s+(.+)\s+$/, '$1');
+        name = preparedVariables[num].name.toUpperCase().replace(/^%:(.+):%$/, '$1').replace(/^ *(.+?) *$/, '$1');
 
         if (variables[name]) return callback(new Error('Some variables has an equal names: ' + name));
 
