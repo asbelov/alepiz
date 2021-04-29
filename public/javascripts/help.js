@@ -11,6 +11,12 @@ document.addEventListener('DOMContentLoaded', function () {
     //    window.location.replace(newLocation);
     //}
 
+    var bodyElm = document.getElementsByTagName('body')[0];
+    bodyElm.style.maxWidth = '1400px';
+    bodyElm.style.width = '90%';
+    bodyElm.style.marginLeft = 'auto';
+    bodyElm.style.marginRight = 'auto';
+
     initGA();
     addClassFrSkipTranslateIcons();
     var divElm = document.getElementsByTagName('header')[0].childNodes[0].querySelectorAll('div.col')[0];
