@@ -2,16 +2,16 @@
 | name                   = ALEPIZ
 | screenshot             = [[File:ALEPIZ data browser.png|thumb|Скриншот ALEPIZ с историческими данными по объекту]]
 | released               = {{start date and age|2016|11}}
-| latest_release_version = 0.0.8<ref>{{cite web|url=https://www.alepiz.com/help/download.pug|title=Информация о последних версиях ALEPIZ}}</ref>
+| latest_release_version = 0.0.8<ref>{{cite web|url=https://alepiz.com/help/download.pug|title=Информация о последних версиях ALEPIZ}}</ref>
 | latest_release_date    = {{start date and age|2021|04|08}}
 | operating_system       = [[Microsoft Windows]]
 | programming_language   = [[Node.js]], [[JavaScript]]
 | genre                  = [[Мониторинг компьютерной сети]], [[Система управления]]
 | license                = [[GNU General Public License#Version 3|GPLv3]]
-| website                = {{URL|https://www.alepiz.com}}
+| website                = {{URL|https://alepiz.com}}
 }}
 
-'''ALEPIZ'''<ref>{{cite web|url=http://www.alepiz.com/help/overview.pug|title=Описание ALEPIZ}}</ref> это [[free software|свободно распространяемая]] система [[open-source software|с открытым исходным кодом]], разработанная для администрирования сред [[Software as a service|SaaS]] с использованием автоматического [[Мониторинг компьютерной сети|мониторинга]] и [[Система управления|управления]]. ALEPIZ позволяет связывать события в инфраструктуре с действиями по управлению. В результате, управляющие действия будут выполнены автоматически в зависимости от произошедших мониторинговых событий. ALEPIZ включает в себя большинство необходимых адаптеров и компонент для выполнения мониторинга и управления инфраструктурой. Модульная архитектура позволяет самостоятельно разрабатывать дополнительные расширения для сбора информации и выполнения управляющих действий. ALEPIZ содержит встроенную базу данных, Web сервер и не требует установки дополнительного программного обеспечения.
+'''ALEPIZ'''<ref>{{cite web|url=http://alepiz.com/help/overview.pug|title=Описание ALEPIZ}}</ref> это [[free software|свободно распространяемая]] система [[open-source software|с открытым исходным кодом]], разработанная для администрирования сред [[Software as a service|SaaS]] с использованием автоматического [[Мониторинг компьютерной сети|мониторинга]] и [[Система управления|управления]]. ALEPIZ позволяет связывать события в инфраструктуре с действиями по управлению. В результате, управляющие действия будут выполнены автоматически в зависимости от произошедших мониторинговых событий. ALEPIZ включает в себя большинство необходимых адаптеров и компонент для выполнения мониторинга и управления инфраструктурой. Модульная архитектура позволяет самостоятельно разрабатывать дополнительные расширения для сбора информации и выполнения управляющих действий. ALEPIZ содержит встроенную базу данных, Web сервер и не требует установки дополнительного программного обеспечения.
 
 ALEPIZ распространяется под лицензией [[GNU_General_Public_License|GNU GPL v3]] и является [[free software|свободно распространяемым]] программным продуктом.
 {{TOC limit}}
@@ -37,7 +37,7 @@ ALEPIZ распространяется под лицензией [[GNU_General_
 {{reflist}}
 
 ==Ссылки==
-* {{official website|https://www.alepiz.com}}
+* {{official website|https://alepiz.com}}
 * {{github|https://github.com/asbelov/alepiz}}
 
 [[Category:Network management]]
