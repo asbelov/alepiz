@@ -4,6 +4,7 @@
 
 
 var path = require('path');
+var fs = require('fs');
 
 // for windows service.
 // Default working directory is windows\system32, __dirname is the directory name of the current module (alepiz.js)
@@ -13,6 +14,11 @@ var installService = require('../lib/installService');
 if(installService.init()) return;
 
 var service = require('os-service');
+
+var conf = require('../lib/conf');
+conf.file('config/conf.json');
+
+var newDirs = makeDirs();
 
 var log = require('../lib/log')(module);
 var initDB = require('../models_db/createDB/createAllDB');
@@ -24,16 +30,21 @@ var actionServer = require('../lib/actionServer');
 var backupServer = require('../lib/dbBackup');
 var taskServer = require('../lib/taskServer');
 var dynamicLog = require('../lib/dynamicLog');
+var IPC = require('../lib/IPC');
 
-var conf = require('../lib/conf');
-conf.file('config/conf.json');
 
 service.run (function () {
     setTimeout(function() {
         log.exit('Service was not stopped in timeout. Exiting');
 
+        log.exit('Trying stop the server...');
+        server.stop(function () {});
+
         history.dump(function() {
-            process.exit(6); // for simple searching process.exit(6)
+            log.disconnect(function () {
+                //waiting for the server to stop
+                setTimeout(process.exit, 15000, 6); // process.exit(6) for search
+            });
         });
     }, conf.get('serviceStopTimeout') || 120000);
 
@@ -79,20 +90,45 @@ function scheduleRestart() {
     setTimeout(restart, d.getTime() - Date.now());
 }
 
+function makeDirs() {
+    var newDirs = [], dirs = conf.get("history:db").map(function (dirEnt) {
+        return dirEnt.relative ? path.join(__dirname, '..', dirEnt.path) : dirEnt.path;
+    });
+
+    Array.prototype.push.apply(dirs, [
+        path.join(__dirname, '..', conf.get("tempDir") || 'temp'),
+        path.join(__dirname, '..', conf.get("privatePath") || 'private'),
+        path.join(__dirname, '..', conf.get("log:path") || 'logs'),
+    ]);
+
+    dirs.forEach(function (newDir) {
+        try {
+            if(!fs.existsSync(newDir)) {
+                fs.mkdirSync(newDir, {recursive: true, mode: 0o700});
+                newDirs.push(newDir);
+            }
+        } catch (e) {}
+    });
+
+    return newDirs;
+}
+
 function start(callback) {
+    IPC.service();
+
     log.start(function(err) {
         if (err) {
             console.error(err.message);
             process.exit(127);
         }
+        log.info('Starting ALEPIZ...');
+        if(newDirs.length) log.warn('Creating dirs: ', newDirs.join(', '));
 
-        log.info('Starting ALEPIZ: initializing database');
+        log.info('Initializing database');
         initDB(function (err) {
             if (err) {
                 log.exit('Error while initialising DataBase: ', err.stack);
-                setTimeout(function () {
-                    process.exit(11);
-                }, 3000);
+                log.disconnect(function () { process.exit(11) });
                 return;
             }
 
@@ -100,9 +136,7 @@ function start(callback) {
             replicationServer.start(function(err) {
                 if (err) {
                     log.exit('Error while starting replication server: ' + err.stack);
-                    setTimeout(function () { // don't run history.stop(). it will replace unsavedData.json
-                        process.exit(11);
-                    }, 1000);
+                    log.disconnect(function () { process.exit(11) });
                     return;
                 }
 
@@ -110,9 +144,7 @@ function start(callback) {
                 backupServer.start(function (err) {
                     if (err) {
                         log.exit('Error while starting backup server: ' + err.stack);
-                        setTimeout(function () { // don't run history.stop(). it will replace unsavedData.json
-                            process.exit(11);
-                        }, 1000);
+                        log.disconnect(function () { process.exit(11) });
                         return;
                     }
 
@@ -120,9 +152,7 @@ function start(callback) {
                     history.start(conf.get('history'), function (err) {
                         if (err) {
                             log.exit('Error starting history storage server: ' + err.stack);
-                            setTimeout(function () { // don't run history.stop(). it will replace unsavedData.json
-                                process.exit(11);
-                            }, 1000);
+                            log.disconnect(function () { process.exit(11) });
                             return;
                         }
 
@@ -130,9 +160,7 @@ function start(callback) {
                         actionServer.start(function (err) {
                             if (err) {
                                 log.exit('Error starting action server: ' + err.stack);
-                                setTimeout(function () { // don't run history.stop(). it will replace unsavedData.json
-                                    process.exit(11);
-                                }, 1000);
+                                log.disconnect(function () { process.exit(11) });
                                 return;
                             }
 
@@ -140,9 +168,7 @@ function start(callback) {
                             taskServer.start(function (err) {
                                 if (err) {
                                     log.exit('Error starting task server: ' + err.stack);
-                                    setTimeout(function () { // don't run history.stop(). it will replace unsavedData.json
-                                        process.exit(11);
-                                    }, 1000);
+                                    log.disconnect(function () { process.exit(11) });
                                     return;
                                 }
 
@@ -150,9 +176,7 @@ function start(callback) {
                                 webServer.start(function(err) {
                                     if (err) {
                                         log.exit('Error starting web server: ' + err.stack);
-                                        setTimeout(function () { // don't run history.stop(). it will replace unsavedData.json
-                                            process.exit(11);
-                                        }, 1000);
+                                        log.disconnect(function () { process.exit(11) });
                                         return;
                                     }
 
@@ -160,9 +184,7 @@ function start(callback) {
                                     dynamicLog.start(function (err) {
                                         if (err) {
                                             log.exit('Error starting dynamic log: ' + err.stack);
-                                            setTimeout(function () { // don't run history.stop(). it will replace unsavedData.json
-                                                process.exit(11);
-                                            }, 1000);
+                                            log.disconnect(function () { process.exit(11) });
                                             return;
                                         }
 
@@ -183,30 +205,29 @@ function start(callback) {
 
 function stop(callback) {
     // waiting for a stop
-    log.exit('Waiting for the web server to stop...');
-    webServer.stop(function() {
+    log.exit('Waiting for the history server to stop...');
+    history.stop(function () {
 
         log.exit('Waiting for the server to stop...');
-
         server.stop(function () {
 
-            log.exit('Waiting for the dynamic log to stop...');
-            dynamicLog.stop(function () {
+            log.exit('Waiting for the web server to stop...');
+            webServer.stop(function() {
 
-                log.exit('Waiting for the task server to stop');
-                taskServer.stop(function () {
+                log.exit('Waiting for the backup server to stop...');
+                backupServer.stop(function () {
 
-                    log.exit('Waiting for the action server to stop');
-                    actionServer.stop(function () {
+                    log.exit('Waiting for the replication server to stop...');
+                    replicationServer.stop(function () {
 
-                        log.exit('Waiting for the history server to stop...');
-                        history.stop(function () {
+                        log.exit('Waiting for the dynamic log to stop...');
+                        dynamicLog.stop(function () {
 
-                            log.exit('Waiting for the backup server to stop...');
-                            backupServer.stop(function () {
+                            log.exit('Waiting for the task server to stop');
+                            taskServer.stop(function () {
 
-                                log.exit('Waiting for the replication server to stop...');
-                                replicationServer.stop(function () {
+                                log.exit('Waiting for the action server to stop');
+                                actionServer.stop(function () {
 
                                     log.exit('Waiting for the log server to stop...');
                                     log.stop(function () {

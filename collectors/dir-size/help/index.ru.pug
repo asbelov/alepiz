@@ -1,0 +1,49 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-03-22 14:02:00
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Directory size: вычисляет размер каталогов
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Directory size
+                    h5.light.
+                        Directory size используется для вычисления размера каталогов.
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание Directory size
+                    p.
+                        Directory size используется для вычисления размера заданных каталогов. Можно задавать исключения, как
+                        в текстовом виде, так и в виде регулярного выражения.
+                        Для снижения нагрузки на систему, после вычисления размера каждого файла, выполнение коллектора
+                        приостанавливается на заданное время.
+                    h3 Параметры
+                    ul.browser-default
+                        li.
+                            Directory names (comma separated) - список каталогов для подсчета размера (через запятую).
+                            Пробелы в начале и конце названия каждого каталога будут удалены.
+                        li.
+                            Excluded directories (comma separated) - список каталогов и файлов, которые будут исключаться
+                            из подсчета размера (через запятую). Пробелы в начале и конце названия каждого каталога будут удалены.
+                        li.
+                            Excluded directories in regExp format - каталоги и файлы для исключения написаны в формате регулярны выражений.
+                            Если отключено, то это точные значений.
+                        li.
+                            Sleep periodically for reduce load (ms) - Для снижения нагрузки на систему, после вычисления
+                            размера каждого файла, выполнение коллектора приостанавливается на заданное время в миллисекундах.
+                        li.
+                            Maximum execution time after which a warning will appear in the log (ms) - Максимальное время выполнения
+                            вычисления, после которого в лог файл будет добавлено предупреждение.
+                    h3 Возвращаемое значение
+                    p.
+                        Размер каталогов в байтах.

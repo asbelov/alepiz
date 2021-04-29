@@ -1,0 +1,23 @@
+{
+    "name": "verPE (Windows file version)",
+    "description": "Get the version of an executable PE file in Microsoft Windows",
+    "active": "",
+    "separate": "",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "files": {
+            "description": "Comma separated files",
+            "type": "textInputMiddle"
+        },
+        "returnVersionAndFilename": {
+            "description": "Return in version|filename format",
+            "canBeEmpty": "on",
+            "type": "checkbox"
+        },
+        "returnFirstResult": {
+            "description": "Return first result (not an array)",
+            "canBeEmpty": "on",
+            "type": "checkbox"
+        }
+    }
+}

@@ -5,6 +5,7 @@
 
 var async = require('async');
 var objectsPropertiesDB = require('../models_db/objectsPropertiesDB');
+var objectsDB = require('../models_db/objectsDB');
 var rightsDB = require('../models_db/usersRolesRightsDB');
 var prepareUser = require('../lib/utils/prepareUser');
 var checkIDs = require('../lib/utils/checkIDs');
@@ -33,7 +34,7 @@ rightsWrapper.getSharedProperties = function(user, objectsIDs, callback) {
         rightsDB.checkObjectsIDs({
             user: user,
             IDs: checkedIDs,
-            checkChange: true,
+            checkVew: true,
             errorOnNoRights: true
         }, function(err, checkedObjectsIDs) {
             if(err) return callback(err);
@@ -74,7 +75,7 @@ rightsWrapper.getProperties = function(user, objectsIDs, callback) {
         rightsDB.checkObjectsIDs({
             user: user,
             IDs: checkedIDs,
-            checkChange: true,
+            checkVew: true,
             errorOnNoRights: true
         }, function(err, checkedObjectsIDs) {
             if(err) return callback(err);
@@ -83,6 +84,110 @@ rightsWrapper.getProperties = function(user, objectsIDs, callback) {
         });
     });
 };
+
+/*
+    getting all properties for objects with OCIDs
+
+    OCIDs - array or string with objects counters IDs
+    callback(err, properties)
+
+    properties [{id:.., objectID:.., OCID:..., name:.., value:.., mode:.., description:..}]
+ */
+rightsWrapper.getPropertiesByOCIDs = function (user, OCIDs, mode, callback) {
+    checkIDs(OCIDs, function(err, checkedOCIDs) {
+        if (err && (!checkedOCIDs || !checkedOCIDs.length)) return callback(err);
+
+        // SELECT objects.name AS name, objects.id AS objectID, objectsCounters.id AS OCID FROM objects...
+        objectsDB.getObjectsByOCIDs(checkedOCIDs, function (err, rowsOCIDs) {
+            if (err) {
+                return callback(new Error('Can\'t get objects IDs using OCIDs ' + JSON.stringify(checkedOCIDs) +
+                    ': ' + err.message));
+            }
+            // remove duplicate objects IDs
+            var objectsIDs2OCIDs = {};
+            rowsOCIDs.forEach(row => {
+                if(!objectsIDs2OCIDs[row.objectID]) objectsIDs2OCIDs[row.objectID] = [row.OCID];
+                else objectsIDs2OCIDs[row.objectID].push(row.OCID);
+            });
+
+            user = prepareUser(user);
+
+            rightsDB.checkObjectsIDs({
+                user: user,
+                IDs: Object.keys(objectsIDs2OCIDs),
+                checkView: true,
+                errorOnNoRights: false
+            }, function (err, checkedObjectsIDs) {
+                if (err) {
+                    return callback(new Error('Error checking rights for get objects properties for objects IDs  ' +
+                        JSON.stringify(objectsIDs2OCIDs) + ': ' + err.message));
+                }
+
+                // SELECT * FROM objectsProperties...
+                objectsPropertiesDB.getProperties(checkedObjectsIDs, function(err, rows) {
+                    if(err) {
+                        return callback(new Error('Can\'t get objects properties for objects IDs  ' +
+                            JSON.stringify(checkedObjectsIDs) + ': ' + err.message));
+                    }
+
+                    var res = [];
+                    rows.forEach(row => {
+                        // typeof mode === "number" - check for mode is defined
+                        // !Array.isArray(objectsIDs2OCIDs[row.objectID]): I dont known how, but once objectsIDs2OCIDs[row.objectID] was undefined
+                        if((typeof mode === "number" && row.mode !== mode) || !Array.isArray(objectsIDs2OCIDs[row.objectID])) return;
+                        objectsIDs2OCIDs[row.objectID].forEach(function (OCID) {
+                            //  if you need you can uncomment any props
+                            res.push({
+                                OCID: OCID,
+                                name: row.name,
+                                value: row.value,
+                                //mode: row.mode,
+                                //objectID: row.objectID,
+                                //description: row.description,
+                                //id: row.id
+                            });
+                        });
+                    });
+                    return callback(null, res);
+                });
+            });
+        });
+    });
+}
+
+/*
+    getting all properties for objects with ObjectsIDs
+
+    objectsIDs - array or string with objects IDs
+    callback(err, properties)
+
+    properties [{id:.., objectID:.., name:.., value:.., mode:.., description:..}]
+ */
+
+rightsWrapper.getObjectsForProperty = function(user, propertyName, callback) {
+
+    if(!propertyName || typeof propertyName !== 'string') {
+        return callback(new Error('Getting objects for property: unknown property name: ' + JSON.stringify(propertyName)));
+    }
+
+    objectsPropertiesDB.getObjectsForProperty(propertyName, function(err, rows) {
+        if(err) return callback(new Error('Getting objects for property error: ' + err.message));
+
+        user = prepareUser(user);
+
+        rightsDB.checkObjectsIDs({
+            user: user,
+            IDs: rows.map(row => row.objectID),
+            checkVew: true,
+            errorOnNoRights: false
+        }, function(err, checkedObjectsIDs) {
+            if(err) return callback('Getting objects for property error while checking objects rights: ' + err.message);
+
+            callback(null, rows.filter(row => checkedObjectsIDs.indexOf(row.objectID) !== -1));
+        });
+    })
+};
+
 
 /*
     Save properties for specific objects.
@@ -180,8 +285,8 @@ function sortProperties(objectsIDs, initProperties, isDeleteNotListedProperties,
                     if(!propertiesForUpdate[objectID]) propertiesForUpdate[objectID] = [sharedProperty];
                     else propertiesForUpdate[objectID].push(sharedProperty);
                 } else if(sharedProperty.description !== property.description) {
-                    if(!propertiesWithDifferentDescriptions[objectID]) propertiesWithDifferentDescriptions[objectID] = [property];
-                    else propertiesWithDifferentDescriptions[objectID].push(property);
+                    if(!propertiesWithDifferentDescriptions[objectID]) propertiesWithDifferentDescriptions[objectID] = [sharedProperty];
+                    else propertiesWithDifferentDescriptions[objectID].push(sharedProperty);
                 }
             } else if(isDeleteNotListedProperties) {
                 if(!sharedPropertiesNamesForDelete[property.name]) sharedPropertiesNamesForDelete[property.name] = [property];

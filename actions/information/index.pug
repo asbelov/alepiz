@@ -1,0 +1,48 @@
+//
+    Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2021-1-24 0:54:27
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;',
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+        script(src='/javascripts/objectsSelector.js')
+        script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+        main
+            div.row
+                div.col.s12
+                    div.card
+                        div.card-content
+                            span.card-title Objects Information
+                            table.striped.highlight.responsive-table#infoTable
+                        div.card-action
+                            a(href="#")#downloadCSV Download data
+                            a(href="#")#downloadRawCSV Download raw data

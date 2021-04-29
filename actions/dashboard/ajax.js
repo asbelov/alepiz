@@ -4,7 +4,13 @@
 
 var log = require('../../lib/log')(module);
 var path = require('path');
+var async = require('async');
 var eventDisabled = require('../../collectors/event-generator/collector').isEventDisabled; // only for isEventsDisabled()
+var objectsPropertiesDB = require('../../rightsWrappers/objectsPropertiesDB');
+var countersDB = require('../../models_db/countersDB');
+var prepareUser = require('../../lib/utils/prepareUser');
+var usersDB = require('../../models_db/usersDB');
+var actionsRights = require('../../rightsWrappers/actions');
 var sqlite = require('../../lib/sqlite');
 var conf = require('../../lib/conf');
 conf.file('config/conf.json');
@@ -17,15 +23,83 @@ function ajax(args, callback) {
 
     log.debug('Starting ajax ', __filename, ' with parameters ', args);
 
+    var cfg = args.actionCfg;
+    if(!cfg || !cfg.restrictions) return callback(new Error('Can\'t find "restrictions" in action configuration'));
+
     if(!db) return initDB(args, callback);
 
-    if(args.func === 'getEventsData') getEvents(args, callback); // callback(err, {history: [..], current: [...], disabled: [...], comment: []});
-    else if(args.func === 'getComment') getCommentForEvent(args.ID, callback);
-    else if(args.func === 'getHint') getHintForEvent(args.ID, callback);
-    else if(args.func === 'getComments') getDashboardDataForHistoryCommentedEvents (args, callback);
-    else if(args.func === 'getCommentedEventsList') getDashboardDataForCommentedEventsList(args.objectsIDs, args.commentID, callback);
-    else if(args.func === 'getHistoryData') getHistoryForOCID(args, callback);
-    else return callback(new Error('Ajax function is not set or unknown function: "' + args.func +'"'));
+    var user = prepareUser(args.username);
+
+    usersDB.getUsersInformation(user, function(err, rows) {
+        if(err) return callback(new Error('Can\'t get user information for ' + args.username + '(' + user +'): ' + err.message));
+        if(rows.length < 1) {
+            return callback(new Error('Error while getting user information for ' + args.username + '(' + user +
+                '): received data for ' + rows.length + ' users'));
+        }
+
+        var role = rows[0].roleName;
+        if(!role) return callback(new Error('Can\'t find any role for user ' + args.username + '(' + user +')'));
+        var restrictions = cfg.restrictions[role] || cfg.restrictions.Default;
+        if(!restrictions) {
+            return callback(new Error('Can\'t find restrictions for role ' + role + ' user ' + args.username +
+                '(' + user +') and "Default" restriction is not set'));
+        }
+
+        if(args.func === 'getRestrictions') {
+            if(!restrictions.Links) {
+                return callback(null, {
+                    restrictions: restrictions,
+                    actions: [],
+                });
+            }
+
+            // filter actions, which can displayed as action links according user actions rights
+            checkActionsRights(args.username, cfg.actions, function(err, checkedActions) {
+                if(err) log.error(err.message);
+                return callback(null, {
+                    restrictions: restrictions,
+                    actions: checkedActions,
+                });
+            })
+        } else if(args.func === 'getEventsData') {
+            if(!restrictions.Current && args.getDataForCurrentEvents) {
+                return callback(new Error('Access denied for ' + user +
+                    ' and function: "getEventsData:getDataForCurrentEvents": ' + JSON.stringify(args)));
+            }
+            if(!restrictions.Historical && args.getDataForHistoryEvents) {
+                return callback(new Error('Access denied for ' + user +
+                    ' and function: "getEventsData:getDataForHistoryEvents": ' + JSON.stringify(args)));
+            }
+            if(!restrictions.Disabled && args.getDataForDisabledEvents) {
+                return callback(new Error('Access denied for ' + user +
+                    ' and function: "getEventsData:getDataForDisabledEvents": ' + JSON.stringify(args)));
+            }
+
+            if(!args.getDataForCurrentEvents && !args.getDataForHistoryEvents && !args.getDataForDisabledEvents) {
+                return callback(new Error('Nothing to do for function: "' + args.func + '": ' + JSON.stringify(args)));
+            }
+
+            // callback(err, {history: [..], current: [...], disabled: [...], comment: []});
+            getEvents(args, restrictions.Importance, callback);
+        } else if(restrictions.Info && args.func === 'getComment') {
+            getCommentForEvent(args.ID, callback);
+        } else if(restrictions.Hints && args.func === 'getHint') {
+            getHintForEvent(args.ID, callback);
+        } else if(restrictions.Comments && args.func === 'getComments') {
+            getDashboardDataForHistoryCommentedEvents (args, restrictions.Importance, callback);
+        } else if(restrictions.Comments && args.func === 'getCommentedEventsList') {
+            getDashboardDataForCommentedEventsList(args.objectsIDs, args.commentID, restrictions.Importance, callback);
+        } else if(restrictions.History && args.func === 'getHistoryData') {
+            getHistoryForOCID(args, Number(restrictions.Importance), callback);
+        } else if(restrictions.Message && args.func === 'getObjectsProperties') {
+            objectsPropertiesDB.getPropertiesByOCIDs(args.username, args.IDs, 0, callback);
+        } else if(restrictions.Links && args.func === 'getCounterVariables') {
+            countersDB.getOCIDsForVariables(args.objectName, args.counterID, callback);
+        } else {
+            return callback(new Error('Access denied for ' + user +
+                ' or ajax function is not set or unknown function: "' + args.func + '"'));
+        }
+    });
 }
 
 function initDB(args, callback) {
@@ -46,7 +120,22 @@ function initDB(args, callback) {
     });
 }
 
-function getEvents (args, callback) {
+function checkActionsRights(user, actions, callback) {
+
+    var checkedActions = [];
+    async.each(actions, function (action, callback) {
+        if(!action.ID || !action.name) return callback();
+
+        actionsRights.checkActionRights(user, action.ID, 'ajax', function(err) {
+            if(!err) checkedActions.push(action);
+            callback();
+        });
+    }, function(/* err */) {
+        callback(null, checkedActions);
+    });
+}
+
+function getEvents (args, maxImportance, callback) {
     checkIDs(args.objectsIDs, function (err, objectsIDs) {
         if (!args.objectsIDs || !objectsIDs || !objectsIDs.length) objectsIDs = [];
         else if (err) return callback(err);
@@ -54,6 +143,8 @@ function getEvents (args, callback) {
         var condition = ['disabledEvents.eventID NOTNULL'];
         if(args.getDataForCurrentEvents) condition.push('events.endTime ISNULL');
         if(args.getDataForHistoryEvents) condition.push('events.commentID ISNULL');
+        var queryParameters = [maxImportance];
+        Array.prototype.push.apply(queryParameters, objectsIDs);
 
         db.all('\
 SELECT events.id AS id, events.OCID AS OCID, events.parentOCID AS parentOCID, events.objectName AS objectName, \
@@ -63,9 +154,9 @@ events.startTime AS startTime, events.endTime AS endTime, events.pronunciation A
 disabledEvents.disableUntil AS disableUntil, disabledEvents.intervals AS disableIntervals, disabledEvents.user AS disableUser \
 FROM events \
 LEFT JOIN disabledEvents ON disabledEvents.eventID=events.id \
-WHERE (' + condition.join(' OR ') + ') ' +
-    (objectsIDs.length ? 'AND events.objectID IN (' + (new Array(objectsIDs.length)).fill('?').join(',') + ')' : '') + ' \
-ORDER BY disabledEvents.eventID DESC, events.startTime DESC', objectsIDs, function (err, events) {
+WHERE (' + condition.join(' OR ') + ') AND events.importance <= ? ' +
+            (objectsIDs.length ? 'AND events.objectID IN (' + (new Array(objectsIDs.length)).fill('?').join(',') + ')' : '') + ' \
+ORDER BY disabledEvents.eventID DESC, events.startTime DESC', queryParameters, function (err, events) {
             if (err) return callback(new Error('Can\'t get data from events: ' + err.message));
 
             db.all('SELECT id, OCID, counterID FROM hints', function (err, rows) {
@@ -83,7 +174,7 @@ ORDER BY disabledEvents.eventID DESC, events.startTime DESC', objectsIDs, functi
                 events.forEach(function (event) {
                     // add hintID to events
                     if (hintsOCID[event.OCID]) event.hintID = hintsOCID[event.OCID].id;
-                    else if (hintsCounterID[event.counterID]) event.hintID = hintsOCID[event.counterID].id;
+                    else if (hintsCounterID[event.counterID]) event.hintID = hintsCounterID[event.counterID].id;
 
                     // make list of disabled events
                     // events are sorted by disabledEvents.eventID and at first of the events list we have a disabled events
@@ -103,7 +194,7 @@ ORDER BY disabledEvents.eventID DESC, events.startTime DESC', objectsIDs, functi
                         !eventDisabled(event.disableIntervals, event.startTime, event.endTime)) {
 
                         //log.info('event prn: ', event.objectName, ':', event.counterName, ':', event);
-                        if (args.getDataForCurrentEvents && !event.endTime ) current.push(event);
+                        if (args.getDataForCurrentEvents && event.endTime === null ) current.push(event);
                         if (args.getDataForHistoryEvents && !event.commentID) history.push(event);
                     }
                 });
@@ -118,9 +209,9 @@ ORDER BY disabledEvents.eventID DESC, events.startTime DESC', objectsIDs, functi
     });
 }
 
-function getHistoryForOCID (args, callback) {
+function getHistoryForOCID (args, maxImportance, callback) {
     checkIDs(args.OCID, function (err, OCID) {
-        if (!args.OCID || !OCID || !OCID.length) OCID = [];
+        if (!args.OCID || !OCID || !OCID.length) return callback(new Error('OCID is not set for getting history'));
         else if (err) return callback(err);
 
         db.all('\
@@ -131,15 +222,16 @@ events.startTime AS startTime, events.endTime AS endTime, events.pronunciation A
 disabledEvents.disableUntil AS disableUntil, disabledEvents.intervals AS disableIntervals, disabledEvents.user AS disableUser \
 FROM events \
 LEFT JOIN disabledEvents ON disabledEvents.eventID=events.id \
-WHERE events.OCID = ? \
-ORDER BY disabledEvents.eventID DESC, events.startTime DESC LIMIT 100', OCID, function (err, events) {
-            if (err) return callback(new Error('Can\'t get history data for OCID ' + OCID + ' from events: ' + err.message));
+WHERE events.OCID = ? AND events.importance <= ? \
+ORDER BY disabledEvents.eventID DESC, events.startTime DESC LIMIT 100', [OCID[0], maxImportance], function (err, events) {
+            if (err) return callback(new Error('Can\'t get history data for OCID ' + OCID[0] + ' and importance ' +
+                maxImportance + ' from events: ' + err.message));
             callback(null, events);
         });
     });
 }
 
-function getDashboardDataForHistoryCommentedEvents (args, callback) {
+function getDashboardDataForHistoryCommentedEvents (args, maxImportance, callback) {
 
     var from = Number(args.from);
     var to = new Date(new Date(Number(args.to)).setHours(23,59,59,999)).getTime();
@@ -153,7 +245,7 @@ function getDashboardDataForHistoryCommentedEvents (args, callback) {
         if (!args.ObjectsIDs || !objectsIDs || !objectsIDs.length) objectsIDs = [];
         else if (err) return callback(err);
 
-        var queryParameters = [from, to];
+        var queryParameters = [from, to, maxImportance];
         if (objectsIDs && objectsIDs.length) Array.prototype.push.apply(queryParameters, objectsIDs);
         else objectsIDs = null;
 
@@ -162,9 +254,9 @@ SELECT comments.id AS id, comments.timestamp AS timestamp, comments.user AS user
 comments.subject AS subject, comments.comment AS comment, count(events.id) AS eventsCount, min(events.importance) AS importance \
 FROM comments \
 JOIN events ON comments.id=events.commentID \
-WHERE comments.timestamp BETWEEN ? AND ? '
-    + (objectsIDs ? ' AND events.objectID IN (' + (new Array(objectsIDs.length)).fill('?').join(',') + ') ' : '') +
-'GROUP by events.commentID ORDER BY comments.timestamp DESC', queryParameters, function (err, rows) {
+WHERE comments.timestamp BETWEEN ? AND ? AND events.importance <= ? '
+            + (objectsIDs ? ' AND events.objectID IN (' + (new Array(objectsIDs.length)).fill('?').join(',') + ') ' : '') +
+            'GROUP by events.commentID ORDER BY comments.timestamp DESC', queryParameters, function (err, rows) {
             if (err) return callback(new Error('Can\'t get data for dashboard commented history events: ' + err.message));
 
             callback(null, rows);
@@ -172,7 +264,7 @@ WHERE comments.timestamp BETWEEN ? AND ? '
     });
 }
 
-function getDashboardDataForCommentedEventsList (initObjectsIDs, commentID, callback) {
+function getDashboardDataForCommentedEventsList (initObjectsIDs, commentID, maxImportance, callback) {
     checkIDs(initObjectsIDs, function (err, objectsIDs) {
         if(!initObjectsIDs) objectsIDs = ''; // sorry for this
         else if(err) return callback(err);
@@ -181,6 +273,7 @@ function getDashboardDataForCommentedEventsList (initObjectsIDs, commentID, call
             if (err) return callback(err);
 
             var queryParameters = commentIDs;
+            queryParameters.push(maxImportance);
             if(objectsIDs && objectsIDs.length) Array.prototype.push.apply(queryParameters, objectsIDs);
             else objectsIDs = null;
 
@@ -194,10 +287,10 @@ LEFT JOIN hints ON hints.id = (SELECT id FROM hints \
     WHERE (OCID IS NOT NULL AND events.OCID=OCID) OR \
     ((SELECT id FROM hints WHERE OCID IS NOT NULL AND events.OCID=OCID) IS NULL AND \
     counterID IS NOT NULL AND events.counterID=counterID) ORDER BY timestamp DESC LIMIT 1) \
-WHERE events.commentID = ? ' +
-/*'AND events.startTime > ?' + */
-(objectsIDs ? 'AND events.objectID IN (' + (new Array(objectsIDs.length)).fill('?').join(',') + ') ' : '') +
-'ORDER BY events.startTime DESC LIMIT 1000', queryParameters, function(err, rows) {
+WHERE events.commentID = ? AND events.importance <= ? ' +
+                /*'AND events.startTime > ?' + */
+                (objectsIDs ? 'AND events.objectID IN (' + (new Array(objectsIDs.length)).fill('?').join(',') + ') ' : '') +
+                'ORDER BY events.startTime DESC LIMIT 1000', queryParameters, function(err, rows) {
 
                 if(err) return callback(new Error('Can\'t get data for commented events list: ' + err.message));
                 callback(null, rows);

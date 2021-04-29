@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
- */
-
-/**
+ * Copyright (C) 2015. Alexander Belov. Contacts: <asbel@alepiz.com>
  * Created by Alexander Belov on 24.07.2015.
  */
 var net = require('net');
@@ -17,7 +14,7 @@ module.exports = collector;
 var zbx_notsupportedLength = String('ZBX_NOTSUPPORTED').length;
 var minResponseLength = String('ZBXD').length + 1 + 8 + 1;
 
-collector.get = function(param, callback){
+collector.get = function(param, callback) {
 
     if(param.itemParameters) param.itemParameters = '['+param.itemParameters+']';
     else param.itemParameters= '';
@@ -137,7 +134,8 @@ collector.get = function(param, callback){
             });
 
             socket.on('error', function (err) {
-                log.error(errorMessage, err.message);
+                // use log.info() so that problems with host unavailability do not clog up the errors.log
+                log.info(errorMessage, err.message);
                 callback();
             });
         });

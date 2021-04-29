@@ -1,0 +1,27 @@
+{
+    "name": "NSLookup",
+    "description": "Get IP address by hostname",
+    "active": "",
+    "separate": "",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "host": {
+            "description": "Host name"
+        },
+        "returnErrors": {
+            "description": "Return errors",
+            "canBeEmpty": "on",
+            "type": "checkbox"
+        },
+        "checkHostname": {
+            "description": "Check if the hostname is correct",
+            "canBeEmpty": "on",
+            "type": "checkbox"
+        },
+        "getHostname": {
+            "description": "Get hostnames by IP address",
+            "canBeEmpty": "on",
+            "type": "checkbox"
+        }
+    }
+}

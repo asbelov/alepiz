@@ -71,35 +71,37 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                                 select#counterIDSelector
                                                     option New counter
                                                 label Counters selector
+                                            div.col.s12
+                                                label
+                                                    input(type='checkbox')#selectedCollectorFilter
+                                                    span(data-position='top' data-tooltip='Show counters only for selected collector').tooltipped Show counters only for selected collector
                                             input(type='hidden')#counterID
                                             input(type='hidden')#activeCollector
                                     div.col.l6.m12.s12
                                         select(title=""
                                             description="Filter counters by objects"
                                             no-border=1)#objectsIDs
-                                    div.col.s12
-                                        div.row
-                                            p.col.s3
-                                                label
-                                                    input(type='checkbox' value="1")#disabled
-                                                    span(data-position='top' data-tooltip='Do not collect data for this counter').tooltipped Disable
-                                            p.col.s3
-                                                label
-                                                    input(type='checkbox')#debug
-                                                    span(data-position='top' data-tooltip='Write debug information for this counter for "Variables" action').tooltipped Enable debug
-                                            p.col.s3
-                                                label
-                                                    input(type='checkbox')#taskCondition
-                                                    span(data-position='top' data-tooltip='The counter can be used as a condition for the task').tooltipped Condition for task
-                                            p.col.s3
-                                                label
-                                                    input(type='checkbox')#deleteCounter
-                                                    span(data-position='top' data-tooltip='Delete selected counter and unlink all linked objects from it').tooltipped Delete counter
+
+                                    div.col.s3
+                                        label
+                                            input(type='checkbox' value="1")#disabled
+                                            span(data-position='top' data-tooltip='Do not collect data for this counter').tooltipped Disable
+                                    div.col.s3
+                                        label
+                                            input(type='checkbox')#debug
+                                            span(data-position='top' data-tooltip='Log debug information for this counter for the "Variables" action.').tooltipped Enable debug
+                                    div.col.s3
+                                        label
+                                            input(type='checkbox')#taskCondition
+                                            span(data-position='top' data-tooltip='The counter can be used as a condition for the task').tooltipped Condition for task
+                                    div.col.s3
+                                        label
+                                            input(type='checkbox')#deleteCounter
+                                            span(data-position='top' data-tooltip='Delete selected counter and unlink all linked objects from it').tooltipped Delete counter
                             div.card-panel
                                 div.row
-                                    div.col.s11 If you change the name of the counter, please change links to this counter manually in all variables that used this counter.
-                                    div.col.s1
-                                        a(href="/help" data-position='top' data-tooltip='Help for selected collector parameters')#collectorHelpBtn.tooltipped
+                                    div.col.s1.offset-s11
+                                        a(href="/help" data-position='top' data-tooltip='Help for the selected collector')#collectorHelpBtn.tooltipped
                                             i.material-icons.right help_outline
                                     div.input-field.col.s12.m4.l4
                                         input(type='text')#name
@@ -136,13 +138,10 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                         textarea(data-length="65535").materialize-textarea#description
                                         label(for="description") Description
                 div#objectsLinksTab
-                    div.col.s12#updateEventsArea
+                    ul.col.s12#updateEventsArea
+                    input(type="hidden")#updateEventsOrder
                     div.col.s1
                         a.btn-floating#addUpdateEvent: i.material-icons add
-                    div.input-field.col.s11.
-                        Add an object and select counter, linked to the object for generating update event. You can use all variables from parent counter.
-                        Variables with same names with parent counter will be overwrite by variables values from this counter.
-                        Update event will be generated when counter will update his value and logical expression is empty or returned true.
                     div.col.s12
                         input(type="hidden" title="Objects linked to a counter"
                             description="This objects will be linked to a edited counter and collecting data according counter settings with implementation to those objects. You can add objects from LINKS menu"
@@ -151,18 +150,26 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                 div#variablesDefinitionsTab
                     div.row
                         div.col.s12
-                            div.card-panel
-                                span Predefined variables, which you can use without definition here can be a:
-                                ul
-                                    li OBJECT_NAME - name of the current object;
-                                    li COUNTER_NAME - name of the current counter;
-                                    li PARENT_OBJECT_NAME - if counter has dependence from other object, then this variable will be set to a parent object name;
-                                    li PARENT_COUNTER_NAME - if counter has dependence from other object, then this variable will be set to a parent counter name;
-                                    li PARENT_VALUE - if counter has dependence from other object, then this variable will be set to a value, returned by counter of a parent object;
-                                    li UPDATE_EVENT_STATE - if counter has dependence from other object, then this variable will be set to update event state. Event state is 'SUCCESS' if 0 and 'PROBLEM' if 1
-                                    li UPDATE_EVENT_TIMESTAMP - if counter has dependence from other object, then this variable will be set to timestamp (ms from 1.1.1970) when state of update event was changed
-                                span If action returned some value you can use this value in "task maker" by %:PREV_ACTION_RESULT:% variable. Also you can use all variables from parent counter.
-                    div.row#variables
+                            ul.collapsible
+                                li
+                                    div.collapsible-header
+                                        i.material-icons build
+                                        span Predefined and inherited variables
+                                    div.collapsible-body
+                                        span
+                                            h4 Predefined variables
+                                            ul
+                                                li OBJECT_NAME - name of the current object;
+                                                li COUNTER_NAME - name of the current counter;
+                                                li PARENT_OBJECT_NAME - if the counter has a dependency on another object, then this variable will be assigned the name of the parent object;
+                                                li PARENT_COUNTER_NAME - if the counter has a dependency on another object, then this variable will be assigned the name of the parent counter;
+                                                li PARENT_VALUE - if the counter has a dependency on another object, then this variable will be assigned the value returned by the counter of the parent object;
+                                                li UPDATE_EVENT_STATE - if the counter has a dependency on another counter, then this variable will take the value of the expression for the update event for the counter.
+                                                li UPDATE_EVENT_TIMESTAMP - if the counter has a dependency on another counter, then this variable will be set to the timestamp (ms since 1.1.1970) when the update event state was changed
+                                            span If the action returned some value, you can use this value in the "task maker" using the %:PREV_ACTION_RESULT:% variable. Also you can use all variables from the parent counter.
+                                            span#inheritedVariables
+                    ul#variables
+                    input(type="hidden")#variablesOrder
                     div.input-field.col.s1.m1.l1
                         a#addVariable.btn-floating: i.material-icons add_box
                         span &nbsp;
@@ -175,19 +182,19 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                     div
                         label
                             input(type='radio' name='groupsAction')#groupsActionNewGroup.with-gap
-                            span Add new group (and enter name of the new group bellow)
+                            span Add a new group (and enter the name of the new group below)
                     div
                         label
                             input(type='radio' name='groupsAction')#groupsActionEditGroup.with-gap
-                            span Edit selected group name (and enter new name of the group bellow)
+                            span Edit the name of the selected group (and enter the new group name below)
                     div
                         label
                             input(type='radio' name='groupsAction')#groupsActionSetDefault.with-gap
-                            span Set selected group as initial in the group selector
+                            span Set selected group as start in group selector
                     div
                         label
                             input(type='radio' name='groupsAction')#groupsRemoveGroup.with-gap
-                            span Remove selected group with all counters, included in this group
+                            span Delete selected group with all counters included in this group
                 div.col.s12.input-field &nbsp;
                 div.col.s12.input-field
                     input(type='text')#newGroupName
@@ -204,15 +211,15 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                     div
                         label
                             input(type='radio' name='unitsAction')#unitsActionNewUnit.with-gap
-                            span Add new unit (and enter parameters of the new unit bellow)
+                            span Add a new unit (and enter the parameters of the new unit below)
                     div
                         label
                             input(type='radio' name='unitsAction')#unitsActionEditUnit.with-gap
-                            span Edit selected unit name (and enter parameters of the unit bellow)
+                            span Edit the name of the selected unit (and enter the unit parameters below)
                     div
                         label
                             input(type='radio' name='unitsAction')#unitsRemoveUnit.with-gap
-                            span Remove selected unit with all counters, has this unit
+                            span Delete selected unit with all counters in this unit
                 div.col.s12 &nbsp;
                 div.col.s12.m8.l3.input-field
                     input(type='text')#newUnitName
@@ -229,7 +236,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                 div.col.s12
                     label
                         input(type='checkbox')#newUnitOnlyPrefixes
-                        span Use prefix without abbreviation in name when multiply (f.e. for time)
+                        span Use a prefix without an abbreviation where no abbreviation is used (for example, for time)
             div.modal-footer
                 a(href='#!')#applyUnitsChanges.modal-action.modal-close.btn-flat Apply
                 a(href='#!').modal-action.modal-close.btn-flat Cancel
@@ -237,15 +244,15 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         div#modalDeleteConfirm.modal
             div.modal-content
                 h4 Delete confirmation
-                p Do you really delete selected counter from database?
+                p Are you sure you want to delete the selected counter??
             div.modal-footer
                 a(href='#!')#modalDeleteConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
                 a(href='#!')#modalDeleteConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
 
         div#modalAddUpdateEventConfirm.modal
             div.modal-content
-                h4 Add update event to active collector confirmation
-                p Selected collector is active. It's usually mean, that this collector will be get data by himself using internal mechanism. Do you really want to add update event for this collector?
+                h4 Confirmation of adding update event to active collector
+                p You have selected an active collector. This usually means that this collector itself will receive data using an internal mechanism. Are you sure you want to add an additional external update event for this collector?
             div.modal-footer
                 a(href='#!')#modalAddUpdateEventConfirmYes.modal-close.waves-effect.waves-green.btn-flat Yes
                 a(href='#!')#modalAddUpdateEventConfirmNo.modal-close.waves-effect.waves-green.btn-flat No
@@ -253,15 +260,15 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         div#modalCounterNameChangedConfirm.modal
             div.modal-content
                 input(type="hidden")#updateVariablesRef
-                h4 Confirmation of changing the name of the counter
-                p Counter name has been changed. Do you want to change the variables that refer to the name of this counter?
+                h4 Confirmation of a change the name of the counter
+                p Counter name changed. Do you want to change the variables associated with the name of this counter?
                 ul
-                    li Press "Yes" for replace counter name for all variables automatically and save changes for counter
-                    li Press "No" for skip automatically counter name replacement for variables and save changes for counter
-                    li Press "Cancel" for do not save changes for counter
-                p List of variables that refer to the old name of this counter:
+                    li Click "Yes" to automatically replace the counter name for all variables and save the changes for the counter.
+                    li Click "No" to not change the name of the counter for the variables but keep all changes for the counter.
+                    li Click "Cancel" to not save any changes to the counter
+                p List of variables referring to the old name of this counter:
                 ul#modalCounterNameChangedConfirmOldVariablesList
-                p List of variables, that will refer to the new name of this counter:
+                p List of variables that will refer to the new name of this counter:
                 ul#modalCounterNameChangedConfirmNewVariablesList
             div.modal-footer
                 a(href='#!')#modalCounterNameChangedConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes

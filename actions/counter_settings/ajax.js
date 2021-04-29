@@ -31,8 +31,6 @@ module.exports = function(args, callback) {
 
     if(func === 'getCountersUnits') return unitsDB.getUnits(callback);
 
-    if(func === 'getCounterGroupID') return rightsWrappersCountersDB.getCounterGroup(args.username, args.id, callback);
-
     // [{counterID:.., expression:.., mode: <0|1|2|3|4>, objectID: parentObjectID, name: <parentObjectName|''>}, ...]
     // mode: 0 - update every time when parent counter received a new value and expression is true,
     // 1 - update once when parent counter received a new value and expression change state to true,
@@ -73,6 +71,8 @@ module.exports = function(args, callback) {
     if(func === 'removeCounterUnit') return unitsDB.remove(args.unit, callback);
 
     if(func === 'getFunctionsDescription') return callback(null, getFunctionsDescription());
+
+    if(func === 'getParentCountersVariables') return rightsWrappersCountersDB.getParentCountersVariables(args.username, [args.id], [], callback);
 
     callback(new Error('Unknown function ' + func));
 };

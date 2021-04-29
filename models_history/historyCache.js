@@ -21,10 +21,11 @@ var storage = require('../models_history/historyStorage');
 var historyCache = {};
 module.exports = historyCache;
 
-var cache = {};
-var dumpPath = path.join(__dirname, '..', parameters.dbPath, parameters.dumpFileName);
+var cache = new Map(), functions = new Map();
+var dumpPath = path.join(__dirname, '..', parameters.tempDir, parameters.dumpFileName);
 var cacheServiceIsRunning = 0;
 var terminateCacheService = 0;
+var cacheServiceCallback = null;
 var recordsFromCacheCnt = 0;
 var recordsFromStorageCnt = 0;
 var storageRetrievingDataComplete = 0;
@@ -43,19 +44,16 @@ historyCache.init = function (initParameters, callback){
     terminateCacheService = 0;
     cacheServiceIsRunning = 0;
 
-    loadDataFromDumpToCache(dumpPath, function(err, _cache) {
+    loadDataFromDumpToCache(dumpPath, function(err) {
         if(err) return callback(err); // only if can\'t close dump file
 
-        if(typeof _cache !== 'object') _cache = {};
-        storage.initStorage(_cache,function(err, _cache) {
+        storage.initStorage(function(err) {
             if(err) return callback(err);
-
-            cache = _cache;
 
             setInterval(cacheService, parameters.cacheServiceInterval * 1000); // sec
             setInterval(function() {
                 log.info('Records returned from cache\\storage: ', recordsFromCacheCnt, '\\', recordsFromStorageCnt,
-                    '; Retrieving data for processing using history functions complete\\failure: ', storageRetrievingDataComplete,
+                    '; required data found\\not found: ', storageRetrievingDataComplete,
                     '\\', storageRetrievingDataIncomplete);
                 recordsFromCacheCnt = recordsFromStorageCnt = 0;
                 storageRetrievingDataComplete = storageRetrievingDataIncomplete = 0;
@@ -66,7 +64,13 @@ historyCache.init = function (initParameters, callback){
     });
 };
 
+historyCache.getDBPath = storage.getDbPaths;
+
 historyCache.startCacheService = cacheService;
+
+historyCache.addCallbackToCacheService = function (callback) {
+    cacheServiceCallback = callback;
+}
 
 historyCache.cacheServiceIsRunning = function(val) {
     if(val !== undefined) cacheServiceIsRunning = val;
@@ -97,18 +101,21 @@ function loadDataFromDumpToCache(dumpPath, callback) {
                 if (err) return callback(new Error('Can\'t close dump file ' + dumpPath + ': ' + err.message));
 
                 try {
-                    var cache = JSON.parse(String(data));
+                    var cacheObj = JSON.parse(String(data));
                 } catch (err) {
                     log.error('Can\'t parse dump data from ' + dumpPath + ' as JSON object: ' + err.message);
                     return callback();
                 }
 
-                if (!cache) return callback();
+                if (!cacheObj) return callback();
 
-                var loadedRecords = 0;
-                for (var id in cache) {
-                    if(!cache[id] || !Array.isArray(cache[id].records)) delete cache[id];
-                    else loadedRecords += cache[id].records.length - cache[id].savedCnt;
+                var loadedRecords = 0, unsavedRecords = 0;
+                for (var id in cacheObj) {
+                    if(cacheObj[id] && Array.isArray(cacheObj[id].records)) {
+                        cache.set(id, cacheObj[id]);
+                        loadedRecords += cacheObj[id].records.length;
+                        unsavedRecords += cacheObj[id].records.length - cacheObj[id].savedCnt;
+                    }
                 }
 
                 if (!loadedRecords) {
@@ -116,10 +123,18 @@ function loadDataFromDumpToCache(dumpPath, callback) {
                     return callback();
                 }
 
-                log.info('Loaded ', loadedRecords, ' unsaved records for ', Object.keys(cache).length,' objects.');
-                callback(null, cache);
+                log.info('Loaded ', loadedRecords, ' records including ', unsavedRecords,' unsaved records for ', cache.size,' objects.');
+                callback();
             })
         });
+    });
+}
+
+function createNewCacheObject(id) {
+    cache.set(Number(id), {
+        cachedRecords: parameters.initCachedRecords,
+        savedCnt: 0, // Count of saved records, 'records' is an array of the last data returned from counters
+        records: [],
     });
 }
 
@@ -133,44 +148,47 @@ historyCache.add = function (id, newRecord){
     // the record was checked on the client side using the history.add () function
 
     //log.debug('Adding data to history: id ', id, ' newRecord: ', newRecord);
-    if(!cache[id]) {
-        cache[id] = {
-            cachedRecords: parameters.initCachedRecords,
-            savedCnt: 0, // Count of saved records, 'records' is an array of the last data returned from counters
-            records: [newRecord],
-        };
+    id = Number(id);
+    if(!cache.has(id)) {
+        createNewCacheObject(id);
+        cache.get(id).records = [newRecord];
         //log.debug('Inserting newRecord for new object to history. id: ', id, ' newRecord: ', newRecord);
     } else {
-        var recordsInCacheCnt = cache[id].records.length;
+        var cacheObj = cache.get(id), recordsInCacheCnt = cacheObj.records.length;
 
         // TODO: add throttling support in counter settings
         // if throttling is enabled for this objectID
         // Don't create new record for a new data which equal to  data from last record in a cache.
         // Only change last record timestamp
-        if(cache[id].throttling &&
+        if(cacheObj.throttling &&
             recordsInCacheCnt > 2 &&
-            cache[id].records[recordsInCacheCnt-1].data === newRecord.data &&
-            cache[id].records[recordsInCacheCnt-2].data === newRecord.data
+            cacheObj.records[recordsInCacheCnt-1].data === newRecord.data &&
+            cacheObj.records[recordsInCacheCnt-2].data === newRecord.data
         ) {
-            cache[id].records[recordsInCacheCnt-1].timestamp = newRecord.timestamp;
-            //log.debug('Inserting new timestamp for newRecord, equal to previous to history. id: ', id, ' newRecord: ', newRecord, ' records in cache: ', cache[id].records);
+            cacheObj.records[recordsInCacheCnt-1].timestamp = newRecord.timestamp;
+            //log.debug('Inserting new timestamp for newRecord, equal to previous to history. id: ', id, ' newRecord: ', newRecord, ' records in cache: ', cacheObj.records);
         } else { // add a new record to the cache otherwise
           //log.debug('Inserting new newRecord to history. id: ', id, ' newRecord: ', newRecord);
 
-            if(!recordsInCacheCnt || cache[id].records[recordsInCacheCnt-1].timestamp < newRecord.timestamp) cache[id].records.push(newRecord);
-            else {
-                if(recordsInCacheCnt === 1) cache[id].records.unshift(newRecord);
-                else if(cache[id].records[0].timestamp > newRecord.timestamp) {
+            if(!recordsInCacheCnt || cacheObj.records[recordsInCacheCnt-1].timestamp < newRecord.timestamp) {
+                if(checkDuplicateRecords(recordsInCacheCnt, id, recordsInCacheCnt-1, newRecord)) return;
+                cacheObj.records.push(newRecord);
+            } else {
+                if(recordsInCacheCnt === 1) { // one record in cache with timestamp > newRecord.timestamp
+                    if(checkDuplicateRecords(recordsInCacheCnt, id, 0, newRecord)) return;
+                    cacheObj.records.unshift(newRecord);
+                } else if(cacheObj.records[0].timestamp > newRecord.timestamp) {
                     log.warn('Don\'t add a record for the object ', id, ' with a timestamp (',
                         new Date(newRecord.timestamp).toLocaleString() + '.' + newRecord.timestamp % 1000,
                         ') less then latest record (',
-                        new Date(cache[id].records[0].timestamp).toLocaleString() + '.' + cache[id].records[0].timestamp % 1000,
-                        ') in the cache. New record: ', newRecord, ', latest in cache: ', cache[id].records[0]);
+                        new Date(cacheObj.records[0].timestamp).toLocaleString() + '.' + cacheObj.records[0].timestamp % 1000,
+                        ') in the cache. New record: ', newRecord, ', latest in cache: ', cacheObj.records[0]);
                 } else {
                     // inserting new record into the cache in position according to new record timestamp for save correct records order
                     for (var i = recordsInCacheCnt - 2; i >= 0; i--) {
-                        if (cache[id].records[i].timestamp < newRecord.timestamp) {
-                            cache[id].records.splice(i, 0, newRecord);
+                        if (cacheObj.records[i].timestamp < newRecord.timestamp) {
+                            if(checkDuplicateRecords(recordsInCacheCnt, id, i+1, newRecord)) return;
+                            cacheObj.records.splice(i, 0, newRecord);
                             break;
                         }
                     }
@@ -179,6 +197,54 @@ historyCache.add = function (id, newRecord){
         }
     }
 };
+
+historyCache.addFunctionResultToCache = function (id, functionName, parameters, result) {
+    id = Number(id);
+    if(!cache.has(id)) createNewCacheObject(id);
+
+    var cacheObj = cache.get(id),
+        key = functionName + '_' + Array.isArray(parameters) ? parameters.map(p => p.toLowerCase()).join(',') : '';
+    // functions[id][<funcName>_<parameters>] = {timestamp:.., result:..}
+    functions.set(id, new Map().set(key, new Map()
+        .set('result', result)
+        .set('timestamp', cacheObj.records && cacheObj.records.length ? cacheObj.records[cacheObj.records.length - 1].timestamp : null)));
+}
+
+historyCache.getFunctionResultFromCache = function (id, functionName, parameters) {
+    id = Number(id);
+    if(!cache.has(id) || !functions.has(id)) return;
+
+    // functions[id][<funcName>_<parameters>] = {timestamp:.., result:..}
+    var func = functions.get(id), records = cache.get(id).records;
+
+    var key = functionName + '_' + Array.isArray(parameters) ? parameters.map(p => p.toLowerCase()).sort().join(',') : '';
+    if(!func.has(key)) return;
+
+    var funcResult = func.get(key);
+    var timestamp = records && records.length ? records[records.length - 1].timestamp : null;
+    if(funcResult.get('timestamp') === timestamp) {
+        // return objects for make possible return undefined function result and make possible for difference between
+        // undefined result and not present result in the cache
+        return {
+            result: funcResult.get('result'),
+        };
+    }
+
+    func.delete(key);
+}
+
+function checkDuplicateRecords(recordsInCacheCnt, id, idx, newRecord) {
+    var cacheObj  = cache.get(id);
+    if(recordsInCacheCnt && cacheObj.records[idx].timestamp === newRecord.timestamp &&
+        cacheObj.records[idx].data === newRecord.data) {
+        log.debug('Received duplicate record ', id, ' with a timestamp ',
+            new Date(newRecord.timestamp).toLocaleString() + '.' + newRecord.timestamp % 1000,
+            ': ', newRecord.data);
+
+        return true;
+    }
+    return false
+}
 
 /*
     removing all history for specific object
@@ -209,38 +275,49 @@ historyCache.del = function (IDs, daysToKeepHistory, daysToKeepTrends, callback)
     savedCnt = 3 - 2 = 1
  */
 
-    IDs.forEach(function (id) {
-        if(cache[id]) {
-            if (!daysToKeepHistory) delete cache[id];
-            else {
-                if (cache[id].records[0] && cache[id].records[0].timestamp <= lastTimeToKeepHistory) {
-                    for (var recordsToDelete = 1; recordsToDelete < cache[id].records.length; recordsToDelete++) {
-                        if (cache[id].records[recordsToDelete].timestamp >= lastTimeToKeepHistory) break;
-                    }
+    storage.delRecords(IDs, daysToKeepHistory, daysToKeepTrends, function (err) {
+        if(err) return callback(err);
 
-                    log.debug('Removing ', recordsToDelete, ' records from the end of the cache ', id, ', records was: ', cache[id].records);
-                    cache[id].records.splice(0, recordsToDelete);
-                    cache[id].savedCnt -= recordsToDelete;
-                    if(cache[id].savedCnt < 0) cache[id].savedCnt = 0;
-                } else {
-                    cache[id].records = [];
-                    cache[id].savedCnt = 0;
+        // remove records from cache after commit transaction
+        IDs.forEach(function (id) {
+            id = Number(id);
+            var cacheObj = cache.get(id);
+            if(cacheObj !== undefined) {
+                if (!daysToKeepHistory) {
+                    cache.delete(id)
+                    functions.delete(id)
+                }
+                else {
+                    if (cacheObj.records[0] && cacheObj.records[0].timestamp <= lastTimeToKeepHistory) {
+                        for (var recordsToDelete = 1; recordsToDelete < cacheObj.records.length; recordsToDelete++) {
+                            if (cacheObj.records[recordsToDelete].timestamp >= lastTimeToKeepHistory) break;
+                        }
+
+                        log.debug('Removing ', recordsToDelete, ' records from the end of the cache ', id, ', records was: ', cacheObj.records);
+                        cacheObj.records.splice(0, recordsToDelete);
+                        cacheObj.savedCnt -= recordsToDelete;
+                        if(cacheObj.savedCnt < 0) cacheObj.savedCnt = 0;
+                    } else {
+                        cacheObj.records = [];
+                        cacheObj.savedCnt = 0;
+                    }
                 }
             }
-        }
+        });
+
+        callback();
     });
-    storage.delRecords(IDs, daysToKeepHistory, daysToKeepTrends, callback);
 };
 
 historyCache.getByValue = function(id, value, callback) {
-    if(typeof callback !== 'function') return log.error('[getByValue]: callback is not a function');
+    if(typeof callback !== 'function') return log.error('[getByValue]: callback is not a function', (new Error()).stack);
 
     id = Number(id);
     if(id !== parseInt(String(id), 10) || !id) return callback(new Error('[getByValue] incorrect object ID '+id));
 
     if(!isNaN(parseFloat(value)) && isFinite(value)) value = Number(value);
 
-    var cacheObj = cache[id];
+    var cacheObj = cache.get(id);
     if(cacheObj && cacheObj.records && cacheObj.records.length) {
         for(var i = 0; i < cacheObj.records.length; i++) {
             if(cacheObj.records[i].data === value) return callback(null, cacheObj.records[i].timestamp);
@@ -273,6 +350,12 @@ historyCache.getByValue = function(id, value, callback) {
  */
 historyCache.get = function (id, shift, num, recordsType, callback) {
 
+    var isRequiredAllRecords = false;
+    if(String(num).charAt(0) === '!') {
+        num = num.slice(1);
+        isRequiredAllRecords = true;
+    }
+
     if(String(num).charAt(0) === '#') {
         var getFromHistory = historyCache.getByIdx;
         num = num.slice(1);
@@ -288,6 +371,11 @@ historyCache.get = function (id, shift, num, recordsType, callback) {
     if(getFromHistory === undefined) {
         getFromHistory = historyCache.getByTime;
         isTime = true;
+    }
+
+    if(String(num).charAt(0) === '!') {
+        num = num.slice(1);
+        isRequiredAllRecords = true;
     }
 
     getFromHistory(id, shift, num, 0, recordsType, function (err, rawRecords, isGotAllRecords) {
@@ -310,9 +398,9 @@ historyCache.get = function (id, shift, num, recordsType, callback) {
         } else records = rawRecords;
 
         // when recordsType is null, return received records in any cases
-        if(recordsType === null ) {
+        if(recordsType === null || !isRequiredAllRecords) {
             ++storageRetrievingDataComplete;
-            return callback(null, records);
+            return callback(null, records, records);
         }
 
         // used in a history functions, if not got all required records, return nothing
@@ -330,7 +418,7 @@ historyCache.get = function (id, shift, num, recordsType, callback) {
                 return callback(null, null, rawRecords);
             }
             ++storageRetrievingDataComplete;
-            return callback(null, records);
+            return callback(null, records, records);
         } else {
             if(records.length === 0) {
                 ++storageRetrievingDataIncomplete;
@@ -340,7 +428,7 @@ historyCache.get = function (id, shift, num, recordsType, callback) {
 
             if(records.length === 1) {
                 ++storageRetrievingDataComplete;
-                return callback(null, records);
+                return callback(null, records, records);
             }
 
             // calculating an avg time interval between the record timestamps
@@ -359,7 +447,7 @@ historyCache.get = function (id, shift, num, recordsType, callback) {
                 return callback(null, null, rawRecords);
             }
             ++storageRetrievingDataComplete;
-            return callback(null, records);
+            return callback(null, records, records);
         }
     });
 };
@@ -374,7 +462,7 @@ historyCache.get = function (id, shift, num, recordsType, callback) {
  */
 
 historyCache.getLastValues = function(IDs, callback) {
-    if(typeof callback !== 'function') return log.error('[getLastValues]: callback is not a function');
+    if(typeof callback !== 'function') return log.error('[getLastValues]: callback is not a function', (new Error()).stack);
 
     var records = {}, errors = [];
     //log.debug('Getting last values for ', IDs);
@@ -382,7 +470,7 @@ historyCache.getLastValues = function(IDs, callback) {
         if(records[id]) return callback();
 
         records[id] = {};
-        historyCache.getByIdx(id, 0, 1, 0, 0,function (err, record) {
+        historyCache.getLastValue(id,function (err, record) {
             if(err) {
                 if(!historyCache.terminateHousekeeper) {
                     log.warn('Can\'t get last value for ', id, ': ', err.message);
@@ -403,17 +491,31 @@ historyCache.getLastValues = function(IDs, callback) {
         callback(errors.length ?  new Error(errors.join('; ')) : null, records);
     });
 }
+
+historyCache.getLastValue = function (id, callback) {
+    if(typeof callback !== 'function') return log.error('[getLastValue]: callback is not a function: ', (new Error()).stack);
+
+    id = Number(id);
+    var cacheObj = cache.get(id);
+
+    if(cacheObj && cacheObj.records && cacheObj.records.length) {
+        return callback(null, [cacheObj.records[cacheObj.records.length - 1]], true);
+    }
+
+    //log.warn('Can\'t get last value for ', id,' from history cache: ', cache.get(id));
+    historyCache.getByIdx(id, 0, 1, 0, 0, callback);
+}
 /*
     get requested records by position
 
     id: object ID
     offset: record position from the end of the storage. 0 - last element
     cnt: count of the requirement records from the last position. 0 - only one element with a 'last' position
-    callback(err, records), where records: [{data:.., timestamp:..}, ....]
+    callback(err, records, isGotAllRequiredRecords(true|false)), where records: [{data:.., timestamp:..}, ....]
 
  */
 historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, callback) {
-    if(typeof callback !== 'function') return log.error('[getByIdx]: callback is not a function');
+    if(typeof callback !== 'function') return log.error('[getByIdx]: callback is not a function: ', (new Error()).stack);
 
     if(recordsType === undefined) recordsType = 0;
     offset = Number(offset); cnt = Number(cnt); id = Number(id);
@@ -422,9 +524,9 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
     if(Number(offset) !== parseInt(String(offset), 10) || offset < 0) return callback(new Error('[getByIdx] incorrect "offset" parameter ('+offset+') for objectID '+id));
     if(Number(cnt) !== parseInt(String(cnt), 10) || cnt < 1) return callback(new Error('[getByIdx] incorrect "cnt" parameter ('+cnt+') for objectID '+id));
 
-    var cacheObj = cache[id];
+    var cacheObj = cache.get(id);
 
-    if(cacheObj) {
+    if(cacheObj && cacheObj.records && cacheObj.records.length) {
         var recordsFromCache = cacheObj.records.slice(-(offset+cnt), offset ? -offset : cacheObj.records.length);
         recordsFromCacheCnt += recordsFromCache.length;
 
@@ -435,12 +537,9 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
     } else {
         recordsFromCache = [];
         // create new cache object cache[id] and make reference cacheObj = cache[id]
-        cache[id] = {
-            cachedRecords: cnt,
-            savedCnt: 0,
-            records: []
-        };
-        cacheObj = cache[id];
+        createNewCacheObject(id);
+        cache.get(id).cachedRecords = cnt; // not parameters.initCachedRecords because you will read only cnt records to the cache
+        cacheObj = cache.get(id);
     }
 
     // set the cnt equal to the initial cnt minus the number of already found records in the cache
@@ -485,7 +584,9 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
         addDataToCache(cacheObj, recordsFromStorage); // add records loaded from storage to cache
 
         Array.prototype.push.apply(recordsFromStorage, recordsFromCache);
-
+        if(recordsFromStorage.length) {
+            recordsFromStorage[0].recordsFromCache = recordsFromCache.length;
+        }
         callback(null, recordsFromStorage, true);
     });
 };
@@ -497,12 +598,12 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
     timeShift and timeInterval:
         1. timeShift - timestamp (from 1970 in ms) - "time from". timeInterval can be a timestamp too and it interpretable as "time to" or time interval from "time from"
         2. timeShift - time in ms from last record. timeInterval - time interval in ms from timeShift
-    callback(err, records), where records: [{data:.., timestamp:..}, ....]
+    callback(err, records, isGotAllRequiredRecords(true|false)), where records: [{data:.., timestamp:..}, ....]
  */
 historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, recordsType, callback) {
 
     //log.debug('[getByTime]: ',id, ', ', timeShift, ', ', timeInterval, ', ', maxRecordsCnt);
-    if (typeof callback !== 'function') return log.error('[getByTime]: callback is not a function');
+    if (typeof callback !== 'function') return log.error('[getByTime]: callback is not a function', (new Error()).stack);
 
     if(recordsType === undefined) recordsType = 0;
     id = Number(id); timeShift = Number(timeShift); timeInterval = Number(timeInterval);
@@ -529,7 +630,7 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
         timeFrom = timeTo - timeInterval;
     }
 
-    var cacheObj = cache[id];
+    var cacheObj = cache.get(id);
 
     //log.debug('[getByTime]: ',id, ', ', timeFrom, ' - ', timeTo, ': ', cacheObj);
     /*
@@ -539,7 +640,9 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
      */
     if(cacheObj && cacheObj.records) {
         // last record timestamp in cache less then required timestamp in timeFrom. History have not data for required time interval
-        if(cacheObj.records.length && timeFrom > cacheObj.records[cacheObj.records.length - 1].timestamp) return callback(null, [], false);
+        if(cacheObj.records.length && timeFrom > cacheObj.records[cacheObj.records.length - 1].timestamp) {
+            return callback(null, [], false);
+        }
         // checking for present required records in cache.
         // timestamps: [10:00, 10:05, 10:10, 10:15, 10:20]. timeTo 10:05 - present; timeTo 09:50 - not present in cache
         if(cacheObj.records.length && timeTo > cacheObj.records[0].timestamp) {
@@ -553,13 +656,17 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
             // lastRecordIdxInCache + 1 because slice is not include last element to result
             // var recordsFromCache = cacheObj.records.slice(firstRecordIdxInCache, lastRecordIdxInCache + 1);
             // Don\'t use slice, copy every records from cache to a new array
-            for(var recordsFromCache = [], i = firstRecordIdxInCache, j = 0; i <= lastRecordIdxInCache; i++, j++) {
-                recordsFromCache[j] = {
+            for(var recordsFromCache = [], i = firstRecordIdxInCache; i <= lastRecordIdxInCache; i++) {
+                recordsFromCache.push({
                     timestamp: cacheObj.records[i].timestamp,
                     data: cacheObj.records[i].data
-                }
+                });
             }
             recordsFromCacheCnt += recordsFromCache.length;
+            if(recordsFromCache.length) {
+                recordsFromCache[0].isDataFromTrends = false;
+                recordsFromCache[0].recordsFromCache = recordsFromCache.length;
+            }
 
             //log.debug(id, ': !!! records form cache: ', recordsFromCache, '; firstRecordIdxInCache: ', firstRecordIdxInCache, '; lastRecordIdxInCache: ', lastRecordIdxInCache, '; ', cacheObj);
             if (firstRecordIdxInCache) { // firstRecordIdxInCache !== 0
@@ -569,13 +676,9 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
         } else recordsFromCache = [];
     } else {
         recordsFromCache = [];
-        // create new cache object cache[id] and make reference cacheObj = cache[id]
-        cache[id] = {
-            cachedRecords: parameters.initCachedRecords,
-            savedCnt: 0,
-            records: []
-        };
-        cacheObj = cache[id];
+        // create new cache object cache[id] and make reference cacheObj = cache.get(id)
+        createNewCacheObject(id);
+        cacheObj = cache.get(id);
     }
 
     /*
@@ -583,15 +686,17 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
     */
     var storageTimeTo = recordsFromCache.length ? recordsFromCache[0].timestamp - 1 : timeTo;
     storage.getRecordsFromStorageByTime(id, timeFrom, storageTimeTo, maxRecordsCnt, recordsType,
-        function(err, recordsFromStorage, isThisDataFromTrends) {
+        function(err, recordsFromStorage) {
+//            log.debug(id, ': !!! records form storage err: ', err, '; time: ', (new Date(timeFrom)).toLocaleString(), '-', (new Date(storageTimeTo)).toLocaleString(), ';', timeFrom,'-', storageTimeTo, ': ', recordsFromStorage);
 
             if (err) return callback(err);
             if(!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) return callback(err, recordsFromCache, false);
 
             recordsFromStorageCnt += recordsFromStorage.length;
-            //log.debug(id, ': !!! records form storage: ', recordsFromStorage);
 
-            if(!isThisDataFromTrends) {
+            var isDataFromTrends = recordsFromStorage.length ? recordsFromStorage[0].isDataFromTrends : false;
+
+            if(!isDataFromTrends) {
                 calculateCacheSize(cacheObj, recordsFromStorage);
                 addDataToCache(cacheObj, recordsFromStorage);
             }
@@ -608,6 +713,10 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
                 }
             }
             Array.prototype.push.apply(recordsFromStorage, recordsFromCache);
+            if(recordsFromStorage.length) {
+                recordsFromStorage[0].isDataFromTrends = isDataFromTrends;
+                recordsFromStorage[0].recordsFromCache = recordsFromCache.length;
+            }
             callback(null, recordsFromStorage, true);
     });
 };
@@ -664,7 +773,7 @@ function findRecordIdx(records, timestamp, first, last) {
 /*
  fill cache to requested cache size
 
- cacheObj: cache[id]
+ cacheObj: cache.get(id)
  records: records, returned from storage [{data:.., timestamp:..}, ...]
  */
 function addDataToCache(cacheObj, recordsFromStorage) {
@@ -704,33 +813,6 @@ function calculateCacheSize(cacheObj, recordsFromStorage, recordsFromCache) {
     return cacheObj.cachedRecords;
 }
 
-/*
- save records from cache to storage
- remove unnecessary records from cache
-
- savedCnt = 2; cachedRecords = 4; recordsInCache = 7
- [1 2 3 4 5 6 7]
- recordsForSave = records.slice(savedCnt + 1) = [3 4 5 6 7]
- 1.  after save:
-     [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15]
-     recordsForSave.length = 5; recordsInCache = 15
-     unnecessaryCachedRecordsCnt = recordsInCache - cachedRecords = 15 - 5 = 10;
-     savedRecordsCnt = savedCnt + recordsForSave.length = 2 + 5 = 7
-     unnecessaryCachedRecordsCnt = savedRecordsCnt = 7
-     records.splice(0, unnecessaryCachedRecordsCnt);
-     [8 9 10 11 12 13 14 15]
-     savedCnt = savedRecordsCnt - unnecessaryCachedRecordsCnt - 1= 7 - 7 - 1 = -1
- 2.  after save:
-     [1 2 3 4 5 6 7 8 9 10]
-     recordsForSave.length = 5; recordsInCache = 10
-     unnecessaryCachedRecordsCnt = recordsInCache - cachedRecords = 10 - 5 = 5;
-     savedRecordsCnt = savedCnt + recordsForSave.length = 2 + 5 = 7
-     unnecessaryCachedRecordsCnt = 5
-     records.splice(0, unnecessaryCachedRecordsCnt);
-     [6 7 8 9 10]
-     savedCnt = savedRecordsCnt - unnecessaryCachedRecordsCnt - 1 = 7 - 5 - 1 = 1
-*/
-
 function cacheService(callback) {
     if(cacheServiceIsRunning > 0 && cacheServiceIsRunning < 100) return; // waiting for scheduled restart
     log.info('Saving cache data to database...');
@@ -746,27 +828,34 @@ function cacheService(callback) {
         if(Date.now() - cacheServiceIsRunning < parameters.cacheServiceExitTimeout) return callback(); // < 24 hours
 
         log.exit('Cache service was running at ' + (new Date(cacheServiceIsRunning)).toLocaleString() + '. It\'s too long. Something was wrong. Exiting...');
-        setTimeout(function() {
-            process.exit(2);
-        }, 2000);
+        log.disconnect(function () { process.exit(2) });
     }
 
     if(terminateCacheService) {
         log.warn('Received command for terminating cache service. Exiting');
+        if(typeof cacheServiceCallback === 'function') {
+            cacheServiceCallback(new Error('Cache service was terminated'));
+            cacheServiceCallback = null;
+        }
         return callback();
     }
 
     cacheServiceIsRunning = Date.now();
-    var allUnnecessaryRecordsCnt = 0;
     var allSavedRecords = 0;
-    var allRecordsInCacheWas = 0;
-    var allRecordsInCache = 0;
-    var savedObjects = 0, savedRecords = 0, savedTrends = 0, timeInterval = 60000, nextTimeToPrint = Date.now() + timeInterval;
+    var savedObjects = 0, savedRecords = 0, savedTrends = 0,
+        timeInterval = 60000, nextTimeToPrint = Date.now() + timeInterval;
+    storage.beginTransaction(function (err) {
+        if(err) {
+            if(typeof cacheServiceCallback === 'function') {
+                cacheServiceCallback(err);
+                cacheServiceCallback = null;
+            }
+            return callback(err);
+        }
 
-    storage.beginTransaction(function(err) {
-        if(err) return callback(err);
-
-        async.eachSeries(Object.keys(cache), function(id, callback) {
+        // cacheObj = {savedCnt:, cachedRecords:, records: [{data:, timestamp:},...]}
+        var recordsForRemoveFromCache = new Map();
+        async.eachLimit(Array.from(cache.keys()), 10,function (id, callback) {
             if(terminateCacheService) return callback();
 
             if(cacheServiceIsRunning > 100 && // it is not a scheduled restart
@@ -774,7 +863,7 @@ function cacheService(callback) {
                 log.warn('Cache service was running at ' + (new Date(cacheServiceIsRunning)).toLocaleString() +
                     '. It\'s too long. Something was wrong. Terminating...');
                 terminateCacheService = Date.now();
-                // cache service will terminated because now this condition will be always true
+                // cache service will terminated because now if(terminateCacheService) condition will be always true
                 return callback();
             }
 
@@ -782,70 +871,102 @@ function cacheService(callback) {
             ++savedObjects;
             if(nextTimeToPrint < Date.now()) {
                 nextTimeToPrint = Date.now() + timeInterval;
-                var objectsCnt = Object.keys(cache).length;
+                var objectsCnt = cache.size;
                 log.info('Saved cache to database ', Math.ceil(savedObjects * 100 / objectsCnt),
                     '% (', savedObjects, '/', objectsCnt, ' objects, ', savedRecords, ' records, ', savedTrends,' trends)');
             }
 
-            var cacheObj = cache[id];
             // object may be removed while processing cache saving operation or nothing to save
+            var cacheObj = cache.get(id);
+
+            // cacheObj.records.length <= cacheObj.savedCnt - are all records saved in the DB?
             if(!cacheObj || !cacheObj.records || cacheObj.records.length <= cacheObj.savedCnt) return callback();
-            if(!cacheObj.trends) cacheObj.trends = {};
 
             var callbackAlreadyCalled = false;
             var watchDogTimerID = setTimeout(function () {
                 callbackAlreadyCalled = true;
+                terminateCacheService = Date.now();
                 log.error('Time to saving records for object ' + id + ' form cache to database too long (',
-                    parameters.cacheServiceTimeoutForSaveObjectRecords / 1000, 'sec). Stop saving records for object.');
+                    (parameters.cacheServiceTimeoutForSaveObjectRecords / 60000),
+                    'min). Stop waiting to save records for an object and terminating cache service');
                 callback();
             }, parameters.cacheServiceTimeoutForSaveObjectRecords); // 10 min
 
-            // savedCnt and cachedRecords parameters will saving to database
-            storage.saveRecords(id, {
+            // savedCnt - Number of saved records (3)
+            // copy to recordsForSave 0 to end (9) - savedCnt (3)
+            var recordsForSave = cacheObj.records.slice(cacheObj.savedCnt);
+            storage.saveRecordsForObject(id, {
                 savedCnt: cacheObj.savedCnt,
                 cachedRecords: cacheObj.cachedRecords
-            }, cacheObj.records, cacheObj.trends, function(err, savedData) {
+            }, recordsForSave, function(err, savedData) {
+                /*
+                savedData for 2 running storage servers can be:
+                savedData: [
+                  {
+                    id: 1,
+                    timestamp: 1611082763939,
+                    result: { savedRecords: 3, savedTrends: 0 }
+                  },
+                  {
+                    id: 0,
+                    timestamp: 1611082763984,
+                    result: { savedRecords: 3, savedTrends: 0 }
+                  }
+                ]
 
+                 */
+                //console.log('savedData:', savedData);
                 clearTimeout(watchDogTimerID);
-
                 if(err) {
-                    log.error('Cache service error: ', err.message);
+                    log.error('Error while saving records for ', id, ': ', err.message);
                     return callbackAlreadyCalled ? null : callback();
                 }
-
-                // was nothing to save
-                if(!savedData) return callbackAlreadyCalled ? null : callback();
-
                 var recordsInCache = cacheObj.records.length;
 
-                // both counters used for information
-                allRecordsInCacheWas += recordsInCache;
+                // all counters used for information
                 allSavedRecords += recordsInCache - cacheObj.savedCnt;
+                savedRecords += recordsForSave.length;
 
-                var unnecessaryCachedRecordsCnt = recordsInCache - cacheObj.cachedRecords;
-                savedRecords += savedData.savedRecords;
-                // prevent to remove unsaved records from cache
-                var savedRecordsCnt = cacheObj.savedCnt + savedData.savedRecords;
-                if (savedRecordsCnt < unnecessaryCachedRecordsCnt) unnecessaryCachedRecordsCnt = savedRecordsCnt;
+                var unnecessaryCachedRecordsCnt =  recordsInCache - cacheObj.cachedRecords;
+                if(unnecessaryCachedRecordsCnt < 0) unnecessaryCachedRecordsCnt = 0;
+                cacheObj.savedCnt += recordsForSave.length;
 
-                if(savedData.trends) cacheObj.trends = savedData.trends;
-                if(savedData.savedTrends) savedTrends += savedData.savedTrends;
+                if(savedData && savedData[0] && savedData[0].result && savedData[0].result.savedTrends) {
+                    savedTrends += savedData[0].result.savedTrends;
+                }
 
-                if(unnecessaryCachedRecordsCnt > 0) {
-                    cacheObj.records.splice(0, unnecessaryCachedRecordsCnt);
-                    allUnnecessaryRecordsCnt += unnecessaryCachedRecordsCnt;
-                } else unnecessaryCachedRecordsCnt = 0;
-                cacheObj.savedCnt = savedRecordsCnt - unnecessaryCachedRecordsCnt;
+                recordsForRemoveFromCache.set(id, unnecessaryCachedRecordsCnt > cacheObj.savedCnt ?
+                    cacheObj.savedCnt : unnecessaryCachedRecordsCnt);
 
-                allRecordsInCache += cacheObj.records.length;
                 return callbackAlreadyCalled ? null : callback();
             });
         }, function(err) {
             storage.commitTransaction(err, function(err) {
+                // removing records from cache after commit transactions
+                // and calculate records number
+                if(!err) { // error will include async error
+                    var allRecordsInCache = 0, allRecordsInCacheWas = 0, allUnnecessaryRecordsCnt = 0;
+                    for (var id of cache.keys()) {
+                        var cacheObj = cache.get(id);
+                        if (!Array.isArray(cacheObj.records)) continue;
+                        allRecordsInCacheWas += cacheObj.records.length;
+
+                        var recordsForRemoveFromCacheObj = recordsForRemoveFromCache.get(id)
+                        if (recordsForRemoveFromCacheObj) {
+                            cacheObj.records.splice(0, recordsForRemoveFromCacheObj);
+                            cacheObj.savedCnt = cacheObj.savedCnt > recordsForRemoveFromCacheObj ?
+                                cacheObj.savedCnt - recordsForRemoveFromCacheObj : 0;
+                            allUnnecessaryRecordsCnt += recordsForRemoveFromCacheObj;
+                        }
+
+                        allRecordsInCache += cacheObj.records.length;
+                    }
+                }
+
                 log.info('Saving cache to database is ', ( terminateCacheService ? 'terminated' : 'finished' ),
                     (err ? ' with error: ' + err.message : ''),
                     '. Records removed from cache: ', allUnnecessaryRecordsCnt,
-                    '. Saving records from cache to storage: ', allSavedRecords,
+                    '. Saving from cache to storage: records: ', allSavedRecords, ', trends: ', savedTrends,
                     '. Records in a cache was: ', allRecordsInCacheWas, ', now: ', allRecordsInCache);
 
 
@@ -864,6 +985,10 @@ function cacheService(callback) {
                 else terminateCacheService = 0;
                 if(cacheServiceIsRunning > 100) cacheServiceIsRunning = 0; // it is not a scheduled restart
                 callback();
+                if(typeof cacheServiceCallback === 'function') {
+                    cacheServiceCallback();
+                    cacheServiceCallback = null;
+                }
             });
         });
     });
@@ -875,8 +1000,8 @@ Create cache dump (JSON) to file before exit.
 Data from dump file will be loaded to cache on next startup
 */
 historyCache.dumpData = function(callback, isScheduled) {
-    cache.cacheServiceIsRunning = cacheServiceIsRunning;
-    if(!callback || Object.keys(cache).length < 10) { // on fast destroy or small cache don\'t overwrite dump file
+
+    if(!callback || cache.size < 10) { // on fast destroy or small cache don\'t overwrite dump file
         try {
             var stat = fs.statSync(dumpPath);
         } catch (e) {}
@@ -885,13 +1010,15 @@ historyCache.dumpData = function(callback, isScheduled) {
             else return;
         }
     }
+
     try {
         // default flag: 'w' - file created or truncated if exist
-        //fs.writeFileSync(dumpPath, JSON.stringify(cache, null, 1));
-        //log.exit('Starting to save history cache data for ' + Object.keys(cache).length + ' objects to ' + dumpPath);
-        fs.writeFileSync(dumpPath, JSON.stringify(cache));
-        if(!isScheduled) log.exit('Finished saving history cache data for ' + Object.keys(cache).length + ' objects to ' + dumpPath);
-        else log.warn('Finished saving history cache data for ' + Object.keys(cache).length + ' objects to ' + dumpPath);
+        // convert from map to object: Object.fromEntries(cache.entries()))
+        //fs.writeFileSync(dumpPath, JSON.stringify(Object.fromEntries(cache.entries())), null, 1));
+        //log.exit('Starting to save history cache data for ' + cache.size + ' objects to ' + dumpPath);
+        fs.writeFileSync(dumpPath, JSON.stringify(Object.fromEntries(cache.entries())));
+        if(!isScheduled) log.exit('Finished dumping history cache data for ' + cache.size + ' objects to ' + dumpPath);
+        else log.warn('Finished dumping history cache data for ' + cache.size + ' objects to ' + dumpPath);
     } catch(e) {
         if(!isScheduled) log.exit('Can\'t dump history cache to file ' + dumpPath + ': ' + e.message);
         else log.warn('Can\'t dump history cache to file ' + dumpPath + ': ' + e.message);

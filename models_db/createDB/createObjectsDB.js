@@ -33,7 +33,8 @@ function createObjectsTable(callback){
         'description TEXT,' +
         'sortPosition INTEGER DEFAULT 80,' +
         'color TEXT,' +
-        'disabled BOOLEAN)',
+        'disabled BOOLEAN,' +
+        'created INTEGER)',
         function (err) {
             if (err) return callback(new Error('Can\'t create objects table in database: ' + err.message));
 

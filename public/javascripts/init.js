@@ -60,6 +60,36 @@ var initJQueryNamespace = (function($){
         // it's needed for prevent multiple start autocomplete function
         isAutoCompleteRunning,
 
+        // Maximum number of characters in URL
+        // http://www.example.com/?property=value&property2=value return "property=value&property2=value" without "?"
+        /*
+        Browser     Address bar   document.location
+                                  or anchor tag
+        ------------------------------------------
+        Chrome          32779           >64k
+        Android          8192           >64k
+        Firefox          >64k           >64k
+        Safari           >64k           >64k
+        IE11             2047           5120
+        Edge 16          2047          10240
+
+        URL Length (https://chromium.googlesource.com/chromium/src/+/master/docs/security/url_display_guidelines/url_display_guidelines.md)
+        In general, the web platform does not have limits on the length of URLs (although 2^31 is a common limit).
+        Chrome limits URLs to a maximum length of 2MB for practical reasons and to avoid causing denial-of-service problems in inter-process communication.
+        On most platforms, Chrome’s omnibox limits URL display to 32kB (kMaxURLDisplayChars) although a 1kB limit is used on VR platforms.
+        Ensure that the client behaves reasonably if the length of the URL exceeds any limits:
+        Origin information appears at the start of the URL, so truncating the end is typically harmless.
+        Rendering a URL as an empty string in edge cases is not ideal, but truncating poorly
+        (or crashing unexpectedly and insecurely) could be worse.
+        Attackers may use long URLs to abuse other parts of the system.
+        DNS syntax limits fully-qualified hostnames to 253 characters and each label in the hostname to 63 characters,
+        but Chromium's GURL class does not enforce this limit.
+         */
+
+        // is you want to change this parameter, change also lib/installService.js --max-http-header-size=32767 and your
+        // service parameter
+        maxUrlLength = 32767, // was 2083
+
         /*
          {
          checked: [objectName1, objectName2, ...],
@@ -73,6 +103,7 @@ var initJQueryNamespace = (function($){
         additionalObjectsTabName = 'OBJECTS',
 
         // JQuery HTML DOM elements will defined at initVariablesElm() function
+        bodyElm,
         logBodyElm,
         logLastUpdateElm,
         modalLogWindowsInstance,
@@ -87,6 +118,7 @@ var initJQueryNamespace = (function($){
         walletBtnElm,
         searchObjectsElm,
         searchActionsElm,
+        searchActionsAutocompleteInstance,
 
         runActionBtnElm,
         makeTaskBtnElm,
@@ -125,7 +157,8 @@ var initJQueryNamespace = (function($){
     }
 
     // set variables to JQuery HTML DOM elements
-    function initVariablesElm(){
+    function initVariablesElm() {
+        bodyElm = $("body");
         logBodyElm = $('#collapsible-log-body');
         logLastUpdateElm = $('#last-update');
         modalLogMessageElm = $('#modalLogMessage');
@@ -168,7 +201,13 @@ var initJQueryNamespace = (function($){
             draggable: true // Choose whether you can drag to open on touch screens
         });
 
-        modalLoginInstance = M.Modal.init(document.getElementById('modal-login'), {});
+        modalLoginInstance = M.Modal.init(document.getElementById('modal-login'), {
+            onOpenStart: function () {
+                $('#changePasswordForm').addClass('hide');
+                $('#newUserPass1').val('');
+                $('#newUserPass2').val('');
+            }
+        });
 
         modalLogInstance = M.Modal.init(document.getElementById('modal-log'), {});
 
@@ -199,6 +238,10 @@ var initJQueryNamespace = (function($){
             }
         });
 
+        searchActionsElm.keydown(function (e) {
+            if (e.keyCode === 13) return false;
+        });
+
         if(!isMobile) searchActionsElm.focus();
 
         $('#searchTip').click(function (e) {
@@ -227,6 +270,23 @@ var initJQueryNamespace = (function($){
         return 0;
     }
 
+    function initObjectsList() {
+        if(getActiveObjectsList() === 2) objectsInAdditionalObjectsTab = getObjectsFromObjectsList();
+
+        searchValForAdditionalObjectsTab = searchObjectsElm.val();
+        searchObjectsElm.val(searchValForObjectsTab);
+
+        createObjectsList(objectsInObjectsTab.unchecked, objectsInObjectsTab.checked);
+
+        objectsTabSwitchElm.text('').text('TO TOP');
+        additionalObjectsTabSwitchElm.text(additionalObjectsTabName);
+        searchActionsElm.addClass('hide');
+        searchObjectsElm.removeClass('hide');
+        if(!isMobile) searchObjectsElm.focus();
+        walletBtnElm.removeClass('hide');
+        selectAllObjBtnElm.removeClass('hide');
+    }
+
     // init events
     function initEvents() {
 
@@ -249,22 +309,7 @@ var initJQueryNamespace = (function($){
                     redrawIFrameDataOnChangeObjectsList();
                 });
                 searchObjectsElm.val('');
-            } else {
-                if(getActiveObjectsList() === 2) objectsInAdditionalObjectsTab = getObjectsFromObjectsList();
-
-                searchValForAdditionalObjectsTab = searchObjectsElm.val();
-                searchObjectsElm.val(searchValForObjectsTab);
-
-                createObjectsList(objectsInObjectsTab.unchecked, objectsInObjectsTab.checked);
-
-                $(this).text('').text('TO TOP');
-                additionalObjectsTabSwitchElm.text(additionalObjectsTabName);
-                searchActionsElm.addClass('hide');
-                searchObjectsElm.removeClass('hide');
-                if(!isMobile) searchObjectsElm.focus();
-                walletBtnElm.removeClass('hide');
-                selectAllObjBtnElm.removeClass('hide');
-            }
+            } else initObjectsList();
             //clearAdditionalObjectListInActionParameter();
         });
 
@@ -339,7 +384,7 @@ var initJQueryNamespace = (function($){
                 return;
             }
 
-            // do thi before starting local search
+            // do this before starting local search
             if(searchStr.length < minSearchStrLength) useGlobalSearch = false;
 
             if (searchStr.length && !useGlobalSearch) {
@@ -380,7 +425,7 @@ var initJQueryNamespace = (function($){
                 // objects: [{name: objectName1, description: objectDescription1, id: objectID1, color: <color>:<shade>, disabled: <1|0>},...]
                 prevCheckedObjectsNames = [];
 
-                if(!objects || !objects.length) M.toast({html: 'No objects found or too many objects found', displayLength: 2000});
+                if(!objects || !objects.length) M.toast({html: 'No objects found or too many objects found', displayLength: 3000});
                 drawObjectsList(objects, setBrowserHistory);
             });
         });
@@ -460,7 +505,26 @@ var initJQueryNamespace = (function($){
 
         // When pressing Esc, clear search actions field
         searchActionsElm.keyup(function(e){
-            if(e.which === 27) $(this).val('');
+            if(e.which === 27) {
+                $(this).val('');
+                return;
+            }
+
+            // when nothing found in actions switch to objects tab and try to search objects
+            var val = searchActionsElm.val();
+            if(searchActionsAutocompleteInstance && val.length > searchActionsAutocompleteInstance.options.minLength + 1 &&
+                !searchActionsAutocompleteInstance.count) {
+                $(this).val('');
+                var tabInstance = M.Tabs.getInstance(document.getElementById('tabs'));
+                tabInstance.select('objectsList');
+                initObjectsList();
+                searchObjectsElm.val(val);
+                prevSearchStrLength = val.length;
+                useGlobalSearch = true;
+                searchObjectsElm.trigger('keyup');
+                objectsTabSwitchElm.addClass('active');
+                redrawTabsIndicatorElm();
+            }
         });
     }
 
@@ -516,8 +580,10 @@ var initJQueryNamespace = (function($){
 
     }
 
+    // setParametersToUrl - for simple search this function
     function setBrowserHistory() {
 
+        setDocumentTitle();
         //if(getActiveObjectsList() === 2) return;
 
         var activeActionLink = $('li[action_link].active').attr('action_link');
@@ -573,19 +639,33 @@ var initJQueryNamespace = (function($){
             URL = (URLArray.length ? URLArray.join('&') : '');
 
             // if length of URL more then some browsers are support, make URL from prev checked objects
-            if(document.title.length + URL.length > 2083) {
+            if(prevCheckedObjectsNames.length && document.title.length + URL.length > maxUrlLength) {
                 URLArray = [];
                 Array.prototype.push.apply(URLArray, parameters); // copy parameters array to URLArray
                 URLArray.push('p='+encodeURIComponent(prevCheckedObjectsNames.join(',')));
+                if(objectsNames.unchecked.length < objectsNames.checked.length) {
+                    URLArray.push('u='+encodeURIComponent(objectsNames.unchecked.join(',')));
+                } else if(objectsNames.checked.length) URLArray.push('c='+encodeURIComponent(objectsNames.checked.join(',')));
                 URL = (URLArray.length ? URLArray.join('&') : '');
+
+                // if length of URL again more then some browsers are support, make URL from prev checked objects
+                if(document.title.length + URL.length > maxUrlLength) {
+                    URLArray = [];
+                    Array.prototype.push.apply(URLArray, parameters); // copy parameters array to URLArray
+                    URLArray.push('p=' + encodeURIComponent(prevCheckedObjectsNames.join(',')));
+                    URL = (URLArray.length ? URLArray.join('&') : '');
+                }
             }
 
+            if(document.title.length + URL.length >= maxUrlLength) {
+                console.log('URL length more then ',  maxUrlLength, ': ', document.title + '?' + URL);
+            }
             // replace last record in history if action and list of objects are not changed.
             // may be change only checked and unchecked objects in the list
             if(!objectListIsDifferent && parametersFromURL.activeActionLink  === activeActionLink) {
-                window.history.replaceState(null, document.title, '?' + (document.title.length + URL.length < 2083 ? URL : window.location.search.substring(1)));
+                window.history.replaceState(null, document.title, '?' + (document.title.length + URL.length < maxUrlLength ? URL : window.location.search.substring(1)));
             } else {
-                window.history.pushState(null, document.title, '?' + (document.title.length + URL.length < 2083 ? URL : window.location.search.substring(1)));
+                window.history.pushState(null, document.title, '?' + (document.title.length + URL.length < maxUrlLength ? URL : window.location.search.substring(1)));
             }
         });
     }
@@ -632,8 +712,8 @@ var initJQueryNamespace = (function($){
 
     function setActionParametersToBrowserURL(actionParameters) {
         if(!actionParameters || !$.isArray(actionParameters) || !actionParameters.length) return;
-        var parameters = actionParameters.filter(function(prm){
-            return ($.isPlainObject(prm) && prm.key &&
+        var actionParameters = actionParameters.filter(function(prm) {
+            return ($.isPlainObject(prm) && prm.key && prm.key.toLowerCase() !== 'p' &&
                 prm.key.toLowerCase() !== 'u' && prm.key.toLowerCase() !== 'c' && prm.key.toLowerCase() !== 'a');
         }).map(function(prm) {
             if(prm.val === undefined) prm.val = '';
@@ -641,15 +721,45 @@ var initJQueryNamespace = (function($){
         });
 
         getParametersFromURL(function (parametersFromURL) {
-            if(parametersFromURL.activeActionLink) parameters.push('a='+encodeURIComponent(parametersFromURL.activeActionLink));
-            if(parametersFromURL.uncheckedObjectsNames.length) parameters.push('u=' + encodeURIComponent(parametersFromURL.uncheckedObjectsNames.join(',')));
-            if(parametersFromURL.checkedObjectsNames.length) parameters.push('c=' + encodeURIComponent(parametersFromURL.checkedObjectsNames.join(',')));
+            if(parametersFromURL.activeActionLink) {
+                actionParameters.unshift('a='+encodeURIComponent(parametersFromURL.activeActionLink));
+            }
+
+            var parameters = [];
+            if (parametersFromURL.uncheckedObjectsNames.length) {
+                parameters.push('u=' + encodeURIComponent(parametersFromURL.uncheckedObjectsNames.join(',')));
+            }
+            if (parametersFromURL.checkedObjectsNames.length) {
+                parameters.push('c=' + encodeURIComponent(parametersFromURL.checkedObjectsNames.join(',')));
+            }
+
+            if(document.title.length + parameters.join('&').length + actionParameters.join('&').length + 2 >= maxUrlLength &&
+                (prevCheckedObjectsNames.length || parametersFromURL.parentObjectNames.length)) {
+
+                parameters = [];
+                if(prevCheckedObjectsNames.length) {
+                    parameters.push('p=' + encodeURIComponent(prevCheckedObjectsNames.join(',')));
+                } else {
+                    parameters.push('p=' + encodeURIComponent(parametersFromURL.parentObjectNames.join(',')));
+                }
+                if(parametersFromURL.uncheckedObjectsNames.length < parametersFromURL.checkedObjectsNames.length) {
+                    parameters.push('u=' + encodeURIComponent(parametersFromURL.uncheckedObjectsNames.join(',')));
+                } else if (parametersFromURL.checkedObjectsNames.length) {
+                    actionParameters.push('c=' + encodeURIComponent(parametersFromURL.checkedObjectsNames.join(',')));
+                }
+            }
+
+            Array.prototype.push.apply(parameters, actionParameters);
 
             // checking for changes in parameter string
             if(parameters.join('&') === parametersFromURL) return;
 
             URL = parameters.join('&');
-            window.history.pushState(null, document.title, '?' + (document.title.length + URL.length < 2083 ? URL : window.location.search.substring(1)));
+            if(document.title.length + URL.length >= maxUrlLength) {
+                console.log('Can\'t save action parameters to URL: parameters length more then ',  maxUrlLength, '. ',
+                    document.title + '?' + URL);
+            }
+            window.history.pushState(null, document.title, '?' + (document.title.length + URL.length < maxUrlLength ? URL : window.location.search.substring(1)));
         });
     }
 
@@ -677,7 +787,7 @@ var initJQueryNamespace = (function($){
         IE11             2047           5120
         Edge 16          2047          10240
          */
-        var query = URL.length > 2083 ? URL : window.location.search.substring(1);
+        var query = URL.length > maxUrlLength ? URL : window.location.search.substring(1);
 
         var actionParameters = [], uncheckedObjectsNames = [], checkedObjectsNames = [], activeActionLink = '',
             upLevelCheckedObjects = [];
@@ -711,7 +821,8 @@ var initJQueryNamespace = (function($){
                 checkedObjectsNames: checkedObjectsNames,
                 uncheckedObjectsNames: uncheckedObjectsNames,
                 activeActionLink: activeActionLink,
-                actionParameters: actionParameters
+                actionParameters: actionParameters,
+                parentObjectNames: upLevelCheckedObjects,
             });
 
         var objectsNamesStr = upLevelCheckedObjects.join(',');
@@ -719,18 +830,32 @@ var initJQueryNamespace = (function($){
         $.post('/mainMenu', {f: 'filterObjects', name: objectsNamesStr}, function (objects) {
             // objects: [{name: objectName1, description: objectDescription1, id: objectID1, color: <color>:<shade>, disabled: <1|0>},...]
             if (!objects || !objects.length) {
-                M.toast({html: 'Not found interactions with another objects for object[s]: ' + objectsNamesStr, displayLength: 1000});
+                if(objectsNamesStr) {
+                    M.toast({html: 'No interactions detected with other objects for : ' +
+                            objectsNamesStr, displayLength: 5000});
+                }
             } else {
-                uncheckedObjectsNames = objects.map(function (object) {
-                    return object.name;
-                })
+                if(!uncheckedObjectsNames.length || checkedObjectsNames.length) {
+                    uncheckedObjectsNames = objects.filter(function (object) {
+                        return checkedObjectsNames.indexOf(object.name) === -1;
+                    }).map(function (object) {
+                        return object.name;
+                    })
+                } else {
+                    checkedObjectsNames = objects.filter(function (object) {
+                        return uncheckedObjectsNames.indexOf(object.name) === -1;
+                    }).map(function (object) {
+                        return object.name;
+                    });
+                }
             }
 
             return callback({
                 checkedObjectsNames: checkedObjectsNames,
                 uncheckedObjectsNames: uncheckedObjectsNames,
                 activeActionLink: activeActionLink,
-                actionParameters: actionParameters
+                actionParameters: actionParameters,
+                parentObjectNames: upLevelCheckedObjects,
             });
         });
     }
@@ -750,7 +875,9 @@ var initJQueryNamespace = (function($){
             function(objects) {
 
                 if(!objects || !objects.length) {
-                    M.toast({html: 'Not found interactions with another objects for object[s]: ' + objectsNamesStr, displayLength: 1000});
+                    if(objectsNamesStr) {
+                        M.toast({html: 'Not found interactions with another objects for object[s]: ' + objectsNamesStr, displayLength: 3000});
+                    }
                     if(typeof(callback) === 'function') return callback();
                     return;
                 }
@@ -780,7 +907,7 @@ var initJQueryNamespace = (function($){
             // objects: [{id:.., name:.., description:.., color: <color>:<shade>}, {..}, ...]
             function(objects){
 
-                if(!objects || !objects.length) M.toast({html: 'Objects "' + objectsNamesStr +'" are not found in database', displayLength: 1000});
+                if(!objects || !objects.length) M.toast({html: 'Objects "' + objectsNamesStr +'" are not found in database', displayLength: 3000});
                 else {
 
                     if (checkedObjectsNames && checkedObjectsNames.length) {
@@ -856,6 +983,7 @@ var initJQueryNamespace = (function($){
                 instance.destroy();
             });
         }
+        $('div.material-tooltip').remove();
 
         objectsListElm.empty().append(html);
         objectsTooltipInstances = M.Tooltip.init(document.querySelectorAll('a[object-in-list]'), {
@@ -999,6 +1127,8 @@ var initJQueryNamespace = (function($){
                     instance.destroy();
                 });
             }
+            $('div.material-tooltip').remove();
+
             actionsListElm.empty().append(newActionsMenuHTML);
             M.Collapsible.init(actionsListElm[0], {});
             actionsTooltipInstances = M.Tooltip.init(document.querySelectorAll('a.tooltipped'), {
@@ -1033,6 +1163,8 @@ var initJQueryNamespace = (function($){
                 }
             });
 
+            searchActionsAutocompleteInstance = M.Autocomplete.getInstance(searchActionsElm[0]);
+
             $('li[action_link]').click(function(){
                 // manually add class active to menu element, when clicked
                 // it's not work automatically, when init menu by $('#actionsMenu.collapsible').collapsible();
@@ -1048,7 +1180,7 @@ var initJQueryNamespace = (function($){
     }
 
     /*
-    Create html with actions list and object with atcions list for autocomplete in search action element
+    Create html with actions list and object with actions list for autocomplete in search action element
 
     actions: array of objects with actions groups and actions properties
     activeActionLink: link to active action
@@ -1068,6 +1200,8 @@ var initJQueryNamespace = (function($){
                 if(!actions[groupName].hasOwnProperty(ID)) continue;
 
                 var action = actions[groupName][ID];
+
+                if(action.donotShow) continue;
 
                 var attributes = '';
 
@@ -1222,24 +1356,40 @@ var initJQueryNamespace = (function($){
         });
     }
 
+    function setDocumentTitle() {
+        var title = $('li[action_link].active').attr('action_name') || 'ALEPIZ';
+        var objectsNames = getObjectsFromObjectsList().checked, objectsNum = objectsNames ? objectsNames.length : 0;
+        if(objectsNum) {
+            var objectsStr = objectsNames.join('; ');
+            if(objectsStr.length > 50) {
+                objectsStr = objectsStr.substring(0, 50) + '...[' + objectsNum + ']';
+            }
+            title += ' (' + objectsStr + ')';
+        }
+        document.title = title;
+    }
+
     /*
     Draw HTML page in iframe element and init javaScript objects in iframe document
     html: string with HTML page for drawing
      */
     function drawAction(html) {
 
+        setDocumentTitle();
         // stopping all executed setTimeout setInterval functions in the action frame
         if(iframeDOMElm.contentWindow) {
-            var setTimeoutHighestTimeoutId = iframeDOMElm.contentWindow.setTimeout(';');
-            var setIntervalHighestTimeoutId = iframeDOMElm.contentWindow.setInterval(';');
+            try {
+                var setTimeoutHighestTimeoutId = iframeDOMElm.contentWindow.setTimeout(';');
+                var setIntervalHighestTimeoutId = iframeDOMElm.contentWindow.setInterval(';');
 
-            for (var i = 0; i < setTimeoutHighestTimeoutId; i++) {
-                iframeDOMElm.contentWindow.clearTimeout(i);
-            }
-            for (i = 0; i < setIntervalHighestTimeoutId; i++) {
-                iframeDOMElm.contentWindow.clearInterval(i);
-            }
-            //console.log('All timeouts are clearing: ', setTimeoutHighestTimeoutId, setIntervalHighestTimeoutId);
+                for (var i = 0; i < setTimeoutHighestTimeoutId; i++) {
+                    iframeDOMElm.contentWindow.clearTimeout(i);
+                }
+                for (i = 0; i < setIntervalHighestTimeoutId; i++) {
+                    iframeDOMElm.contentWindow.clearInterval(i);
+                }
+                //console.log('All timeouts are clearing: ', setTimeoutHighestTimeoutId, setIntervalHighestTimeoutId);
+            } catch(err) { }
         }
 
         if(!html) {
@@ -1250,7 +1400,7 @@ var initJQueryNamespace = (function($){
                 'For help click here</h4></a>' +
                 '</div>' +
                 '<script>' +
-                '   function showHelpWindow(e) {\n' +
+                '   function showHelpWindow(/*e*/) {\n' +
                 '            //e.preventDefault();  // prevent default\n' +
                 '            var helpWindowWidth = Math.floor(screen.width - screen.width / 3);\n' +
                 '            var helpWindowsHeight = Math.floor(screen.height - screen.height / 3);\n' +
@@ -1265,18 +1415,22 @@ var initJQueryNamespace = (function($){
             sessionID = undefined;
         }
 
-        iframeDOMElm.contentWindow.document.open();
-        iframeDOMElm.contentWindow.document.write(html);
-        iframeDOMElm.contentWindow.document.close();
+        try {
+            iframeDOMElm.contentWindow.document.open();
+            iframeDOMElm.contentWindow.document.write(html);
+            iframeDOMElm.contentWindow.document.close();
+        } catch(err) {
+            console.error(err.stack);
+        }
 
-        // make possible save action parameters into the URL from action
+        // make possible to save action parameters into the URL from the action
         // function setActionParametersToBrowserURL(actionParameters)
         // actionParameters is array of [{key: <key1>, val:<val1>}, {..}, ...]
         try {
             iframeDOMElm.contentWindow.setActionParametersToBrowserURL = setActionParametersToBrowserURL;
         } catch (err) { }
 
-        // make possible get action parameters from the URL for action
+        // make possible to get action parameters from the URL for the action
         // function getActionParameters()
         // return action parameters as array [{key: <key1>, val:<val1>}, {..}, ...]
         try {
@@ -1287,32 +1441,65 @@ var initJQueryNamespace = (function($){
             };
         } catch (err) { }
 
-        // run task on Ctrl + Enter
+        // add an event handler for catch the scroll action page event inside the iframe
+        setTimeout(function () {
+            try {
+                if (iframeDOMElm.contentWindow && typeof iframeDOMElm.contentWindow.onScrollIframe === 'function') {
+                    iframeDOMElm.contentDocument.addEventListener('scroll', iframeDOMElm.contentWindow.onScrollIframe, false);
+                }
+            } catch(err) { }
+        }, 2000);
+
         try {
-            $(iframeDOMElm.contentWindow).keydown(function (e) {
-                if(runActionBtnElm.hasClass('hide')) return;
-                if(e.keyCode === 13 && e.ctrlKey) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    processIframeInputsData(true); // true - don't open a log window
-                    return false;
-                }
-            }).keypress(function (e) { // prevent submit event generation
-                if(runActionBtnElm.hasClass('hide')) return;
-                if(e.keyCode === 13 && e.ctrlKey) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return false;
-                }
-            }).keyup(function (e) { // prevent submit event generation
-                if(runActionBtnElm.hasClass('hide')) return;
-                if(e.keyCode === 13 && e.ctrlKey) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return false;
-                }
-            });
-        } catch (err) {}
+            iframeDOMElm.contentWindow.getActionConfig = function(callback) {
+                var activeActionLink = $('li[action_link].active').attr('action_link');
+                $.post(activeActionLink, { func: 'getActionConfig' }, callback);
+            }
+        } catch (err) { }
+
+        try {
+            iframeDOMElm.contentWindow.setActionConfig = function(config, callback) {
+                var activeActionLink = $('li[action_link].active').attr('action_link');
+                //console.log('set:', config)
+                $.post(activeActionLink, {
+                    func: 'setActionConfig',
+                    config: typeof config === 'object' ? JSON.stringify(config) : config.toString()
+                }, callback);
+            }
+        } catch (err) { }
+
+        ctrlEnter();
+        setTimeout(ctrlEnter, 60000);
+
+        // run task on Ctrl + Enter
+        function ctrlEnter() {
+            try {
+                var iframeContentWindowElm = $(iframeDOMElm.contentWindow);
+                iframeContentWindowElm.unbind('keydown', keyDown).keydown(keyDown);
+                iframeContentWindowElm.unbind('keypress', keyPressAndKeyUp).keypress(keyPressAndKeyUp);
+                iframeContentWindowElm.unbind('keyUp', keyPressAndKeyUp).keyup(keyPressAndKeyUp);
+            } catch (err) {
+            }
+        }
+
+        function keyDown(e) {
+            if (runActionBtnElm.hasClass('hide')) return;
+            if (e.keyCode === 13 && e.ctrlKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                processIframeInputsData(true); // true - don't open a log window
+                return false;
+            }
+        }
+
+        function keyPressAndKeyUp(e) { // prevent submit event generation
+            if (runActionBtnElm.hasClass('hide')) return;
+            if (e.keyCode === 13 && e.ctrlKey) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+        }
     }
 
     function redrawIFrameDataOnChangeObjectsList() {
@@ -1588,6 +1775,7 @@ var initJQueryNamespace = (function($){
                 sessionsIDs[sessionID] = true;
             }
 
+            if(returnObj.actionError) log.error(returnObj.actionError);
             // reload objects list and actions
             reloadObjectsAndActionListsAfterActionExecution();
 
@@ -1612,14 +1800,14 @@ var initJQueryNamespace = (function($){
                     callback(returnObj, function (err) {
                         if (err) return log.error(err.stack);
                     });
-                    $("body").css("cursor", "auto");
+                    bodyElm.css("cursor", "auto");
                 }
                 catch (err) {
                     log.error('Error running callback on browser side after execution action. ',
                         'Callback name is: "', callbackName, '(data, callback)": ', err.stack);
                 }
             } else {
-                $("body").css("cursor", "auto");
+                bodyElm.css("cursor", "auto");
             }
 
         }
@@ -1628,7 +1816,7 @@ var initJQueryNamespace = (function($){
     /*
     Reload object list at objects tab and additional objects tab after action executed.
     For objects list try to create objects list using previous objects interaction rules from previous step from browser history
-    For additional objects list or if previous history is empty, try to create object list using objects ID and reload objects names from dabatase
+    For additional objects list or if previous history is empty, try to create object list using objects ID and reload objects names from database
      */
         function reloadObjectsAndActionListsAfterActionExecution() {
             // if current objects list was created using interaction with another objects by clicking on the objects
@@ -1742,24 +1930,59 @@ var initJQueryNamespace = (function($){
 //====================================================================================================================
 //============================================== AUTHORISATION SYSTEM ================================================
 //====================================================================================================================
-    function initAuthorisationSystem(){
+    function initAuthorisationSystem() {
+
+        var userNameElm = $('#userName'),
+            userPassElm = $('#userPass'),
+            newPass1Elm = $('#newUserPass1'),
+            newPass2Elm = $('#newUserPass2');
         // set focus on a login field after login dialog initialize
-        loginBtnElm.click(function(){ setTimeout(function(){ $('#userName').focus() }, 500 ) });
+        loginBtnElm.click(function(){ setTimeout(function(){ userNameElm.focus() }, 500 ) });
+
         // set focus to password field on press enter or tab on a user field
         // or close modal for esc
-        $('#userName').keypress(function(e) {
-            if(e.which === 13 || e.which === 9) $('#userPass').focus();
+        userNameElm.keypress(function(e) {
+            if(e.which === 13 || e.which === 9) userPassElm.focus();
             if(e.which === 27) modalLoginInstance.close();
         });
         // try to login in when press enter on a password field
         // or close modal for esc
-        $('#userPass').keypress(function(e) {
-            if(e.which === 13){
+        userPassElm.keypress(function(e) {
+            if($('#changePasswordForm').hasClass('hide')) {
+                if(e.which === 13) {
+                    login();
+                    modalLoginInstance.close();
+                }
+            } else if(e.which === 13 || e.which === 9) newPass1Elm.focus();
+
+            if(e.which === 27) modalLoginInstance.close();
+        });
+
+        newPass1Elm.keypress(function(e) {
+            if(e.which === 13 || e.which === 9) newPass2Elm.focus();
+            if(e.which === 27) modalLoginInstance.close();
+        });
+
+        newPass2Elm.keypress(function(e) {
+            if(e.which === 13) {
                 login();
                 modalLoginInstance.close();
             }
             if(e.which === 27) modalLoginInstance.close();
+            var newPass = newPass1Elm.val();
+            if(!newPass) return false;
         });
+
+        newPass2Elm.keyup(function (e) {
+            var newPass = newPass1Elm.val();
+            if(newPass !== newPass2Elm.val()) newPass2Elm.addClass('red-text');
+            else newPass2Elm.removeClass('red-text');
+        });
+
+        $('#changePasswordBtn').click(function () {
+            $('#changePasswordForm').toggleClass('hide');
+        });
+
         // try to login in when click on LOGIN button
         $('#login').click(function(eventObject){
             eventObject.preventDefault();
@@ -1772,49 +1995,72 @@ var initJQueryNamespace = (function($){
         });
 
         $.post('/mainMenu', {f: 'getCurrentUserName'}, function(userName) {
-            if(userName) {
+            if(userName && userName.length) { // userName is a string or empty array [], when login as guest
 
-                M.toast({html: 'Entering as "'+userName+'"', displayLength: 1000});
-                loginBtnElm.removeClass('yellow-text').attr('data-tooltip', 'Login as '+userName);
+                M.toast({html: 'Entering as "'+userName+'"', displayLength: 3000});
+                loginBtnElm.removeClass('grey-text').attr('data-tooltip', 'Login as '+userName);
                 M.Tooltip.init(loginBtnElm[0], {
-                    enterDelay: 500
+                    enterDelay: 2000
                 });
 
-            } else M.toast({html: 'Entering as "GUEST", please login first', displayLength: 2000});
+            } else M.toast({html: 'Entering as "GUEST", please login first', displayLength: 3000});
         });
 
-        function login(){
-            $.post('/mainMenu', {f: 'login', user: $('#userName').val(), pass: $('#userPass').val()}, function(userName) {
+        function login() {
+            var user = userNameElm.val(), pass = userPassElm.val(), newPass = newPass1Elm.val();
+            if(newPass !== newPass2Elm.val()) {
+                M.toast({html: 'New entered passwords don\'t match', displayLength: 5000});
+                return;
+            }
+
+            if(newPass && !pass) {
+                M.toast({html: 'Please enter your old password before changing', displayLength: 5000});
+                return;
+            }
+
+            if(!user || !pass) {
+                M.toast({html: 'Please enter your user name and password for login', displayLength: 5000});
+                return;
+            }
+
+            $.post('/mainMenu', {
+                f: 'login', user: user,
+                pass: pass,
+                newPass: newPass,
+            }, function(userName) {
 
                 if(!userName){
-                    M.toast({html: 'User or password are incorrect', displayLength: 4000});
+                    M.toast({html: 'User name or password are incorrect', displayLength: 4000});
                     setTimeout(function () { location.reload() }, 4000);
                     return;
                 }
 
-                loginBtnElm.removeClass('yellow-text').attr('data-tooltip', 'Login as '+userName);
+                if (newPass) M.toast({
+                    html: 'Password successfully changed for user ' + userName,
+                    displayLength: 5000,
+                });
+
+                loginBtnElm.removeClass('grey-text').attr('data-tooltip', 'Login as '+userName);
                 M.Tooltip.init(loginBtnElm[0], {
                     enterDelay: 500
                 });
 
-                $('#userPass').val('');
-                M.toast({html: 'Entering as "'+userName+'"', displayLength: 1000});
-                setTimeout(function () { location.reload() }, 2000);
+                userPassElm.val('');
+                setTimeout(function () { location.reload(); }, 3000);
             });
         }
 
-        // send logout command to server, clear User name and password field, set yellow color for login icon
+        // send logout command to server, clear User name and password field, set grey color for login icon
         // and set tooltip for it as 'login as guest'
         function logout(){
             $.post('/mainMenu', {f: 'logout'}, function() {
-                $('#userPass').val('');
-                $('#userName').val('');
-                loginBtnElm.addClass('yellow-text').attr('data-tooltip', 'Login as GUEST');
+                userPassElm.val('');
+                userNameElm.val('');
+                loginBtnElm.addClass('grey-text').attr('data-tooltip', 'Login as GUEST');
                 M.Tooltip.init(loginBtnElm[0], {
-                    enterDelay: 500
+                    enterDelay: 2000
                 });
 
-                M.toast({html: 'You logout from system and now entering as "GUEST"', displayLength: 2000});
                 setTimeout(function () { location.reload() }, 2000);
             });
         }
@@ -1828,7 +2074,7 @@ var initJQueryNamespace = (function($){
     var retrievingLogRecordsInProgress = 0;
     var closeLogWindowsTimeout = 30; // close log window after 30 minutes
     var maxLogRecords = 200;
-    //  Open log window, start retrieving log, autoclose log window after 30 minutes
+    //  Open log window, start retrieving log, auto close log window after 30 minutes
     function openLogWindow(force) {
         if(!Object.keys(sessionsIDs).length) {
             M.toast({html: 'No actions are running in this window. Please run any action before', displayLength: 5000});
@@ -1840,27 +2086,30 @@ var initJQueryNamespace = (function($){
         autoCloseLogWindow(closeLogWindowsTimeout);
         // Run getLastLogRecords() only if it is not running or not updated more then 1 minutes
         //if(retrievingLogRecordsInProgress === 0 || (Date.now() - retrievingLogRecordsInProgress) > 60000) {
-            getLastLogRecords(force);
+            //getLastLogRecords(force);
         //}
+        clearInterval(logTimer);
+        logTimer = setInterval(getLastLogRecords, 1000, force);
         modalLogWindowsInstance.open();
     }
 
     // Close log window, and set flag for stopping retrieving log records
-    function closeLogWindow(){
+    function closeLogWindow() {
         stoppingRetrievingLog();
         modalLogWindowsInstance.close();
+        clearInterval(logTimer);
     }
 
     // used for set variables, for stopping retrieving log from server
     // it used in two places of the code, don't remove this function
     function stoppingRetrievingLog() {
         continueRetrievingLog = 0;
-        clearTimeout(logTimer);
+        //clearTimeout(logTimer);
     }
 
     // Auto close log window after timeout, which set at the last time when calling this function
     var autoCloseTimeout;
-    function autoCloseLogWindow(timeout){
+    function autoCloseLogWindow(timeout) {
         if(!autoCloseTimeout) {
             autoCloseTimeout = timeout;
             autoCloseWaiter();
@@ -1875,12 +2124,53 @@ var initJQueryNamespace = (function($){
     }
 
     // start retrieving last log records, until continueRetrievingLog set to true
-    var lastLorRecordID = 0;
+    var lastLorRecordID = 0, timeout = 60000;
     function getLastLogRecords(force, callback) {
+        if(!continueRetrievingLog || Date.now() - retrievingLogRecordsInProgress < timeout) return;
+
         retrievingLogRecordsInProgress = Date.now();
 
         logLastUpdateElm.text('Starting update: ' + (new Date()).toLocaleString() + '; records: ' + logBodyElm.find('div.logRecord').length + '...');
-        $.post('/mainMenu', {f: 'getLogRecords', lastID: lastLorRecordID, sessionsIDs: Object.keys(sessionsIDs).join(',')}, function(records){
+        $.ajax('/mainMenu', {
+            type: 'POST',
+            data: $.param({f: 'getLogRecords', lastID: lastLorRecordID, sessionsIDs: Object.keys(sessionsIDs).join(',')}),
+            success: processLogRecords,
+            error: ajaxError,
+            timeout: timeout - 10,
+            cache: false
+        });
+
+        function ajaxError(/*jqXHR, exception*/) {
+            /*
+            bodyElm.css("cursor", "auto");
+            var msg;
+            if (jqXHR.status === 404) {
+                msg = 'Requested page not found. [404]';
+            } else if (jqXHR.status === 500) {
+                msg = 'Internal Server Error [500].';
+            } else if (exception === 'parsererror') {
+                msg = 'Requested JSON parse failed.';
+            } else if (exception === 'timeout') {
+                msg = 'Time out error.';
+            } else if (exception === 'abort') {
+                msg = 'Ajax request aborted.';
+            } else if (jqXHR.status === 0) {
+                msg = 'Not connect. Verify Network.';
+            } else {
+                msg = 'Uncaught Error.\n' + jqXHR.responseText;
+            }
+            M.toast({
+                html: 'Web server error: ' + msg + ' [status: ' + jqXHR.status +
+                    (exception ? '; exception: ' + exception : '')+ ']',
+                displayLength: 5000
+            });
+
+             */
+            retrievingLogRecordsInProgress = 0;
+        }
+
+        //$.post('/mainMenu', {f: 'getLogRecords', lastID: lastLorRecordID, sessionsIDs: Object.keys(sessionsIDs).join(',')}, function(records){
+        function processLogRecords(records) {
             if(records && $.isArray(records) && records.length) {
 
                 if (records[0] && records[0].lastID) {
@@ -1916,14 +2206,16 @@ var initJQueryNamespace = (function($){
 
             logLastUpdateElm.text('Last update: ' + (new Date()).toLocaleString() + '; records: ' + logBodyElm.find('div.logRecord').length);
 
+            /*
             if(continueRetrievingLog) {
                 clearTimeout(logTimer);
                 logTimer = setTimeout(getLastLogRecords, 1000);
-            }
-            else retrievingLogRecordsInProgress = 0;
+            } else retrievingLogRecordsInProgress = 0;
+             */
 
+            retrievingLogRecordsInProgress = 0;
             if(typeof callback === 'function') callback();
-        });
+        };
     }
 
     var logLevels = {S: 0, D: 1, I: 2, W: 3, E: 4};
@@ -1977,10 +2269,17 @@ var initJQueryNamespace = (function($){
                 }
             }
 
-            recordsSortedBySessions[sessionID].html = '<div class="logRecord"><span><i class="material-icons">' +
-                icon + '</i> ' + dateString +
+            var msgHtml = coloringLogMessage(record.message).split('\r').map(function (msgPart, idx) {
+                if(!idx) return msgPart;
+                var spacesCnt = msgPart.search(/\S/) + 1; // index of first non whitespace char
+                return '<div style="padding:0 0 0 ' + spacesCnt + 'em;">' + msgPart + '</div>';
+            }).join('\n');
+
+            recordsSortedBySessions[sessionID].html = '<div class="logRecord">' +
+                '<div class="logIcon"><i class="material-icons">' + icon + '</i></div>' +
+                '<div class="logDateStr"> ' + dateString +
                 //                    '['+sessionID+']'+
-                ': </span><span>' + coloringLogMessage(record.message) + '</span></div>' + recordsSortedBySessions[sessionID].html;
+                ':</div><span>' + msgHtml + '</span></div>' + recordsSortedBySessions[sessionID].html;
 
             recordsSortedBySessions[sessionID].lines++;
             if (logLevels[record.level] > logLevels[recordsSortedBySessions[sessionID].logLevel])
@@ -2026,7 +2325,7 @@ var initJQueryNamespace = (function($){
         '37m': 'logColor37m',
         '38m': 'logColor38m'
     };
-    function coloringLogMessage(message){
+    function coloringLogMessage(message) {
         //console.log('Message: ', message);
         var messageParts = message
             .replace(/.\[\d\d?m(.\[\d\d?m)/gm, '$1')
@@ -2057,7 +2356,13 @@ var initJQueryNamespace = (function($){
                 var header = getHumanLogLevel(level);
                 modalLogHeaderElm.text(header.text).removeClass().addClass(header.color + '-text');
 
-                if(level === 'E') var message = JSON.stringify(args).replace(/^\["Error: (.*?)\\n.*$/i, '$1');
+                if(level === 'E') {
+                    var actionName = $('li[action_link].active').attr('action_name') || '';
+                    if(actionName) actionName = 'An error occurred while executing action ' + actionName + ': ';
+                    var message = actionName + '<span class="red-text">' +
+                        escapeHtml(JSON.stringify(args).replace(/^\["Error: (.*?)\\n.*$/i, '$1')) +
+                        '</span>';
+                }
                 else message = JSON.stringify(args);
                 modalLogMessageElm.html(message);
 

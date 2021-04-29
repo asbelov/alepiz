@@ -68,14 +68,21 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled, c
     log.debug('Add objects: ', newObjectsNames, ', description: ', description, ', order: ', order, ', disabled: ', disabled);
 
     // Prepare statement for inserting new objects into a database
-    var stmt = db.prepare('INSERT INTO objects (name, description, sortPosition, disabled) VALUES (?,?,?,?)', function(err){
+    var stmt = db.prepare('INSERT INTO objects (name, description, sortPosition, disabled, created) VALUES ' +
+        '($name,$description,$sortPosition, $disabled, $created)', function(err){
         if(err) return callback(err);
 
         // array with IDs of a new objects, which inserting
         var newObjectsIDs = [];
         // async inserting new objects into a database. series used for transaction rollback if error
         async.eachSeries(newObjectsNames, function(name, callback){
-            stmt.run([name, description, order, disabled], function(err){
+            stmt.run({
+                $name: name,
+                $description: description,
+                $sortPosition: order,
+                $disabled: disabled,
+                $created: Date.now(),
+            }, function(err){
                 if(err) return callback(err);
                 // push new object ID into array
                 newObjectsIDs.push(this.lastID);
@@ -290,7 +297,7 @@ objectsDB.getObjectsCountersIDs = function (objectsIDs, callback){
 
     // used for remove too big array of objects. don\'t optimize and don\'t use IN() in select
     var rows = [];
-    var stmt = db.prepare('SELECT id FROM objectsCounters WHERE objectID=?', function(err) {
+    var stmt = db.prepare('SELECT * FROM objectsCounters WHERE objectID=?', function(err) {
         if(err) return callback(err);
 
         async.eachLimit(objectsIDs, 20,function(objectID, callback) {

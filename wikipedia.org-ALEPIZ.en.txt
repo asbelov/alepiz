@@ -2,8 +2,8 @@
 | name                   = ALEPIZ
 | screenshot             = [[File:ALEPIZ data browser.png|thumb|Screenshot of ALEPIZ action with historical monitoring data]]
 | released               = {{start date and age|2016|11}}
-| latest_release_version = 0.0.6<ref>{{cite web|url=http://www.alepiz.com/help/download.pug|title=Information about the latest version of ALEPIZ}}</ref>
-| latest_release_date    = {{start date and age|2020|09|26}}
+| latest_release_version = 0.0.8<ref>{{cite web|url=http://www.alepiz.com/help/download.pug|title=Information about the latest version of ALEPIZ}}</ref>
+| latest_release_date    = {{start date and age|2021|04|08}}
 | operating_system       = [[Microsoft Windows]]
 | programming_language   = [[Node.js]], [[JavaScript]]
 | genre                  = [[Network management system]], [[System monitor]], [[Comparison of network monitoring systems]], [[Systems_management]]

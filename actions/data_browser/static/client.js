@@ -14,22 +14,29 @@ var JQueryNamespace = (function ($) {
         selectCountersElm = $('#select-counters');
         latestDataElm = $('#latest-data');
         historyDataElm = $('#history-data');
+        historyWrapperElm = $('#historyWrapper');
         graphAreaElm = $('#graphArea');
         graphAreaDomElm = document.getElementById('graphArea'); // for drawing graph by Flotr2 library
         dateFromElm = $('#startDate');
         dateToElm = $('#endDate');
+        setTimeElm = $('#setTime');
+        setStartTimeElm = $('#setStartTime');
+        setEndTimeElm = $('#setEndTime');
         autoUpdateElm = $('#auto-update');
         messageElm = $('#message-area');
         fullScreenGraphBtnElm = $('#fullScreenGraphBtn');
         fullScreenCountersBtnElm = $('#fullScreenCountersBtn');
+        checkAllGroupsAndCountersBtnElm = $('#checkAllGroupsAndCountersBtn');
         leftDivElm = $('#leftDiv');
         rightDivElm = $('#rightDiv');
         alignSettingsElm = $('#alignSettings');
         closeGraphSettingsElm = $('#closeGraphSettings');
 
+        if(!parameters.objects.length) return noObjectsSelected();
+
         M.FormSelect.init(document.querySelectorAll('select'), {});
 
-        init(parameters.objects, function(){
+        init(parameters.objects, function() {
             var datePickerFromInstance = M.Datepicker.init(dateFromElm[0], {
                 firstDay: 1,
                 format: 'dd mmmm, yyyy',
@@ -41,6 +48,82 @@ var JQueryNamespace = (function ($) {
                 format: 'dd mmmm, yyyy',
                 setDefaultDate: true
             });
+
+            var timePickerTo = M.Timepicker.init(setEndTimeElm[0], {
+                twelveHour: false,
+                autoClose: true,
+                defaultTime: '13:14',
+                i18n: {
+                    done: 'Set End Time',
+                    cancel: 'Cancel',
+                    clear: 'Clear',
+                },
+                onOpenStart: function () {
+                    var d = new Date(dateTo);
+                    setEndTimeElm.val(d.getHours() + ':' + (d.getMinutes() < 10 ? '0' + d.getMinutes() : d.getMinutes()));
+                },
+                onCloseEnd: function() {
+                    if(!timePickerTo.time) return;
+                    var timePair = timePickerTo.time.split(/[^0-9]/);
+                    if(!Array.isArray(timePair) || timePair.length !== 2) return;
+                    var newDateTo = getTimestampFromStr(dateToElm.val()) + Number(timePair[0]) * 3600000 + Number(timePair[1]) * 60000;
+                    dateTo = newDateTo < dateFrom ? dateFrom + 3600000 : newDateTo;
+                    autoUpdateElm.prop('checked', false);
+                    getCountersValues();
+                },
+            });
+
+            var timePickerFrom = M.Timepicker.init(setStartTimeElm[0], {
+                twelveHour: false,
+                autoClose: true,
+                defaultTime: '13:14',
+                i18n: {
+                    done: 'Set Start Time',
+                    cancel: 'Cancel',
+                    clear: 'Clear',
+                },
+                onOpenStart: function () {
+                    var d = new Date(dateFrom);
+                    setStartTimeElm.val(d.getHours() + ':' + (d.getMinutes() < 10 ? '0' + d.getMinutes() : d.getMinutes()));
+                },
+                onCloseEnd: function() {
+                    if(!timePickerFrom.time) return;
+                    var timePair = timePickerFrom.time.split(/[^0-9]/);
+                    // to not show timePickerTo when cancel click on timePickerFrom after successfully set time before on timePickerFrom
+                    timePickerFrom.time = undefined;
+                    if(!Array.isArray(timePair) || timePair.length !== 2) return
+                    dateFrom = getTimestampFromStr(dateFromElm.val()) + Number(timePair[0]) * 3600000 + Number(timePair[1]) * 60000;
+                    var d = new Date(dateTo);
+                    setEndTimeElm.val(d.getHours() + ':' + (d.getMinutes() < 10 ? '0' + d.getMinutes() : d.getMinutes()));
+                    timePickerTo.open();
+                },
+            });
+
+            setTimeElm.click(function () {
+                var d = new Date(dateFrom);
+                setStartTimeElm.val(d.getHours() + ':' + (d.getMinutes() < 10 ? '0' + d.getMinutes() : d.getMinutes()));
+                timePickerFrom.open();
+            });
+
+            M.Modal.init(document.getElementById('debugDataParametersDialog'), {
+                onOpenStart: function() {
+                    var debugDataParametersElm = $('#debugDataParameters');
+                    debugDataParametersElm.html('No history data information');
+                    if(!Object.keys(dataInfo).length) return;
+
+                    var html = [];
+                    for(var name in dataInfo) {
+                        var data = [];
+                        for(var key in dataInfo[name]) {
+                            if(key === 'data' || key === 'timestamp') continue;
+                            data.push(key + ': ' + dataInfo[name][key]);
+                        }
+                        html.push('<li><b>' + name + '</b></li><li>' + data.join('<li></li>') + '</li></>' );
+                    }
+                    debugDataParametersElm.html('<ul>' + html.join('<br/>') + '</ul>');
+                }
+            });
+
 
             initGraphEvents();
 
@@ -77,6 +160,7 @@ var JQueryNamespace = (function ($) {
 
     var serverURL = parameters.action.link+'/ajax',
         unitsObj = {},
+        dataInfo = {},
         OCIDs = [],
         counterObj = {},
         bodyElm,
@@ -84,14 +168,21 @@ var JQueryNamespace = (function ($) {
         selectGroupsElm,
         latestDataElm,
         historyDataElm,
+        historyTHeadElm,
+        historyTBodyElm,
+        historyWrapperElm,
         graphAreaElm,
         graphAreaDomElm,
         dateFromElm,
         dateToElm,
+        setTimeElm,
+        setStartTimeElm,
+        setEndTimeElm,
         autoUpdateElm,
         messageElm,
         fullScreenGraphBtnElm,
         fullScreenCountersBtnElm,
+        checkAllGroupsAndCountersBtnElm,
         leftDivElm,
         rightDivElm,
         alignSettingsElm,
@@ -106,7 +197,10 @@ var JQueryNamespace = (function ($) {
         dateTo,
         parametersFromURL = {},
         historyTooltipsInstances,
-        drawingInProgress = false;
+        historyHeaderTooltipsInstances,
+        dataViewHumanMode = {},
+        drawingLatestDataInProgress = 0,
+        drawingHistoryInProgress = 0;
 
     var monthNames = ["January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
@@ -120,20 +214,14 @@ var JQueryNamespace = (function ($) {
         object: array of objects with IDs [{id:...}, ...] from parameters.objects
         callback(): may be skipped
      */
-    function init(_objects, callback){
+    function init(_objects, callback) {
+        // !!! onScrollIframe init in parent init.js
+        onScrollIframe = scrollIframe;
         if(_objects) objects = _objects;
 
         // parse parameters from browser URL
         // external function from init.js
-        getActionParametersFromBrowserURL(function(actionParametersFromURL) {
-            actionParametersFromURL.forEach(function(prm) {
-                if(prm.key === 'f' || prm.key === 'n') var val = Number(prm.val);
-                // Number(' ') = 0
-                else if(/-/.test(prm.val)) val = prm.val.split('-').map(function(o) { return (o === '' ? '' : Number(o)); });
-                else val = prm.val === '' ? [] : [Number(prm.val)];
-                parametersFromURL[prm.key.toLowerCase()] = val;
-            });
-
+        getParametersFromURL(function() {
             if(parametersFromURL.f === 1) fullScreenGraphSwitcher(true);
 
             if(parametersFromURL.y && parametersFromURL.y.length === 4){
@@ -143,7 +231,7 @@ var JQueryNamespace = (function ($) {
                 $('#yMaxRight').val(parametersFromURL.y[3]).addClass('active');
             }
 
-            // !!! parametersFromURL.t is an Array, splited by '-'. Array made when parse parameters from actionParametersFromURL
+            // !!! parametersFromURL.t is an Array, separated by '-'. Array created when parsing parameters from actionParametersFromURL
             if(parametersFromURL.t && parametersFromURL.t.length === 2 &&
                 new Date(parametersFromURL.t[0]) && new Date(parametersFromURL.t[1]) &&
                 parametersFromURL.t[0] < parametersFromURL.t[1]
@@ -158,9 +246,20 @@ var JQueryNamespace = (function ($) {
             dateFromElm.val(getDateString(new Date(dateFrom)));
             dateToElm.val(getDateString(new Date(dateTo)));
 
-            drawGroups(function(_groups) {
+            drawGroups(false,function(_groups) {
                 groups = _groups;
                 initCounters(getValuesForMultipleSelectElement(selectCountersElm), callback);
+            });
+
+            checkAllGroupsAndCountersBtnElm.click(function () {
+                drawGroups(true, function (_groups) {
+                    groups = _groups;
+                    initCounters(true, function () {
+                        drawHistory(function() {
+                            getParametersFromURL();
+                        });
+                    });
+                });
             });
 
             fullScreenGraphBtnElm.click(function() {
@@ -183,8 +282,42 @@ var JQueryNamespace = (function ($) {
             autoUpdateElm.click(function() {
                 if(autoUpdateElm.is(':checked')) autoUpdateData();
                 else drawHistory(); // run for update this parameter in browser URL
-            })
+            });
         });
+    }
+
+    // parse parameters from browser URL
+    function getParametersFromURL(callback) {
+        // external function from init.js
+        getActionParametersFromBrowserURL(function(actionParametersFromURL) {
+            actionParametersFromURL.forEach(function (prm) {
+                if (prm.key === 'f' || prm.key === 'n') var val = Number(prm.val);
+                // Number(' ') = 0
+                else if (/-/.test(prm.val)) val = prm.val.split('-').map(function (o) {
+                    return (o === '' ? '' : Number(o));
+                });
+                else val = prm.val === '' ? [] : [Number(prm.val)];
+                parametersFromURL[prm.key.toLowerCase()] = val;
+            });
+
+            if(typeof callback === 'function') callback();
+        });
+    }
+
+    function scrollIframe(e) {
+        if(!historyTHeadElm) return;
+        var scrollPos = $(window).scrollTop();
+        var tableTopPos = historyDataElm.offset().top;
+        if(scrollPos > tableTopPos) {
+            historyTHeadElm.css({
+                position: 'fixed',
+                top: 0,
+            });
+        } else {
+            historyTHeadElm.css({
+                position: 'static',
+            });
+        }
     }
 
     /*
@@ -199,15 +332,15 @@ var JQueryNamespace = (function ($) {
 
         return '\
 <div class="col s12" style="margin-top: 10px" alignElmID="'+id+'">\
-    <div class="col s1 switch">\
+    <div class="col s1 no-padding switch">\
         <label>\
             <input type="checkbox"' + (prop.align === 2 ? ' checked' : '') + ' alignCounterID="' + id + '">\
             <span class="lever"></span>\
         </label>\
     </div>\
-    <div class="col s8">' + escapeHtml(counterObj[id].objectName + ': ' +counterObj[id].counterName +
+    <div class="col s7">' + escapeHtml(counterObj[id].objectName + ': ' +counterObj[id].counterName +
                 (counterObj[id].unitID ? ' in '+ unitsObj[counterObj[id].unitID].abbreviation : '')) + '</div>\
-    <div class="col s3" minAvgMax="'+id+'"></div>\
+    <div class="col s4" minAvgMax="'+id+'"></div>\
 </div>';
     }
 
@@ -227,13 +360,13 @@ var JQueryNamespace = (function ($) {
 
         if(runInFullScreenMode) {
             leftDivElm.addClass('hide');
-            historyDataElm.addClass('hide');
+            historyWrapperElm.addClass('hide');
             rightDivElm.removeClass('l8');
             graphAreaElm.css('height', '600px');
             fullScreenGraphBtnElm.find('i').text('fullscreen_exit');
         } else {
             leftDivElm.removeClass('hide');
-            historyDataElm.removeClass('hide');
+            historyWrapperElm.removeClass('hide');
             rightDivElm.addClass('l8');
             graphAreaElm.css('height', '300px');
             fullScreenGraphBtnElm.find('i').text('fullscreen');
@@ -276,16 +409,31 @@ var JQueryNamespace = (function ($) {
         callback(): may be skipped
      */
     function initLatestData(callback) {
-        drawLatestData(function(){
-            getUnits(function(_unitsObj){
+        if(drawingLatestDataInProgress) {
+            ++drawingLatestDataInProgress;
+            if(typeof(callback) === 'function') callback();
+            return;
+        }
+
+        drawingLatestDataInProgress = 1;
+        drawLatestData(function() {
+            getUnits(function(_unitsObj) {
                 unitsObj = _unitsObj;
                 // create align settings elements
                 var OCIDs = parametersFromURL.l && parametersFromURL.l.length ? parametersFromURL.l.map(function(id) {return {id: id, align: 1}}) : [];
-                if(parametersFromURL.r && parametersFromURL.r.length)
-                    Array.prototype.push.apply(OCIDs, parametersFromURL.r.map(function(id) {return {id: id, align: 2}}));
-                alignSettingsElm.empty().append(OCIDs.map(createAlignElmHTML).join(''));
+                if(parametersFromURL.r && parametersFromURL.r.length) {
+                    Array.prototype.push.apply(OCIDs, parametersFromURL.r.map(function (id) {
+                        return {id: id, align: 2}
+                    }));
+                }
+                alignSettingsElm.html(OCIDs.map(createAlignElmHTML).join(''));
 
-                getCountersValues(function(){
+                getCountersValues(function() {
+                    if(drawingLatestDataInProgress > 1) {
+                        drawingLatestDataInProgress = 0;
+                        return initLatestData(callback);
+                    }
+                    drawingLatestDataInProgress = 0;
                     if(typeof(callback) === 'function') callback();
                 });
             })
@@ -309,10 +457,8 @@ var JQueryNamespace = (function ($) {
 
     function ajaxError (jqXHR, exception) {
         bodyElm.css("cursor", "auto");
-        var msg = '';
-        if (jqXHR.status === 0) {
-            msg = 'Not connect.\n Verify Network.';
-        } else if (jqXHR.status === 404) {
+        var msg;
+        if (jqXHR.status === 404) {
             msg = 'Requested page not found. [404]';
         } else if (jqXHR.status === 500) {
             msg = 'Internal Server Error [500].';
@@ -322,10 +468,18 @@ var JQueryNamespace = (function ($) {
             msg = 'Time out error.';
         } else if (exception === 'abort') {
             msg = 'Ajax request aborted.';
+        } else if (jqXHR.status === 0) {
+            msg = 'Not connect. Verify Network.';
         } else {
             msg = 'Uncaught Error.\n' + jqXHR.responseText;
         }
-        M.toast({html: 'Web server error: ' + msg});
+        M.toast({
+            html: 'Web server error: ' + msg + ' [status: ' + jqXHR.status +
+                (exception ? '; exception: ' + exception : '')+ ']',
+            displayLength: 5000
+        });
+        drawingHistoryInProgress = 0;
+        drawingLatestDataInProgress = 0;
     }
 
     /*
@@ -334,7 +488,7 @@ var JQueryNamespace = (function ($) {
         callback(groups)
         groups: [{id:.., name:...},...]
      */
-    function drawGroups(callback) {
+    function drawGroups(selectAll, callback) {
         var html = '';
 
         var selectedGroupsIDs = getValuesForMultipleSelectElement(selectGroupsElm);
@@ -351,22 +505,25 @@ var JQueryNamespace = (function ($) {
                 IDs: IDs.join(',')
             },
             error: ajaxError,
-            success: function (groups) {
+            success: function (groups) { // SELECT countersGroups.id AS id, countersGroups.name AS name FROM countersGroups...
 
                 bodyElm.css("cursor", "auto");
                 if (!groups || !groups.length) return callback([]);
+
+                var selectedCnt = 0;
                 groups.forEach(function (group) {
 
-                    if ((selectedGroupsIDs.length && selectedGroupsIDs.indexOf(group.id) !== -1) ||
+                    if (selectAll || (selectedGroupsIDs.length && selectedGroupsIDs.indexOf(group.id) !== -1) ||
                         !parametersFromURL.g ||
-                        (parametersFromURL.g && parametersFromURL.g.length && parametersFromURL.g.indexOf(group.id) !== -1))
+                        (parametersFromURL.g && parametersFromURL.g.length && parametersFromURL.g.indexOf(group.id) !== -1)) {
                         var selected = ' selected';
-                    else selected = '';
+                        ++selectedCnt;
+                    } else selected = '';
 
                     html += '<option value="' + group.id + '"' + selected + '>' + escapeHtml(group.name) + '</option>';
                 });
-
-                selectGroupsElm.empty().append(html);
+                if(!selectedCnt) html = html.replace(/(<option[^>]+)>/gi, '$1 selected>');
+                selectGroupsElm.html(html);
 
                 M.FormSelect.init(selectGroupsElm[0], {});
                 selectGroupsElm.change(initCounters);
@@ -388,7 +545,7 @@ var JQueryNamespace = (function ($) {
         var html = '';
         var selectedGroupsIDs = getValuesForMultipleSelectElement(selectGroupsElm);
 
-        if(selectedCountersIDs.length) {
+        if(Array.isArray(selectedCountersIDs) && selectedCountersIDs.length) {
             var selectedCountersIDsObj = {};
             selectedCountersIDs.forEach(function(id){ selectedCountersIDsObj[id] = true; })
         } else selectedCountersIDsObj = null;
@@ -407,11 +564,12 @@ var JQueryNamespace = (function ($) {
             },
             error: ajaxError,
             success: function (counters) {
-
                 bodyElm.css("cursor", "auto");
+                var selectedCnt = -1;
                 if (!counters.length) {
                     html = '<option disabled selected>Not found shared counters for selected objects</option>'
                 } else {
+                    selectedCnt = 0;
                     var countersObj = {}, multipleCounters = {};
                     counters.forEach(function (counter) {
                         if (countersObj[counter.id]) {
@@ -422,17 +580,20 @@ var JQueryNamespace = (function ($) {
                     });
                     for (var id in countersObj) {
                         if (!countersObj.hasOwnProperty(id)) continue;
-                        if (selectedCountersIDs.length && selectedCountersIDs.indexOf(Number(id)) !== -1 ||
+                        if (selectedCountersIDs === true ||
+                            (selectedCountersIDs.length && selectedCountersIDs.indexOf(Number(id)) !== -1) ||
                             !parametersFromURL.o ||
-                            (parametersFromURL.o && parametersFromURL.o.length && parametersFromURL.o.indexOf(Number(id)) !== -1))
+                            (parametersFromURL.o && parametersFromURL.o.length && parametersFromURL.o.indexOf(Number(id)) !== -1)) {
                             var selected = ' selected';
-                        else selected = '';
+                            ++selectedCnt;
+                        } else selected = '';
 
                         html += '<option value="' + id + '"' + selected + '>' + escapeHtml(countersObj[id]) + '</option>';
                     }
                 }
+                if(selectedCnt === 0) html = html.replace(/(<option[^>]+)>/gi, '$1 selected>');
 
-                selectCountersElm.empty().append(html);
+                selectCountersElm.html(html);
 
                 M.FormSelect.init(selectCountersElm[0], {});
                 selectCountersElm.change(initLatestData);
@@ -506,7 +667,7 @@ var JQueryNamespace = (function ($) {
         var selectedOCID = getOCIDFromSelectedLatestDataCheckBoxes();
 
         var currentGroupID = 0, multipleObjects = objects && objects.length > 1;
-        if(!jQuery.isEmptyObject(counters)) {
+        if(Array.isArray(counters) && counters.length) {
             var groupsObj = {};
             groups.forEach(function(group){
                 groupsObj[group.id] = group.name;
@@ -563,7 +724,7 @@ var JQueryNamespace = (function ($) {
             html += htmlGroupTail;
         }
 
-        latestDataElm.empty().append(html);
+        latestDataElm.html(html);
 
         $('a#selectUnselect').click(function() {
             var checkedElms = $(this).closest('table').find('input:checkbox:checked');
@@ -600,9 +761,10 @@ var JQueryNamespace = (function ($) {
         if(withDate) {
             var month = t.getMonth() + 1;
             var date = t.getDate();
-            var dateStr = String(date < 10 ? '0' + date : date) + '.' + String(month < 10 ? '0' + month : month) + '.' + String((t.getYear() - 100))
+            var dateStr = String(date < 10 ? '0' + date : date) + '.' +
+                String(month < 10 ? '0' + month : month) + '.' + String((t.getYear() - 100) + ' ');
         } else dateStr = '';
-        return dateStr + ' ' + String('0' + t.getHours() + ':0' + t.getMinutes() + ':0' + t.getSeconds()).replace(/0(\d\d)/g, '$1');
+        return dateStr + String('0' + t.getHours() + ':0' + t.getMinutes() + ':0' + t.getSeconds()).replace(/0(\d\d)/g, '$1');
     }
 
 
@@ -632,7 +794,7 @@ var JQueryNamespace = (function ($) {
                             var timeStr = String(date < 10 ? '0' + date : date) + '.' + String(month < 10 ? '0' + month : month) + '.' + String((t.getYear() - 100));
                         } else timeStr = timestampToTimeStr(record.timestamp);
                     } else timeStr = '';
-                    $('#OCID-time-' + id).empty().append(timeStr);
+                    $('#OCID-time-' + id).html(timeStr);
 
                     var value = !isNaN(parseFloat(record.data)) && isFinite(record.data) ? record.data * counterObj[id].multiplier : record.data;
 
@@ -642,7 +804,7 @@ var JQueryNamespace = (function ($) {
                     }
                     else if (counterObj[id]) value = formatValue(value, unitsObj[counterObj[id].unitID]);
 
-                    $('#OCID-' + id).empty().append(value).attr('data-tooltip', value);
+                    $('#OCID-' + id).html(value).attr('data-tooltip', value);
                 });
             }
             $("[timestampForLastValue]:contains('loading...')").text('no data');
@@ -666,17 +828,18 @@ var JQueryNamespace = (function ($) {
 
     function drawHistory(callback) {
 
-        if(drawingInProgress) {
+        if(drawingHistoryInProgress) {
+            ++drawingHistoryInProgress;
             if(typeof(callback) === 'function') callback();
             return;
         }
 
-        drawingInProgress = true;
+        drawingHistoryInProgress = 1;
         //console.log('drawHistory: ', (new Date), ': ', (new Error('stack')).stack);
 
         var OCIDs = getOCIDFromSelectedLatestDataCheckBoxes();
 
-        var tableHearedHTML = '';
+        var tableHeaderHTML = '';
         if(OCIDs.length && !jQuery.isEmptyObject(counters)) {
 
             // 5400000 ms = 1:30, if maxRecordsCnt = 0, then return all records
@@ -685,7 +848,7 @@ var JQueryNamespace = (function ($) {
 
             //console.log(dateFrom, dateTo, maxRecordsCnt, OCIDs);
 
-            var messageTail = (maxRecordsCnt ? 'AVERAGE' : 'ALL') +' values from ' +
+            var messageTail = ' values from ' +
                 ((new Date(dateFrom)).toLocaleString()) + ' to ' + ((new Date(dateTo)).toLocaleString());
             messageElm.empty().append('Loading ' + messageTail + '...');
 
@@ -707,33 +870,63 @@ var JQueryNamespace = (function ($) {
                     maxRecordsCnt: maxRecordsCnt
                 },
                 error: ajaxError,
-                success: function (objectsCountersValues) {
-                    // [{<id1>: [{timestamp:.., data:..}, ...]}, {<id2>: [{timestamp:.., data:..}, ....]}, ...]
+                success: function (data) {
+                    // data.history = {<ocid1>: [{timestamp:.., data:..}, ...], <ocid2>: [{timestamp:.., data:..}, ....], ...
 
-                    if (!objectsCountersValues) {
-                        drawingInProgress = false;
+                    var objectsCountersValues = data.history;
+                    //var isDataFromTrends = data.isDataFromTrends;
+                    dataInfo = {};
+
+                    if (!objectsCountersValues || !Object.keys(objectsCountersValues).length) {
+                        if(drawingHistoryInProgress > 1) {
+                            drawingHistoryInProgress = 0;
+                            return drawHistory(callback)
+                        }
+                        drawingHistoryInProgress = 0;
                         bodyElm.css("cursor", "auto");
                         if (typeof (callback) === 'function') callback();
-                        messageElm.empty().append('No data for displaying ' + messageTail);
+                        messageElm.html('No data for displaying ' + messageTail);
                         return;
                     }
+                    var isPartOfDataFromTrends = false;
 
-                    messageElm.empty().append('Displaying ' + messageTail);
-
-                    tableHearedHTML += '<thead><tr><th>Time</th>';
+                    tableHeaderHTML += '<thead style="background-color:rgba(255, 255, 255, 0.7)" id="historyTHead"><tr><th>Time</th>';
                     // set start index (OCIDsIndexes[ocid] variable) to 0 and drawing table header
                     var OCIDsIndexes = {};
-                    OCIDs.forEach(function (ocid) {
+                    Object.keys(objectsCountersValues).forEach(function (ocid) {
                         OCIDsIndexes[ocid] = 0;
                         for (var i = 0; i < counters.length; i++) {
                             var counter = counters[i];
-                            if (counter.OCID === ocid) {
-                                tableHearedHTML += '<th class="right-align">' + escapeHtml(counter.objectName + ':' + counter.name) + '</th>';
+                            if (counter.OCID === Number(ocid)) {
+                                var objectCounterNames = counter.objectName + ':' + counter.name;
+
+                                if(objectsCountersValues[ocid] && objectsCountersValues[ocid][0]) {
+                                    dataInfo[objectCounterNames] = objectsCountersValues[ocid][0];
+                                    dataInfo[objectCounterNames].recordsNum = objectsCountersValues[ocid].length;
+                                    dataInfo[objectCounterNames].ID = ocid;
+                                    if(dataInfo[objectCounterNames].isDataFromTrends ||
+                                        (dataInfo[objectCounterNames].notTrimmedRecordsNum &&
+                                        dataInfo[objectCounterNames].notTrimmedRecordsNum !== dataInfo[objectCounterNames].recordsNum)) {
+                                        isPartOfDataFromTrends = true;
+                                    }
+                                } else {
+                                    dataInfo[objectCounterNames] = {
+                                        ID: ocid,
+                                        recordsNum: 0,
+                                    };
+                                }
+
+                                if(dataViewHumanMode[ocid] === undefined) dataViewHumanMode[ocid] = true;
+                                tableHeaderHTML +=
+                                    '<th class="right-align blue-text tooltipped" style="cursor: pointer" data-th-ocid="' +
+                                    ocid +
+                                    '" data-position="top" data-tooltip="Switch raw\\human (#' + ocid + ')">' +
+                                    escapeHtml(counter.objectName + ':' + counter.name) + '</th>';
                                 return;
                             }
                         }
 
-                        if (objectsCountersValues[ocid].length) {
+                        if (objectsCountersValues[ocid] && objectsCountersValues[ocid].length) {
                             objectsCountersValues[ocid] = objectsCountersValues[ocid].sort(function (a, b) {
                                 if (a.timestamp < b.timestamp) return 1;
                                 if (a.timestamp > b.timestamp) return -1;
@@ -741,108 +934,130 @@ var JQueryNamespace = (function ($) {
                             })
                         }
                     });
-                    tableHearedHTML += '</tr></thead>';
-                    var tableBodyElm = $('<tbody></tbody>');
+
+                    messageElm.html('Displaying ' + (isPartOfDataFromTrends ? 'TRENDS' : 'ALL') +' values from ' +
+                        ((new Date(dateFrom)).toLocaleString()) + ' to ' + ((new Date(dateTo)).toLocaleString()));
+
+                    tableHeaderHTML += '</tr></thead>';
+                    historyTHeadElm = $(tableHeaderHTML);
+                    historyTBodyElm = $('<tbody></tbody>');
 
                     if (historyTooltipsInstances && historyTooltipsInstances.length) {
                         historyTooltipsInstances.forEach(function (instance) {
                             instance.destroy();
-                        })
+                        });
                     }
 
-                    historyDataElm.empty().append(tableHearedHTML, tableBodyElm);
-
-                    if (!jQuery.isEmptyObject(objectsCountersValues)) {
-
-                        // from older (smaller) timestamp values to newer (bigger)
-                        // completedDrawingOCIDs[ocid] = true|undefined. if true, then all data from array for this ocid was processed and printed
-                        // variable attempts will limits attempts count to 1000
-                        for (var completedDrawingOCIDs = {}, attempts = 0; Object.keys(completedDrawingOCIDs).length !== OCIDs.length && attempts < 5000; attempts++) {
-                            var minTimestamp = 0, minNextTimestamp = 0, maxTimestamp = 0;
-
-                            // searching most smaller (min) next timestamp from all next OCIDs timestamps.
-                            OCIDs.forEach(function (ocid) {
-                                // if index of current OCID greater then OCID array length, mark this OCID array completed processing.
-                                // when all OCID arrays will be marked as completed, main loop is finished
-                                if (!objectsCountersValues[ocid] || !objectsCountersValues[ocid].length || objectsCountersValues[ocid].length <= OCIDsIndexes[ocid] + 1) {
-                                    completedDrawingOCIDs[ocid] = true;
-                                    return;
-                                }
-                                // find min timestamp from OCIDs timestamps
-                                var nextTimestamp = objectsCountersValues[ocid][OCIDsIndexes[ocid] + 1].timestamp;
-                                var currentTimestamp = objectsCountersValues[ocid][OCIDsIndexes[ocid]].timestamp;
-
-                                // minNextTimestamp > currentTimestamp
-                                // checking for error in data, when next timestamp lower then current timestamp
-                                if (nextTimestamp > currentTimestamp && (!minNextTimestamp || minNextTimestamp > nextTimestamp))
-                                    minNextTimestamp = nextTimestamp;
-                            });
-
-                            var historyRow = '';
-
-                            //
-                            OCIDs.forEach(function (ocid) {
-                                if (objectsCountersValues[ocid] && objectsCountersValues[ocid].length &&
-                                    objectsCountersValues[ocid].length > OCIDsIndexes[ocid]) {
-                                    var currentTimestamp = objectsCountersValues[ocid][OCIDsIndexes[ocid]].timestamp;
-                                } else currentTimestamp = 0;
-
-                                if (currentTimestamp && (currentTimestamp <= minNextTimestamp || !minNextTimestamp)) {
-
-                                    // calculate min timestamp for current row. It can be most smaller timestamp value
-                                    // from timestamp values of all current OCIDs
-                                    if (!minTimestamp || minTimestamp > currentTimestamp) minTimestamp = currentTimestamp;
-
-                                    // calculate max timestamp for current row. It can be most bigger timestamp value
-                                    // from timestamp values of all current OCIDs
-                                    if (maxTimestamp < currentTimestamp) maxTimestamp = currentTimestamp;
-
-                                    var value = objectsCountersValues[ocid][OCIDsIndexes[ocid]].data;
-                                    var multipliedValue = !isNaN(parseFloat(value)) && isFinite(value) ? value * counterObj[ocid].multiplier : value;
-                                    historyRow += '<td class="right-align tooltipped" data-position="top" data-tooltip="' +
-                                        timestampToTimeStr(currentTimestamp, timestampWithDate) + ':' + escapeHtml(value) + '">' +
-                                        formatValue(multipliedValue, unitsObj[counterObj[ocid].unitID]) +
-                                        '</td>';
-                                    // for debugging
-                                    //historyRow += '<td class="right-align">' + formatValue(objectsCountersValues[ocid][OCIDsIndexes[ocid]].data, unitsObj[counterObj[ocid].unitID]) +
-                                    //    ':'+OCIDsIndexes[ocid]+'/'+objectsCountersValues[ocid].length+';'+Object.keys(completedDrawingOCIDs).length+'/'+OCIDs.length+'</td>';
-
-//if(/null/.test(historyRow)) console.log(OCIDsIndexes[ocid] + '/' + objectsCountersValues[ocid].length + ';' +
-//    objectsCountersValues[ocid][OCIDsIndexes[ocid]].data + ' -', unitsObj[counterObj[ocid].unitID],
-//    ' = ' + formatValue(objectsCountersValues[ocid][OCIDsIndexes[ocid]].data, unitsObj[counterObj[ocid].unitID]));
-
-                                    // Increase index for OCID only if counter value for this index was printed.
-                                    // else waiting for correct time interval
-                                    if (objectsCountersValues[ocid].length > OCIDsIndexes[ocid]) ++OCIDsIndexes[ocid];
-                                } else historyRow += '<td>&nbsp;</td>';
-                                // for debugging
-                                //} else historyRow += '<td class="right-align">'+OCIDsIndexes[ocid]+'/'+objectsCountersValues[ocid].length+':'+
-                                //    timestampToTimeStr(minNextTimestamp)+'/'+(currentTimestamp ? timestampToTimeStr(currentTimestamp) : '0')+'</td>';
-                            });
-
-                            var minTimestampStr = timestampToTimeStr(minTimestamp, timestampWithDate);
-                            var maxTimestampStr = timestampToTimeStr(maxTimestamp);
-                            if (minTimestamp + 1000 >= maxTimestamp) var timestampStr = minTimestampStr;
-                            else timestampStr = minTimestampStr + '-' + maxTimestampStr;
-
-                            tableBodyElm.prepend('<tr><td>' + timestampStr + '</td>' + historyRow + '</tr>');
-                        }
+                    if(historyHeaderTooltipsInstances && historyHeaderTooltipsInstances.length) {
+                        historyHeaderTooltipsInstances.forEach(function (instance) {
+                            instance.destroy();
+                        });
                     }
+
+                    // don't replace .empty().append(...) to html(...)
+                    historyDataElm.empty().append(historyTHeadElm, historyTBodyElm);
+
+                    // settings for the correct display of the floating header
+                    historyDataElm.css({tableLayout: 'fixed'});
+                    var td = historyTBodyElm.children('tr:first').find('td');
+                    historyTHeadElm.find('th').each(function (idx) {
+                        $(this).css({width: $(this).width()});
+                        td.eq(idx).css({width: $(this).width()});
+                    });
+
+                    historyHeaderTooltipsInstances =  M.Tooltip.init(document.querySelectorAll('[data-th-ocid]'), {
+                        enterDelay: 2000
+                    });
+
+                    $('[data-th-ocid]').click(function () {
+                        dataViewHumanMode[$(this).attr('data-th-ocid')] = !dataViewHumanMode[$(this).attr('data-th-ocid')];
+                        drawHistory();
+                    });
+
+                    var table = makeLatestDataTable(timestampWithDate, objectsCountersValues);
+                    historyTBodyElm.append(table.join(''));
                     historyTooltipsInstances = M.Tooltip.init(document.querySelectorAll('td.tooltipped'), {
                         enterDelay: 1000
                     });
 
                     prepareDataForGraph(objectsCountersValues);
-                    drawingInProgress = false;
+                    if(drawingHistoryInProgress > 1) {
+                        drawingHistoryInProgress = 0;
+                        return drawHistory(callback)
+                    }
+                    drawingHistoryInProgress = 0;
                     bodyElm.css("cursor", "auto");
+                    scrollIframe();
                     if (typeof (callback) === 'function') callback();
                 }
             });
         } else {
             historyDataElm.empty();
             prepareDataForGraph({});
-            drawingInProgress = false;
+            if(drawingHistoryInProgress > 1) {
+                drawingHistoryInProgress = 0;
+                return drawHistory(callback)
+            }
+            drawingHistoryInProgress = 0;
+            dataInfo = {};
+            M.Toast.dismissAll();
             if(typeof(callback) === 'function') callback();
+        }
+    }
+
+    //{<ocid1>: [{timestamp:.., data:..}, ...], <ocid2>: [{timestamp:.., data:..}, ....], ...}
+    function makeLatestDataTable(timestampWithDate, data) {
+        var pos = {}, OCIDs = Object.keys(data), dataExist = 0;
+        OCIDs.forEach(function (ocid) {
+            if(data[ocid] && data[ocid].length) {
+                pos[ocid] = data[ocid].length-1;
+                ++dataExist;
+                //console.log(ocid, data[ocid][0].recordsFromCache, data[ocid].length)
+            } else pos[ocid] = 0;
+        });
+        if(!dataExist) return []; // no data
+
+        var HTML = [];
+        while(true) {
+            var to = null, from = null;
+            var minTimestamp = getMaxTimestampFromPrevRow(data, pos);
+            var row = OCIDs.map(function (ocid) {
+                if(!data[ocid] || pos[ocid] < 0) return '<td>&nbsp;</td>';
+                var d = data[ocid][pos[ocid]];
+                if(d && (minTimestamp === null || d.timestamp >= minTimestamp)) {
+                    if(to === null || d.timestamp > to) to = d.timestamp;
+                    if(from === null || d.timestamp < from) from = d.timestamp
+                    var recordFromCacheClass = data[ocid][0].recordsFromCache &&
+                        data[ocid][0].recordsFromCache >= data[ocid].length - pos[ocid] ? ' blue-text text-darken-4' : '';
+                    --pos[ocid];
+                    var multipliedValue = !isNaN(parseFloat(d.data)) && isFinite(d.data) ?
+                        d.data * counterObj[ocid].multiplier : escapeHtml(d.data);
+
+                    return '<td class="right-align tooltipped'+ recordFromCacheClass +'" data-position="top" data-tooltip="' +
+                        timestampToTimeStr(d.timestamp, timestampWithDate)+ '.'+ d.timestamp % 1000 +
+                        ':<b>' + escapeHtml(d.data) + '</b>">' +
+                        (dataViewHumanMode[ocid] ?
+                            formatValue(multipliedValue, unitsObj[counterObj[ocid].unitID]) : multipliedValue) +
+                        '</td>';
+                } else return '<td>&nbsp;</td>';
+            });
+
+            HTML.push('<tr><td>' +
+                (from !== null && from + 1000 < to ? timestampToTimeStr(from, timestampWithDate) + '-': '') +
+                timestampToTimeStr(to) + '</td>' +
+                row.join('')+ '</tr>');
+            if(minTimestamp === null) break;
+        }
+
+        return HTML;
+
+        function getMaxTimestampFromPrevRow(data, pos) {
+            var max = null;
+            for(var ocid in pos) {
+                var d = data[ocid] && pos[ocid] > 0 ? data[ocid][pos[ocid]-1] : null;
+                if(d && (max === null || d.timestamp > max)) max = d.timestamp;
+            }
+            return max;
         }
     }
 
@@ -885,6 +1100,26 @@ var JQueryNamespace = (function ($) {
         else suffix = unit.prefixes[i] + unit.abbreviation;
 
         return escapeHtml(newVal + ' ' + suffix);
+    }
+
+    function fromHumanDataView(data) {
+        // '   20 Gb '.match(/^ *(\d+) *([A-Z]+) *$/i); = [ '20 Gb', '20', 'Gb', index: 0, input: '20 Gb', groups: undefined ]
+        var res = data.match(/^ *(-?\d+\.?\d*) *([A-Z]+) *$/i);
+        if(!res || res.length !== 3 || typeof res[1] !== 'string' || typeof res[2] !== 'string') return '';
+        var num = Number(res[1]);
+        var unit = res[2];
+        //unitObj { <unitID>: {id:.., name:..., abbreviation:.., multiplies: [xx,yy,], prefixes: [str1, str2], onlyPrefixes:...}, ... }
+        for(var unitID in unitsObj) {
+            var unitObj = unitsObj[unitID], abbr = unitObj.abbreviation;
+            if(!unitObj.prefixes.length) return (unit === abbr ? num : '');
+            // skip first prefix[0] = abbreviation
+            for(var i = 0; i < unitObj.prefixes.length; i++) {
+                var prefix = unitObj.prefixes[i];
+                var abbrPref = unitObj.onlyPrefixes ? prefix : (abbr !== prefix ? prefix + abbr : prefix);
+                if(unit === abbrPref) return num * unitObj.multiplies[i];
+            }
+        }
+        return '';
     }
 
     function secondsToHuman ( seconds ) {
@@ -949,7 +1184,8 @@ var JQueryNamespace = (function ($) {
     function getDateString(date) {
         if(!date) date = new Date();
 
-        return date.getDate() + ' ' + monthNames[date.getMonth()] + ', ' + date.getFullYear();
+        return (date.getDate() < 10 ? '0' + date.getDate() : date.getDate()) + ' ' + monthNames[date.getMonth()] +
+            ', ' + date.getFullYear();
     }
 
     /*
@@ -976,8 +1212,10 @@ var JQueryNamespace = (function ($) {
 
         function getLimitValues(elmID) {
             var val = $(elmID).val();
-            if(/^\d+$/.test(val)) return Number(val);
-            return '';
+            if(!val) return '';
+            val = val.replace(/,/g, '.');
+            if(/^ *-?\d+\.?\d* *$/.test(val)) return Number(val);
+            return fromHumanDataView(val);
         }
         var yMinLeft = getLimitValues('#yMinLeft');
         var yMaxLeft = getLimitValues('#yMaxLeft');
@@ -1124,9 +1362,9 @@ var JQueryNamespace = (function ($) {
                 (yAxisNumber === 2 ? ' (right)' : '');
 
             if(!alignElm.length) alignSettingsElm.append(createAlignElmHTML({id: ocid, align: yAxisNumber}));
-
-            $('div[minAvgMax="'+ocid+'"]').text((Math.round(min * 100) / 100) + ' \\ ' + (Math.round(avg * 100) / 100) + ' \\ ' +
-                (Math.round(max * 100) / 100));
+            $('div[minAvgMax="'+ocid+'"]').text(formatValue(min, unitsObj[counterObj[ocid].unitID]) + ' \\ ' +
+                formatValue(avg, unitsObj[counterObj[ocid].unitID]) + ' \\ ' +
+                formatValue(max, unitsObj[counterObj[ocid].unitID]));
         }
 
         graphProperties.title = Object.keys(countersNames).join(', ');
@@ -1209,4 +1447,44 @@ var JQueryNamespace = (function ($) {
         // graph.download.saveImage('png', null, null, true); // function (type, width, height, replaceCanvas)
     }
 
+    function noObjectsSelected() {
+        //leftDivElm.addClass('hide');
+        rightDivElm.addClass('hide');
+
+        var cardPanel = '<div class="card-panel"><div id="sinus" style="height:400px;width:100%"></div></div>';
+        leftDivElm.addClass('l12').html(cardPanel);
+        var
+            container = document.getElementById('sinus'),
+            start = (new Date).getTime(),
+            data, graph, offset, i;
+
+        // Draw a sine curve at time t
+        function animate (t) {
+
+            data = [];
+            offset = 2 * Math.PI * (t - start) / 10000;
+
+            // Sample the sine function
+            for (i = 0; i < 4 * Math.PI; i += 0.2) {
+                data.push([i, Math.sin(i - offset)]);
+            }
+
+            // Draw Graph
+            graph = Flotr.draw(container, [ { data: data, label: 'Until you have selected objects, please see the sin(x) graph'} ], {
+                title : 'Waiting for objects to be selected...',
+                subtitle : 'Objects must contain counters with historical data',
+                yaxis : {
+                    max : 1,
+                    min : -1
+                }
+            });
+
+            // Animate
+            setTimeout(function () {
+                animate((new Date).getTime());
+            }, 50);
+        }
+
+        animate(start);
+    }
 })(jQuery); // end of jQuery name space

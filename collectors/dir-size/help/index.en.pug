@@ -1,0 +1,50 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-03-22 14:02:00
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Directory size: calculates the size of directories
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Directory size
+                    h5.light.
+                        Directory size used to calculate the size of directories.
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Directory size description
+                    p.
+                        Directory size is used to calculate the size of the given directories.
+                        You can set exceptions both in text form and in the form of a regular expression.
+                        To reduce the load on the system, after calculating the size of each file, the execution of
+                        the collector is suspended for a specified time.
+                    h3 Parameters
+                    ul.browser-default
+                        li.
+                            Directory names (comma separated) - list of directories to calculate the size (comma separated).
+                            Spaces at the beginning and end of each directory name will be removed.
+                        li.
+                            Excluded directories (comma separated) - list of directories and files to be excluded
+                            from counting the size (separated by commas).
+                            Leading and trailing spaces for each directory name will be removed.
+                        li.
+                            Excluded directories in regExp format - directories and files for exclusion are written in
+                            regular expression format. If disabled, then these are the exact values.
+                        li.
+                            Sleep periodically for reduce load (ms) - To reduce the load on the system, after calculating
+                            the size of each file, the collector is paused for the specified amount of time in milliseconds.
+                        li.
+                            Maximum execution time after which a warning will appear in the log (ms) - Maximum lead time
+                             calculations, after which a warning will be added to the log file.
+                    h3 Returned value
+                    p.
+                        Directory size in bytes

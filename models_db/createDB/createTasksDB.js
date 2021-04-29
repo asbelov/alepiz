@@ -42,7 +42,7 @@ module.exports = function(callback){
                     'groupID INTEGER REFERENCES tasksGroups(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
                     'userID INTEGER REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
                     'name TEXT,' +
-                    'timestamp DATETIME NOT NULL)', function (err) {
+                    'timestamp INTEGER NOT NULL)', function (err) {
                     if (err) return callback(new Error('Can\'t create tasks table in database: ' + err.message));
 
                     db.run('CREATE INDEX IF NOT EXISTS name_timestamp_index on tasks(timestamp)', function (err) {
@@ -73,14 +73,14 @@ module.exports = function(callback){
                                             'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
                                             'taskActionID INTEGER REFERENCES tasksActions(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
                                             'name TEXT NOT NULL,' +
-                                            'value TEXT NOT NULL)', function (err) {
+                                            'value TEXT)', function (err) {
                                             if (err) return callback(new Error('Can\'t create tasksParameters table in database: ' + err.message));
 
                                             log.debug('Creating tasksRunConditions table in database');
                                             db.run(
                                                 'CREATE TABLE IF NOT EXISTS tasksRunConditions (' +
                                                 'taskID INTEGER REFERENCES tasks(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
-                                                'timestamp DATETIME NOT NULL,' + // record change timestamp
+                                                'timestamp INTEGER NOT NULL,' + // record change timestamp
                                                 'runType INTEGER NOT NULL,' +
                                                 'userApproved INTEGER REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
                                                 'userCanceled INTEGER REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE)', function (err) {

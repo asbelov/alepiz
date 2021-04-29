@@ -24,17 +24,21 @@ var parameters = {
     numberType: 0,
     textType: 1,
     initCachedRecords: 5,
-    queryMaxResultNumbers: 1000,
+    queryMaxResultNumbers: 5000,
     queryMaxResultStrings: 50,
     dbPath: 'db',
+    tempDir: 'temp',
     dbFile: 'storage.db',
+    db: [], // [{path:.., file:...}, {path:.., file:..},...]
     dumpFileName: 'unsavedData.json',
     queriesMaxQueueLength: 200,
     slowQueueSec: 15,
     cacheServiceExitTimeout: 86400000, // exit when running more then 24 hours
     cacheServiceTimeout: 3600000, // terminate cache service when running more then 1 hour
     cacheServiceTimeoutForSaveObjectRecords: 600000, // terminate cache service when saving records for object more then 10 min
-    housekeeperInterval: 3600000, // how often houseKeeper will running
+    housekeeperInterval: 1800000, // how often houseKeeper will running
+    housekeeperWaitTimeout: 1200000, // time to wait until the housekeeper is not checked or not made changes
+    housekeeperWatchdogCheckInterval: 300000, // time interval for checking housekeeper
 
     init: function (initParameters) {
         for (var parameter in initParameters) {

@@ -1,0 +1,52 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-10-2 2:33:37
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Data aggregator: обработка данных для нескольких объектов
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Data aggregator
+                    h5.light.
+                        Data aggregator используется обработки данных, полученных для счетчика, подключенного к
+                        нескольким объектам.
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание Data aggregator
+                    p.
+                        Data aggregator используется для обработки данных, полученных для определенного счетчика,
+                        который подключен к нескольким объектам. Список объектов можно задать через запятую или через
+                        подстановки (wildcards) SQL Lite.
+                        Например, сборщик позволит посчитать суммарную утилизацию CPU для кластера,
+                        либо средний расход памяти для процессов определенного типа.
+                    h3 Параметры
+                    ul.browser-default
+                        li.
+                            Object names (comma separated in SQL Like format) - Список объектов через запятую.
+                            В именах объектов можно использовать подстановки SQL Like формата
+                            ("_" - любой один символ, "%" - ноль или больше любых символов). Начальные и конечные
+                            пробелы для каждого объекта будут удалены.
+                        li.
+                            counterName - имя общего для выбранных объектов счетчика, для которого будут получены и
+                            обработаны  исторические данные. Если указанный счетчик не подключен к части объектов, эти объекты
+                            будут пропущены. Начальные и конечные пробелы будут удалены.
+                        li.
+                            Function - функция, используемая для обработки данных:
+                        ul.browser-default
+                            li sum - полученные данные складываются
+                            li avg - вычисляется среднее арифметическое для полученных данных
+                            li min value - возвращается минимальное значение из полученных данных
+                            li max value - возвращается максимальное значение из полученных данных
+                    h3 Возвращаемое значение
+                    p.
+                        Значение, полученное в результате обработки данных

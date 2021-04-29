@@ -19,5 +19,41 @@ module.exports = function(args, callback) {
 
     if (func === 'getTemplatesParameters') return objectsDB.getObjectsByIDs(args.username, args.ids.split(','), callback);
 
+    if (func === 'getAllForCounter') return  countersDB.getAllForCounter(args.username, args.ids.split(','), callback);
+
     return callback(new Error('Ajax function is not set or unknown function'));
 };
+
+/*
+objects.
+objectsParameters
+interactions.objectID1
+interactions.objectID2
+
+objectsCounters.counterID
+objectsCounters.objectID
+
+counters.groupID
+counters.unitID
+counters.taskCondition
+
+countersGroups
+countersUnits
+
+countersUpdateEvents.parentCounterID
+counterUpdateEvents.parentObjectID (may be NULL)
+counterUpdateEvents.objectFilter // regExp for filtering depended objects by object name
+
+variables.objectID (may be NULL)
+variables.parentCounterName // for get data using a historical function from a specified counter
+variables.objectName // for get data using a historical function from a specified object when an objectID is not set. May be a variable
+
+countersParameters (runTask.taskID)
+
+tasks
+tasksGroups
+tasksActions
+auditUsers
+taskParameters
+
+ */

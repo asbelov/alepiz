@@ -55,7 +55,7 @@
                 "path": "templates/newTask.txt"
             },
             "html": {
-                "path": "templates/replayTask.html"
+                "path": "templates/replyTask.html"
             }
         }
     },
@@ -71,7 +71,7 @@
                 "path": "templates/newTask.txt"
             },
             "html": {
-                "path": "templates/replayTask.html"
+                "path": "templates/replyTask.html"
             }
         }
     },
@@ -87,7 +87,7 @@
                 "path": "templates/newTask.txt"
             },
             "html": {
-                "path": "templates/replayTask.html"
+                "path": "templates/replyTask.html"
             }
         }
     },
@@ -103,7 +103,7 @@
                 "path": "templates/newTask.txt"
             },
             "html": {
-                "path": "templates/replayTask.html"
+                "path": "templates/replyTask.html"
             }
         }
     }

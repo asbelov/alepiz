@@ -57,35 +57,41 @@ module.exports = function(args, callback) {
                     var objectID = object.id;
                     countersDB.getObjectCounterID(objectID, startTimeCounterID, function (err, startTimeRow) {
                         if(err) {
-                            return callback(new Error('Can\'t get startTime OCID for objectID: ' + objectID +
-                                ' and startCounterID ' + startTimeCounterID + ': ' + err.message));
+                            log.warn('Can\'t get startTime OCID for objectID: ' + objectID +
+                                ' and startCounterID ' + startTimeCounterID + ': ' + err.message);
+                            return callback();
                         }
 
                         if(!startTimeRow || !startTimeRow.id) {
-                            return callback(new Error('Can\'t find startTime OCID for objectID ' + objectID +
-                                ', counterID: ' + startTimeCounterID + ': ' + JSON.stringify(startTimeRow)));
+                            log.warn('Can\'t find startTime OCID for objectID ' + objectID +
+                                ', counterID: ' + startTimeCounterID + ': ' + JSON.stringify(startTimeRow));
+                            return callback();
                         }
 
                         countersDB.getObjectCounterID(objectID, stopTimeCounterID, function (err, stopTimeRow) {
                             if(err) {
-                                return callback(new Error('Can\'t get stopTime OCID for objectID: ' + objectID +
-                                    ' and stopCounterID ' + stopTimeCounterID + ': ' + err.message));
+                                log.warn('Can\'t get stopTime OCID for objectID: ' + objectID +
+                                    ' and stopCounterID ' + stopTimeCounterID + ': ' + err.message);
+                                return callback();
                             }
 
                             if(!stopTimeRow || !stopTimeRow.id) {
-                                return callback(new Error('Can\'t find stopTime OCID for objectID ' + objectID +
-                                    ', counterID: ' + stopTimeCounterID +': ' + JSON.stringify(stopTimeRow)));
+                                log.warn('Can\'t find stopTime OCID for objectID ' + objectID +
+                                    ', counterID: ' + stopTimeCounterID +': ' + JSON.stringify(stopTimeRow));
+                                return callback();
                             }
 
                             countersDB.getObjectCounterID(objectID, serviceStateCounterID, function (err, serviceStateRow) {
                                 if (err) {
-                                    return callback(new Error('Can\'t get serviceState OCID for objectID: ' + objectID +
-                                        ' and serviceStateCounterID ' + serviceStateCounterID + ': ' + err.message));
+                                    log.warn('Can\'t get serviceState OCID for objectID: ' + objectID +
+                                        ' and serviceStateCounterID ' + serviceStateCounterID + ': ' + err.message);
+                                    return callback();
                                 }
 
                                 if (!serviceStateRow || !serviceStateRow.id) {
-                                    return callback(new Error('Can\'t find serviceState OCID for objectID ' + objectID +
-                                        ', counterID: ' + serviceStateCounterID + ': ' + JSON.stringify(serviceStateRow)));
+                                    log.warn('Can\'t find serviceState OCID for objectID ' + objectID +
+                                        ', counterID: ' + serviceStateCounterID + ': ' + JSON.stringify(serviceStateRow));
+                                    return callback();
                                 }
 
                                 var startTimeOCID = startTimeRow.id;
@@ -93,19 +99,28 @@ module.exports = function(args, callback) {
                                 var serviceStateOCID = serviceStateRow.id;
 
                                 history.getByIdx(startTimeOCID, 0, historyDataCnt, 0, function (err, startData) {
-                                    if (err) return callback(err);
+                                    if (err) {
+                                        log.warn('Can\'t get history data for start times for objectID ' + objectID + ': ' + err.message);
+                                        return callback();
+                                    }
                                     if(!startData || !startData.length) {
                                         log.warn('History data for counter ' + startTimeCounterName + ' not found');
                                     }
 
                                     history.getByIdx(stopTimeOCID, 0, historyDataCnt, 0, function (err, stopData) {
-                                        if (err) return callback(err);
+                                        if (err) {
+                                            log.warn('Can\'t get history data for stop times for objectID ' + objectID + ': ' + err.message);
+                                            return callback();
+                                        }
                                         if(!stopData || !stopData.length) {
                                             log.warn('History data for counter ' + stopTimeCounterName + ' not found');
                                         }
 
                                         history.getByIdx(serviceStateOCID, 0, 1, 0, function (err, serviceStateData) {
-                                            if (err) return callback(err);
+                                            if (err) {
+                                                log.warn('Can\'t get history data for service state for objectID ' + objectID + ': ' + err.message);
+                                                return callback();
+                                            }
                                             if(!serviceStateData || !serviceStateData.length) {
                                                 log.warn('History data for counter ' + serviceStateName + ' not found');
                                             }

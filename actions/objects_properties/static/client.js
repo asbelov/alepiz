@@ -10,23 +10,40 @@ var JQueryNamespace = (function ($) {
     $(function () {
         init(parameters.objects);
         $('#addProperty').click(addProperty);
+        M.Tabs.init(document.getElementById('mainTabs'), {});
     });
 
     // path to ajax
     var serverURL = parameters.action.link+'/ajax',
-        propIdx = 0;
+        propIdx = 0,
+        modes = {
+            0: 'Not calculated text field',
+            1: 'Checkbox',
+            2: 'Not calculated text area',
+            3: 'Calculated expression',
+        };
 
     return { init: init };
 
     function init(objects) {
+        $('#searchProperties').unbind('click', searchObjectsWithProperties).click(searchObjectsWithProperties);
+        $('#propertyName').unbind('keyup').keyup(function(e) {
+            if(e.which === 13) searchObjectsWithProperties();
+            else if(e.which === 27) $(this).val('');
+        });
 
-        // HTML chars in names are always escaped by jquery
-        $('#objectsNames').text(objects.map(function(obj){ return obj.name}).join(', '));
-
+        var objectsNamesElm = $('#objectsNames');
+        var addPropertyElm = $('#addProperty');
         $('#propertiesField').empty();
+        if(!objects || !objects.length) {
+            objectsNamesElm.html('No objects selected');
+            addPropertyElm.hide();
+            return;
+        }
+        // HTML chars in names are always escaped by jquery
+        objectsNamesElm.text(objects.map(function(obj){ return obj.name}).join(', '));
 
         var IDs = objects.map(function(obj){ return obj.id});
-        var addPropertyElm = $('#addProperty');
         if(!IDs || !IDs.length) {
             addPropertyElm.hide();
             return;
@@ -36,9 +53,13 @@ var JQueryNamespace = (function ($) {
         $.post(serverURL, {func: 'getSharedObjectsProperties', IDs: IDs.join(',')}, function(properties){
             if(!properties || !properties.length) return;
 
-            properties.reverse().forEach(function(property) {
-                addProperty(property);
-            });
+            properties.sort(function(a, b) {
+                if(!a || !b) return 0;
+                if(a.name > b.name) return -1;
+                if(a.name < b.name) return 1;
+                return 0;
+            }).forEach(addProperty);
+
             M.updateTextFields();
             setTimeout(function() {
                 $('textarea').each(function() {
@@ -56,22 +77,16 @@ var JQueryNamespace = (function ($) {
         if(typeof property.description !== 'string') property.description = '';
 
         var propertyValueCheckboxHTML = '\
-            <div class="col s12">\
                 <label><input type="checkbox" id="property'+propIdx+'value"' +(property.value ? ' checked': '')+ '/>\
-                <span>Value</span></label>\
-            </div>';
+                <span>Value</span></label>';
 
         var propertyValueTextareaHTML = '\
-            <div class="col s12 input-field">\
                 <textarea id="property'+propIdx+'value" class="materialize-textarea">' + escapeHtml(property.value) + '</textarea>\
-                <label for="property'+propIdx+'value"' +(property.value ? ' class="active"': '')+ '>Value</label>\
-            </div>';
+                <label for="property'+propIdx+'value"' +(property.value ? ' class="active"': '')+ '>Value</label>';
 
         var propertyValueTextFieldHTML = '\
-                <div class="col s12 input-field">\
                     <input type="text" id="property'+propIdx+'value"' +(property.value ? ' value="' + escapeHtml(property.value) + '"': '')+ '/>\
-                    <label for="property'+propIdx+'value"' +(property.value ? ' class="active"': '')+ '>Value</label>\
-                </div>';
+                    <label for="property'+propIdx+'value"' +(property.value ? ' class="active"': '')+ '>Value</label>';
 
 
         if(property.mode === 1) var propertyValueHTML = propertyValueCheckboxHTML;
@@ -82,31 +97,30 @@ var JQueryNamespace = (function ($) {
         }
 
         var html = '\
-<div class="card">\
-    <div class="card-content">\
-        <a href="#!" removeProp="'+propIdx+'">\
-            <i class="material-icons right">close</i>\
-        </a>\
-        <span class="card-title">Object property</span>\
-        <div class="row">\
-            <div class="col s12 m7 l9 input-field">\
-                <input type="text" id="property'+propIdx+'name"' +(property.name ? ' value="' + escapeHtml(property.name) + '"': '')+ '/>\
-                <label for="prop_'+propIdx+'name"' +(property.name ? ' class="active"': '')+ '>Name</label>\
-            </div>\
-            <div class="col s12 m5 l3 input-field">\
-                <select id="property'+propIdx+'mode" propIdx="' + propIdx + '">\
-                    <option value="0"' +(property.mode === 0 ? ' selected' : '')+ '>Not calculated text field</option>\
-                    <option value="1"' +(property.mode === 1 ? ' selected' : '')+ '>Checkbox</option>\
-                    <option value="2"' +(property.mode === 2 ? ' selected' : '')+ '>Not calculated text area</option>\
-                    <option value="3"' +(property.mode === 3 ? ' selected' : '')+ '>Calculated expression</option>\
-                </select>\
-                <label>Display mode</label>\
-            </div>\
-            <span propertyValue="'+ propIdx +'">' + propertyValueHTML + '</span>\
-            <div class="col s12 m12 l12 input-field">\
-                <textarea id="property'+propIdx+'description" class="materialize-textarea">' +escapeHtml(property.description)+ '</textarea>\
-                <label for="prop_'+propIdx+'description"' +(property.description ? ' class="active"': '')+ '>Description</label>\
-            </div>\
+<div>\
+    <div class="row no-margin">\
+        <div class="col s12 m4 l2 input-field">\
+            <input type="text" id="property'+propIdx+'name"' +(property.name ? ' value="' + escapeHtml(property.name) + '"': '')+ '/>\
+            <label for="prop_'+propIdx+'name"' +(property.name ? ' class="active"': '')+ '>Name</label>\
+        </div>\
+        <div class="col s12 m4 l4 input-field" propertyValue="'+ propIdx +'">' + propertyValueHTML + '</div>\
+        <div class="col s12 m3 l2 input-field">\
+            <select id="property'+propIdx+'mode" propIdx="' + propIdx + '">\
+                <option value="0"' +(property.mode === 0 ? ' selected' : '')+ '>'+ modes[0] + '</option>\
+                <option value="1"' +(property.mode === 1 ? ' selected' : '')+ '>'+ modes[1] + '</option>\
+                <option value="2"' +(property.mode === 2 ? ' selected' : '')+ '>'+ modes[2] + '</option>\
+                <option value="3"' +(property.mode === 3 ? ' selected' : '')+ '>'+ modes[3] + '</option>\
+            </select>\
+            <label>Mode</label>\
+        </div>\
+        <div class="col s12 m12 l3 input-field">\
+            <textarea id="property'+propIdx+'description" class="materialize-textarea">' +escapeHtml(property.description)+ '</textarea>\
+            <label for="prop_'+propIdx+'description"' +(property.description ? ' class="active"': '')+ '>Description</label>\
+        </div>\
+        <div class="col input-field">\
+            <a href="#!" removeProp="'+propIdx+'">\
+                <i class="material-icons">close</i>\
+            </a>\
         </div>\
     </div>\
 </div>\
@@ -121,13 +135,36 @@ var JQueryNamespace = (function ($) {
         (function(propIdx, propertyValueTextFieldHTML, propertyValueCheckboxHTML, propertyValueTextareaHTML) {
             $('#property' + propIdx + 'mode').change(function () {
                 var mode = $(this).val();
-                var propertyValueElm = $('span[propertyValue=' + propIdx + ']');
-                if (mode === '1') propertyValueElm.empty().append(propertyValueCheckboxHTML);
-                else if (mode === '2' || mode === '3') propertyValueElm.empty().append(propertyValueTextareaHTML);
+                var propertyValueElm = $('[propertyValue=' + propIdx + ']');
+                if (mode === '1') propertyValueElm.html(propertyValueCheckboxHTML);
+                else if (mode === '2' || mode === '3') propertyValueElm.html(propertyValueTextareaHTML);
                 else propertyValueElm.empty().append(propertyValueTextFieldHTML);
             });
         })(propIdx, propertyValueTextFieldHTML, propertyValueCheckboxHTML, propertyValueTextareaHTML);
 
         ++propIdx;
+    }
+
+    function searchObjectsWithProperties() {
+        var propName = $('#propertyName').val();
+        if(!propName) return;
+        var searchResultElm = $('#searchResult'), bodyElm = $('body');;
+
+        bodyElm.css("cursor", "wait");
+        $.post(serverURL, {func: 'getObjectsForProperty', propertyName: propName}, function(rows) {
+            bodyElm.css("cursor", "auto");
+            if (!rows || !rows.length) {
+                searchResultElm.html('<tr><td colspan="5" class="center-align">Nothing found</td></tr>');
+                return;
+            }
+
+            var HTML = rows.map(function (row) {
+                return '<tr><td>' + escapeHtml(row.objectName) + '</td><td>' + escapeHtml(row.propName) +
+                    '</td><td>' + escapeHtml(row.propVal) +
+                    '</td><td>' + modes[row.propMode] + '</td><td>' + escapeHtml(row.propDescription) + '</td></tr>';
+            });
+            searchResultElm.html(HTML.join(''));
+        });
+
     }
 })(jQuery); // end of jQuery name space

@@ -1,0 +1,23 @@
+{
+    "name": "Events editor",
+    "description": "Edit events parameters",
+    "homePage": "index",
+    "ajaxServer": "ajax.js",
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "launcherPrms": { "javaScript": "server.js" },
+    "staticDir": "static",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": true,
+    "onChangeObjectMenuEvent": "callback:onChangeObjects",
+    "callbackBeforeExec": "callbackBeforeExec",
+    "outputFormat": "text",
+    "descriptionTemplate": "Make some action with objects %:o:%",
+    "icon": "settings",
+    "canAddParametersToAction": true,
+    "parameters": {
+        "objects": {
+            "description": "List of objects IDs, used as templates"
+        }
+    }
+}

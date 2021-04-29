@@ -14,11 +14,13 @@
     "systemUser": "system",
     "reloadRightsIntervalSec": 180,
     "IPCClientMaxReconnectAttempts": 10,
-    "serviceStopTimeout": 600000,
+    "serviceStopTimeout": 300000,
     "privatePath": "private",
+    "tempDir": "temp",
     "webSecretFile": "webSecret.json",
     "httpsKeyFile": "key.pem",
     "httpsCertFile": "cert.pem",
+    "restartTime": "6:45",
     "log": {
         "localAddress": "127.0.0.1",
         "serverAddress": "127.0.0.1",
@@ -36,7 +38,6 @@
         "databaseLogLevel": "I",
         "alwaysLogToConsoleIfLogLevelMoreThen": "E",
         "exitLogFileName": "exit.log",
-        "dynamicLogDumpFile": "db/dynamicLog.json",
         "lib": {
             "log": {
                 "logToDataBase": false,
@@ -97,7 +98,39 @@
         },
         "actions": {
             "logToDatabase": false,
-            "file": "actions.log"
+            "file": "actions.log",
+            "counter_settings": {
+                "logToDatabase": false,
+                "file": "actions.counter_settings.log"
+            },
+            "objects_properties": {
+                "logToDatabase": false,
+                "file": "actions.objects_properties.log"
+            },
+            "objects_clone": {
+                "logToDatabase": false,
+                "file": "actions.objects_clone.log"
+            },
+            "objects_creator": {
+                "logToDatabase": false,
+                "file": "actions.objects_creator.log"
+            },
+            "objects_remover": {
+                "logToDatabase": false,
+                "file": "actions.objects_remover.log"
+            },
+            "objects_editor": {
+                "logToDatabase": false,
+                "file": "actions.objects_editor.log"
+            },
+            "objects_interactions": {
+                "logToDatabase": false,
+                "file": "actions.objects_interactions.log"
+            },
+            "users_editor": {
+                "logToDatabase": false,
+                "file": "actions.users_editor.log"
+            }
         },
         "routes": {
             "actions": {
@@ -139,11 +172,12 @@
         "serverAddress": "127.0.0.1",
         "serverPort": 10181,
         "serverPortChildrenIPC": 10182,
+        "updateEventsDumpFile": "updateEvents-10182.json",
         "reconnectTimeout": 1500,
-        "childrenNumber":0,
+        "childrenNumber":10,
         "maxQueueLength": 3000,
         "maxMemUsageForChildMb": 2048,
-        "maxMemUsageTotalMb": 4096,
+		"maxMemUsageTotalMb": 10240,
         "memUsageTime": 200,
         "fullUpdateCacheInterval": 0,
         "updateCacheInterval": 60,
@@ -158,11 +192,12 @@
         "serverAddress": "127.0.0.1",
         "serverPort": 10183,
         "serverPortChildrenIPC": 10184,
+        "updateEventsDumpFile": "updateEvents-10184.json",
         "reconnectTimeout": 1500,
-        "childrenNumber":0,
+        "childrenNumber":10,
         "maxQueueLength": 3000,
         "maxMemUsageForChildMb": 2048,
-        "maxMemUsageTotalMb": 4096,
+		"maxMemUsageTotalMb": 10240,
         "memUsageTime": 200,
         "fullUpdateCacheInterval": 0,
         "updateCacheInterval": 60,
@@ -177,12 +212,13 @@
         "serverAddress": "127.0.0.1",
         "serverPort": 10185,
         "serverPortChildrenIPC": 10186,
+        "updateEventsDumpFile": "updateEvents-10186.json",
         "reconnectTimeout": 1500,
-        "childrenNumber":0,
+        "childrenNumber":10,
         "maxQueueLength": 3000,
         "maxMemUsageForChildMb": 2048,
-        "maxMemUsageTotalMb": 4096,
-        "memUsageTime": 0,
+		"maxMemUsageTotalMb": 10240,
+        "memUsageTime": 200,
         "fullUpdateCacheInterval": 0,
         "updateCacheInterval": 60,
         "useProcIPCForChild": true,
@@ -205,12 +241,15 @@
         "layout": {
             "Monitoring": {
                 "data_browser": {},
-                "dashboard": {}
+                "dashboard": {},
+				"information": {}
             },
             "Administration": {
                 "restart_server": {},
                 "users_editor": {},
-                "tasks_groups_editor": {}
+                "tasks_groups_editor": {},
+				"ILO": {},
+				"events_editor": {}
             },
             "Configuration": {
                 "objects_creator": {},
@@ -227,13 +266,13 @@
                 "action_editor": {},
                 "launcher_editor": {},
                 "variables": {},
-		"send_message": {},	
+				"send_message": {},	
                 "simple_test": {}
             },
             "Services": {
                 "log_viewer": {},
                 "file_editor": {},
-		"sched_viewer": {}
+				"sched_viewer": {}
             }
         }
     },
@@ -243,14 +282,9 @@
         "sessionDB": "db/session.db",
         "sessionTableName": "session",
         "verbose": true,
-        "flushVariablesCacheInterval": 500,
-        "flushHistoryCacheInterval": 10000,
-        "houseKeeperRunEveryTime": "1:00",
-        "sleepInGetVariablesValuesLoop": 50,
         "howOftenTryToFindIndependentCountersAtStart": 60000,
         "maxVariableNumber": 99,
         "pragma": {
-            "temp_store_directory": "db",
             "foreign_keys": "ON",
             "encoding": "UTF-8",
             "journal_mode": "WAL"
@@ -315,35 +349,47 @@
             "localAddress": "127.0.0.1",
             "serverAddress": "127.0.0.1",
             "port": 10170,
-            "discoveryIP": "db/discoveryIP.txt"
+            "discoveryIP": "discoveryIP.txt"
         },
         "scheduler": {
             "localAddress": "127.0.0.1",
             "serverAddress": "127.0.0.1",
             "port": 10170
+        },
+        "mssql": {
+            "localAddress": "127.0.0.1",
+            "serverAddress": "127.0.0.1",
+            "port": 10170,
+            "connectionTimeoutSec": 25,
+            "queryTimeoutSec": 25
         }
     },
     "history": {
         "localAddress": "127.0.0.1",
         "serverAddress": "127.0.0.1",
         "serverPort": 10163,
+		"maxSocketErrorsCnt": 5000,
         "cacheServiceInterval": 300,
-        "restartHistoryInterval": 0,
-        "restartStorageModifier": false,
+		"restartHistoryInterval": 5400,
+        "restartStorageModifier": true,
         "restartStorageQueryProcesses": false,
         "restartHistory": false,
-        "queryMaxResultNumbers": 1000,
-        "queryMaxResultStrings": 50,
         "cacheServiceTimeout": 10800000,
         "cacheServiceExitTimeout": 86400000,
         "cacheServiceTimeoutForSaveObjectRecords": 600000,
         "initCachedRecords": 2,
-        "dbPath": "db",
-        "dbFile": "storage.db",
+		"queryMaxResultNumbers": 5000,
+        "queryMaxResultStrings": 50,
+        "db": [
+            {
+                "path": "db",
+                "file": "storage.db",
+                "relative": true
+            }
+        ],
 	    "housekeeperInterval": 2700000,
-        "dumpFileName": "unsavedData.json",
-        "maxSocketErrorsCnt": 500,
-	"queriesMaxQueueLength": 500
+		"queriesMaxQueueLength": 1000,
+        "dumpFileName": "unsavedData.json"
     },
     "dynamicLog": {
         "localAddress": "127.0.0.1",
@@ -374,19 +420,24 @@
         "server": {
             "disable": true,
             "maxQueueSize": 1000,
+            "maxMemoryUsageMb": 4096,
+            "maxMemoryUsageTime": 600000,
+            "dumpFile": "repl.json",
             "history": {
                 "disable": false,
                 "serverAddress": "127.0.0.1",
                 "serverPort": 10191,
                 "dbPath": "\\\\<server>\\d$\\backup_alepiz\\DB",
-                "dbFile": "storage.db"
+                "dbFile": "storage.db",
+                "relativePath": false
             },
             "events": {
                 "disable": false,
                 "serverAddress": "127.0.0.1",
                 "serverPort": 10192,
                 "dbPath": "\\\\<server>\\d$\\backup_alepiz\\DB",
-                "dbFile": "events.db"
+                "dbFile": "events.db",
+                "relativePath": false
             }
         }
     },
@@ -398,7 +449,8 @@
             "dbPath": "db",
             "dbFile": "db.db",
             "//backupPath": "\\\\<server>\\d$\\backup_alepiz\\DB",
-	    "backupPath": "backup",		
+		    "backupPath": "backup",	
+            "relativePath": true,
             "timeout": 3600000
         }
     },
@@ -407,7 +459,6 @@
         "serverAddress": "127.0.0.1",
         "serverPort": 10166,
         "waitingConditionsTime": 30000,
-	"dataPath": "db",
         "dataFile": "taskConditions.json"
     }
 }

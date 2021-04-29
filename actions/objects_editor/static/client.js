@@ -81,8 +81,6 @@ var JQueryNamespace = (function ($) {
 
     function init(_objects) {
         objects = _objects;
-        $('#objectsNames').text(_objects.map(function(obj){ return obj.name}).join(', '));
-
         var IDs = objects.map(function(obj){ return obj.id});
         if(!IDs || !IDs.length) return;
 
@@ -97,12 +95,19 @@ var JQueryNamespace = (function ($) {
         }
 
         $.post(serverURL, {func: 'getObjectsParameters', IDs: IDs.join(',')}, function(data) {
-            //objectsParameters = [{id: <id>, name: <objectName>, description: <objectDescription>, sortPosition: <objectOrder>, color:.., disabled:...}, {...},...]
+            //objectsParameters = [{id: <id>, name: <objectName>, description: <objectDescription>,
+            // sortPosition: <objectOrder>, color:.., disabled:..., created:...}, {...},...]
 
             var objectsParameters = data.objectsParameters;
             if(!objectsParameters.length) return;
 
-            var disabled = objectsParameters[0].disabled, sortPosition = objectsParameters[0].sortPosition, description = objectsParameters[0].description;
+            var disabled = objectsParameters[0].disabled,
+                sortPosition = objectsParameters[0].sortPosition,
+                description = objectsParameters[0].description;
+
+            $('#objectsNames').text(objectsParameters.map(function(obj) {
+                return obj.name + (obj.created ? ' (created: ' + new Date(Number(obj.created)).toLocaleString() + ')' : '');
+            }).join(', '));
 
             for(var i = 1; i < objectsParameters.length; i++) {
                 var obj = objectsParameters[i];

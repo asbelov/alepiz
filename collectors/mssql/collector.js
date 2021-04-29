@@ -94,22 +94,20 @@ collector.get = function(param, callback) {
     }, function (err, con) {
 
         if(err) {
-            if(!param.query) return callback(null, 0);
-            return callback(null, JSON.stringify({unableToConnect: err.message}));
+            var ret = param.query ? JSON.stringify({unableToConnect: err.message}) : 0;
+            con && typeof con.close  === 'function' ? con.close(() => callback(null, ret)) : callback(null, ret);
+            return;
         }
         //log.debug('Connected to ', param.server, 'using ', param);
-        if(!param.query) return callback(null, 1);
+        if(!param.query) return con.close(() => callback(null, 1));
 
         var q = con.query({
             query_str: param.query,
             query_timeout: queryTimeout, // specified in seconds.
         }, function (err, rows) {
-            if(err) return callback(new Error('Error in query "' + param.query + '": ' + err.message));
+            if(err) return con.close(() => callback(new Error('Error in query "' + param.query + '": ' + err.message)));
 
-            con.close(function(err) {
-                if(err) log.error('Can\'t close connection: ', err, ': ', param);
-            });
-            callback(null, rows);
+            con.close(() => callback(null, rows));
         });
 
         q.on('error', function(err) {

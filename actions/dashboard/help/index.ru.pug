@@ -38,7 +38,9 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         li Comments: события, обработанные администратором
                     p.
                         С помощью Dashboard можно организовать полноценный рабочий процесс с мониторингом и обработкой
-                        всех происходящих событий. Ниже приведен пример регламента такого рабочего процесса.
+                        всех происходящих событий. Можно установить права доступа до элементов и действий
+                        Dashboard в зависимости от ролей пользователей.
+                        Ниже приведен пример регламента рабочего процесса.
 
                     ul.collapsible
                         li
@@ -51,23 +53,24 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                         является непрерывным процессом, поэтому если по какой-то причине администратор временно
                                         не может исполнять обязанности, он должен их явно передать другому администратору.
                                     li.
-                                        В начале рабочей смены администратор обрабатывает текущие события, которые происходят сейчас.
-                                        Такие события расположены в Current events
+                                        В начале рабочей смены администратор обрабатывает текущие события, которые происходят в настоящее время.
+                                        Такие события расположены в таблице Current events
                                     li.
                                         После обработки текущих событий администратор начинает обрабатывать события, которые произошли
-                                        в нерабочий период. Эти события расположены в Historical events
+                                        в нерабочий период. Эти события расположены в таблице Historical events
                                     li Процесс обработки событий повторяется в течение рабочей смены.
 
                                 h4 Обработка событий
                                 p.
-                                    Обработка событий заключается в его анализе и принятии решения о том, что дальше
-                                    делать с событием. Обработка событий выполняется через Message editor. Под формой
+                                    Обработка событий заключается в его анализе и принятии решения о том, какие действия
+                                    необходимо выполнить с событием.
+                                    Обработка событий выполняется с использованием Message editor. Под формой
                                     ввода сообщения располагаются необходимые элементы для обработки событий.
                                 ol
                                     li.
                                         Если событие сгенерировано из-за ошибки настройки системы мониторинга,
                                         администратор устраняет ошибку и помечает событие соответствующим образом с
-                                        помощью соответствующего шаблона.
+                                        помощью шаблона.
                                         При необходимости, администратор принудительно помечает событие как решенное
                                         с помощью Solve problems.
                                     li.
@@ -186,7 +189,15 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                                             "bill.gates@microsoft.com": null,
                                                             "steve.jobs@apple.com": null
                                                         }
-                                    li replyTo - Адрес отправителя, например "replyTo": "\"Bill Gates\" &lt;bill.gates@microsoft.com&gt;"
+                                    li.
+                                        replyTo - Адрес отправителя для поля replyTo по умолчанию для всех шаблонов, например
+                                        "replyTo": "\"Bill Gates\" &lt;bill.gates@microsoft.com&gt;"
+                                    li.
+                                        actionForSeveralObjects - Действие, которое будет запущено во время открытия нового
+                                         окна с выбранными объектами, при нажатии на элемент
+                                        #[i.teal-text.material-icons open_in_new]. Например,
+                                        "actionForSeveralObjects": "objects_editor" откроет действие Objects editor для
+                                        выбранных объектов.
                                     li messageTemplates - массив объектов с настройками шаблонов сообщений
                                         ol
                                             li name - Название шаблона, которое будет отображаться в Dashboard
@@ -197,8 +208,11 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                                 при применении шаблона будет
                                                 выведено сообщение о том, что использовать этот шаблон невозможно.
                                             li default [true|false] - является ли этот шаблон шаблоном, который появляется при запуске Dashboard
-                                            li subject - В начале темы сообщения будет подставляться то, что задано в этой настройке
+                                            li subject - В начале темы сообщения будет подставляться текст, заданный в этом параметре
                                             li recipients - список получателей сообщения
+                                            li.
+                                                replyTo - Адрес отправителя для поля сообщения replyTo.
+                                                Параметр имеет более высокий приоритет, чем глобальный параметр "replyTo"
                                             ul.collapsible
                                                 li
                                                     div.collapsible-header #[i.material-icons settings] Пример объекта messageTemplates (нажмите для того, чтобы развернуть)
@@ -220,12 +234,14 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                                                     "name": "Mistaken",
                                                                     "tip": "Mistake in event",
                                                                     "subject": "[MISTAKE]",
-                                                                    "importance": 2
+                                                                    "importance": 2,
+                                                                    "replyTo": "\"ALEPIZ Support\" &lt;support@alepiz.com&gt;"
                                                                 }, {
                                                                     "name": "Support",
                                                                     "tip": "Send support",
                                                                     "recipients": ["\"ALEPIZ Support\" &lt;support@alepiz.com&gt;", "\"Microsoft support\" &lt;support@microsoft.com&gt;"],
-                                                                    "subject": "[Problem]"
+                                                                    "subject": "[Problem]",
+                                                                    "replyTo": "\"ALEPIZ Support\" &lt;support@alepiz.com&gt;"
                                                                 }
                                                             ]
                                     li actionsMessageTemplates - Шаблоны для действий.
@@ -234,69 +250,123 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                                 Возможные действия: addAsHint, addAsHintForObject, addAsComment,
                                                 solveProblem, disableEvents, enableEvents
                                             li subject - Текст, который будет вставлен в конец темы сообщения
-                                            li bodyHeader - Текст, который будет вставлен перед телом сообщения
-                                            li eventTemplate - Шаблон для строки текста про каждое событие в теле сообщения
-                                            li intervalsDivider - разделитель при повторяющихся событиях
+                                            li bodyHeader - Текст в формате HTML, который будет вставлен перед телом сообщения
+                                            li eventTemplate - Шаблон в формате HTML для строки текста для каждого события в теле сообщения
+                                            li intervalsDivider - Текст в формате HTML для формы короткой записи повторяющихся событий
                                             li objectsListLength - максимальное количество объектов в списке
                                             li countersListLength - максимальное количество счетчиков в списке
                                             li tables - к каким таблицам Dashboard можно применять этот шаблон
+                                        p.
+                                            В параметрах bodyHeader, eventTemplate и intervalsDivider текст должен быть
+                                            отформатирован как HTML. Форматирование HTML может быть использовано в
+                                            объеме, который поддерживает редактор
+                                            #[a(href="https://quilljs.com/" target="_blank") QUILL].
+                                            Для формирования корректной разметки HTML необходимо сформировать
+                                            соответствующий текст в редакторе сообщений. Далее для браузера Chrome
+                                            в поле редактора
+                                            нажать правую кнопку мышки и выбрать "Посмотреть код",
+                                            либо нажать комбинацию клавишь &lt;Ctrl&gt;+&lt;Shift&gt;+&lt;I&gt;.
+                                            Требуемое форматирование появится в окне консоли браузера. Его необходимо
+                                            перенести в настройки.
+                                        p Переменные, используемые в теме сообщения (subject)
+                                        ul
+                                            li %:COUNTERS_LIST:% - список счетчиков из выбранных событий
+                                            li %:OBJECTS_LIST:% - список объектовиз выбранных событий
+                                        p Переменные, используемые в шаблоне для события (eventTemplate)
+                                        ul
+                                            li %:OBJECT_NAME:% - имя объекта из события
+                                            li %:COUNTER_NAME:% - имя счетчика из события
+                                            li %:EVENT_DESCRIPTION:% - описание события
+                                            li %:EVENT_TIME:% - время, когда произошло событие
+                                            li.
+                                                %:ACTION:% - действие при включении или отключении события
+                                                'ENABLE' или 'DISABLE'. Может использоваться только в секциях
+                                                disableEvents или enableEvents
+                                            li.
+                                                %:DISABLE_UNTIL:% - при отключении события время до которого событие
+                                                будет отключено. Может использоваться только в секции disableEvents
+                                            li.
+                                                %:NEW_DISABLE_TIME_INTERVAL:% - при отключении события новый интервал
+                                                времени для отключения. Может использоваться только в секции disableEvents
+                                        p.
+                                            Так же можно использовать в качестве переменных любые свойства объектов,
+                                            установленные с помощью действия Objects properties в режиме
+                                            "Not calculated text field".
+                                        p Переменные, используемые в разделителе повторяющихся событий (intervalsDivider)
+                                        ul
+                                            li %:EVENT_DESCRIPTION:% - описание события
+                                            li %:EVENT_TIME:% - время, когда произошло событие
+
                                         ul.collapsible
                                             li
                                                 div.collapsible-header #[i.material-icons settings] Пример объекта actionsMessageTemplates (нажмите для того, чтобы развернуть)
                                                 div.collapsible-body
                                                     pre.
-                                                        "actionsMessageTemplates": {
-                                                            "addAsHint": {
-                                                                "subject": "Hint for %:COUNTERS_LIST:%",
-                                                                "bodyHeader": "\n\n",
-                                                                "eventTemplate": "%:COUNTER_NAME:% (%:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%)\n",
-                                                                "intervalsDivider": ",\n\t\t\tand "
+                                                        &quot;actionsMessageTemplates&quot;: {
+                                                            &quot;addAsHint&quot;: {
+                                                                &quot;subject&quot;: &quot;Hint for %:COUNTERS_LIST:%&quot;,
+                                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&quot;,
+                                                                &quot;eventTemplate&quot;: &quot;&lt;p&gt;&lt;strong&gt;%:COUNTER_NAME:%&lt;/strong&gt; (&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt;%:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;)&lt;/p&gt;&quot;,
+                                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                                             },
-                                                            "addAsHintForObject": {
-                                                                "subject": "Hint for %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
-                                                                "bodyHeader": "\n\n",
-                                                                "eventTemplate": "%:OBJECT_NAME:%: %:COUNTER_NAME:%: (%:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%)\n",
-                                                                "intervalsDivider": ",\n\t\t\tand "
+                                                            &quot;addAsHintForObject&quot;: {
+                                                                &quot;subject&quot;: &quot;Hint for %:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
+                                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&quot;,
+                                                                &quot;eventTemplate&quot;: &quot;&lt;p&gt;&lt;strong&gt;%:OBJECT_NAME:%: %:COUNTER_NAME:%&lt;/strong&gt;: (&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt;%:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;)&lt;/p&gt;&quot;,
+                                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                                             },
-                                                            "addAsComment": {
-                                                                "subject": "%:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
-                                                                "objectsListLength": 100,
-                                                                "countersListLength": 300,
-                                                                "bodyHeader": "\n\nEvents list:\n",
-                                                                "eventTemplate": "%:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
-                                                                "intervalsDivider": ",\n\t\t\tand "
+                                                            &quot;addAsComment&quot;: {
+                                                                &quot;subject&quot;: &quot;%:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
+                                                                &quot;objectsListLength&quot;: 100,
+                                                                &quot;countersListLength&quot;: 300,
+                                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(230,0,0);\&quot;&gt;Events list:&lt;/strong&gt;&lt;/h3&gt;&quot;,
+                                                                &quot;eventTemplate&quot;: &quot;&lt;p&gt;&lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt; %:ZABBIX_HOSTNAME:%&lt;/p&gt;&quot;,
+                                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                                             },
-                                                            "solveProblem": {
-                                                                "subject": "Events was marked as solved: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
-                                                                "objectsListLength": 100,
-                                                                "countersListLength": 300,
-                                                                "tables": ["currentEvents"],
-                                                                "bodyHeader": "\n\nFollowing events was marked as solved:\n",
-                                                                "eventTemplate": "%:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
-                                                                "intervalsDivider": ",\n\t\t\tand "
+                                                            &quot;solveProblem&quot;: {
+                                                                &quot;subject&quot;: &quot;Events was marked as solved: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
+                                                                &quot;objectsListLength&quot;: 100,
+                                                                &quot;countersListLength&quot;: 300,
+                                                                &quot;tables&quot;: [&quot;currentEvents&quot;],
+                                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(0,138,0);\&quot;&gt;Following events was marked as solved:&lt;/strong&gt;&lt;/h3&gt;&quot;,
+                                                                &quot;eventTemplate&quot;: &quot;&lt;p&gt;&lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/p&gt;&quot;,
+                                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;ervalsDivider&quot;: &quot;,\n\t\t\tand &quot;
                                                             },
-                                                            "disableEvents": {
-                                                                "subject": "Disable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
-                                                                "objectsListLength": 100,
-                                                                "countersListLength": 300,
-                                                                "bodyHeader": "\n\nFollowing events was disabled until %:DISABLE_UNTIL:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.\n",
-                                                                "eventTemplate": "%:ACTION:%: %:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
-                                                                "intervalsDivider": ",\n\t\t\tand "
+                                                            &quot;disableEvents&quot;: {
+                                                                &quot;subject&quot;: &quot;Disable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
+                                                                &quot;objectsListLength&quot;: 100,
+                                                                &quot;countersListLength&quot;: 300,
+                                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(0,0,0);\&quot;&gt;Following events was disabled until %:DISABLE_UNTIL:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.&lt;/strong&gt;&lt;/h3&gt;&quot;,
+                                                                &quot;eventTemplate&quot;: &quot;&lt;p&gt;%:ACTION:%: &lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/p&gt;&quot;,
+                                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                                             },
-                                                            "enableEvents": {
-                                                                "subject": "Enable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
-                                                                "objectsListLength": 100,
-                                                                "countersListLength": 300,
-                                                                "tables": ["disabledEvents"],
-                                                                "bodyHeader": "\n\nFollowing events was enabled:\n",
-                                                                "eventTemplate": "%:ACTION:%: %:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
-                                                                "intervalsDivider": ",\n\t\t\tand "
+                                                            &quot;enableEvents&quot;: {
+                                                                &quot;subject&quot;: &quot;Enable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
+                                                                &quot;objectsListLength&quot;: 100,
+                                                                &quot;countersListLength&quot;: 300,
+                                                                &quot;tables&quot;: [&quot;disabledEvents&quot;],
+                                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(0,71,178);\&quot;&gt;Following events was enabled:&lt;/strong&gt;&lt;/h3&gt;&quot;,
+                                                                &quot;eventTemplate&quot;: &quot;&lt;p&gt;%:ACTION:%: &lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/p&gt;&quot;,
+                                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;lsDivider&quot;: &quot;,\n\t\t\tand &quot;
                                                             }
                                                         }
                                     li.
                                         pronunciation - произношение события.
                                         В тексте, который будет произносится голосом, ищется регулярное выражение и заменяется
                                         на его значение.
+                                        С помощью этой настройки можно заменить в том числе и фразы:
+                                    ul.browser-default
+                                        li.
+                                            "Update paused",
+                                            произносится через 5 минут после того, как приостанавливается обновление
+                                            событий,
+                                        li.
+                                            "Voice pronunciation of events enabled", произносится
+                                            при включении звукового информирования о событиях
+                                        li.
+                                            "About (\d+) new events will not be spoken" произносится при поступлении
+                                            большого количества событий
+
                                     ul.collapsible
                                         li
                                             div.collapsible-header #[i.material-icons settings] Пример объекта pronunciation (нажмите для того, чтобы развернуть)
@@ -306,8 +376,94 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                                         "(\\d+).\\d+": "$1",
                                                         "(\\d)Kb": "$1Килобайт",
                                                         "(\\d)Mb": "$1Мегабайт",
-                                                        "(\\d)Gb": "$1Гигабайт"
+                                                        "(\\d)Gb": "$1Гигабайт",
+                                                        "Update paused": "Обновление событий приостановлено",
+                                                        "Voice pronunciation of events enabled": "Включено звуковое информирование о событиях",
+                                                        "About (\\d+) new events will not be spoken": "Пропущены сообщения о $1 событиях"
                                                     }
+                                    li
+                                        span.
+                                            restrictions - определения прав доступа до элементов интерфейса и действий в Dashboard.
+                                            Права доступа должны быть определены для всех ролей пользователей, которые пользуются Dashboard.
+                                            Можно описать права для объекта "Default", тогда они будут применяться ко всем неописанным
+                                            ролям.
+                                            Если у пользователя несколько ролей, для определения прав доступа в Dashboard
+                                            будет использована первая присвоенная пользователю роль.
+                                        ul.browser-default
+                                            li.
+                                                Message (true/false/&lt;object&gt;) - показывать или не показывать редактор сообщений.
+                                                Можно назначить ограничения на действия в редакторе сообщений
+                                            ul.browser-default
+                                                li Comments (true/false) - возможность создания комментариев к событиям
+                                                li Hints (true/false) - возможность создания подсказок к событиям
+                                                li Solve (true/false) - возможность принудительно пометить событие как решенное
+                                                li Enable (true/false) - возможность включить отключенные события
+                                                li Disable (true/false) - возможность отключить события
+                                            li Historical (true/false) - показывать или не показывать таблицу Historical events
+                                            li Current (true/false) - показывать или не показывать таблицу Current events
+                                            li Disabled (true/false) - показывать или не показывать таблицу Disabled events
+                                            li Comments (true/false) - показывать или не показывать таблицу Comments
+                                            li Importance (&lt;Number&gt;) - не будут отображаться события, у которых importance больше указанного значения
+                                            li importanceFilter (true/false) - показывать элемент управления фильтрацией событий по важности
+                                            li.
+                                                Sound (true/false/"alwaysOn") - показывать или не показывать элемент управления звуком событий.
+                                                Если установить значение "alwaysOn", звук всегда будет включен и его будет невозможно отключить
+                                            li Hints (true/false) - показывать или не показывать в таблицах подсказки для событий
+                                            li Info (true/false) - показывать или не показывать в таблицах комментарии к событиям
+                                            li History (true/false) - показывать или не показывать в таблицах историю для событий
+                                            li Links (true/false) - показывать или не показывать в таблицах ссылки на действия для событий
+                                        ul.collapsible
+                                            li
+                                                div.collapsible-header #[i.material-icons settings] Пример объекта restrictions (нажмите для того, чтобы развернуть)
+                                                div.collapsible-body
+                                                    pre.
+                                                        "Operators": {
+                                                            "Importance": 3,
+                                                            "Sound": "alwaysOn",
+                                                            "Hints": true,
+                                                            "Info": true,
+                                                            "History": true,
+                                                            "Links": true,
+                                                            "Message": {
+                                                                "Comments": true,
+                                                                "Hints": false,
+                                                                "Solve": false,
+                                                                "Enable": false,
+                                                                "Disable": false
+                                                            },
+                                                            "Historical": true,
+                                                            "Current": true,
+                                                            "Disabled": true,
+                                                            "Comments": true
+                                                        },
+                                                        "Administrators": {
+                                                            "Importance": 100,
+                                                            "Sound": true,
+                                                            "Hints": true,
+                                                            "Info": true,
+                                                            "History": true,
+                                                            "Links": true,
+                                                            "Message": true,
+                                                            "Historical": true,
+                                                            "Current": true,
+                                                            "Disabled": true,
+                                                            "Comments": true,
+                                                            "importanceFilter": true
+                                                        },
+                                                        "Default": {
+                                                            "Importance": 2,
+                                                            "Sound": false,
+                                                            "Hints": false,
+                                                            "Info": false,
+                                                            "History": false,
+                                                            "Links": false,
+                                                            "Message": false,
+                                                            "Historical": false,
+                                                            "Current": true,
+                                                            "Disabled": false,
+                                                            "Comments": false
+                                                        }
+
                     ul.collapsible
                         li
                             div.collapsible-header #[i.material-icons code] Пример файла настроек (нажмите для того, чтобы развернуть)
@@ -384,6 +540,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                             }
                                         },
                                         "replyTo": "\"Bill Gates\" &lt;bill.gates@microsoft.com&gt;",
+                                        "actionForSeveralObjects": "information",
                                         "messageTemplates": [
                                             {
                                                 "name": "Information",
@@ -400,60 +557,62 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                                 "name": "Mistaken",
                                                 "tip": "Mistake in event",
                                                 "subject": "[MISTAKE]",
-                                                "importance": 0
+                                                "importance": 0,
+                                                "replyTo": "\"ALEPIZ Support\" &lt;support@alepiz.com&gt;"
                                             }, {
                                                 "name": "Support",
                                                 "tip": "Send to support",
                                                 "recipients": ["\"ALEPIZ support\" &lt;support@alepiz.com&gt;", "\"Microsoft support\" &lt;support@microsoft.com&gt;"],
-                                                "subject": "[Problem]"
+                                                "subject": "[Problem]",
+                                                "replyTo": "\"ALEPIZ Support\" &lt;support@alepiz.com&gt;"
                                             }
                                         ],
                                         "actionsMessageTemplates": {
-                                            "addAsHint": {
-                                                "subject": "Hint for %:COUNTERS_LIST:%",
-                                                "bodyHeader": "\n\n",
-                                                "eventTemplate": "%:COUNTER_NAME:% (%:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%)\n",
-                                                "intervalsDivider": ",\n\t\t\tand "
+                                            &quot;addAsHint&quot;: {
+                                                &quot;subject&quot;: &quot;Hint for %:COUNTERS_LIST:%&quot;,
+                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&quot;,
+                                                &quot;eventTemplate&quot;: &quot;&lt;p&gt;&lt;strong&gt;%:COUNTER_NAME:%&lt;/strong&gt; (&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt;%:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;)&lt;/p&gt;&quot;,
+                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                             },
-                                            "addAsHintForObject": {
-                                                "subject": "Hint for %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
-                                                "bodyHeader": "\n\n",
-                                                "eventTemplate": "%:OBJECT_NAME:%: %:COUNTER_NAME:%: (%:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%)\n",
-                                                "intervalsDivider": ",\n\t\t\tand "
+                                            &quot;addAsHintForObject&quot;: {
+                                                &quot;subject&quot;: &quot;Hint for %:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
+                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&quot;,
+                                                &quot;eventTemplate&quot;: &quot;&lt;p&gt;&lt;strong&gt;%:OBJECT_NAME:%: %:COUNTER_NAME:%&lt;/strong&gt;: (&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt;%:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;)&lt;/p&gt;&quot;,
+                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                             },
-                                            "addAsComment": {
-                                                "subject": "%:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
-                                                "objectsListLength": 100,
-                                                "countersListLength": 300,
-                                                "bodyHeader": "\n\nEvents list:\n",
-                                                "eventTemplate": "%:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
-                                                "intervalsDivider": ",\n\t\t\tand "
+                                            &quot;addAsComment&quot;: {
+                                                &quot;subject&quot;: &quot;%:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
+                                                &quot;objectsListLength&quot;: 100,
+                                                &quot;countersListLength&quot;: 300,
+                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(230,0,0);\&quot;&gt;Events list:&lt;/strong&gt;&lt;/h3&gt;&quot;,
+                                                &quot;eventTemplate&quot;: &quot;&lt;p&gt;&lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt; %:ZABBIX_HOSTNAME:%&lt;/p&gt;&quot;,
+                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                             },
-                                            "solveProblem": {
-                                                "subject": "Events was marked as solved: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
-                                                "objectsListLength": 100,
-                                                "countersListLength": 300,
-                                                "tables": ["currentEvents"],
-                                                "bodyHeader": "\n\nFollowing events was marked as solved:\n",
-                                                "eventTemplate": "%:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
-                                                "intervalsDivider": ",\n\t\t\tand "
+                                            &quot;solveProblem&quot;: {
+                                                &quot;subject&quot;: &quot;Events was marked as solved: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
+                                                &quot;objectsListLength&quot;: 100,
+                                                &quot;countersListLength&quot;: 300,
+                                                &quot;tables&quot;: [&quot;currentEvents&quot;],
+                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(0,138,0);\&quot;&gt;Following events was marked as solved:&lt;/strong&gt;&lt;/h3&gt;&quot;,
+                                                &quot;eventTemplate&quot;: &quot;&lt;p&gt;&lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/p&gt;&quot;,
+                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                             },
-                                            "disableEvents": {
-                                                "subject": "Disable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
-                                                "objectsListLength": 100,
-                                                "countersListLength": 300,
-                                                "bodyHeader": "\n\nFollowing events was disabled until %:DISABLE_UNTIL:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.\n",
-                                                "eventTemplate": "%:ACTION:%: %:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
-                                                "intervalsDivider": ",\n\t\t\tand "
+                                            &quot;disableEvents&quot;: {
+                                                &quot;subject&quot;: &quot;Disable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
+                                                &quot;objectsListLength&quot;: 100,
+                                                &quot;countersListLength&quot;: 300,
+                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(0,0,0);\&quot;&gt;Following events was disabled until %:DISABLE_UNTIL:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.&lt;/strong&gt;&lt;/h3&gt;&quot;,
+                                                &quot;eventTemplate&quot;: &quot;&lt;p&gt;%:ACTION:%: &lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/p&gt;&quot;,
+                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                             },
-                                            "enableEvents": {
-                                                "subject": "Enable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
-                                                "objectsListLength": 100,
-                                                "countersListLength": 300,
-                                                "tables": ["disabledEvents"],
-                                                "bodyHeader": "\n\nFollowing events was enabled:\n",
-                                                "eventTemplate": "%:ACTION:%: %:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
-                                                "intervalsDivider": ",\n\t\t\tand "
+                                            &quot;enableEvents&quot;: {
+                                                &quot;subject&quot;: &quot;Enable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
+                                                &quot;objectsListLength&quot;: 100,
+                                                &quot;countersListLength&quot;: 300,
+                                                &quot;tables&quot;: [&quot;disabledEvents&quot;],
+                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(0,71,178);\&quot;&gt;Following events was enabled:&lt;/strong&gt;&lt;/h3&gt;&quot;,
+                                                &quot;eventTemplate&quot;: &quot;&lt;p&gt;%:ACTION:%: &lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/p&gt;&quot;,
+                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                             }
                                         },
                                         "pronunciation": {
@@ -461,6 +620,68 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                             "(\\d)Kb": "$1Килобайт",
                                             "(\\d)Mb": "$1Мегабайт",
                                             "(\\d)Gb": "$1Гигабайт"
+                                        }
+                                        "restrictions": {
+                                            "Default": {
+                                                "Importance": 2,
+                                                "Sound": false,
+                                                "Hints": false,
+                                                "Info": false,
+                                                "History": false,
+                                                "Links": false,
+                                                "Message": false,
+                                                "Historical": false,
+                                                "Current": true,
+                                                "Disabled": false,
+                                                "Comments": false
+                                            },
+                                            "Businesses": {
+                                                "Importance": 10,
+                                                "Sound": false,
+                                                "Hints": false,
+                                                "Info": true,
+                                                "History": true,
+                                                "Links": false,
+                                                "Message": false,
+                                                "Historical": true,
+                                                "Current": true,
+                                                "Disabled": true,
+                                                "Comments": true,
+                                                "importanceFilter": true
+                                            },
+                                            "Operators": {
+                                                "Importance": 2,
+                                                "Sound": "alwaysOn",
+                                                "Hints": true,
+                                                "Info": true,
+                                                "History": true,
+                                                "Links": true,
+                                                "Message": {
+                                                    "Comments": true,
+                                                    "Hints": false,
+                                                    "Solve": false,
+                                                    "Enable": false,
+                                                    "Disable": false
+                                                },
+                                                "Historical": true,
+                                                "Current": true,
+                                                "Disabled": true,
+                                                "Comments": true
+                                            },
+                                            "Administrators": {
+                                                "Importance": 100,
+                                                "Sound": true,
+                                                "Hints": true,
+                                                "Info": true,
+                                                "History": true,
+                                                "Links": true,
+                                                "Message": true,
+                                                "Historical": true,
+                                                "Current": true,
+                                                "Disabled": true,
+                                                "Comments": true,
+                                                "importanceFilter": true
+                                            }
                                         }
                                     }
                     h3 Управление выбором событий
@@ -473,9 +694,9 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                     p.
                         Для выбора нескольких событий необходимо щелкнуть на каждом из них
                     p.
-                        Для выбора всех событий необходимо нажать на кнопку #[img(src="./images/help.selectAll.png")]
-                        в правом верхнем углу. Если часть событий или все события были выбраны, кнопка
-                        #[img(src="./images/help.selectAll.png")] снимет выделение со всех событий в элементе.
+                        Для выбора всех событий необходимо нажать на заголовок столбца "Select".
+                        Если часть событий или все события были выбраны, нажатие на "Select" снимет выделение со всех
+                        событий в элементе.
                     p.
                         Если требуется выбрать все события, которые относятся к определенному счетчику, необходимо
                         щелкнуть на событии, удерживая клавишу Ctrl. Повторное нажатие на выделенном событии с
@@ -509,7 +730,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         присутствует элементы, описанные в настройках Dashboard - actions. Это ссылки на действия,
                         которые можно выполнить с объектом для которого произошло событие. При нажатии на ссылку
                         открывается дополнительная вкладка с выбранным действием и объектом. Для действия
-                        Data Browser  открывается дополнительная вкладка, в которой отображаются исторические данные по
+                        Data Browser открывается дополнительная вкладка, в которой отображаются исторические данные по
                         родительскому счетчику из Update events для события в интервале +- 15 минут вокруг интервала
                         события.
                     p.
@@ -527,9 +748,21 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         администратор при его обработке.
                     p.
                         В Comments присутствует элемент events: #. При нажатии на элемент появится окно с таблицей, в
-                        которой перечислены события, выбранные в момент обработки администратором.
+                        которой перечислены события, выбранные в момент их обработки администратором. Можно выбрать
+                        события в появившейся таблице, затем закрыть окно м выполнить с событием необходимые действия
+                        с помощью Message editor. Например, составить новое сообщение или отключить события.
+                        Таким образом можно получить доступ к событиям, которые уже были обработаны и пропали из
+                        других таблиц.
 
                     h3 Фильтрация событий
+                    p.
+                        События можно отфильтровать по важности. В заголовке формы Historical events находится элемент
+                        #[i.teal-text.material-icons visibility]. При нажатии на него появится список важностей для событий.
+                        Если выбрать необходимую "важность", события, у которых важность ниже выбранной, отображаться не будут.
+                        Если события фильтруются, элемент управления фильтрацией меняет иконку на
+                        #[i.red-text.material-icons visibility_off]. Цвет элемента соответствует цвету важности, по
+                        которой производится фильтрация событий. Для отключения фильтрации событий по важности
+                        необходимо выбрать "Show all".
                     p.
                         В заголовке формы Historical events находится поле ввода Events filter, которое служит для
                         фильтрации отображаемых событий. Фильтрация осуществляется одновременно по элементам таблиц
@@ -553,7 +786,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         содержимое таблицы скрыто, обновление данных таблицы не будет производится. Это уменьшает трафик,
                         нагрузку на браузер и нагрузку на сервер.
                     p.
-                        Переключатель #[img(src="./images/help.showHideMessageEditor.png")] в заголовке формы Historical events
+                        Переключатель #[i.teal-text.material-icons email] в заголовке формы Historical events
                         позволяет убрать или отобразить Message editor.
                         Отсутствие Message editor экономит пространство для просмотра таблиц с событиями.
                     p.
@@ -568,8 +801,8 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                     h3 Запуск и остановка обновления таблиц.
                     p.
                         В заголовке формы Historical events находится переключатель для запуска
-                        #[img(src="./images/help.startUpdate.png")] или приостановки
-                        #[img(src="./images/help.pauseUpdate.png")] обновления содержимого таблиц событий. С помощью него
+                        #[i.teal-text.material-icons play_arrow] или приостановки #[i.red-text.material-icons pause]
+                        обновления содержимого таблиц событий. С помощью него
                         можно остановить обновления для удобства обработки текущих событий. При остановке обновления
                         содержимого, заголовки элементов таблиц окрашиваются в розовый цвет. Запуск обновления
                         содержимого таблиц можно осуществлять клавишей Esc.
@@ -586,11 +819,20 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                             обновлялись в &lt;date and time&gt;.
                             Предыдущее обновление длилось &lt;prev update time&gt; секунд
 
+                    h3 Открыть окно с выбранными объектами
+                    p.
+                        Нажатие на элемент #[i.teal-text.material-icons open_in_new] позволяет открыть новое окно
+                        ALEPIZ в котором будут выделены объекты, соответствующие выбранным событиям. Если в настроечном
+                        файле config.json установлена настройка "actionForSeveralObjects", то в новом окне так же будет
+                        отображаться действие, определенное в настройке "actionForSeveralObjects". Например для
+                        отображения действия редактирования объектов необходимо установить
+                        "actionForSeveralObjects": "objects_editor"
+
                     h3 Включение и выключение голосового сопровождения событий.
                     p.
                         В заголовке формы Historical events находится переключатель для включения
-                        #[img(src="./images/help.enableVoiceAlert.png")] или отключения
-                        #[img(src="./images/help.disableVoiceAlert.png")] голосового сопровождения событий.
+                        #[i.teal-text.material-icons volume_up] или отключения
+                        #[i.red-text.material-icons volume_off] голосового сопровождения событий.
                     p.
                         Голосовое сопровождение служит для дублирование новых событий голосом. Настройка фраз,
                         произносимых при возникновении событий, производится в Counter settings при выборе

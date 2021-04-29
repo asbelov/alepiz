@@ -100,7 +100,7 @@ module.exports = function(args, callback) {
     log.debug('Collector object: ', collector);
     log.debug('Collector code: ', code);
 
-    collectors.save(ID, collector, code, args.collectorID, function(err){
+    collectors.save(ID, collector, code, args.collectorID, function(err) {
         if(err) return callback(err);
 
         help.save(collectors.getCollectorPath(ID), null, args.lang, args.helpEditor, 'pug', function (err) {

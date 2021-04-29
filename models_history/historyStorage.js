@@ -13,7 +13,7 @@ var countersDB = require('../models_db/countersDB');
 var parameters = require('../models_history/historyParameters');
 
 var transProcessArgID = 'trans';
-if(!module.parent) runProcessForQueries(process.argv[2]);  //standalone process
+if(!module.parent) runProcessForQueries(process.argv[2], process.argv[3]);  //standalone process
 
 var storage = {};
 module.exports = storage;
@@ -25,261 +25,94 @@ var selectQueryQueue = [], queriesInProgress = 0;
 var storageQueryingProcesses, storageModifyingProcess;
 
 
-storage.initStorage = function (cache, callback) {
+function getDbPaths() {
+    var dbPaths = [path.join(__dirname, '..', parameters.dbPath, parameters.dbFile)];
+    if(Array.isArray(parameters.db) && parameters.db.length) {
+        dbPaths = parameters.db.map(function (obj) {
+            if(obj.relative) return path.join(__dirname, '..', obj.path, obj.file);
+            else return path.join(obj.path, obj.file);
+        })
+    }
+    return dbPaths;
+}
 
-    var dbPath = path.join(__dirname, '..', parameters.dbPath, parameters.dbFile);
+storage.getDbPaths = getDbPaths;
 
-    log.info('Open storage file ', dbPath, '...');
-    sqlite.init(dbPath, function (err, db) {
-        if (err) return callback(new Error('Can\'t initialise storage database ' + dbPath + ': ' + err.message));
+storage.initStorage = function (callback) {
 
-        function createTrendTable(timeInterval, callback) {
-            db.run(
-                'CREATE TABLE IF NOT EXISTS trends' + timeInterval + 'min (' +
-                'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
-                'objectID INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
-                'timestamp INTEGER NOT NULL,' +
-                'data REAL NOT NULL)',
-                function (err) {
-                    if (err) return callback(new Error('Can\'t create trends' + timeInterval + 'min table in storage database: ' + err.message));
+    var dbPaths = getDbPaths();
+    async.eachSeries(dbPaths, initDB, function (err) {
+        if(err) return callback(err);
 
-                    db.run('CREATE INDEX IF NOT EXISTS objectID_timestamp_trends' + timeInterval + 'min_index on trends' + timeInterval + 'min(objectID, timestamp)',
-                        function (err) {
-                            if (err) return callback(new Error('Can\'t create objects-timestamp index in trends' + timeInterval + 'min table in storage database: ' + err.message));
-                            callback();
-                        }
-                    );
+
+        // print warning when queue exist every 30 sec
+        setInterval(function () {
+            if (selectQueryQueue.length > parameters.queriesMaxQueueLength) {
+                log.warn('Too many queries in queue (', selectQueryQueue.length,
+                    ') for getting data from history at same time. ' +
+                    'Queries are queued.');
+
+                // try to process queue.
+                // dontPushToQueue set to 1 or true when query was pushed to queue and now
+                // query don't queued
+                childFunc.apply(this, selectQueryQueue.shift());
+            }
+        }, 120000);
+
+        log.info('Starting main storage process for processing transaction...');
+        storageModifyingProcess = new proc.parent({
+            childProcessExecutable: __filename,
+            args: [transProcessArgID, '%:childID:%'],
+            killTimeout: 1800000, // waiting for finishing all transactions
+            restartAfterErrorTimeout: 200,
+            childrenNumber: dbPaths, //If array, then number will be equal to array length and %:childID:% will be set to array item
+            module: 'historyStorage:writer',
+            cleanUpCallbacksPeriod: 86400000,
+        }, function (err, storageModifyingProcess) {
+            if (err) {
+                return callback(new Error('Can\'t initializing main storage process for processing transaction: ' + err.message));
+            }
+
+            storageModifyingProcess.startAll(function (err) {
+                if (err) {
+                    return callback(new Error('Can\'t run main storage process for processing transaction: ' + err.message));
                 }
-            )
-        }
 
-        db.run(
-            'CREATE TABLE IF NOT EXISTS objects (' +
-            'id INTEGER PRIMARY KEY ASC,' +
-            'type INTEGER,' + // 0 - number, 1 - string
-            'cachedRecords INTEGER)',
-            function (err) {
-                if (err) return callback(new Error('Can\'t create objects table in storage database: ' + err.message));
+                storageModifyingProcess.sendToAll({
+                    parameters: parameters,
+                });
 
-                async.parallel([function (callback) {
-                    db.run(
-                        'CREATE TABLE IF NOT EXISTS numbers (' +
-                        'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
-                        'objectID INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
-                        'timestamp INTEGER NOT NULL,' +
-                        'data REAL NOT NULL)',
-                        function (err) {
-                            if (err) return callback(new Error('Can\'t create numbers table in storage database: ' + err.message));
+                log.info('Starting storage processes for getting data from database...');
+                storageQueryingProcesses = new proc.parent({
+                    childProcessExecutable: __filename,
+                    killTimeout: 60000,
+                    restartAfterErrorTimeout: 200,
+                    module: 'historyStorage:reader',
+                    cleanUpCallbacksPeriod: 86400000,
+                }, function (err, storageQueryingProcesses) {
+                    if (err) {
+                        return callback(new Error('Can\'t initializing storage processed for for getting data from database: ' + err.message));
+                    }
 
-                            db.run('CREATE INDEX IF NOT EXISTS objectID_timestamp_numbers_index on numbers(objectID, timestamp)',
-                                function (err) {
-                                    if (err) return callback(new Error('Can\'t create objects-timestamp index in numbers table in storage database: ' + err.message));
-                                    callback();
-                                }
-                            );
+                    storageQueryingProcesses.startAll(function (err) {
+                        if (err) {
+                            return callback(new Error('Can\'t run storage processed for for getting data from database: ' + err.message));
                         }
-                    )
-                }, function (callback) {
-                    db.run(
-                        'CREATE TABLE IF NOT EXISTS strings (' +
-                        'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
-                        'objectID INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
-                        'timestamp INTEGER NOT NULL,' +
-                        'data TEXT NOT NULL)',
-                        function (err) {
-                            if (err) return callback(new Error('Can\'t create strings table in storage database: ' + err.message));
 
-                            db.run('CREATE INDEX IF NOT EXISTS objectID_timestamp_strings_index on strings(objectID, timestamp)',
-                                function (err) {
-                                    if (err) return callback(new Error('Can\'t create objects-timestamp index in strings table in storage database: ' + err.message));
-                                    callback();
-                                    /*
-                                    db.run('CREATE INDEX IF NOT EXISTS data_strings_index on strings(data)',
-                                        function (err) {
-                                            if (err) return callback(new Error('Can\'t create value index in strings table in storage database: ' + err.message));
+                        storageQueryingProcesses.sendToAll({
+                            parameters: parameters,
+                        });
 
-                                            callback();
-                                        }
-                                    );
-                                     */
-                                }
-                            );
-                        }
-                    )
-                }, function (callback) {
-                    db.run('CREATE TABLE IF NOT EXISTS config (' +
-                    'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
-                    'name TEXT NOT NULL UNIQUE,' +
-                    'value TEXT)',
-                    function (err) {
-                        if (err) return callback(new Error('Can\'t create config table in storage database: ' + err.message));
                         callback();
                     });
-                },
-                    function (callback) {
-                    async.eachSeries(trendsTimeIntervals, createTrendTable, callback);
-                }], function (err) {
-                    if (err) return callback(err);
-
-                    log.info('Truncating the WAL journal file');
-                    db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(err) {
-                        if(err) log.error('Can\'t truncate WAL journal file: ', err.message);
-
-                        log.info('Optimizing database');
-                        db.exec('PRAGMA optimize', function(err) {
-                            if (err) log.error('Can\'t optimize database: ', err.message);
-
-                            // loading data to cache from DB only when cache is empty
-                            //loadDataToCache(db, cache, function(err, cache) {
-                            //    if(err) return callback(err);
-
-                                db.close(function (err) {
-                                    if (err) return callback(new Error('Can\'t close storage DB: ' + err.message));
-
-                                    log.info('Close storage DB file in main history process');
-
-                                    // print warning when queue exist every 30 sec
-                                    setInterval(function () {
-                                        if (selectQueryQueue.length > parameters.queriesMaxQueueLength) {
-                                            log.warn('Too many queries in queue (', selectQueryQueue.length,
-                                                ') for getting data from history at same time. ' +
-                                                'Queries are queued.');
-
-                                            // try to process queue.
-                                            // dontPushToQueue set to 1 or true when query was pushed to queue and now
-                                            // query don't queued
-                                            childFunc.apply(this, selectQueryQueue.shift());
-                                        }
-                                    }, 120000);
-
-                                    log.info('Starting main storage process for processing transaction...');
-                                    storageModifyingProcess = new proc.parent({
-                                        childProcessExecutable: __filename,
-                                        args: [transProcessArgID],
-                                        killTimeout: 1800000, // waiting for finishing all transactions
-                                        restartAfterErrorTimeout: 200,
-                                        childrenNumber: 1,
-                                        module: 'historyStorage:writer',
-                                        cleanUpCallbacksPeriod: 86400000,
-                                    }, function (err, storageModifyingProcess) {
-                                        if (err) {
-                                            return callback(new Error('Can\'t initializing main storage process for processing transaction: ' + err.message));
-                                        }
-
-                                        storageModifyingProcess.start(function (err) {
-                                            if (err) {
-                                                return callback(new Error('Can\'t run main storage process for processing transaction: ' + err.message));
-                                            }
-
-                                            log.info('Starting storage processes for getting data from database...');
-                                            storageQueryingProcesses = new proc.parent({
-                                                childProcessExecutable: __filename,
-                                                killTimeout: 60000,
-                                                restartAfterErrorTimeout: 200,
-                                                module: 'historyStorage:reader',
-                                                cleanUpCallbacksPeriod: 86400000,
-                                            }, function (err, storageQueryingProcesses) {
-                                                if (err) {
-                                                    return callback(new Error('Can\'t initializing storage processed for for getting data from database: ' + err.message));
-                                                }
-
-                                                storageQueryingProcesses.startAll(function (err) {
-                                                    if (err) {
-                                                        return callback(new Error('Can\'t run storage processed for for getting data from database: ' + err.message));
-                                                    }
-
-                                                    callback(null, cache);
-                                                });
-                                            });
-                                        });
-                                    });
-                                });
-
-                            //});
-                        });
-                    });
                 });
-            }
-        );
+            });
+        });
     });
 };
 
-/*
-    loading data from storage into the cache when init cache first time
-
-    callback(err, cache), cache - loaded cache
- */
-/*
-function loadDataToCache(db, cache, callback) {
-
-    if(typeof cache === 'object' && Object.keys(cache).length > 2) return callback(null, cache);
-    cache =db.all( {};
-
-    db.all('SELECT * FROM objects', function (err, rows) { // id, type, cachedRecords
-        if (err) return callback(new Error('Can\'t get data from objects table from storage database: ' + err.message));
-
-        var objectsParameters = {};
-        rows.forEach(function (row) {
-            objectsParameters[row.id] = row;
-        });
-
-        log.info('Starting load history data to cache from database for ', Object.keys(objectsParameters).length, ' objects');
-
-        var recordsCnt = 0, loaded = 0, nextInfo = Object.keys(objectsParameters).length / 10, loadStep = nextInfo;
-        // 'limit' canceled database high loading with many parallel queries
-        async.eachOfLimit(objectsParameters, 10, function (row, ID, callback) {
-
-            // loading data to cache from numbers and strings tables for required object
-            var cachedRecords = row.cachedRecords ? row.cachedRecords : parameters.initCachedRecords;
-            var trendsTimeIntervalsObj = {};
-            trendsTimeIntervals.forEach(function (timeInterval) {
-                trendsTimeIntervalsObj[timeInterval] = timeInterval;
-            });
-            db.all('SELECT timestamp, data FROM numbers  WHERE objectID=$id ' +
-                'UNION ALL ' +
-                'SELECT timestamp, data FROM strings WHERE objectID=$id ' +
-                'ORDER BY timestamp DESC LIMIT $cachedRecords', {
-                $id: ID,
-                $cachedRecords: cachedRecords
-            }, function (err, records) {
-                if (err) return callback(new Error('Can\'t load ' + row.cachedRecords +
-                    ' records to cache from storage database for object: ' + ID + ': ' + err.message));
-
-                async.mapValues(trendsTimeIntervalsObj, function (timeInterval, key, callback) {
-                    db.get('SELECT timestamp, data FROM trends' + timeInterval + 'min ORDER BY ROWID DESC LIMIT 1', function (err, row) {
-                        if (err) return callback('Can\'t get latest record from trends' + timeInterval + 'min table: ' + err.message);
-                        callback(null, row);
-                    });
-                }, function (err, trends) {
-                    if (err) return callback(err);
-
-                    cache[ID] = {
-                        cachedRecords: cachedRecords,
-                        savedCnt: records.length,
-                        records: records.reverse(),
-                        trends: trends // {'2': {timestamp:..., data:...}, '10': {timestamp:..., data:...}, '30':{..}, '60':{..}}
-                    };
-                    //log.debug('Loading data for ', ID, ': ', cache[ID]);
-                    recordsCnt += records.length;
-                    ++loaded;
-                    if (loaded > nextInfo) {
-                        nextInfo += loadStep;
-                        log.info('Loaded ', Math.ceil(loaded * 100 / Object.keys(objectsParameters).length) - 1, '% data to cache (', recordsCnt, ' records)');
-                    }
-                    callback();
-                });
-            });
-        }, function (err) {
-            callback(err, cache);
-            log.info('Finishing load history data to cache. Loaded ', recordsCnt, ' records for ', Object.keys(cache).length, ' objects');
-        });
-    });
-}
-
-*/
-
 storage.restartStorageModifierProcess = function(callback) {
-    storageModifyingProcess.sendAndReceive({
+    storageModifyingProcess.sendAndReceiveToAll({
         restart: 'storage modifier',
         waitForCallback: true,
     }, callback);
@@ -292,19 +125,37 @@ storage.restartStorageQueryProcesses = function(callback) {
 }
 
 storage.stop = function(callback) {
+    // use series to be able to fetch data while waiting while transactional processes are closing the database
     async.series([
         function(callback) {
-            if(storageModifyingProcess && typeof storageModifyingProcess.stop === "function") storageModifyingProcess.stop(callback);
-            else callback();
+            if(storageModifyingProcess && typeof storageModifyingProcess.stopAll === "function") {
+                storageModifyingProcess.stopAll(function (err) {
+                    if(err) log.warn('Error while stopped storage transaction processes: ', err.message);
+                    else log.warn('Storage transaction processes were stopped successfully');
+                    callback();
+                });
+            } else {
+                log.warn('storageModifyingProcess.stopAll is not a function. Can\'t stop storage transaction process');
+                callback();
+            }
         }, function(callback) {
-            if(storageQueryingProcesses && typeof storageQueryingProcesses.stopAll === "function") storageQueryingProcesses.stopAll(callback);
-            else callback();
+            if(storageQueryingProcesses && typeof storageQueryingProcesses.stopAll === "function") {
+                storageQueryingProcesses.stopAll(function (err) {
+                    if(err) log.warn('Error while stopped storage query processes: ', err.message);
+                    else log.warn('Storage query processes were stopped successfully');
+                    callback();
+                });
+            }
+            else {
+                log.warn('storageQueryingProcesses.stopAll is not a function. Can\'t stop storage query process');
+                callback();
+            }
         }
     ], callback);
 };
 
 storage.kill = function() {
-    if(storageModifyingProcess && typeof storageModifyingProcess.kill === 'function') storageModifyingProcess.kill();
+    if(storageModifyingProcess && typeof storageModifyingProcess.killAll() === 'function') storageModifyingProcess.killAll();
     if(storageQueryingProcesses && typeof storageQueryingProcesses.killAll ==='function') storageQueryingProcesses.killAll();
 };
 
@@ -335,7 +186,8 @@ function childFunc() {
     }
 
     // storageModifyingProcess for modify database
-    var sendAndReceive = dontPushToQueue === 0 || dontPushToQueue === 1 ? storageModifyingProcess.sendAndReceive : storageQueryingProcesses.sendAndReceive;
+    var sendAndReceive = dontPushToQueue === 0 || dontPushToQueue === 1 ?
+        storageModifyingProcess.sendAndReceiveToAll : storageQueryingProcesses.sendAndReceive;
 
     var funcName = args.pop();
     var callback = args.pop();
@@ -351,8 +203,130 @@ function childFunc() {
         // get one query result, run to process one query from queue
         if (selectQueryQueue.length) childFunc.apply(this, selectQueryQueue.shift());
 
-        //if(funcName === 'saveRecords') { log.info('Func: ', funcName, ' send: ', args); log.info('Func: ', funcName, ' recv: ', data); }
+        //if(funcName === 'config') { log.info('Func: ', funcName, ' send: ', args); log.info('Func: ', funcName, ' recv: ', data); }
         callback(null, data);
+    });
+}
+
+function initDB(dbPath, callback) {
+    log.info('Open storage file ', dbPath, '...');
+    sqlite.init(dbPath, function (err, db) {
+        if (err) return callback(new Error('Can\'t initialise storage database ' + dbPath + ': ' + err.message));
+
+        function createTrendTable(timeInterval, callback) {
+            db.run(
+                'CREATE TABLE IF NOT EXISTS trends' + timeInterval + 'min (' +
+                'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
+                'objectID INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
+                'timestamp INTEGER NOT NULL,' +
+                'data REAL NOT NULL)',
+                function (err) {
+                    if (err) return callback(new Error('Can\'t create trends' + timeInterval + 'min table in storage database: ' + err.message));
+
+                    db.run('CREATE INDEX IF NOT EXISTS objectID_timestamp_trends' + timeInterval + 'min_index on trends' + timeInterval + 'min(objectID, timestamp)',
+                        function (err) {
+                            if (err) return callback(new Error('Can\'t create objects-timestamp index in trends' + timeInterval + 'min table in storage database: ' + err.message));
+                            callback();
+                        }
+                    );
+                }
+            )
+        }
+
+        db.run(
+            'CREATE TABLE IF NOT EXISTS objects (' +
+            'id INTEGER PRIMARY KEY ASC,' +
+            'type INTEGER,' + // 0 - number, 1 - string
+            'cachedRecords INTEGER,' +
+            'trends TEXT)',
+            function (err) {
+                if (err) return callback(new Error('Can\'t create objects table in storage database: ' + err.message));
+
+            async.parallel([function (callback) {
+                db.run(
+                    'CREATE TABLE IF NOT EXISTS numbers (' +
+                    'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
+                    'objectID INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
+                    'timestamp INTEGER NOT NULL,' +
+                    'data REAL NOT NULL)',
+                    function (err) {
+                        if (err) return callback(new Error('Can\'t create numbers table in storage database: ' + err.message));
+
+                        db.run('CREATE INDEX IF NOT EXISTS objectID_timestamp_numbers_index on numbers(objectID, timestamp)',
+                            function (err) {
+                                if (err) return callback(new Error('Can\'t create objects-timestamp index in numbers table in storage database: ' + err.message));
+                                callback();
+                            }
+                        );
+                    }
+                )
+            }, function (callback) {
+                db.run(
+                    'CREATE TABLE IF NOT EXISTS strings (' +
+                    'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
+                    'objectID INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
+                    'timestamp INTEGER NOT NULL,' +
+                    'data TEXT NOT NULL)',
+                    function (err) {
+                        if (err) return callback(new Error('Can\'t create strings table in storage database: ' + err.message));
+
+                        db.run('CREATE INDEX IF NOT EXISTS objectID_timestamp_strings_index on strings(objectID, timestamp)',
+                            function (err) {
+                                if (err) return callback(new Error('Can\'t create objects-timestamp index in strings table in storage database: ' + err.message));
+                                callback();
+                                /*
+                                db.run('CREATE INDEX IF NOT EXISTS data_strings_index on strings(data)',
+                                    function (err) {
+                                        if (err) return callback(new Error('Can\'t create value index in strings table in storage database: ' + err.message));
+
+                                        callback();
+                                    }
+                                );
+                                 */
+                            }
+                        );
+                    }
+                )
+            }, function (callback) {
+                db.run('CREATE TABLE IF NOT EXISTS config (' +
+                    'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
+                    'name TEXT NOT NULL UNIQUE,' +
+                    'value TEXT)',
+                    function (err) {
+                        if (err) return callback(new Error('Can\'t create config table in storage database: ' + err.message));
+                        callback();
+                    });
+            },
+                function (callback) {
+                    async.eachSeries(trendsTimeIntervals, createTrendTable, callback);
+                }], function (err) {
+                if (err) return callback(err);
+/*
+                log.info('Truncating the WAL journal file');
+                db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function (err) {
+                    if (err) log.error('Can\'t truncate WAL journal file: ', err.message);
+
+                    log.info('Optimizing database');
+                    db.exec('PRAGMA optimize', function (err) {
+                        if (err) log.error('Can\'t optimize database: ', err.message);
+
+ */
+
+                        // loading data to cache from DB only when cache is empty
+                        //loadDataToCache(db, cache, function(err, cache) {
+                        //    if(err) return callback(err);
+
+                        db.close(function (err) {
+                            if (err) return callback(new Error('Can\'t close storage DB: ' + err.message));
+
+                            log.info('Close storage DB file in main history process');
+
+                            callback(null);
+                        });
+                    //});
+                //});
+            });
+        });
     });
 }
 /*
@@ -423,10 +397,10 @@ storage.delRecords = function () {
     childFunc.apply(this, args);
 };
 
-//id, newObjectParameters, records, trends, callback
-storage.saveRecords = function () {
+//recordsForSave, callback
+storage.saveRecordsForObject = function () {
     var args = Array.prototype.slice.call(arguments);
-    args.push('saveRecords'); // add last parameter (funcName)
+    args.push('saveRecordsForObject'); // add last parameter (funcName)
     args.push(0); // add last parameter (dontPushToQueue)
 
     childFunc.apply(this, args);
@@ -462,14 +436,16 @@ storage.config = function () {
 
 // =============================================================================================
 
-function runProcessForQueries(isTransactionProcess) {
-    var dbPath = path.join(__dirname, '..', parameters.dbPath, parameters.dbFile);
-    var db;
+function runProcessForQueries(isTransactionProcess, dbPath) {
+
+    var db, initDB;
     var functions = {};
-    var objectsParameters; // mast be undefined for check for initializing
+    var trendsData = new Map();
+    var objectsParameters; // it's new Map(), but it must be undefined to be checked on initialization
     var transactionInProgress = false;
     var transactionsFunctions = [];
     var callbackOnStop;
+    var lastModifierRestartTime = Date.now();
     var repl = require('../lib/dbReplication');
 
     var slowRecords = {
@@ -503,25 +479,54 @@ function runProcessForQueries(isTransactionProcess) {
 
     if(isTransactionProcess && isTransactionProcess === transProcessArgID) {
         var dbReplication = function(initDB, id, callback) {
-            log.warn('Truncate WAL journal file...');
+            transactionInProgress = true;
+            log.info('Truncate WAL journal file for ', dbPath,'...');
             initDB.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(err) {
-                if (err) log.error('Can\'t truncate WAL journal file: ', err.message);
-                repl(initDB, id, callback);
-            });
-        };
-    } else dbReplication = function(initDB, id, callback) { callback(null, initDB); };
+                if (err) log.error('Can\'t truncate WAL journal file for ', dbPath, ':', err.message);
 
-    sqlite.init(dbPath, function (err, initDB) {
+                log.info('Optimizing database ', dbPath);
+                initDB.exec('PRAGMA optimize', function (err) {
+                    if (err) log.error('Can\'t optimize database ', dbPath, ': ', err.message);
+
+                    transactionInProgress = false;
+                    log.info('Loading trends data...');
+                    loadTrendsData(initDB, function(err) {
+                        if(err) log.error(err.message);
+                        else log.info('Loading trends data is complete');
+
+                        if (transactionsFunctions.length) {
+                            log.warn('Starting ', transactionsFunctions.length, ' delayed transactions');
+                            functions.beginTransaction(transactionsFunctions.shift());
+                        }
+                    });
+
+                });
+            });
+            repl(initDB, id, callback);
+            //});
+        };
+    } else {
+        dbPath = getDbPaths()[0];
+        dbReplication = function(initDB, id, callback) { callback(null, initDB); };
+    }
+
+    sqlite.init(dbPath, function (err, _initDB) {
         if (err) {
             log.exit('Can\'t initialize storage database ' + dbPath + ': ' + err.message);
-            setTimeout(process.exit, 500, 2);
+            log.disconnect(function () {
+                log.disconnect(function () { process.exit(2) });
+            });
             return;
         }
 
-        dbReplication(initDB, 'history', function (err, replicationDB) {
+        initDB = _initDB;
+
+        dbReplication(_initDB, 'history', function (err, replicationDB) {
             if (err) {
                 log.error('Can\'t initialize replication for storage database ' + dbPath + ': ' + err.message);
-                setTimeout(process.exit, 500, 2);
+                log.disconnect(function () {
+                    log.disconnect(function () { process.exit(2) });
+                });
             }
 
             db = replicationDB;
@@ -540,7 +545,7 @@ function runProcessForQueries(isTransactionProcess) {
                         onMessage: onMessage,
                         onStop: onStop,
                         onDestroy: function () {
-                            initDB.close(function (err) {
+                            _initDB.close(function (err) {
                                 if (err) log.exit('Error while close storage DB: ' + err.message);
                                 else log.exit('Storage DB closed successfully');
                             });
@@ -548,7 +553,7 @@ function runProcessForQueries(isTransactionProcess) {
                         onDisconnect: function () {  // exit on disconnect from parent (then server will be restarted)
                             log.exit('History storage process ' + process.pid + ' was disconnected from server unexpectedly. Exiting');
                             onStop(function () {
-                                process.exit(2);
+                                log.disconnect(function () { process.exit(2) });
                             });
                         },
                     });
@@ -559,17 +564,25 @@ function runProcessForQueries(isTransactionProcess) {
 
     function onMessage(message, callback) {
         if (message && message.restart) {
-            log.warn('Receiving message for restart history ', message.restart,'...');
+            log.warn('Receiving message for restart history ', message.restart,' for ', dbPath,'...');
             onStop(function (err) {
-                if(err) log.error('Error when preparing to stop history ', message.restart,': ', err.message);
-                else log.warn('History ', message.restart ,' successfully stopped, starting...');
-
                 if(message.waitForCallback) callback();
 
-                setTimeout(function() {
-                    exitHandler.exit(12); // process.exit(12)
-                }, 10000);
+                if(err) log.error('Error when preparing to stop history ', message.restart,' for ', dbPath,': ', err.message);
+                else log.warn('History ', message.restart ,' for ', dbPath, ' successfully stopped.');
+
+                log.disconnect(function () {
+                    setTimeout(function() {
+                        exitHandler.exit(12); // process.exit(12)
+                    }, 10000);
+                });
             });
+            return;
+        }
+
+        // init parameters
+        if(message && typeof message.parameters === 'object') {
+            parameters = message.parameters;
             return;
         }
 
@@ -580,6 +593,7 @@ function runProcessForQueries(isTransactionProcess) {
         storageFunctionArguments.push(function () {
             var storageFunctionResult = Array.prototype.slice.call(arguments);
             //log.info('Send data back for ', message, ': ', storageFunctionResult);
+            //console.log('Send data back for ', message, ': ', storageFunctionResult);
 
             // callback arguments is [err, data]
             var err = storageFunctionResult[0];
@@ -595,58 +609,76 @@ function runProcessForQueries(isTransactionProcess) {
         if(!transactionInProgress) {
             // prevent to run transaction
             transactionInProgress = true;
-            callbackOnStop = function(err) { if (err) log.error('Error while commit transaction: ' + err.message); };
-            log.warn('Closing database...');
-            db.close(function (err) {
-                if (err) log.error('Error while close storage DB: ' + err.message);
-                else log.warn('Storage DB closed successfully');
-                db.sendReplicationData(callback);
+            callbackOnStop = function(err) {
+                if (err) log.error('Error while committing an unexpected transaction: ' + err.message);
+                else log.error('Unexpected transaction committed successfully');
+            };
+
+            var timeToWaitForDB = isTransactionProcess === transProcessArgID ? 300 : 15; //sec
+
+            log.warn('Closing the database for ', (isTransactionProcess === transProcessArgID ?
+                    ('transactions process ' + dbPath + '...') : 'queries process...'));
+
+            initDB.close(function (err) {
+                if (err) {
+                    log.error('Error while close storage DB for ' + (isTransactionProcess === transProcessArgID ?
+                        'transactions process ' + dbPath + ': ' : 'queries process: ') + err.message);
+                } else {
+                    log.warn('Storage DB closed successfully for ', (isTransactionProcess === transProcessArgID ?
+                        ('transactions process ' + dbPath) : 'queries process'));
+                }
+                db.sendReplicationData(function (err) {
+                    if (err) log.error('Error while sending replication data: ' + err.message);
+
+                    clearTimeout(terminateTimeout);
+                    if(typeof callback === 'function') callback();
+                    callback = null;
+                });
             });
-            setTimeout(function () {
-                log.error('Can\'t close database without transactions in 15sec.');
-                db.sendReplicationData(callback);
-                callback = null;
-            }, 15000);
         } else {
             var waitingTimeout = setTimeout(function() {
-                log.warn('Continue waiting while last transaction is committed...');
+                log.warn('Continue waiting while last transaction is committed for ' + dbPath + '...');
             }, 30000);
-            log.warn('Waiting while last transaction is committed...');
+            log.warn('Waiting while last transaction is committed for ' + dbPath + '...');
 
             // clear transaction queue
             transactionsFunctions = [];
+            timeToWaitForDB = 300; //sec
 
             // function will running after transaction.commit
             callbackOnStop = function(err) {
                 // prevent to run transaction
                 transactionInProgress = true;
                 clearTimeout(waitingTimeout);
-                if (err) log.error('Error while commit transaction: ' + err.message);
-                else log.warn('Transaction commit successfully');
+                if (err) log.error('Error while commit transaction for ' + dbPath + ': ' + err.message);
+                else log.warn('Transaction commit successfully for ' + dbPath);
 
-                log.warn('Truncate WAL journal file...');
-                db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(err) {
-                    if (err) log.error('Can\'t truncate WAL journal file: ', err.message);
+                log.warn('Closing the database after commit transaction for ' + dbPath + '...');
+                initDB.close(function (err) {
+                    if (err) log.error('Error while close storage DB after commit transaction for ' + dbPath + ': ' + err.message);
+                    else log.warn('Storage DB closed successfully after commit transaction for ' + dbPath);
 
-                    log.warn('Closing database...');
-                    db.close(function (err) {
-                        if (err) log.error('Error while close storage DB: ' + err.message);
-                        else log.warn('Storage DB closed successfully');
-                        log.warn('Sending cached transaction to replication server...');
-                        db.sendReplicationData(function (err) {
-                            if (err) log.error('Error while sending transaction: ' + err.message);
-                            else log.warn('Sending transaction successfully. Exiting');
-                            callback();
-                        });
-                    });
-                    setTimeout(function () {
-                        log.warn('Can\'t close database with transactions, but it committed in 60sec.');
-                        db.sendReplicationData(callback);
+                    log.warn('Sending cached transaction to replication server for ' + dbPath + '...');
+                    db.sendReplicationData(function (err) {
+                        if (err) log.error('Error while sending transaction for ' + dbPath + ': ' + err.message);
+                        else log.warn('Sending transaction successfully for ' + dbPath + '. Exiting');
+
+                        clearTimeout(terminateTimeout);
+                        if(typeof callback === 'function') callback();
                         callback = null;
-                    }, 60000);
+                    });
                 });
             };
         }
+
+        var terminateTimeout = setTimeout(function () {
+            log.warn('Cannot close database ', dbPath, ' in ', timeToWaitForDB,'sec. Terminate...');
+            db.sendReplicationData(function (err) {
+                if (err) log.error('Error while sending replication data: ' + err.message);
+                if(typeof callback === 'function') callback();
+                callback = null;
+            });
+        }, timeToWaitForDB * 1000);
     }
 
     /*
@@ -711,7 +743,8 @@ function runProcessForQueries(isTransactionProcess) {
                 /*
                 log.debug('Getting records for object id: ' + id + ', from strings, position: ' + offset + ', count: ' + cnt + ': ', records2);
                  */
-                callback(null ,records1);
+                // remove first unneeded and return not more then required number of records
+                callback(null ,records1.slice(Math.max(records1.length - cnt, 0)));
             });
         });
     };
@@ -723,7 +756,7 @@ function runProcessForQueries(isTransactionProcess) {
 
  recordsType: [0|1|2]: 0 - number and string, 1 number, 2 - string
 
- callback(err, records, type), where
+ callback(err, records), where
  records: [{data:.., timestamp:..}, ....], sorted by ascending timestamp
  */
     functions.getRecordsFromStorageByTime = function (id, timeFrom, timeTo, maxRecordsCnt, recordsType, callback) {
@@ -731,85 +764,133 @@ function runProcessForQueries(isTransactionProcess) {
         var startTime = Date.now();
         if(recordsType < 2) {
             if(maxRecordsCnt > parameters.queryMaxResultNumbers) maxRecordsCnt = parameters.queryMaxResultNumbers;
-            var tableType = getTableNameForNumbers(timeFrom, timeTo, maxRecordsCnt);
             var cnt = parameters.queryMaxResultNumbers;
-        } else {
-            tableType = 'strings';
-            cnt = parameters.queryMaxResultStrings;
-        }
+        } else cnt = parameters.queryMaxResultStrings;
 
-        /*
-        Note that the BETWEEN operator is inclusive. It returns true when the test_expression is less than or equal
-        to high_expression and greater than or equal to the value of low_expression:
-        test_expression >= low_expression AND test_expression <= high_expression
-        */
-        db.all('SELECT data, timestamp FROM ' + tableType + ' WHERE objectID=$id AND timestamp BETWEEN $timeFrom AND $timeTo ' +
-            'ORDER BY timestamp LIMIT $queryMaxResult', {
-            $id: id,
-            $timeFrom: timeFrom,
-            $timeTo: timeTo,
-            $queryMaxResult: cnt,
-        }, function (err, records1) {
-
-            if (err) return callback(err);
-            if (Date.now() - startTime > parameters.slowQueueSec * 1000) {
-                addSlowRecord(Date.now() - startTime, records1.length);
-            }
+        getTableName(id, timeFrom, timeTo, maxRecordsCnt, recordsType, function(tableType) {
             /*
-            log.debug('Getting records from ' + tableType + ' for object id: ', id, ', from: ',
-                (new Date(timeFrom)).toLocaleString(), '(', timeFrom, ')',
-                ' to: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, '): ', records1);
+            Note that the BETWEEN operator is inclusive. It returns true when the test_expression is less than or equal
+            to high_expression and greater than or equal to the value of low_expression:
+            test_expression >= low_expression AND test_expression <= high_expression
+
+            Use DESC for show last records if number of the records are more then cnt
             */
-            if(recordsType > 0) return callback(null, records1, tableType !== 'numbers');
-
-            if(cnt > parameters.queryMaxResultStrings) cnt = parameters.queryMaxResultStrings;
-
-            db.all('SELECT data, timestamp FROM strings WHERE objectID=$id AND timestamp BETWEEN $timeFrom AND $timeTo ' +
-                'ORDER BY timestamp LIMIT $queryMaxResult', {
+            db.all('SELECT data, timestamp FROM ' + tableType + ' WHERE objectID=$id AND ' +
+                'timestamp BETWEEN $timeFrom AND $timeTo ORDER BY timestamp DESC LIMIT $queryMaxResult', {
                 $id: id,
                 $timeFrom: timeFrom,
                 $timeTo: timeTo,
                 $queryMaxResult: cnt,
-            }, function (err, records2) {
+            }, function (err, records1) {
 
                 if (err) return callback(err);
                 if (Date.now() - startTime > parameters.slowQueueSec * 1000) {
-                    addSlowRecord(Date.now() - startTime, records2.length);
+                    addSlowRecord(Date.now() - startTime, records1.length);
+                }
+                /*
+                log.debug('Getting records from ' + tableType + ' for object id: ', id, ', from: ',
+                    (new Date(timeFrom)).toLocaleString(), '(', timeFrom, ')',
+                    ' to: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, '): ', records1);
+                */
+                if(recordsType > 0) {
+                    if(records1.length) {
+                        records1 = records1.reverse();
+                        records1[0].isDataFromTrends = tableType !== 'numbers';
+                    }
+                    return callback(null, records1);
                 }
 
-                if(!records2.length) return callback(null, records1, tableType !== 'numbers');
+                if(cnt > parameters.queryMaxResultStrings) cnt = parameters.queryMaxResultStrings;
 
-                Array.prototype.push.apply(records1, records2);
-                records1.sort(function (a, b) {
-                    return a.timestamp - b.timestamp; // inc sorting
+                db.all('SELECT data, timestamp FROM strings WHERE objectID=$id AND ' +
+                    'timestamp BETWEEN $timeFrom AND $timeTo ORDER BY timestamp DESC LIMIT $queryMaxResult', {
+                    $id: id,
+                    $timeFrom: timeFrom,
+                    $timeTo: timeTo,
+                    $queryMaxResult: cnt,
+                }, function (err, records2) {
+
+                    if (err) return callback(err);
+                    if (Date.now() - startTime > parameters.slowQueueSec * 1000) {
+                        addSlowRecord(Date.now() - startTime, records2.length);
+                    }
+
+                    if(!records2.length) {
+                        if(records1.length) {
+                            records1 = records1.reverse();
+                            records1[0].isDataFromTrends = tableType !== 'numbers';
+                        }
+                        return callback(null, records1);
+                    }
+
+                    Array.prototype.push.apply(records1, records2);
+                    records1.sort(function (a, b) {
+                        return a.timestamp - b.timestamp; // inc sorting
+                    });
+
+                    /*
+                    log.debug('Getting records from strings for object id: ', id, ', from: ',
+                        (new Date(timeFrom)).toLocaleString(), '(', timeFrom, ')',
+                        ' to: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, '): ', records2);
+                    */
+                    records1[0].isDataFromTrends = tableType !== 'numbers';
+                    return callback(null, records1);
                 });
-
-                /*
-                log.debug('Getting records from strings for object id: ', id, ', from: ',
-                    (new Date(timeFrom)).toLocaleString(), '(', timeFrom, ')',
-                    ' to: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, '): ', records2);
-                */
-                callback(null ,records1, tableType !== 'numbers');
             });
-
         });
     };
 
-    function getTableNameForNumbers(timeFrom, timeTo, maxRecordsCnt) {
-        if (!maxRecordsCnt || maxRecordsCnt === 1) return 'numbers';
+    function getTableName(id, timeFrom, timeTo, maxRecordsCnt, recordsType, callback) {
+        if (!maxRecordsCnt || maxRecordsCnt === 1) return callback('numbers');
+        //0 - number and string, 1 number, 2 - string
+        if (recordsType >= 2) return callback('strings');
 
         var requiredTimeInterval = ((timeTo - timeFrom) / (maxRecordsCnt - 1)) / 60000;
-        var timeIntervals = [0];
-        Array.prototype.push.apply(timeIntervals, trendsTimeIntervals);
 
-        for (var i = 1; i < timeIntervals.length; i++) {
-            if (requiredTimeInterval > timeIntervals[i]) continue;
-            if (requiredTimeInterval - timeIntervals[i - 1] >= timeIntervals[i] - requiredTimeInterval) return 'trends' + timeIntervals[i] + 'min';
-            if (i === 1) return 'numbers';
-            return 'trends' + timeIntervals[i - 1] + 'min';
+        if(requiredTimeInterval < trendsTimeIntervals[0] / 2) return callback('numbers');
+        var idx = trendsTimeIntervals.length - 1;
+        if(requiredTimeInterval < trendsTimeIntervals[0]) idx = 0;
+        else {
+            for (var i = 0; i < trendsTimeIntervals.length - 1; i++) {
+                if (requiredTimeInterval - trendsTimeIntervals[i] <= trendsTimeIntervals[i+1] - requiredTimeInterval) {
+                    idx = i;
+                    break;
+                }
+            }
         }
 
-        return 'trends' + trendsTimeIntervals[trendsTimeIntervals.length - 1] + 'min';
+        var debugInfo = [];
+
+        // trendsTables = [2, 10, 30, 60]; idx = 2; trendsTimeIntervals.slice(0,idx+1).reverse() = [30, 10, 2];
+        async.each(trendsTimeIntervals.slice(0, idx + 1).reverse(), function (trendTimeInterval, callback) {
+            var trendsTableName = 'trends' + trendTimeInterval + 'min';
+            db.all('SELECT count(*) AS num FROM ' + trendsTableName + ' WHERE objectID=$id AND timestamp BETWEEN $timeFrom AND $timeTo', {
+                $id: id,
+                $timeFrom: timeFrom,
+                $timeTo: timeTo,
+            }, function (err, count) {
+                if (err) {
+                    log.error('Can\'t get number of rows for object ', id,
+                        ', time interval: ',
+                        (new Date(timeFrom)).toLocaleString(), '-', (new Date(timeTo)).toLocaleString(),
+                        ' from table "', trendsTableName, '": ', err.message);
+                    return callback();
+                }
+                if (!count[0] || count[0].num * 0.8 < maxRecordsCnt) {
+                    debugInfo.push(trendsTableName + ': ' + count[0].num);
+                    return callback();
+                }
+                return callback(trendsTableName);
+            });
+        }, function(trendsTableName) {
+            if(trendsTableName) return callback(trendsTableName);
+
+            log.info('Using numbers table for get ', maxRecordsCnt,' records for object ', id,
+                ', time interval: ', (new Date(timeFrom)).toLocaleString(), ' - ', (new Date(timeTo)).toLocaleString(),
+                '; required time interval: ', Math.round(requiredTimeInterval), 'min; ',
+                ' records in trends: ', debugInfo.join('; '));
+            return callback('numbers');
+        });
     }
 
     functions.getLastRecordTimestampForValue = function (id, value, callback) {
@@ -839,13 +920,13 @@ function runProcessForQueries(isTransactionProcess) {
     function getObjectsParameters (callback) {
         if(objectsParameters) return callback();
 
-        objectsParameters = {};
-        log.info('This process used for storage database modification, loading objects parameters to cache');
+        objectsParameters = new Map();
+        log.info('The initial loading of object parameters into the cache is performed before starting first transaction');
         db.all('SELECT * FROM objects', function (err, rows) { // id, type, cachedRecords
             if (err) return callback(new Error('Can\'t get data from objects table from storage database: ' + err.message));
 
             rows.forEach(function (row) {
-                objectsParameters[row.id] = row;
+                objectsParameters.set(row.id, row);
             });
 
             callback();
@@ -863,9 +944,11 @@ function runProcessForQueries(isTransactionProcess) {
 
         getObjectsParameters(function(err) {
             if(err) return callback(err);
+            if(typeof callbackOnStop === 'function') return callback(new Error('Can\'t run new transaction while stopping'));
 
             db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(err) {
                 if (err) log.error('Can\'t truncate WAL journal file: ', err.message);
+                if(typeof callbackOnStop === 'function') return callback(new Error('Can\'t run new transaction while stopping'));
 
                 db.exec('BEGIN', function (err) {
                     if (err) return callback(new Error('Can\'t start transaction for storage database: ' + err.message));
@@ -1005,7 +1088,7 @@ function runProcessForQueries(isTransactionProcess) {
                     stmt.run(id, function (err) {
                         if (err) return callback(new Error('Can\'t remove all data for object: ' + id + ' from storage: ' + err.message));
 
-                        delete (objectsParameters[id]);
+                        objectsParameters.delete(id);
                         callback();
                     })
                 }, function (err) {
@@ -1017,7 +1100,48 @@ function runProcessForQueries(isTransactionProcess) {
     }
 
     /*
-    Prepare SQL if not prepared before, then run with parameters. Used in saveRecords for optimize DB access
+    Loading data for create trends
+     */
+
+    function loadTrendsData(db, callback) {
+        db.all('SELECT id, trends FROM objects', function(err, rows) {
+            if (err) return callback(new Error('Can\'t load trends data from DB: ' + err.message));
+
+            rows.forEach(function(row) {
+                if(!row.trends) return;
+                try {
+                    var trendObj = JSON.parse(row.trends);
+                    trendsData.set(row.id, new Map());
+                    var trendData = trendsData.get(row.id);
+
+                    // convert trend time intervals to Number
+                    for(var key in trendObj) {
+                        if(Number(key) === parseInt(String(key), 10)) key = Number(key);
+                        trendData.set(key, trendObj[key]);
+                    }
+                } catch (e) {
+                    log.warn('Can\'t parse trends data for object ', row.id, ': ', e.message, '; data: ', row.trends);
+                }
+            });
+
+            callback();
+        });
+    }
+
+    function saveTrendData(id, trendsStr, callback) {
+        if(!trendsStr) return callback();
+
+        db.run('UPDATE objects SET trends=$trendsStr WHERE id=$id', {
+            $trendsStr: trendsStr,
+            $id: id
+        }, function(err) {
+            if(err) callback(new Error('Can\'t update trends data for object ' + id + ': ' + err.message + '; data: ' + trendsStr));
+            callback()
+        });
+    }
+
+    /*
+    Prepare SQL if not prepared before, then run with parameters. Used in saveRecordsForObject for optimize DB access
     stmt - DB statement
     sql - SQL query
     param - query parameters
@@ -1040,33 +1164,16 @@ function runProcessForQueries(isTransactionProcess) {
         });
     }
 
-    /*
- Saving records to a storage
-
- id: objectID
- newObjectParameters: {
-    savedCnt: cacheObj.savedCnt
-    cachedRecords: cacheObj.cachedRecords
- }
-
- records: [{data:.., timestamp:..}, ...]
- trends: {'2': {timestamp:..., data:...}, '10': {timestamp:..., data:...}, '30':{..}, '60':{..}}
- callback(err)
- */
-    functions.saveRecords = function (id, newObjectParameters, records, trends, callback) {
+    functions.saveRecordsForObject = function (id, newObjectParameters, recordsForSave, callback) {
         if (!id) return callback(new Error('Undefined ID while saving records to storage database'));
 
-        if (newObjectParameters.savedCnt >= records.length) return callback();
-
-        // save records from saveCnt index to end of records array
-        var recordsForSave = records.slice(newObjectParameters.savedCnt);
-
-        if (!objectsParameters[id]) {
+        var objectParametersObj = objectsParameters.get(Number(id));
+        if (!objectParametersObj) {
             var updateObjectParameters = function (callback) {
                 createStorage(id, newObjectParameters, callback)
             };
         } else {
-            if (objectsParameters[id].cachedRecords === newObjectParameters.cachedRecords)
+            if (objectParametersObj.cachedRecords === newObjectParameters.cachedRecords)
                 updateObjectParameters = function (callback) {
                     callback()
                 };
@@ -1079,13 +1186,16 @@ function runProcessForQueries(isTransactionProcess) {
                 }
         }
 
-        objectsParameters[id] = newObjectParameters;
-        var savedTrends = 0, stmtNumbers, stmtStrings, stmtTrends = {};
+        objectsParameters.set(Number(id), newObjectParameters);
+        var savedTrends = 0,
+            stmtNumbers,
+            stmtStrings,
+            stmtTrends = {},
+            trendData = trendsData.get(id),
+            initTrendsStr = trendData ? JSON.stringify(Object.fromEntries(trendData.entries())) : '';
         updateObjectParameters(function (err) {
             if (err) return callback(new Error('Can\'t update or create storage parameters for object id ' + id + ': ' + err.message));
 
-            // set prevRecordTimestamp to timestamp of last saved record or 0
-            var prevRecordTimestamp = newObjectParameters.savedCnt > 0 && records[newObjectParameters.savedCnt - 1] ? records[newObjectParameters.savedCnt - 1].timestamp : 0;
             async.eachSeries(recordsForSave, function (record, callback) {
                 if(!isNaN(parseFloat(String(record.data))) && isFinite(record.data)) {
                     var isNumber = true;
@@ -1111,44 +1221,57 @@ function runProcessForQueries(isTransactionProcess) {
                     if (!isNumber) return callback();
 
                     // save trends
+                    // trendsData[id] = {"10":{"timestamp":1609863584322,"data":0.5127103117898119},"30":{"timestamp":1609862915322,"data":0.5127103117898119},"60":{"timestamp":1609861114626,"data":0.5127103117898119},"prevRecordTimestamp":1609863794413}
+                    if(!trendsData.has(id)) trendsData.set(id, new Map([['prevRecordTimestamp', 0]]));
+                    var trendData = trendsData.get(id);
+
                     async.eachSeries(trendsTimeIntervals, function (timeInterval, callback) {
                         timeInterval = Number(timeInterval);
 
-                        var longTimeSpan = record.timestamp - prevRecordTimestamp > timeInterval * 60000;
-                        var trend = trends[timeInterval];
-                        if (!trend) {
-                            trends[timeInterval] = record; // record = {data:.., timestamp:...}
+                        // timeInterval was converted to Number when trends data is loaded
+                        var trendDataForTimeInterval = trendData.get(timeInterval);
+                        if (!trendDataForTimeInterval) {
+                            trendData.set(timeInterval, record); // record = {data:.., timestamp:...}
                             return callback();
                         }
 
-                        // if time interval between current and previous record more then time interval between trends records
-                        // or if current record and previous record data is 0 write current record
+                        // The time interval between the current and the previous record is greater than the trend time interval
+                        var longTimeSpan = record.timestamp - trendData.get('prevRecordTimestamp') > timeInterval * 60000;
+
+                        // if the time interval between current and previous record greater than time interval between trends records
+                        // or if current record and previous record data are 0 then write the current record
                         // f.e. (0 + 0) / 2 = 1.7487687511971466e-48 sec
-                        trend.data = longTimeSpan || (!record.data && !trend.data) ? record.data : (record.data + trend.data) / 2;
-                        if (record.timestamp - trend.timestamp < timeInterval * 60000) return callback();
+                        trendDataForTimeInterval.data =
+                            longTimeSpan || (!record.data && !trendDataForTimeInterval.data) ?
+                                record.data :
+                                (record.data + trendDataForTimeInterval.data) / 2;
+
+                        if (record.timestamp - trendDataForTimeInterval.timestamp < timeInterval * 60000) return callback();
 
                         dbRun(stmtTrends[timeInterval],
                             'INSERT INTO trends' + timeInterval + 'min (objectID, timestamp, data) VALUES ($id, $timestamp, $data)',
                             {
                                 $id: id,
-                                $timestamp: longTimeSpan ? record.timestamp : record.timestamp + Math.round((record.timestamp - trend.timestamp) / 2),
-                                $data: trend.data
+                                $timestamp: longTimeSpan ? record.timestamp :
+                                    record.timestamp + Math.round((record.timestamp - trendDataForTimeInterval.timestamp) / 2),
+                                $data: trendDataForTimeInterval.data,
                             }, function(err, stmt) {
-                            stmtTrends[timeInterval] = stmt;
+                                stmtTrends[timeInterval] = stmt;
 
-                            if (err) return callback(new Error('Can\'t insert data to trends' +
-                                timeInterval + 'min table: objectID: ' + id + ' trends: ' + JSON.stringify(trends) + '; record: ' +
-                                JSON.stringify(record) + ': ' + err.message));
+                                if (err) return callback(new Error('Can\'t insert data to trends' +
+                                    timeInterval + 'min table: objectID: ' + id + ' trends: ' +
+                                    JSON.stringify(Object.fromEntries(trendData.entries())) + '; record: ' +
+                                    JSON.stringify(record) + ': ' + err.message));
 
-                            trend.timestamp = record.timestamp;
-                            savedTrends++;
-                            callback();
-                        });
+                                trendDataForTimeInterval.timestamp = record.timestamp;
+                                savedTrends++;
+                                callback();
+                            });
                     }, function (err) {
-                        prevRecordTimestamp = record.timestamp;
-                        callback(err);
+                        trendData.set('prevRecordTimestamp', record.timestamp);
+                        callback(err)
                     });
-                })
+                });
             }, function (err) {
                 if(stmtNumbers) stmtNumbers.finalize();
                 if(stmtStrings) stmtStrings.finalize();
@@ -1157,15 +1280,20 @@ function runProcessForQueries(isTransactionProcess) {
                 });
                 if(err) return callback(err);
 
-                log.debug('Saving ', recordsForSave.length, '/', records.length, ' records for object ', id,
-                    '. parameters: ', newObjectParameters, ': records: ', recordsForSave, ': trends: ', trends);
+                var trendsStr = trendData ? JSON.stringify(Object.fromEntries(trendData.entries())) : '';
+                // check and don't save unchanged trend data
+                saveTrendData(id, trendsStr !== initTrendsStr ? trendsStr : '', function(err) {
+                    if(err) log.error(err.message);
 
-                callback(err, {
-                    trends: trends,
-                    savedRecords: recordsForSave.length,
-                    savedTrends: savedTrends
+                    log.debug('Saving ', recordsForSave.length, ' records, ', savedTrends, ' trends for object ', id,
+                        '. parameters: ', newObjectParameters, ': records: ', recordsForSave, ': trends: ', trendsStr);
+
+                    callback(err, {
+                        savedRecords: recordsForSave.length,
+                        savedTrends: savedTrends
+                    });
                 });
-            })
+            });
         });
     };
 
@@ -1254,20 +1382,21 @@ function runProcessForQueries(isTransactionProcess) {
             }
 
             if(typeof value !== 'string' && typeof value !== 'number' && value !== null) {
-                return callback(new Error('Can\'t set incorrect or undefined parameter "' + name + '" value to config table'));
+                return callback(new Error('Can\'t set incorrect or undefined configuration parameter "' + name +
+                    '" value to config table'));
             }
 
-            db.run('INSERT INTO config (name, value) VALUES (?,?)', [name, String(value)], function(err_insert) {
-                if(err_insert) {
-                    db.run('UPDATE config SET value=? WHERE name=?', [String(value), name], function(err_update) {
-                        if(err_update) {
-                            return callback(new Error('Can\'t insert or update parameter ' + name + ' = ' + value +
-                                ': insert error: ' + err_insert.message + '; update error: ' + err_update.message));
-                        }
-                        callback();
-                    })
+            db.run('INSERT INTO config (name, value) VALUES ($name, $value) ON CONFLICT (name) DO UPDATE SET value=$value', {
+                $name: name,
+                $value: String(value),
+            }, function(err) {
+                if(err) {
+                    return callback(new Error('Can\'t insert or update configuration parameter ' + name +
+                        ' = ' + String(value) + ' :' + err.message));
                 }
+                callback();
             });
+
             return;
         }
 

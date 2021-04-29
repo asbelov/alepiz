@@ -150,10 +150,14 @@ collector.get = function(prms, _callback) {
             }
 
             if(Number(prms.eventDuration) === parseInt(String(prms.eventDuration), 10)) {
-                setTimeout(function() {
+                prms.eventDuration = Number(prms.eventDuration);
+                var solve_problem = function() {
                     prms.$variables.UPDATE_EVENT_STATE = false;
                     collector.get(prms, _callback); // use _callback()!!!
-                }, Number(prms.eventDuration) * 1000);
+                }
+
+                if(!prms.eventDuration || prms.eventDuration < 1) solve_problem();
+                else setTimeout(solve_problem, Number(prms.eventDuration) * 1000);
             }
 
             // save new event to history database too
@@ -191,7 +195,7 @@ collector.get = function(prms, _callback) {
         callback(new Error('Can\'t generate event: incorrect variable value for UPDATE_EVENT_STATE (' +
             prms.$variables.UPDATE_EVENT_STATE + ') for ' +
             prms.$variables.OBJECT_NAME + '->' + prms.$variables.PARENT_OBJECT_NAME + ':' +
-            prms.$variables.PARENT_COLLECTOR_NAME + '=' + prms.$variables.PARENT_VALUE));
+            (prms.$variables.PARENT_COLLECTOR_NAME || 'unknown parent collector') + '=' + prms.$variables.PARENT_VALUE));
     }
 };
 
@@ -248,6 +252,8 @@ function runAction(prms, callback) {
        https://www.sqlite.org/limits.html
      */
 
+    if(prms.action === 'eventEditor') return transactionEventEditor(prms, callback);
+
     var events = [], arrayPartsIdx = [0];
 
     // Math.ceil(.95)=1; Math.ceil(7.004) = 8
@@ -276,21 +282,21 @@ function runAction(prms, callback) {
         prms.events = events;
         if(!Array.isArray(prms.events) || !prms.events.length) return callback(new Error('Events are not select for ' + JSON.stringify(prms)));
 
-        log.info('Executing action ', prms.action, ' parameters: ', prms);
+        log.info('Executing action ', prms.action, ' for ', prms.events.length, ' events: ', prms.subject);
 
         if(prms.action === 'enableEvents') return enableEvents(prms, callback);
         if(!prms.comment) return callback(new Error('Comment is not set for ' + JSON.stringify(prms)));
         if(!prms.recipients) prms.recipients = null;
         if(!prms.subject) prms.subject = null;
 
-        if(prms.action === 'addAsHint') return addHint(prms, callback);
-        if(prms.action === 'addAsHintForObject') return addHint(prms, callback);
-        if(prms.action === 'addAsComment') return addCommentsOrDisableEvents(prms, callback);
-        if(prms.action === 'disableEvents') return addCommentsOrDisableEvents(prms, callback);
+        if(prms.action === 'addAsHint') return addRemoveHint(prms, callback);
+        if(prms.action === 'addAsHintForObject') return addRemoveHint(prms, callback);
+        if(prms.action === 'addAsComment') return transactionAddCommentsOrDisableEvents(prms, callback);
+        if(prms.action === 'disableEvents') return transactionAddCommentsOrDisableEvents(prms, callback);
         if(prms.action === 'removeTimeIntervals') return removeTimeIntervals(prms, callback);
         if(prms.action === 'solveProblem') {
             var timestamp = Date.now();
-            log.info('Mark events as solved: ', prms);
+            log.info('Mark ', prms.events.length ,' events as solved: ', prms.subject);
 
             async.eachSeries(prms.events, function(event, callback) {
                 if(!eventsCache[event.OCID]) {
@@ -306,6 +312,109 @@ function runAction(prms, callback) {
         callback(new Error('Unknown action: ' + JSON.stringify(prms)));
     });
 }
+/*
+param = {
+    event: [{
+        OCID:,
+        counterID:,
+        objectID:,
+        objectName:
+        counterName
+    }]
+    user,
+
+    enableHint
+    hintSubject:
+    hintComment:
+    addAsHintForObject:
+
+    enableDisabled: enable or disable events
+    disableUntil: <timestamp>
+    intervals:
+    subject:
+    comment:
+    importance:
+}
+ */
+
+function transactionEventEditor(param, callback) {
+    db.exec('BEGIN', function(err) {
+        if (err) return callback(new Error('Can\'t start event editor transaction: ' + err.message  + ': ' + JSON.stringify(param)));
+
+        eventEditor(param, function(err) {
+            if (err) {
+                db.exec('ROLLBACK', function (errRollBack) {
+                    var rollBackError = errRollBack ? ' and error while rollback transaction: ' + errRollBack.message : '';
+                    return callback(new Error(err.message + rollBackError));
+                });
+                return;
+            }
+
+            db.exec('COMMIT', function (err) {
+                if (err) return callback(new Error('Can\'t commit event editor transaction: ' + err.message + ': ' + JSON.stringify(param)));
+                callback();
+            });
+        });
+    });
+}
+
+function eventEditor(param, callback) {
+
+    async.parallel([
+        function(callback) {
+
+            if(param.preventHintChangingOperation) return callback();
+
+            addRemoveHint({
+                events: param.events,
+                user: param.user,
+                subject: param.hintSubject,
+                recipients: null,
+                comment: param.hintComment,
+                action: param.addAsHintForObject ? 'addAsHintForObject' : '',
+            }, callback);
+        },
+
+        function (callback) {
+
+            // Skip disabling or enabling events
+            if(param.preventDisableOperation) return callback();
+
+            // Enable disabled events
+            if(param.disableUntil === null) return enableEvents({ events: param.events }, callback);
+
+            var timestamp = Date.now(), events = [];
+            async.eachSeries(param.events, function(event, callback) {
+                onEvent(event.OCID, event.objectID, event.counterID, event.objectName, event.counterName,
+                    null, param.importance, event.counterName, timestamp, 0, null, function (err, eventID) {
+                        if(err) return callback(err);
+                        if(!eventID) return callback(new Error('Error while add a new event. EventID is not returned for OCID ' + event.OCID));
+
+                        events.push({
+                            id: eventID,
+                            OCID: event.OCID,
+                        });
+
+                        callback();
+                    });
+            }, function (err) {
+                if(err) return callback(err);
+
+                addCommentsOrDisableEvents({
+                    action: 'disableEvents',
+                    events: events,
+                    user: param.user,
+                    subject: param.subject,
+                    recipients: null,
+                    comment: param.comment,
+                    disableUntil: param.disableUntil,
+                    intervals: param.intervals,
+                    replaceIntervals: true,
+                }, callback);
+            });
+        }
+    ], callback);
+}
 
 /*
 hint: {
@@ -320,13 +429,16 @@ hint: {
     subject: subject,
     recipients: recipients,
     comment: text
+    action: 'addAsHintForObject' || ?
 }
 
 callback(err)
  */
-function addHint(hint, callback) {
+function addRemoveHint(hint, callback) {
 
-    log.info('Add hint: ', hint);
+    if(!hint.subject && !hint.comment) log.info('Delete hints: ', hint);
+    else log.info('Add hint: ', hint);
+
     var timestamp = Date.now();
     var forObject = hint.action === 'addAsHintForObject';
 
@@ -336,6 +448,9 @@ function addHint(hint, callback) {
 
         db.run('DELETE FROM hints WHERE ' + (forObject ? 'OCID=?' : 'counterID=?'), (forObject ? event.OCID : event.counterID), function(err) {
             if(err) return callback(new Error('Can\'t delete previous hint: ' + err.message + ':' + JSON.stringify(hint)));
+
+            // only delete hint
+            if(!hint.subject && !hint.comment) return callback();
 
             db.run('INSERT INTO hints (OCID, counterID, timestamp, user, subject, recipients, comment) ' +
                 'VALUES ($OCID, $counterID, $timestamp, $user, $subject, $recipients, $comment)', {
@@ -435,9 +550,11 @@ function enableEvents(enable, callback) {
 comment: {
     events: [{
             id: eventID,
+            OCID:
         }, {
         .....
         }],
+    action: 'disableEvents' || null
     user: userName,
     subject: subject,
     recipients: recipients,
@@ -448,101 +565,100 @@ comment: {
 
 callback(err)
  */
-function addCommentsOrDisableEvents(prms, callback) {
+function transactionAddCommentsOrDisableEvents(param, callback) {
+    db.exec('BEGIN', function(err) {
+        if (err) return callback(new Error('Can\'t start transaction while add comment: ' + JSON.stringify(param) + ': ' + err.message));
+
+        addCommentsOrDisableEvents(param, function(err) {
+            if (err) {
+                db.exec('ROLLBACK', function (errRollBack) {
+                    var rollBackError = errRollBack ? ' and error while rollback transaction: ' + errRollBack.message : '';
+                    return callback(new Error(err.message + rollBackError));
+                });
+                return;
+            }
+
+            db.exec('COMMIT', function (err) {
+                if (err) return callback(new Error('Can\'t commit transaction while add comment: ' + err.message + ': ' + JSON.stringify(param)));
+
+                callback();
+            });
+        });
+    });
+}
+
+function addCommentsOrDisableEvents(param, callback) {
     var timestamp = Date.now();
 
-    if(prms.action === 'disableEvents') {
-        log.info('Disable events: ', prms, '; cached: ', prms.events.map(function (event) {
-            return disabledEventsCache[event.OCID];
-        }));
+    if(param.action === 'disableEvents') {
+        log.info('Disable ', param.events.length, ' events: ', (param.events.length < 5 ? param : param.subject) );
 
-        if(!prms.disableUntil || Number(prms.disableUntil) !== parseInt(String(prms.disableUntil), 10) ||
-            prms.disableUntil < Date.now() + 120000)
-            return callback(new Error('Disable time limit is not set or incorrect for ' + JSON.stringify(prms)));
+        if(!param.disableUntil || Number(param.disableUntil) !== parseInt(String(param.disableUntil), 10) ||
+            param.disableUntil < Date.now() + 120000)
+            return callback(new Error('Disable time limit is not set or incorrect for ' + JSON.stringify(param)));
 
-        if (prms.intervals) {
-            var intervals = prms.intervals.split(';');
+        if (param.intervals) {
+            var intervals = param.intervals.split(';');
             for (var i = 0; i < intervals.length; i++) {
                 var fromTo = intervals[i].split('-');
                 if (fromTo.length !== 2 ||
                     Number(fromTo[0]) !== parseInt(fromTo[0], 10) || Number(fromTo[0]) < 0 || Number(fromTo[0] > 86400000) ||
                     Number(fromTo[1]) !== parseInt(fromTo[1], 10) || Number(fromTo[1]) < 0 || Number(fromTo[1] > 86400000)) {
-                    return callback(new Error('Invalid time interval "' + intervals[i] + '" for disable events: ' + JSON.stringify(prms)));
+                    return callback(new Error('Invalid time interval "' + intervals[i] + '" for disable events: ' + JSON.stringify(param)));
                 }
             }
-        } else prms.intervals = null;
-    } else log.info('Add comment: ', prms);
+        } else param.intervals = null;
+    } else log.info('Add comment for ', param.events.length, ' events: ', param.subject);
 
-    db.exec('BEGIN', function(err) {
-        if (err) return callback(new Error('Can\'t start transaction while add comment: ' + JSON.stringify(prms) + ': ' + err.message));
+    db.run('INSERT INTO comments (timestamp, user, subject, recipients, comment) ' +
+        'VALUES ($timestamp, $user, $subject, $recipients, $comment)', {
+        $timestamp: timestamp,
+        $user: param.user,
+        $subject: param.subject,
+        $recipients: param.recipients,
+        $comment: param.comment
+    }, function (err) {
+        if (err) return callback(new Error('Can\'t add comment: ' + err.message + ': ' + JSON.stringify(param)));
 
-        db.run('INSERT INTO comments (timestamp, user, subject, recipients, comment) ' +
-            'VALUES ($timestamp, $user, $subject, $recipients, $comment)', {
-            $timestamp: timestamp,
-            $user: prms.user,
-            $subject: prms.subject,
-            $recipients: prms.recipients,
-            $comment: prms.comment
-        }, function (err) {
-            if (err) {
-                db.exec('ROLLBACK', function (errRollBack) {
-                    var rollBackError = errRollBack ? ' and error while rollback transaction: ' + errRollBack.message : '';
-                    return callback(new Error('Can\'t add comment: ' + err.message + rollBackError + ': ' + JSON.stringify(prms)));
-                });
-                return;
-            }
+        param.commentID = this.lastID;
+        var sameEventOCIDs = {};
+        async.eachSeries(param.events, function (event, callback) {
+            if(param.action !== 'disableEvents')
+                return deletePreviousCommentAndUpdateEventCommentID(event.id, param.commentID, callback);
 
-            prms.commentID = this.lastID;
-            var sameEventOCIDs = {};
-            async.eachSeries(prms.events, function (event, callback) {
-                if(prms.action !== 'disableEvents')
-                    return deletePreviousCommentAndUpdateEventCommentID(event.id, prms.commentID, callback);
+            // do not disable event disabled in previous iteration
+            if(sameEventOCIDs[event.OCID]) return deletePreviousCommentAndUpdateEventCommentID(event.id, param.commentID, callback);
 
-                // do not disable event disabled in previous iteration
-                if(sameEventOCIDs[event.OCID]) return deletePreviousCommentAndUpdateEventCommentID(event.id, prms.commentID, callback);
-
-                sameEventOCIDs[event.OCID] = true;
-                var query;
-                if (disabledEventsCache[event.OCID]) {
-                    if(disabledEventsCache[event.OCID].intervals)
-                        prms.intervals = prms.intervals ? disabledEventsCache[event.OCID].intervals + ';' + prms.intervals : disabledEventsCache[event.OCID].intervals;
-
-                    query = 'UPDATE disabledEvents SET eventID=$eventID, timestamp=$timestamp, user=$user, commentID=$commentID, ' +
-                        'disableUntil=$disableUntil, intervals=$intervals WHERE OCID=$OCID';
-                } else {
-                    query = 'INSERT INTO disabledEvents (eventID, OCID, timestamp, user, disableUntil, intervals, commentID) ' +
-                        'VALUES ($eventID, $OCID, $timestamp, $user, $disableUntil, $intervals, $commentID)';
+            sameEventOCIDs[event.OCID] = true;
+            var query;
+            if (disabledEventsCache[event.OCID]) {
+                if(disabledEventsCache[event.OCID].intervals && !param.replaceIntervals) {
+                    param.intervals = param.intervals ?
+                        disabledEventsCache[event.OCID].intervals + ';' + param.intervals :
+                        disabledEventsCache[event.OCID].intervals;
                 }
-                db.run(query, {
-                    $eventID: event.id,
-                    $OCID: event.OCID,
-                    $timestamp: timestamp,
-                    $user: prms.user,
-                    $disableUntil: Number(prms.disableUntil),
-                    $intervals: clearIntervals(prms.intervals),
-                    $commentID: prms.commentID
-                }, function (err) {
-                    if (err) return callback(new Error('Can\'t disable event: ' + err.message + ': ' + JSON.stringify(prms)));
-                    disabledEventsCache[event.OCID] = prms;
 
-                    deletePreviousCommentAndUpdateEventCommentID(event.id, prms.commentID, callback);
-                });
+                query = 'UPDATE disabledEvents SET eventID=$eventID, timestamp=$timestamp, user=$user, commentID=$commentID, ' +
+                    'disableUntil=$disableUntil, intervals=$intervals WHERE OCID=$OCID';
+            } else {
+                query = 'INSERT INTO disabledEvents (eventID, OCID, timestamp, user, disableUntil, intervals, commentID) ' +
+                    'VALUES ($eventID, $OCID, $timestamp, $user, $disableUntil, $intervals, $commentID)';
+            }
+            db.run(query, {
+                $eventID: event.id,
+                $OCID: event.OCID,
+                $timestamp: timestamp,
+                $user: param.user,
+                $disableUntil: Number(param.disableUntil),
+                $intervals: clearIntervals(param.intervals),
+                $commentID: param.commentID
             }, function (err) {
-                if (err) {
-                    db.exec('ROLLBACK', function (errRollBack) {
-                        var rollBackError = errRollBack ? ' and error while rollback transaction: ' + errRollBack.message : '';
-                        return callback(new Error(err.message + rollBackError));
-                    });
-                    return;
-                }
+                if (err) return callback(new Error('Can\'t disable event: ' + err.message + ': ' + JSON.stringify(param)));
+                disabledEventsCache[event.OCID] = param;
 
-                db.exec('COMMIT', function (err) {
-                    if (err) return callback(new Error('Can\'t commit transaction while add comment: ' + err.message + ': ' + JSON.stringify(prms)));
-
-                    callback();
-                });
+                deletePreviousCommentAndUpdateEventCommentID(event.id, param.commentID, callback);
             });
-        });
+        }, callback);
     });
 }
 
@@ -569,7 +685,7 @@ function clearIntervals(intervalsStr) {
     //console.log('sorted intervals:\n', intervals);
 
     for(var i = 0; i < intervals.length; i++) {
-        var nextInterval = intervals[i+1], interval = newInterval;
+        var nextInterval = intervals[i+1]/*, interval = newInterval*/;
         //console.log('comp:', newInterval, nextInterval);
         if(nextInterval && newInterval.to >= nextInterval.from) {
             newInterval = {
@@ -619,7 +735,7 @@ function deletePreviousCommentAndUpdateEventCommentID(eventID, newCommentID, cal
 
 function onEvent(OCID, objectID, counterID, objectName, counterName, parentOCID, importance, eventDescription, eventTimestamp, dataTimestamp, pronunciation, callback) {
     var eventID = eventsCache[OCID];
-    if(eventID) {
+    if(eventID && dataTimestamp) { // dataTimestamp - check for run not from eventEditor
         repeatEventsCache[eventID] = {
             $eventID: eventID,
             $data: eventDescription || null,
@@ -638,21 +754,22 @@ function onEvent(OCID, objectID, counterID, objectName, counterName, parentOCID,
         $counterName: counterName,
         $parentOCID: parentOCID || null,
         $importance: importance || 0,
-        $startTime: eventTimestamp,
+        $startTime: dataTimestamp,
+        $endTime: dataTimestamp ? null : 0, // for eventEditor
         $data: eventDescription,
         $timestamp: eventTimestamp,
         $pronunciation: pronunciation
     };
-    db.run('INSERT INTO events (OCID, objectID, counterID, objectName, counterName, parentOCID, importance, startTime, initData, data, timestamp, pronunciation) ' +
-        'VALUES ($OCID, $objectID, $counterID, $objectName, $counterName, $parentOCID, $importance, $startTime, $data, $data, $timestamp, $pronunciation)',
+    db.run('INSERT INTO events (OCID, objectID, counterID, objectName, counterName, parentOCID, importance, startTime, endTime, initData, data, timestamp, pronunciation) ' +
+        'VALUES ($OCID, $objectID, $counterID, $objectName, $counterName, $parentOCID, $importance, $startTime, $endTime, $data, $data, $timestamp, $pronunciation)',
         queryParameters, function(err) {
-            if(err) return callback(new Error('Can\'t add event with OCID: ' + OCID +
-                ' data: ' + JSON.stringify(queryParameters) + ' into events table event database: ' +
-                err.message));
+            if(err) return callback(new Error('Can\'t add event with OCID: ' + OCID + ' into events table event database: ' +
+                err.message + ' data: ' + JSON.stringify(queryParameters)));
 
-            eventsCache[OCID] = this.lastID;
+            // dont save eventID to the eventsCache when event generated by eventsEditor (dataTimestamp = 0)
+            if(dataTimestamp) eventsCache[OCID] = this.lastID;
 
-            callback(null, eventsCache[OCID]); // return new event ID
+            callback(null, this.lastID); // return new event ID
         });
 }
 

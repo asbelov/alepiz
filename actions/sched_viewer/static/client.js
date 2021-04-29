@@ -19,6 +19,7 @@ var JQueryNamespace = (function ($) {
     var stopTimeOutlier = parameters.action.stopTimeOutlier || 120000; // as set in the trigger variable STOP_TIME_SCHEDULE_OUTLIER
     var tableData, rawData;
     var collapseElm;
+    var dataNumElm;
     var sortOrder = {
         name: 'timestamps',
         reverse: true,
@@ -30,18 +31,24 @@ var JQueryNamespace = (function ($) {
 
     function _onChangeObjects (_objects) {
         objects = _objects; // set variable "objects" for selected objects
+        if(objects.length > 5) {
+            dataNumElm.val(1);
+        }
         getDataByAjax();
     }
 
     function init() {
         collapseElm = $('#collapse');
-
-        getDataByAjax();
+        dataNumElm = $('#dataNum');
 
         var dataNum = Number(parameters.action.historyDataNum);
 
         if(!dataNum || dataNum !== parseInt(String(dataNum), 10) || dataNum > 1000) dataNum = 7;
-        $('#dataNum').val(dataNum);
+        dataNumElm.val(dataNum).keyup(function (e) {
+            if(e.which === 13) getDataByAjax();
+        });
+
+        getDataByAjax();
 
         collapseElm.change(function () {
             tableData = prepareData(rawData, collapseElm.is(':checked'));
@@ -67,7 +74,7 @@ var JQueryNamespace = (function ($) {
         $('#date').click(function () {
             sortOrder = {
                 name: 'timestamps',
-                reverse: true,
+                reverse: false,
             };
             drawTable(tableData);
         });
@@ -75,7 +82,7 @@ var JQueryNamespace = (function ($) {
         $('#time').click(function () {
             sortOrder = {
                 name: 'data',
-                reverse: true,
+                reverse: false,
             };
             drawTable(tableData);
         });
@@ -92,12 +99,23 @@ var JQueryNamespace = (function ($) {
     }
 
     function getDataByAjax() {
-        var dataNum = Number($('#dataNum').val());
+        var dataNum = Number(dataNumElm.val()), bodyElm = $('body');
         if(!dataNum || dataNum !== parseInt(String(dataNum), 10) || dataNum > 1000) dataNum = 7;
+
+        bodyElm.css("cursor", "progress");
         $.post(serverURL, {func: 'getData', objects: JSON.stringify(objects), dataNum: dataNum}, function(data) {
+            /*
+            data[objectID] = {
+                name: object.name,
+                start: startData,
+                stop: stopData,
+                state: serviceStateData[0].data,
+            };
+             */
+            bodyElm.css("cursor", "auto");
             rawData = data;
             collapseElm.attr('disabled', false);
-            tableData = prepareData(data, true);
+            tableData = prepareData(rawData, collapseElm.is(':checked'));
             drawTable(tableData);
         });
     }
@@ -112,13 +130,14 @@ var JQueryNamespace = (function ($) {
     }
 
     function prepareDataHelper(data, id, type, outlier, isCollapsed) {
+        if(!data[id][type]) return;
         var records = data[id][type].slice();
         if(!Array.isArray(records)) return;
 
         records.reverse().forEach(function (record) {
             if(isCollapsed) {
                 for(var i = 0, isFoundEqualTime = false; i < tableData.length; i++) {
-                    if(Math.abs(record.data - tableData[i].data) < outlier) {
+                    if(Math.abs(record.data - tableData[i].data) < outlier && id === tableData[i].id) {
                         tableData[i].timestamps.push(record.timestamp);
                         tableData[i].data = Math.round((record.data + tableData[i].data) / 2);
                         isFoundEqualTime = true;
@@ -128,6 +147,7 @@ var JQueryNamespace = (function ($) {
             }
             if(!isCollapsed || !isFoundEqualTime) {
                 tableData.push({
+                    id: id,
                     name: data[id].name,
                     action: type,
                     timestamps: [record.timestamp],

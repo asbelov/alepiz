@@ -1,0 +1,28 @@
+{
+    "name": "Data aggregator",
+    "description": "Processing of data received by the specified counters",
+    "active": "",
+    "separate": "",
+    "runCollectorSeparately": "on",
+    "parameters": {
+        "objectNamesLike": {
+            "description": "Object names (comma separated in SQL Like format)",
+            "type": "textInputLong"
+        },
+        "counterName": {
+            "description": "Counter name",
+            "type": "textInputLong"
+        },
+        "func": {
+            "description": "Function",
+            "type": "select",
+            "selectOptions" : {
+                "sum": "Sum",
+                "avg": "Average",
+                "min": "Minimum value",
+                "max": "Maximum value"
+            },
+            "default": "sum"
+        }
+    }
+}

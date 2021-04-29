@@ -142,7 +142,6 @@
             $(elm).attr('id', id);
         }
 
-        objects[id] = Array.isArray(initObjects)? initObjects.map(obj => { return {id: Number(obj.id), name: obj.name} }) : null;
         var elmTag = $(elm).prop("tagName"); // 'SELECT' or 'INPUT' etc
 
         // for each objects selector set own callback
@@ -218,10 +217,20 @@
 
         // if objects defined and has length, then try to draw it in objects selector and skip objects,
         // defined in HTML "option" tags
-        if(objects[id]){
-            if(objects[id].length){
-                if(typeof(objects[id][0]) === 'string') objects[id].shift();
-                else objectsPanelElm.empty(); // !!! need to reload elm props after create it
+        if(initObjects) {
+            if(!$.isArray(initObjects) || !initObjects.length) objects[id] = null;
+            else {
+                var newObjects = [];
+                initObjects.forEach(function (obj) {
+                    var id = Number(obj.id);
+                    if(!id || !obj.name || id !== parseInt(String(id), 10)) return;
+                    newObjects.push({id: id, name: obj.name});
+                });
+
+                if(typeof initObjects[0] === 'string') return addObjectsToPanel(newObjects, _callback[id]);
+
+                objectsPanelElm.empty(); // !!! need to reload elm props after create it
+                objects[id] = newObjects;
             }
         } else { // else try to draw objects, defined in HTML "option" tags
             if(elmTag === 'SELECT') {
@@ -377,9 +386,9 @@
 
         function addCustomObject(callback) {
 
-            var addCustomObjectDivInputElm = $('<div class="col s2"></div>'),
+            var addCustomObjectDivInputElm = $('<div class="col s10"></div>'),
                 addCustomObjectInputElm = $('<input type="text"/>'),
-                addCustomObjectDivBtnElm = $('<div class="col s1"</div>'),
+                addCustomObjectDivBtnElm = $('<div class="col"</div>'),
                 addCustomObjectBtnAddElm = $('<a class="btn-floating"><i class="material-icons right">add</i></a>'),
                 addCustomObjectBtnDelElm = $('<a class="btn-floating"><i class="material-icons right">delete</i></a>');
 

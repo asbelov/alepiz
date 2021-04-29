@@ -1,0 +1,51 @@
+//
+    Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2021-2-12 23:18:29
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title NSLookup: Получает IP адрес по DNS имени
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 NSLookup
+                    h5.light.
+                        Получает IP адрес по DNS имени хоста
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание NSLookup
+                    p.
+                        NSLookup используется для получения IP адреса по DNS имени хоста
+                    h3 Параметры
+                    ul.browser-default
+                        li.
+                            Host name - DNS имя хоста для получения IP адреса
+                        li.
+                            Return errors - в случае возникновения ошибки в качестве IP адреса будет возвращен текст ошибки
+                        li.
+                            Check if the hostname is correct - проверять имя хоста на соответствие стандарту
+                        li.
+                            Get hostnames by IP address - если в качестве имени хоста указан IP адрес, будет возвращены
+                            DNS имена для этого IP адреса.
+                    h3 Возвращаемое значение
+                    p.
+                        Возвращается IP адрес, имена хостов или 0. Если включен параметр "Return errors" и произошла ошибка, то вместо IP
+                        адреса будет возвращен текст ошибки. Поддерживаются адреса IPv4 и IPv6.
+                    p.
+                        Если в параметре "Host name" указан IPv4 или IPv6 адрес и при выполнении DNS запроса было получено несколько
+                        DNS имён, происходит следующее:
+                    ul.browser-default
+                        li Весь полученный массив значений преобразуется в текст JSON и сохраняется в базу с историей значений
+                        li.
+                            Если у счетчика есть зависимые счетчики, то ALEPIZ будет вызывать их столько раз, сколько значений
+                            получено в массиве и каждый раз передавать в качестве переменной %:PARENT_VALUE:% новое значение
+                            из массива значений.
+

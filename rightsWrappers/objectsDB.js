@@ -19,12 +19,15 @@ module.exports = rightsWrapper;
  */
 rightsWrapper.renameObjects = function(user, objects, callback){
 
-    if(!objects || !objects.length) return callback();
+    if(!Array.isArray(objects) || !objects.length) return callback();
 
     var initIDs = objects.map(function(obj){return obj.id});
 
     checkIDs(initIDs, function(err, checkedIDs) {
-        if (err) return callback(err);
+        if (err) {
+            return callback(new Error('User ' + user + ' try to rename objects with incorrect IDs: ' +
+                JSON.stringify(objects) + ': ' + err.message ));
+        }
 
         user = prepareUser(user);
 
@@ -34,9 +37,18 @@ rightsWrapper.renameObjects = function(user, objects, callback){
             checkChange: true,
             errorOnNoRights: true
         }, function (err) {
-            if (err) return callback(err);
+            if (err) {
+                return callback(new Error('User ' + user + ' has no rights for rename objects ' +
+                    JSON.stringify(objects) + ': ' + err.message ));
+            }
 
-            objectsDB.renameObjects(objects, callback);
+            objectsDB.renameObjects(objects, function(err) {
+                if(err) {
+                    return callback(new Error('Error while user ' + user +' rename objects ' +
+                        JSON.stringify(objects) + ': ' + err.message));
+                }
+                callback();
+            });
         });
     });
 };
@@ -88,7 +100,11 @@ rightsWrapper.updateObjectsInformation = function (user, initIDs, description, o
     if((description === undefined && order === undefined && disabled === undefined) || !initIDs.length) return callback();
 
     checkIDs(initIDs, function(err, checkedIDs) {
-        if (err) return callback(err);
+        if (err) {
+            return callback(new Error('User ' + user + ' try to update objects info with incorrect IDs ' +
+                initIDs.join(', ') + '; description: ' + description +
+                 '; order: ' + order + '; disabled: ' + disabled +': ' + err.message ));
+        }
 
         user = prepareUser(user);
 
@@ -98,9 +114,21 @@ rightsWrapper.updateObjectsInformation = function (user, initIDs, description, o
             checkChange: true,
             errorOnNoRights: true
         }, function (err, IDs) {
-            if (err) return callback(err);
+            if (err) {
+                return callback(new Error('User ' + user + ' has no rights when updating objects info for ' +
+                    initIDs.join(', ') + '; description: ' + description +
+                    '; order: ' + order + '; disabled: ' + disabled +': ' + err.message ));
+            }
 
-            objectsDB.updateObjectsInformation(IDs, description, order, disabled, callback);
+            objectsDB.updateObjectsInformation(IDs, description, order, disabled, function(err, res) {
+                if(err) {
+                    return callback(new Error('User ' + user + ' got error when updating objects info for ' +
+                        initIDs.join(', ') + '; description: ' + description +
+                        '; order: ' + order + '; disabled: ' + disabled +': ' + err.message ), res);
+                }
+
+                callback(null, res); // res = true or undefined
+            });
         });
     });
 };
@@ -266,7 +294,10 @@ Getting objectsCountersIDs for specific objects
 rightsWrapper.getObjectsCountersIDs = function (user, objectsIDs, callback){
 
     checkIDs(objectsIDs, function(err, checkedIDs){
-        if(err) return callback(err);
+        if(err) {
+            return callback(new Error('User ' + user + ' try to get OCIDs for incorrect object IDs ' +
+                objectsIDs.join(', ') + ': ' + err.message));
+        }
 
         user = prepareUser(user);
 
@@ -276,12 +307,40 @@ rightsWrapper.getObjectsCountersIDs = function (user, objectsIDs, callback){
             checkChange: true, // don't remove it! function used for change counters
             errorOnNoRights: true
         }, function(err, checkedObjectsIDs){
-            if(err) return callback(err);
+            if(err) {
+                return callback(new Error('User ' + user + ' has no rights for getting OCIDs for object IDs ' +
+                    objectsIDs.join(', ') + ': ' + err.message));
+            }
 
             objectsDB.getObjectsCountersIDs(checkedObjectsIDs, function(err, rows) {
-                if(err) return callback(err);
-                callback(null, rows.map(function(obj) { return obj.id }));
+                if(err) {
+                    return callback(new Error('User ' + user + ' got error when getting OCIDs for object IDs ' +
+                        objectsIDs.join(', ') + ': ' + err.message));
+                }
+
+                callback(null, rows);
+                //callback(null, rows.map(function(obj) { return obj.id }));
             });
         });
     });
 };
+
+rightsWrapper.getObjectsIDs = function (user, objectsNames, callback) {
+
+    // select * from objects where name like <objectsNames>
+    objectsDB.getObjectsLikeNames(objectsNames, function (err, rows) {
+        if(err) return callback(new Error('Can\'t get object IDs by names like ' + objectsNames.join(', ') + ': ' + err.message));
+
+        user = prepareUser(user);
+
+        rightsDB.checkObjectsIDs({
+            user: user,
+            IDs: rows, // can be a [{id:..., name:...}, ....]
+            errorOnNoRights: true
+        }, function(err, checkedObjectsIDs) {
+            if(err) return callback(err);
+
+            callback(null, checkedObjectsIDs);
+        });
+    });
+}

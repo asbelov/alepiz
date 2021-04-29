@@ -4,6 +4,7 @@
   "homePage": "index",
   "ajaxServer": "ajax.js",
   "staticDir": "static",
+  "showWhenNoObjectsSelected": true,
   "onChangeObjectMenuEvent": "fullreload",
   "timeout": 60,
   "outputFormat": "text"

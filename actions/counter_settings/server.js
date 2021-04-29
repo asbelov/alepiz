@@ -36,6 +36,8 @@ module.exports = function(args, callback) {
     var collectorParameters = {};
     var preparedVariables = {};
     var preparedUpdateEvents = {};
+    var variablesOrder = args.variablesOrder ? args.variablesOrder.split(',').map(n => Number(n)) : [];
+    var updateEventsOrder = args.updateEventsOrder ? args.updateEventsOrder.split(',').map(n => Number(n)) : [];
     for(var inputID in args) {
         if(!args.hasOwnProperty(inputID)) continue;
 
@@ -48,14 +50,22 @@ module.exports = function(args, callback) {
         // updateEvent_2_counterID or updateEvent_2_objectID
         var num = Number(inputID.replace(/^updateEvent_(\d+)_.+$/i, '$1'));
         if(num) {
-            if(!preparedUpdateEvents[num]) preparedUpdateEvents[num] = {};
+            if(!preparedUpdateEvents[num]) {
+                preparedUpdateEvents[num] = {
+                    updateEventOrder: updateEventsOrder.indexOf(num),
+                };
+            }
             preparedUpdateEvents[num][inputID.substring(String('updateEvent_' + String(num) + '_').length)] = args[inputID];
             continue;
         }
 
         num = Number(inputID.replace(/^variable_(\d+)_.+$/i, '$1'));
         if(num){
-            if(!preparedVariables[num]) preparedVariables[num] = {};
+            if(!preparedVariables[num]) {
+                preparedVariables[num] = {
+                    variableOrder: variablesOrder.indexOf(num),
+                };
+            }
             preparedVariables[num][inputID.substring(String('variable_' + String(num) + '_').length)] = args[inputID];
         }
     }
@@ -72,9 +82,11 @@ module.exports = function(args, callback) {
 
             updateEvent.mode = Number(updateEvent.mode);
 
-            if(updateEvent.mode !== 0 && updateEvent.mode !== 1 && updateEvent.mode !== 2 && updateEvent.mode !== 3  && updateEvent.mode !== 4)
+            if(updateEvent.mode !== 0 && updateEvent.mode !== 1 && updateEvent.mode !== 2 &&
+                updateEvent.mode !== 3  && updateEvent.mode !== 4) {
                 return callback(new Error('Update event for counter ' + args.counterID +
-                ' incorrect: mode is not 0 or 1 or 2 or 3 or 4 (' + updateEvent.mode + ')'));
+                    ' incorrect: mode is not 0 or 1 or 2 or 3 or 4 (' + updateEvent.mode + ')'));
+            }
 
             updateEvent.objectID = Number(updateEvent.objectID);
 
@@ -92,14 +104,20 @@ module.exports = function(args, callback) {
                     args.counterID + ') is equal to update event counterID (' + updateEvent.counterID + ')'));
             */
 
+            var updateEventOrder =
+                updateEvent.updateEventOrder === parseInt(String(updateEvent.updateEventOrder), 10) &&
+                updateEvent.updateEventOrder >= 0 ? updateEvent.updateEventOrder : null;
+
             if(Number(updateEvent.counterID) === parseInt(updateEvent.counterID, 10)) {
                 updateEvents.push({
                     counterID: Number(updateEvent.counterID),
                     objectID: updateEvent.objectID,
                     expression: updateEvent.expression ? updateEvent.expression : null,
                     mode: updateEvent.mode,
-                    objectFilter: updateEvent.objectID && updateEvent.objectFilter ? updateEvent.objectFilter : null
-                })
+                    objectFilter: updateEvent.objectID && updateEvent.objectFilter ? updateEvent.objectFilter : null,
+                    description: updateEvent.description || null,
+                    updateEventOrder: updateEventOrder,
+                });
             } else return callback(new Error('Update event for counter ' + args.counterID +
                 ' incorrect: counter ID is not an integer (' + updateEvent.counterID +')'));
         } else return callback(new Error('Update event for counter ' + args.counterID +
@@ -122,6 +140,12 @@ module.exports = function(args, callback) {
 
         variables[name] = {};
 
+        variables[name].variableOrder = preparedVariables[num].variableOrder ===
+            parseInt(String(preparedVariables[num].variableOrder), 10) &&
+            preparedVariables[num].variableOrder >= 0 ? preparedVariables[num].variableOrder : null;
+
+        variables[name].description = preparedVariables[num].description || null;
+
         // variable with expression
         if (preparedVariables[num].expression !== undefined) {
 
@@ -143,7 +167,7 @@ module.exports = function(args, callback) {
                 variables[name].functionParameters = preparedVariables[num].function_parameters !== undefined ? preparedVariables[num].function_parameters : '';
         }
     }
-    log.debug('Variables', variables);
+    log.debug('Variables: ', variables);
 
     counterSaveDB.saveCounter(args.username, linkedObjectsIDs, {
         name: args.name,
@@ -159,7 +183,7 @@ module.exports = function(args, callback) {
         disabled: (args.disabled ? 1 : 0),
         debug: (args.debug ? 1 : 0),
         taskCondition: (args.taskCondition ? 1 : 0),
-        updateVariablesRef: args.updateVariablesRef
+        updateVariablesRef: args.updateVariablesRef //= oldCounterName: update variables references when counter name is changed
     }, collectorParameters, updateEvents, variables, function(err, counterID) {
         if(err) return callback(err);
 

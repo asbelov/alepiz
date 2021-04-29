@@ -20,13 +20,19 @@ module.exports = function(args, callback) {
     if (!func) return callback(new Error('Ajax function is not set'));
 
     if (func === 'getCountersGroups'){
-        if(!args.IDs) return callback(new Error('Can\'t get counters groups for objects: objects IDs not specified'));
+        if(!args.IDs) {
+            log.warn('Can\'t get counters groups for objects: objects IDs not specified');
+            return callback();
+        }
 
         return rightsWrappersCountersDB.getGroupsForObjects(args.username, args.IDs.split(','), callback);
     }
 
     if (func === 'getCounters') {
-        if(!args.IDs) return callback(new Error('Can\'t get counters for objects: objects IDs not specified'));
+        if(!args.IDs) {
+            log.warn('Can\'t get counters for objects: objects IDs not specified')
+            return callback();
+        }
         if(!args.groupsIDs) args.groupsIDs = '';
 
         return rightsWrappersCountersDB.getCountersForObjects(args.username, args.IDs.split(','), args.groupsIDs.split(','), callback);
@@ -58,9 +64,9 @@ module.exports = function(args, callback) {
         else maxRecordsCnt = Number(args.maxRecordsCnt);
 
 
-        var objectsCountersHistoryValues = {};
+        var objectsCountersHistoryValues = {}, isDataFromTrends = {};
         async.each(args.IDs.split(','), function(id, callback){
-            history.getByTime(id, fromDate, toDate, maxRecordsCnt, function(err, result){
+            history.getByTime(id, fromDate, toDate, maxRecordsCnt, function(err, result) {
                 if(err){
                     log.warn(err.message);
                     return callback();
@@ -70,11 +76,15 @@ module.exports = function(args, callback) {
                     return callback();
                 }
 
+                isDataFromTrends[id] = result[0].isDataFromTrends;
                 objectsCountersHistoryValues[id] = result;
                 callback();
             });
-        }, function(){
-            callback(null, objectsCountersHistoryValues);
+        }, function() {
+            callback(null, {
+                history: objectsCountersHistoryValues,
+                isDataFromTrends: isDataFromTrends,
+            });
         });
     }
 

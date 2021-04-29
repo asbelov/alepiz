@@ -4,7 +4,7 @@
 doctype
 html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
     head
-        title Zabbix active: получает данные от Zabbix агентов в активном режиме. Порт 10051
+        title Zabbix active: получает данные от Zabbix агентов в активном режиме или режиме trapper. Порт 10051
         link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
         link(rel='stylesheet', href='/material-design-icons/material-icons.css')
         meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
@@ -17,22 +17,28 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                 div.col.s12.m10.offset-m1
                     h1 Zabbix active
                     h5.light.
-                        Получает данные от Zabbix агентов в активном режиме работы агентов
+                        Получает данные от Zabbix агентов в активном режиме работы агентов или в режиме trapper
         main
             div.row
                 div.col.s12.m10.offset-m1
                     h3 Описание Zabbix active
                     p.
-                        Сборщик используется для получения данных от Zabbix агентов, работающих в активном режиме.
+                        Сборщик используется для получения данных от Zabbix агентов, работающих в активном режиме
+                        или в режиме trapper.
+                    h4 Активный режим (Zabbix active)
+                    p.
                         Активный режим работы Zabbix агентов означает, что агент инициирует подключение к ALEPIZ
                         на TCP порт 10051,
                         запрашивает информацию о том, какие данные и с какой периодичностью требуется собирать и
                         начинает сбор данных, передавая их в ALEPIZ.
-                        Zabbix agent разрабатывается компанией #[a(href="https://www.zabbix.com/" target="_blank") Zabbix SIA],
-                        разрабатывающей решения для мониторинга. Zabbix агент можно скачать как с сайта компании
-                        #[a(href="https://www.zabbix.com/ru/download_agents" target="_blank") Zabbix SIA],
-                        так и специально адаптированный пакет под ALEPIZ со страницы
-                        #[a(href="https://alepiz.com/download/" target="_blank") https://alepiz.com/download/].
+                    h4 Режим trapper (Zabbix trapper)
+                    p.
+                        Режим trapper используется для принудительной отправки данных в ALEPIZ, например, при помощи
+                        утилиты zabbix_sender. В этом режиме, при запросе списка ключей от Zabbix агента, коллектор не
+                        возвращает агенту имена ключей, работающие в режиме trapper.
+                        В результате автоматический сбор данных по этим ключам не производится. В случае, если агент не
+                        поддерживает такие ключи, не будет возвращаться ошибка. Используя утилиту zabbix_sender
+                        можно отправлять данные самостоятельно.
                     h3 Throttling
                     p.
                         Для того, чтобы уменьшить нагрузку на ALEPIZ и не засорять базу данных, в сборщике
@@ -70,8 +76,9 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                             Zabbix агента можно получить на сайте компании
                             #[a(href="https://www.zabbix.com/" target="_blank") Zabbix SIA]
                         li.
-                            Polling frequency for item in seconds - временной интервал в секундах, с которым Zabbix
-                            агент будет отправлять данные в ALEPIZ
+                            Polling frequency in seconds. 0 for trapper - временной интервал в секундах, с которым Zabbix
+                            агент будет отправлять данные в ALEPIZ. Если установить в 0, коллектор будет работать в режиме
+                            Zabbix trapper.
                         li.
                             Return only numeric values - Указывает сборщику, что необходимо принимать только данные в
                             виде числовых значений. Все остальные значения, возвращаемые Zabbix агентом, будут игнорироваться.
@@ -112,5 +119,12 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         Сборщик возвращает данные, которые вернул Zabbix агент. Подробную информацию о возвращаемых
                         данных и об объектах LDD можно получить на сайте компании
                         #[a(href="https://www.zabbix.com/" target="_blank") Zabbix SIA]
+                    h3 О Zabbix
+                    p.
+                        Zabbix agent разрабатывается компанией #[a(href="https://www.zabbix.com/" target="_blank") Zabbix SIA],
+                        выпускающей решения для мониторинга. Zabbix агент можно скачать как с сайта компании
+                        #[a(href="https://www.zabbix.com/ru/download_agents" target="_blank") Zabbix SIA],
+                        так и специально адаптированный пакет под ALEPIZ со страницы
+                        #[a(href="https://alepiz.com/download/" target="_blank") https://alepiz.com/download/].
 
 

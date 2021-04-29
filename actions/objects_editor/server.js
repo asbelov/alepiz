@@ -132,9 +132,10 @@ function editObjects(user, parameters, callback){
                                 }
 
                                 // object disabled. remove counters
-                                objectsDB.getObjectsCountersIDs(user, objectsIDs, function (err, OCIDs) {
+                                objectsDB.getObjectsCountersIDs(user, objectsIDs, function (err, rows) {
                                     if (err) return callback(err);
 
+                                    var OCIDs = rows.map(row => row.id);
                                     if (OCIDs.length) server.sendMsg({
                                         removeCounters: OCIDs,
                                         description: 'Objects IDs ' + objectsIDs.join(', ') + ' was disabled from "object editor" by user ' + user

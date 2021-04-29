@@ -1,0 +1,61 @@
+//
+    Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2021-2-22 0:19:05
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title verPE: Gets the version of the MS Windows executable
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 verPE
+                    h5.light.
+                        Gets the PE version of the executable
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 verPE description
+                    p.
+                        verPE is used to get the version of an executable file (exe, scr, sys, dll, etc.) in PE
+                        (Portable Executable) format. (PE, "Portable Executable") is an executable, object code,
+                        and dynamic link library format used by 32-bit and 64-bit versions of the Microsoft Windows
+                        operating system. To get the version of the file, used the verPE.exe program,
+                        which is located in the directory with the collector.
+
+                    h3 Parameters
+                    ul.browser-default
+                        li.
+                            Comma separated files - a list of files separated by commas. The list must contain the
+                            full path to the file. Spaces before and after each file name will be removed.
+                            For example: "C:\Windows\regedit.exe, C:\windows\notepad.exe"
+                        li.
+                            Return in version|filename format - return the result in version|filename format,
+                            for example "10.0.19041.860 (WinBuild.160101.0800)|C:\Windows\regedit.exe"
+                        li.
+                            Return first result (not an array) - return the first result, not an array.
+                            Used when you want to get a version for only one file. In this case, only version
+                            information will be saved in history, and not an array in string representation.
+                            ("10.0.19041.860" and not '["10.0.19041.860"]')
+                    h3 Returned value
+                    p.
+                        By default, the file version is returned ("10.0.19041.860"). If the file contains no version,
+                        an empty string is returned. If Return in version|filename format is active, the file version
+                        and filename are returned
+                        ("10.0.19041.860 (WinBuild.160101.0800)|C:\Windows\notepad.exe" or "|C:\Windows\runMe.bat")
+                    p.
+                        If multiple files are specified in the "Comma separated files" parameter and
+                        the "Return first result (not an array)" parameter is not active, the following occurs:
+                    ul.browser-default
+                        li The entire resulting array of values is converted to JSON text and saved to a database with a history of values
+                        li.
+                            If the counter has dependent counters, then ALEPIZ will call them as many times as the
+                            values are received in the array and each time pass the %:PARENT_VALUE:% new value from
+                            the value array as a variable.
+

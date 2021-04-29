@@ -52,6 +52,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                 div.row
                     div.col.s12.m12.l4#leftDiv
                         a(href='#!')#fullScreenCountersBtn: i.material-icons.right fullscreen
+                        a(href='#!')#checkAllGroupsAndCountersBtn: i.material-icons.right playlist_add_check
                         div.col.s12.input-field
                             select#select-groups(multiple)
                             label Counter groups
@@ -67,25 +68,31 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                     a(href='#!')#fullScreenGraphBtn: i.material-icons.right fullscreen
                                     a(href="#").activator: i.material-icons.right settings
                                     div(style='height:300px;width:100%').col.s12.center#graphArea
+                                    div(style="font-size:0.9rem").col.s12.right-align
+                                        a(href="#!" data-target="debugDataParametersDialog").modal-trigger#message-area
                                     div.col.s12#legendArea
                                 div(style="margin:0").row
-                                    div.input-field.col.s2
+                                    div.input-field.col.s3
                                         // value set to raise label
-                                        input(type='text' value="7 November, 1975").datepicker#startDate
+                                        input(type='text' value="7 November, 1975" style="cursor:pointer").datepicker#startDate
                                         label(for='startDate').active Start date
-                                    div.input-field.col.s2
-                                        input(type='text' value="7 November, 1975").datepicker.active#endDate
+                                    div.input-field.col.s3
+                                        input(type='text' value="7 November, 1975" style="cursor:pointer").datepicker.active#endDate
                                         label(for='endDate').active End date
-                                    div.col.s8
-                                        div.col.s12
-                                            label
-                                                input(type='checkbox' checked)#auto-update
-                                                span Auto update latest data
-                                        div.input-field.col.s12
-                                            span#message-area
+                                    div.input-field.col.s3
+                                        label(style="cursor:pointer")#setTime
+                                            i.material-icons.teal-text schedule
+                                            span(style="position:relative;top:-0.4rem;left:1rem;font-size:1rem") Time interval
+                                        input(type='hidden').timepicker#setStartTime
+                                        input(type='hidden').timepicker#setEndTime
+                                    div.input-field.col.s3
+                                        label
+                                            input(type='checkbox' checked)#auto-update
+                                            span Auto update
+
                             div.card-reveal
                                 div.card-title Settings
-                                    i.material-icons.right#closeGraphSettings close
+                                    i.material-icons.right.blue-text#closeGraphSettings check
                                 div.row
                                     div.input-field.col.s3
                                         input(type="text" placeholder="auto when empty" id="yMinLeft")
@@ -102,20 +109,22 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                 h5 Y axis align
                                 b
                                     div.col.s1 left\right
-                                    div.col.s8 object:counter
-                                    div.col.s3 min\avg\max
+                                    div.col.s7 object:counter
+                                    div.col.s4 min\avg\max
                                 div.row#alignSettings
-                                //h5 Help
-                                //ol
-                                    li Select graph part of area by mouse for zooming graph
-                                    li Click on a zoomed graph to reset zoom
-                                    li Change date period of the graph and history values using date pickers "Start date" and "End date"
-                                    li If value of the date picker "End date" is set to today, then graph and history table will be automatically updated to latest data
-                                    li If you zoom in graph near the end of data (less, then 10 minutes from the latest data), graph and history table  will be automatically updated to latest data
-                                    li Set "Auto update latest data" checkbox to "checked" for automatically updating graphic and history data to latest data
-                                    li If time perion on the X axis more, then 1.5 hour, you probably see an average values in a graph and in a history table
-                                    li If you want to see an accurate values in a graph and in a history table, please zoom in graph to 1.5 hour or less on a X axis
-                                    li If can see current data mode ("accurate" or "average") at the message behind of the graph area.
-                        table#history-data.highlight.bordered
+
+                        // .disable-scrollbars set at actions.css
+                        div.card#historyWrapper
+                            div.card-content
+                                table#history-data.highlight.bordered
+                            //div(style="overflow: scroll;").disable-scrollbars#historyWrapper
+
+        div#debugDataParametersDialog.modal.modal-fixed-footer
+            div(style="padding-right:5px").modal-content
+                h5 Returned data parameters
+                div(style="overflow:auto;height:90%")#debugDataParameters
+            div.modal-footer
+                a(href="#!").modal-close.waves-effect.waves-green.btn-flat Close
+
     footer
         input(type="hidden" name="actionName" value= action.name)

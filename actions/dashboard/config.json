@@ -46,7 +46,7 @@
         },
         "3": {
             "text": "Warning",
-            "color": "FFC859"
+            "color": "#FFC859"
         },
         "4": {
             "text": "Information",
@@ -71,6 +71,7 @@
         }
     },
     "replyTo": "\"Admins\" <root@domain.com>",
+    "actionForSeveralObjects": "information",
     "messageTemplates": [
         {
             "name": "Information",
@@ -87,7 +88,8 @@
             "name": "Mistaken",
             "tip": "Mistake in event",
             "subject": "[MISTAKE]",
-            "importance": 0
+            "importance": 0,
+            "replyTo": "\"Support\" <support@domain.com>"
         }, {
             "name": "Admins and support",
             "tip": "Send to administrators and support",
@@ -108,55 +110,118 @@
     "actionsMessageTemplates": {
         "addAsHint": {
             "subject": "Hint for %:COUNTERS_LIST:%",
-            "bodyHeader": "\n\n",
-            "eventTemplate": "%:COUNTER_NAME:% (%:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%)\n",
-            "intervalsDivider": ",\n\t\t\tand "
+            "bodyHeader": "<br/><br/>",
+            "eventTemplate": "<p><strong>%:COUNTER_NAME:%</strong> (<span style=\"color: rgb(0,102,204);\">%:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong>)</p>",
+            "intervalsDivider": "<p><blockquote>and <span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></blockquote></p>"
         },
         "addAsHintForObject": {
             "subject": "Hint for %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
-            "bodyHeader": "\n\n",
-            "eventTemplate": "%:OBJECT_NAME:%: %:COUNTER_NAME:%: (%:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%)\n",
-            "intervalsDivider": ",\n\t\t\tand "
+            "bodyHeader": "<br/><br/>",
+            "eventTemplate": "<p><strong>%:OBJECT_NAME:%: %:COUNTER_NAME:%</strong>: (<span style=\"color: rgb(0,102,204);\">%:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong>)</p>",
+            "intervalsDivider": "<p><blockquote>and <span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></blockquote></p>"
         },
         "addAsComment": {
             "subject": "%:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
             "objectsListLength": 100,
             "countersListLength": 300,
-            "bodyHeader": "\n\nEvents list:\n",
-            "eventTemplate": "%:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
-            "intervalsDivider": ",\n\t\t\tand "
+            "bodyHeader": "<br/><br/><h3><strong style=\"color: rgb(230,0,0);\">Events list:</strong></h3>",
+            "eventTemplate": "<p><strong>%:OBJECT_NAME:%:</strong><span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong> %:ZABBIX_HOSTNAME:%</p>",
+            "intervalsDivider": "<p><blockquote>and <span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></blockquote></p>"
         },
         "solveProblem": {
             "subject": "Events was marked as solved: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
             "objectsListLength": 100,
             "countersListLength": 300,
             "tables": ["currentEvents"],
-            "bodyHeader": "\n\nFollowing events was marked as solved:\n",
-            "eventTemplate": "%:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
-            "intervalsDivider": ",\n\t\t\tand "
+            "bodyHeader": "<br/><br/><h3><strong style=\"color: rgb(0,138,0);\">Following events was marked as solved:</strong></h3>",
+            "eventTemplate": "<p><strong>%:OBJECT_NAME:%:</strong><span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></p>",
+            "intervalsDivider": "<p><blockquote>and <span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></blockquote></p>"
         },
         "disableEvents": {
             "subject": "Disable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
             "objectsListLength": 100,
             "countersListLength": 300,
-            "bodyHeader": "\n\nFollowing events was disabled until %:DISABLE_UNTIL:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.\n",
-            "eventTemplate": "%:ACTION:%: %:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
-            "intervalsDivider": ",\n\t\t\tand "
+            "bodyHeader": "<br/><br/><h3><strong style=\"color: rgb(0,0,0);\">Following events was disabled until %:DISABLE_UNTIL:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.</strong></h3>",
+            "eventTemplate": "<p>%:ACTION:%: <strong>%:OBJECT_NAME:%:</strong><span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></p>",
+            "intervalsDivider": "<p><blockquote>and <span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></blockquote></p>"
         },
         "enableEvents": {
             "subject": "Enable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%",
             "objectsListLength": 100,
             "countersListLength": 300,
             "tables": ["disabledEvents"],
-            "bodyHeader": "\n\nFollowing events was enabled:\n",
-            "eventTemplate": "%:ACTION:%: %:OBJECT_NAME:%: %:EVENT_DESCRIPTION:% occurred at %:EVENT_TIME:%\n",
-            "intervalsDivider": ",\n\t\t\tand "
+            "bodyHeader": "<br/><br/><h3><strong style=\"color: rgb(0,71,178);\">Following events was enabled:</strong></h3>",
+            "eventTemplate": "<p>%:ACTION:%: <strong>%:OBJECT_NAME:%:</strong><span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></p>",
+            "intervalsDivider": "<p><blockquote>and <span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></blockquote></p>"
         }
     },
     "pronunciation": {
         "(\\d+).\\d+": "$1",
-        "(\\d)Kb": "$1Килобайт",
-        "(\\d)Mb": "$1Мегабайт",
-        "(\\d)Gb": "$1Гигабайт"
+        "(\\d)Kb": "$1Kilobyte",
+        "(\\d)Mb": "$1Megabyte",
+        "(\\d)Gb": "$1Gigabyte",
+        "(\\d)Tb": "$1Terabyte"
+    },
+    "restrictions": {
+        "Default": {
+            "Importance": 2,
+            "Sound": false,
+            "Hints": false,
+            "Info": false,
+            "History": false,
+            "Links": false,
+            "Message": false,
+            "Historical": false,
+            "Current": true,
+            "Disabled": false,
+            "Comments": false
+        },
+        "Businesses": {
+            "Importance": 10,
+            "Sound": false,
+            "Hints": false,
+            "Info": true,
+            "History": true,
+            "Links": false,
+            "Message": false,
+            "Historical": true,
+            "Current": true,
+            "Disabled": true,
+            "Comments": true,
+            "importanceFilter": true
+        },
+        "Operators": {
+            "Importance": 2,
+            "Sound": "alwaysOn",
+            "Hints": true,
+            "Info": true,
+            "History": true,
+            "Links": true,
+            "Message": {
+                "Comments": true,
+                "Hints": false,
+                "Solve": false,
+                "Enable": false,
+                "Disable": false
+            },
+            "Historical": true,
+            "Current": true,
+            "Disabled": true,
+            "Comments": true
+        },
+        "Administrators": {
+            "Importance": 100,
+            "Sound": true,
+            "Hints": true,
+            "Info": true,
+            "History": true,
+            "Links": true,
+            "Message": true,
+            "Historical": true,
+            "Current": true,
+            "Disabled": true,
+            "Comments": true,
+            "importanceFilter": true
+        }
     }
 }

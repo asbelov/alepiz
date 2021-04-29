@@ -106,4 +106,21 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                             In case of successful connection, 1 is returned, in case of unsuccessful returned 0.
                             If a SQL query is specified, but the connection to the server failed, JSON is returned
                             {"unableToConnect": "&lt;error message&gt;"}
+                    h3 Settings
+                    ul.browser-default
+                        li connectionTimeoutSec - connection timeout to MSSQL, default 2 seconds
+                        li queryTimeoutSec - SQL query execution timeout, default 2 sec
+                    p The collector settings can be set in the config/conf.json file in the object collectors => mssql:
+                    div.card-panel
+                        span
+                            pre.
+                                ...
+                                "collectors": {
+                                ...
+                                    "mssql": {
+                                        "connectionTimeoutSec": 5,
+                                        "queryTimeoutSec": 3
+                                    }
+                                }
+                                ...
 

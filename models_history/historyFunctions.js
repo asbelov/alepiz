@@ -36,7 +36,7 @@ functions.avg = function(id, parameters, callback){
 
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -89,7 +89,7 @@ functions.change = function(id, parameters, callback){
         log.debug('FUNC: [abs]change(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -201,7 +201,7 @@ functions.count = function(id, parameters, callback){
         log.debug('FUNC: count(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -258,7 +258,7 @@ functions.delta = function(id, parameters, callback) {
         log.debug('FUNC: delta(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -300,7 +300,7 @@ functions.last = function(id, parameters, callback) {
         log.debug('FUNC: last(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -334,7 +334,7 @@ functions.max = function(id, parameters, callback) {
         log.debug('FUNC: max(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -372,7 +372,7 @@ functions.min = function(id, parameters, callback) {
         log.debug('FUNC: min(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -391,7 +391,7 @@ functions.min.description = 'Lowest value of an item within the defined evaluati
     'recordsCnt: count of records from the recordsShift\n' +
     'recordsShift: evaluation point is moved the number of records back\n';
 
-functions.nodata = function(id, parameters, callback) {
+functions.nodata = function(id, parameters, callback, prevResult) {
     if(parameters && parameters[0]) {
         var period = Number(parameters[0]);
 
@@ -400,15 +400,30 @@ functions.nodata = function(id, parameters, callback) {
                 ')" function for objectID: ' + id + ': parameter mast be a pure time interval without "#"'));
     }
     // get last history record
-    cache.getByIdx(id, 0, 1, 0, 0,function (err, records) {
+    cache.getLastValue(id, function (err, records) {
         if(err) {
-            return callback(new Error('Error occurred while getting data from history for "nodata('+ period || '' +
+            return callback(new Error('Error occurred while getting data from history for "nodata('+ (period || '') +
                 ')" function for objectID: '+ id +': ' + err.message));
         }
 
-        if(period) var result = records && records[0] && Date.now() - records[0].timestamp > period ? 1 : 0;
-        else result = records && records[0] ? Date.now() - records[0].timestamp : Date.now();
+        var result = records && records[0] ? Date.now() - records[0].timestamp : Date.now();
 
+        // it's strange workaround and it tou understand, why sometimes we get
+        // large values as nodata result, but all data is present in history, remove this fucking code
+        if(result > 3600000) { // 1 hour
+            // try to get nodata again after 30 sec
+            if(!prevResult) return setTimeout(functions.nodata, 30000, id, parameters, callback, result);
+
+            var difference = result - prevResult;
+            // the difference should be about 30 seconds
+            if(records && records[0] && (difference < 20000 || difference > 40000)) {
+                log.warn('Nodata for ', id, ' more then ', Math.ceil(result / 3600000),
+                    'hours, prev result 30 sec ago was: ', Math.ceil(prevResult / 3600000), ' hours, difference: ',
+                    result - prevResult, ' milliseconds, now: ', Date.now(), ' records: ', records);
+            }
+        }
+
+        if(period) result = result > period ? 1 : 0;
         log.debug('FUNC: nodata() = ', result, '; records: ', records);
         callback(null, {
             data: result,
@@ -459,7 +474,7 @@ functions.regexp =  function(id, parameters, callback) {
         log.debug('FUNC: regexp(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -507,7 +522,7 @@ functions.sum = function(id, parameters, callback){
         log.debug('FUNC: sum(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -564,7 +579,7 @@ functions.outliersBrd = function(id, parameters, callback) {
 
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -630,9 +645,9 @@ functions.lastRob = function(id, parameters, callback) {
 
         for(var i = records.length-1; i >= 0; i--) {
             var data = records[i].data;
-            if(!isNaN(parseFloat(String(data))) && isFinite(data) && Number(data) > min && Number(data) < max) {
+            if(data > min && data < max) {
                 if(count === recordIdx) {
-                    result = Number(data);
+                    result = data;
                     break;
                 }
                 ++count;
@@ -644,7 +659,7 @@ functions.lastRob = function(id, parameters, callback) {
 
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -734,7 +749,7 @@ functions.avgTF = function(id, parameters, callback) {
 
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -804,7 +819,7 @@ functions.avgMed = function(id, parameters, callback) {
 
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -835,37 +850,102 @@ functions.avgNear = function(id, parameters, callback) {
 
     var num = parameters[0];
     var shift = parameters[1];
-    var nearestValue = Number(parameters[2]);
+    var patternValue = Number(parameters[2]);
     var outliers = Number(parameters[3]);
+    var count = Number(parameters[4]) || 0;
+    var direction = Number(parameters[5]) || 0;
 
-    if(isNaN(parseFloat(String(nearestValue))) || !isFinite(nearestValue))
-        return callback(new Error('Error in parameters for "avgNear('+parameters.join(', ')+')" function for objectID: '+
-            id + ': nearestValue is not number: ' + nearestValue));
+    if(isNaN(parseFloat(String(patternValue))) || !isFinite(patternValue)) {
+        return callback(new Error('Error in parameters for "avgNear(' + parameters.join(', ') + ')" function for objectID: ' +
+            id + ': patternValue is not number: ' + patternValue));
+    }
 
-    if(isNaN(parseFloat(String(outliers))) || !isFinite(outliers))
+    if(isNaN(parseFloat(String(outliers))) || !isFinite(outliers) || outliers < 0) {
+        return callback(new Error('Error in parameters for "avgNear(' + parameters.join(', ') + ')" function for objectID: ' +
+            id + ': outliers is negative or not number: ' + outliers));
+    }
+
+    if(count && count < 0) {
         return callback(new Error('Error in parameters for "avgNear('+parameters.join(', ')+')" function for objectID: '+
-            id + ': outliers is not number: ' + outliers));
+            id + ': num is negative: ' + count));
+    }
 
     cache.get(id, shift, num,1, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "avgNear('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "avgNear('+
+                parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        }
 
         if(!records) return callback(null, {records: rawRecords});
 
-        var maxValue = nearestValue + outliers,
-            minValue = nearestValue - outliers,
-            sum = 0,
-            count = 0;
+        var maxValue = patternValue + outliers,
+            minValue = patternValue - outliers,
+            sum = 0;
 
-        records.forEach(function (record) {
-            if(record.data >= minValue && record.data <= maxValue) {
-                sum += record.data;
-                count++;
+        if(count) {
+            var len = records.length;
+            if(len < count) return callback(null, {records: rawRecords});
+
+            // by default used String sort(). Sorting by Number
+            var sortedRecords = records.map(r => Number(r.data)).sort((a, b) => {return a - b});
+
+            for(var minIdx, maxIdx, i = 0; i < len && maxIdx === undefined; i++) {
+                var record = sortedRecords[i];
+                if (record <= patternValue && i - count + 1 >= 0 && sortedRecords[i - count + 1] >= record - outliers) {
+                // 31/03/21 was: if (record <= patternValue && i > count && sortedRecords[i - count + 1] >= record - outliers) {
+                    minIdx = i;
+                }
+                if (record >= patternValue && i + count - 1 < len && sortedRecords[i + count - 1] <= record + outliers) {
+                // 31/03/21 was: if (record >= patternValue && i <= len - count && sortedRecords[i + count - 1] <= record + outliers) {
+                    maxIdx = i;
+                }
             }
-        });
+
+            if(direction > 0) nearestIdx = maxIdx;
+            else if(direction < 0) nearestIdx = minIdx;
+            else if(minIdx === undefined) {
+                var nearestIdx = maxIdx;
+                direction = 1;
+            } else if(maxIdx === undefined) {
+                nearestIdx = minIdx;
+                direction = -1;
+            } else if(patternValue - sortedRecords[minIdx] < sortedRecords[maxIdx] - patternValue) {
+                nearestIdx = minIdx;
+                direction = -1;
+            } else {
+                nearestIdx = maxIdx;
+                direction = 1;
+            }
+            if(nearestIdx === undefined) return callback(null, {records: rawRecords});
+
+            var nearestValue = sortedRecords[nearestIdx];
+            count = 0;
+            if(direction > 0) {
+                for(i=nearestIdx; i < len; i++) {
+                    if(sortedRecords[i] <= nearestValue + outliers) {
+                        sum += sortedRecords[i];
+                        count++;
+                    } else break;
+                }
+            } else {
+                for(i=nearestIdx; i >= 0; i--) {
+                    if(sortedRecords[i] >= nearestValue - outliers) {
+                        sum += sortedRecords[i];
+                        count++;
+                    } else break;
+                }
+            }
+        } else {
+            records.forEach(function (record) {
+                if (record.data >= minValue && record.data <= maxValue) {
+                    sum += record.data;
+                    count++;
+                }
+            });
+        }
 
         var result = count ? sum / count : null;
         log.debug('FUNC: avgNear(', parameters.join(', '), ') = ', result, '; records: ', records);
-
         callback(null, {
             data: result,
             records: records || rawRecords
@@ -875,26 +955,42 @@ functions.avgNear = function(id, parameters, callback) {
 
 functions.avgNear.description = 'Average value of an items with values nearest to specific value within the defined evaluation period.\n' +
     '\n' +
-    'F.e. records: [1, 3, 4, 2, 6, 5, 7, 9, 8, 10]; nearestValue=3; outliers=2\n' +
+    'ex#1. records: [1, 3, 4, 2, 6, 5, 7, 9, 8, 10]; patternValue=3; outliers=2\n' +
     'minimum value 3-2=1; maximum value 3+2=5; result will be (1 + 3 + 4 + 2 + 5) / 5 = 3\n' +
+    'ex#2. records:  [31,42,55,61,33,44,55,60,39,44,51,69,34,57,44,62,30,40,50,60]; patternValue=52; outliers=4, num=3, direction=-1\n' +
+    'sorted records: [30,31,33,34,39,40,42,44,44,44,50,51,55,55,57,60,60,61,62,69];\n' +
+    'nearest value less then 52 taking into account outliers = 44,\n' +
+    'minimum value 40; maximum value 44; result will be (44 + 44 + 44 + 42 + 40) / 5 = 42.8\n' +
     '\n' +
-    'avgNear(<period>, <timeShift>, <nearestValue>, <outliers>)\n' +
+    'avgNear(<period>, <timeShift>, <patternValue>, <outliers>[, num, [direction]])\n' +
     'period: evaluation period in milliseconds\n'  +
     'timeShift: evaluation point is moved the number of milliseconds\n' +
-    'nearestValue: around this value we will calculate an average\n' +
+    'patternValue: around this value we will calculate an average\n' +
     'outliers: outliers around of nearest value (maximum and minimum values) that is involved in averaging\n' +
+    'num: if specified, then first look for the value closest to the pattern, which repeats the number of times ' +
+    'specified here, taking into account outliers, and calculate the average around the value found.\n' +
+    'direction: if negative, look for a value less than the pattern. if positive, look for a value greater ' +
+    'than the pattern. if 0 or unspecified, look for the nearest value\n' +
     '\n' +
-    'avgNear(<timestampFrom>, <timestampTo>, <nearestValue>, <outliers>)\n' +
+    'avgNear(<timestampFrom>, <timestampTo>, <patternValue>, <outliers>[, num, [direction]])\n' +
     'timestampFrom: timestamp in milliseconds from 1970 - begin of time\n' +
     'timestampTo: timestamp in milliseconds from 1970 - end of time\n'  +
-    'nearestValue: around this value we will calculate an average\n' +
+    'patternValue: around this value we will calculate an average\n' +
     'outliers: outliers around of nearest value (maximum and minimum values) that is involved in averaging\n' +
+    'num: if specified, then first look for the value closest to the pattern, which repeats the number of times ' +
+    'specified here, taking into account outliers, and calculate the average around the value found.\n' +
+    'direction: if negative, look for a value less than the pattern. if positive, look for a value greater ' +
+    'than the pattern. if 0 or unspecified, look for the nearest value\n' +
     '\n' +
-    'avgNear(#<recordsCnt>, #<recordsShift>, <nearestValue>, <outliers>)\n' +
+    'avgNear(#<recordsCnt>, #<recordsShift>, <patternValue>, <outliers>[, num, [direction]])\n' +
     'recordsCnt: count of records from the recordsShift\n' +
     'recordsShift: evaluation point is moved the number of records back\n' +
-    'nearestValue: around this value we will calculate an average\n' +
-    'outliers: outliers around of nearest value (maximum and minimum values) that is involved in averaging\n';
+    'patternValue: around this value we will calculate an average\n' +
+    'outliers: outliers around of nearest value (maximum and minimum values) that is involved in averaging\n' +
+    'num: if specified, then first look for the value closest to the pattern, which repeats the number of times ' +
+    'specified here, taking into account outliers, and calculate the average around the value found.\n' +
+    'direction: if negative, look for a value less than the pattern. if positive, look for a value greater ' +
+    'than the pattern. if 0 or unspecified, look for the nearest value\n';
 
 
 /*
@@ -941,7 +1037,7 @@ functions.forecast = function(id, parameters, callback){
 
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };
@@ -981,7 +1077,7 @@ functions.timeLeft = function(id, parameters, callback){
 
         callback(null, {
             data: result,
-            records: records || rawRecords
+            records: rawRecords
         });
     });
 };

@@ -1,0 +1,21 @@
+{
+    "name": "ILO",
+    "description": "ILO connection",
+    "homePage": "index",
+    "ajaxServer": "ajax.js",
+    "staticDir": "static",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": false,
+    "onChangeObjectMenuEvent": "callback:onChangeObjects",
+    "descriptionTemplate": "ILO connection",
+    "icon": "settings",
+    "canAddParametersToAction": false,
+    "suffix": "_ilo",
+    "prefix": "",
+    "domain": "",
+    "protocol": "https",
+    "privatePath": "private",
+    "keyFile": "alepiz.quik.ru.key",
+    "certFile": "alepiz.quik.ru.crt",
+    "localAddress": "localhost"
+}

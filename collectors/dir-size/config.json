@@ -1,0 +1,33 @@
+{
+    "name": "Directory size",
+    "description": "Calculate size of selected directories",
+    "active": "",
+    "separate": "",
+    "runCollectorSeparately": "on",
+    "parameters": {
+        "dirNames": {
+            "description": "Directory names (comma separated)",
+            "type": "textInputLong"
+        },
+        "excludedDirs": {
+            "description": "Excluded directories (comma separated)",
+            "canBeEmpty": "on",
+            "type": "textInputLong"
+        },
+        "regExpExcludedDirs": {
+            "description": "Excluded directories in regExp format",
+            "canBeEmpty": "on",
+            "type": "checkbox"
+        },
+        "sleepTime": {
+            "description": "Sleep periodically for reduce load (ms)",
+            "checkAs": "UInteger",
+            "default": 1
+        },
+        "warnTimeDirSizeCalculation": {
+            "description": "Maximum execution time for warningin the log (ms)",
+            "checkAs": "UNZInteger",
+            "default": 300000
+        }
+    }
+}

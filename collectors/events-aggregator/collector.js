@@ -54,6 +54,7 @@ collector.get = function(param, callback) {
         getCounterID(param.$id, param.counterName, function(err, countersIDs) {
             if(err) return callback(new Error(err + ' for ' + JSON.stringify(param)));
 
+            if(!eventDB) return callback(); // collector was destroyed
             eventDB.all('SELECT * FROM events WHERE endTime IS NULL AND counterID IN (' + 
                         (new Array(countersIDs.length)).fill('?').join(',') + ')', countersIDs, 
                         function(err, eventsRows) {

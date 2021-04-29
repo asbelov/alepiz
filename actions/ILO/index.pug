@@ -1,0 +1,42 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-10-4 23:45:42
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        script(src='/materialize-css/dist/js/materialize.js')
+        style.
+            a:hover {
+                text-decoration: underline;
+            }
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+        //script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+    body
+        div.row
+            div.col.s12
+                div.card-panel.center-align
+                    h4#ilo-url
+        script.
+            var protocol = parameters.action.protocol || 'https';
+            var domain = parameters.action.domain || location.hostname.replace(/^[^.]+/, '');
+            var prefix = parameters.action.prefix || '';
+            var suffix = parameters.action.suffix || '';
+            var port = parameters.action.port || (protocol === 'https' ? 443 : 80);
+            var hostname = parameters.objects[0].name.toLowerCase()
+            var url = protocol + '://' + prefix + hostname + suffix + domain + (port ? ':' + port : '');
+
+            var link = document.createElement('a');
+            link.href = url;
+            link.text = 'Click to open ILO by link ' + url;
+            link.target = '_blank';
+            var iloUrlElm = document.getElementById('ilo-url');
+            iloUrlElm.appendChild(link);
+            link.click();

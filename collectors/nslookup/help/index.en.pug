@@ -1,0 +1,51 @@
+//
+    Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2021-2-12 23:18:29
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title NSLookup: Get IP address by DNS name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 NSLookup
+                    h5.light.
+                        Get IP address by DNS name
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 NSLookup description
+                    p.
+                        NSLookup used to get IP address from DNS hostname
+                    h3 Parameters
+                    ul.browser-default
+                        li.
+                            Host name - DNS hostname to get IP address
+                        li.
+                            Return errors - if an error occurs, the error text will be returned as the IP address
+                        li.
+                            Check if the hostname is correct - check hostname against standard
+                        li.
+                            Get hostnames by IP address - if an IP address is specified as the hostname,
+                            DNS names for this IP address will be returned
+                    h3 Returned value
+                    p.
+                        Returns the IP address, hostnames, or 0. If "Return errors" is enabled and an error occurs,
+                        the error text will be returned instead of the IP address. IPv4 and IPv6 addresses supported.
+                    p.
+                        If an IPv4 or IPv6 address is specified in the "Host name" parameter and several DNS names were
+                        obtained during the DNS query, the following happens:
+                    ul.browser-default
+                        li The entire resulting array of values is converted to JSON text and saved to a database with a history of values
+                        li.
+                            If the counter has dependent counters, then ALEPIZ will call them as many times as the
+                            values are received in the array and each time pass the %:PARENT_VALUE:% new value from
+                            the value array as a variable.
+

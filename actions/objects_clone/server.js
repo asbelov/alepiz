@@ -16,8 +16,8 @@ module.exports = function(args, callback) {
 
         var user = args.username;
         if(parameters.objectsIDs.length && (
-            parameters.description !== undefined ||
-            !isNaN(parameters.order) &&
+            parameters.description && // '' - save old description
+            parameters.order && // 0 - Current order will be unchanged
             (parameters.disabled === 1 || parameters.disabled === 0) // can be an undefined (if unchanged) or 1 or 0
         )) {
             log.info('Update objects parameters: ', parameters.objectsIDs, ': description: ', parameters.description,
@@ -87,9 +87,10 @@ module.exports = function(args, callback) {
 
                                     // object state changed to disabled. remove counters
                                     if(parameters.disabled === 1) {
-                                        objectsDB.getObjectsCountersIDs(user, parameters.objectsIDs, function (err, OCIDs) {
+                                        objectsDB.getObjectsCountersIDs(user, parameters.objectsIDs, function (err, rows) {
                                             if (err) return callback(err);
 
+                                            var OCIDs = rows.map(row => row.id);
                                             if (OCIDs.length) server.sendMsg({
                                                 removeCounters: OCIDs,
                                                 description: 'Objects IDs ' + parameters.objectsIDs.join(', ') + ' was disabled from "object clone" by user ' + user
@@ -174,7 +175,7 @@ function parseArgs(args, callback) {
 
     var interactions = [];
     if(args.upLevelObjectsIDs) {
-        args.upLevelObjectsIDs.split(/\s*[,;]\s*/).filter(function (id) {
+        String(args.upLevelObjectsIDs).split(/\s*[,;]\s*/).filter(function (id) {
             return id && Number(id) === parseInt(id, 10);
         }).forEach(function (id) {
             objectsIDs.forEach(function (id2) {

@@ -55,9 +55,10 @@ module.exports = function(args, callback) {
 
         log.info('Checking user rights for removing objects for ', args.username,'...');
 
-        rightsWrapper.getObjectsCountersIDs(args.username, objectsIDs, function(err, OCIDs) {
+        rightsWrapper.getObjectsCountersIDs(args.username, objectsIDs, function(err, rows) {
             if(err) return callback(new Error('Error getting objectsCountersIDs for objects IDs: ' + objectsIDs.join(',') + ': ' + err.message));
 
+            var OCIDs = rows.map(row => row.id);
             if(!OCIDs || !OCIDs.length) {
                 log.info('Objects: ', objectsIDs, ' has no counters.');
                 callback();

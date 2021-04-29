@@ -106,13 +106,13 @@ user: userName,
 objectNames: [objectName1, objectName2, ...] case insensitive
 
 callback(null, includedObjectsArray), where
-includedObjectsArray: [{parentObjectID, id, name, description, sortPosition, color, disabled}, {}, ...],
+includedObjectsArray: [{parentObjectID, id, name, description, sortPosition, color, disabled, created}, {}, ...],
  */
 function getIncludedObjects(user, objectsNames, callback) {
 
     var stmt = db.prepare('SELECT obj.id AS parentObjectID, objects.id AS id, objects.name AS name, ' +
         'objects.description AS description, objects.sortPosition AS sortPosition, objects.color AS color, ' +
-        'objects.disabled AS disabled ' +
+        'objects.disabled AS disabled, objects.created AS created ' +
         'FROM objects ' +
         'JOIN interactions ON interactions.objectID2 = objects.id AND interactions.type = 0 ' +
         'JOIN objects obj ON interactions.objectID1 = obj.id '+

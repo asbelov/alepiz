@@ -2,14 +2,14 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var sites = ['pad-asbel', 'www.alepiz.com', 'alepiz.cloudno.de'];
+var sites = ['pad-asbel', 'alepiz.com', 'alepiz.cloudno.de'];
 
 document.addEventListener('DOMContentLoaded', function () {
     // similar behavior as an HTTP redirect
-    if(window.location.hostname === 'alepiz.cloudno.de') {
-        var newLocation = window.location.href.replace('http://', 'https://').replace('alepiz.cloudno.de', 'www.alepiz.com');
-        window.location.replace(newLocation);
-    }
+    //if(window.location.hostname === 'alepiz.cloudno.de') {
+    //    var newLocation = window.location.href.replace('http://', 'https://').replace('alepiz.cloudno.de', 'alepiz.com');
+    //    window.location.replace(newLocation);
+    //}
 
     initGA();
     addClassFrSkipTranslateIcons();
@@ -133,10 +133,10 @@ function makeNavBar(headerElm) {
     var html = '\
     <nav>\
         <div class="nav-wrapper">\
-            <a href="https://www.alepiz.com" class="brand-logo hide-on-med-and-down skiptranslate"' + target +
+            <a href="https://alepiz.com" class="brand-logo hide-on-med-and-down skiptranslate"' + target +
                     ' style="margin-left: 15px">ALEPIZ</a>\
             <ul class="left show-on-medium-and-down hide-on-large-only">\
-                <li><a href="https://www.alepiz.com"' + target + '><i class="material-icons skiptranslate left">home</i></a></li>\
+                <li><a href="https://alepiz.com"' + target + '><i class="material-icons skiptranslate left">home</i></a></li>\
             </ul>\
             <ul class="right show-on-small">\
                 <li class=" show-on-site-only"><a href="/help/contents.pug"><i class="material-icons skiptranslate">toc</i></a></li>\
@@ -176,7 +176,7 @@ function initGA() {
         m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
     })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
 
-    ga('create', 'UA-179080448-1', 'auto'); // https://www.alepiz.com
+    ga('create', 'UA-179080448-1', 'auto'); // https://alepiz.com
     ga('create', 'UA-179080448-2', 'auto'); // http://alepiz.cloudno.de
     ga('create', 'UA-179080448-3', 'auto'); // https://alepiz.cloudno.de
     ga('send', 'pageview');

@@ -11,22 +11,34 @@
         },
         "importance": {
             "description": "Importance",
-            "checkAs": "Integer",
-            "type": "textInputMiddle",
-            "default": 5
+            "checkAs": "UInteger",
+            "type": "select",
+            "default": "5",
+            "selectOptions" : {
+                "0": "Disaster",
+                "1": "High",
+                "2": "Average",
+                "3": "Warning",
+                "4": "Information",
+                "5": "Harmless",
+                "%:IMPORTANCE:%": "%:IMPORTANCE:%"
+            }
         },
         "eventDuration": {
             "description": "Event Duration (sec)",
             "canBeEmpty": "on",
-            "checkAs": "Integer"
+            "type": "textInputShort",
+            "checkAs": "UInteger"
         },
         "problemTaskID": {
-            "description": "Task ID, which running when event occurred (0 - no task)",
+            "description": "TaskID running when event occurred (0 - no task)",
+            "type": "textInputShort",
             "checkAs": "UInteger",
             "default": 0
         },
         "solvedTaskID": {
-            "description": "Task ID, which running when event solved (0 - no task)",
+            "description": "TaskID running when event solved (0 - no task)",
+            "type": "textInputShort",
             "checkAs": "UInteger",
             "default": 0
         },

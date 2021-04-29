@@ -42,25 +42,32 @@ collector.get = function(param, callback) {
     var zabbixHostname = param.zabbixHostname.toLowerCase();
     var key = param.itemParameters ? param.item+'['+param.itemParameters+']' : param.item;
 
+    // add parameters even if a counter for this OCID exists, because the parameters may have changed
+    var isCounterExist = false;
     if(!countersParameters[zabbixHostname]) countersParameters[zabbixHostname] = {};
-    countersParameters[zabbixHostname][key.toLowerCase()] = {
-        callback: callback,
-        onlyNumeric: !!param.onlyNumeric
-    };
+    if(!countersParameters[zabbixHostname][key.toLowerCase()] ||
+        !countersParameters[zabbixHostname][key.toLowerCase()].callbacks || // typeof null === 'object'
+        typeof countersParameters[zabbixHostname][key.toLowerCase()].callbacks !== 'object'
+    ) {
+        countersParameters[zabbixHostname][key.toLowerCase()] = {
+            callbacks: {},
+            onlyNumeric: !!param.onlyNumeric,
+        };
+    } else isCounterExist = true;
+    countersParameters[zabbixHostname][key.toLowerCase()].callbacks[param.$id] = callback;
+
     throttling.init(zabbixHostname + '-' + key.toLowerCase(), param, collector);
 
-    if(!counters[zabbixHostname] || !counters[zabbixHostname].length)	counters[zabbixHostname] = [];
+    if(!counters[zabbixHostname] || !counters[zabbixHostname].length) counters[zabbixHostname] = [];
     else if(Number(param.$id) && countersIDX[param.$id]) {
         var num = countersIDX[param.$id].num;
 
         if(num !== undefined && counters[zabbixHostname][num]) {
-            //delete countersParameters[zabbixHostname][counters[zabbixHostname][num].key.toLowerCase()];
-
             counters[zabbixHostname][num] = {
                 key: key,
                 delay: Number(param.pollingFreq),
                 lastlogsize: 0,
-                mtime: 0
+                mtime: 0,
             };
 
             log.debug('Request to getting data from existing OCID ', param.$id, ', hostname "', zabbixHostname, '": ', counters[zabbixHostname][num]);
@@ -78,7 +85,8 @@ collector.get = function(param, callback) {
         lastlogsize: 0,
         mtime: 0
     });
-    log.info('Adding a new counter with OCID ', param.$id,' for hostname "', zabbixHostname, '": ', counters[zabbixHostname][counters[zabbixHostname].length-1]);
+    log.info('Adding ', (isCounterExist? 'to existing counter an additional' : 'a new counter with'), ' OCID ', param.$id,' for hostname "',
+        zabbixHostname, '": ', counters[zabbixHostname][counters[zabbixHostname].length-1]);
 };
 
 collector.init = function(newServerPort) {
@@ -97,9 +105,20 @@ collector.removeCounters = function(OCIDs, callback) {
 
         // typeof null === 'object'
         if(counters[zabbixHostname][num] && typeof counters[zabbixHostname][num] === 'object') {
-            existingOCIDs.push(OCID + ':' + zabbixHostname + '(' + counters[zabbixHostname][num].key + ')');
-            delete countersParameters[zabbixHostname][counters[zabbixHostname][num].key.toLowerCase()];
-            counters[zabbixHostname][num] = null; // don't delete array item for saving order of 'num'
+            var foundCallbackForDelete = false;
+            for(var callbackOCID in countersParameters[zabbixHostname][counters[zabbixHostname][num].key.toLowerCase()].callbacks) {
+                if(Number(OCID) === Number(callbackOCID)) {
+                    delete countersParameters[zabbixHostname][counters[zabbixHostname][num].key.toLowerCase()].callbacks[OCID];
+                    foundCallbackForDelete = true;
+                    existingOCIDs.push(OCID + ':' + zabbixHostname + '(' + counters[zabbixHostname][num].key + ')');
+                }
+            }
+            if(foundCallbackForDelete) {
+                if(!Object.keys(countersParameters[zabbixHostname][counters[zabbixHostname][num].key.toLowerCase()].callbacks).length) {
+                    delete countersParameters[zabbixHostname][counters[zabbixHostname][num].key.toLowerCase()];
+                    counters[zabbixHostname][num] = null; // don't delete array item for saving order of 'num'
+                }
+            }
         }
         delete countersIDX[OCID];
     });
@@ -182,13 +201,14 @@ function createServer() {
                 }
 
                 if(result.request.toLowerCase() === 'active checks'){
-                    reqActiveChecks(result.host, function(err, data) {
+                    reqActiveChecks(result.host, socket, function(err, data) {
                         sendToZabbix(err, data, socket);
                         socket.pipe(socket);
                         socket.destroy();
                     });
-                } else if(result.request.toLowerCase() === 'agent data') {
-                    reqAgentData(result, function(err, data){
+                // "agent data" for zabbix active protocol. "sender data" for zabbix trapper protocol
+                } else if(result.request.toLowerCase() === 'agent data' || result.request.toLowerCase() === 'sender data') {
+                    reqAgentData(result, function(err, data) {
                         sendToZabbix(err, data, socket);
                     });
                 } else {
@@ -227,7 +247,7 @@ function createServer() {
 
 function sendToZabbix(err, data, socket){
     if(err) {
-        log.error(errorMessage, err.message);
+        log.warn(errorMessage, err.message);
         data = JSON.stringify({response: 'error'});
     }
 
@@ -249,16 +269,20 @@ function sendToZabbix(err, data, socket){
     //socket.destroy();
 }
 
-function reqActiveChecks(host, callback) {
+function reqActiveChecks(host, socket, callback) {
     if(!host) return callback(new Error('host not defined for active check request'));
 
     host = host.toLowerCase();
 
-    if(!counters[host] || !counters[host].length) return callback(new Error('active check not defined for host ' + host));
+    if(!counters[host] || !counters[host].length) {
+        return callback(new Error('active check not defined for host ' + host + ': ' +
+            socket.remoteAddress + ':' + socket.remotePort + '->' + socket.localAddress + ':' + socket.localPort));
+    }
 
     callback(null, JSON.stringify({
         response: 'success',
-        data: counters[host].filter(function(obj) { return obj !== null; } ) // filter removed counters. we don't splice removed counters array for save order
+        // filter removed counters and Zabbix trappers. We don't splice removed counters array for save order
+        data: counters[host].filter(function(obj) { return obj !== null && obj.delay; } ),
     }));
 }
 
@@ -269,7 +293,9 @@ function reqAgentData(result, callback){
     var timestamp = Date.now();
     async.each(result.data, function(data, callback){
 
-        if(!data.host || !data.key  || data.value === undefined /* || !data.clock || !data.ns */){
+        if(!data.host || typeof data.host  !== 'string' || !data.key || typeof data.key !== 'string' ||
+            data.value === undefined /* || !data.clock || !data.ns */) {
+
             log.error('Error while received zabbix data, not all required parameters are defined: host: ', data.host,
                     ', key: ', data.key, ', clock: ', data.clock, ', ns: ', data.ns, ', value: ', data.value, ': ', data);
             errCnt++;
@@ -292,8 +318,10 @@ function reqAgentData(result, callback){
         var zabbixKey = data.key.toLowerCase();
         
         if(!countersParameters[zabbixHost] || !countersParameters[zabbixHost][zabbixKey] ||
-            typeof countersParameters[zabbixHost][zabbixKey].callback !== 'function'
-        ){
+            !countersParameters[zabbixHost][zabbixKey].callbacks ||
+            typeof countersParameters[zabbixHost][zabbixKey].callbacks !== 'object' ||
+            !Object.keys(countersParameters[zabbixHost][zabbixKey].callbacks).length
+        ) {
             log.debug('Callback not defined or callback type is not a function for ', zabbixHost, '; key ',  zabbixKey);
             errCnt++;
             return callback();
@@ -313,12 +341,20 @@ function reqAgentData(result, callback){
             Number(data.clock) === parseInt(String(data.clock), 10) &&
             Number(data.ns) === parseInt(String(data.ns), 10)) {
 
-            countersParameters[zabbixHost][zabbixKey].callback(null, {
+            var res = {
                 value: data.value,
                 timestamp: Math.round(Number(data.clock) * 1000 + (Number(data.ns) / 1000000)) // convert to milliseconds
-            });
-        } else countersParameters[zabbixHost][zabbixKey].callback(null, data.value);
+            };
+        } else res = data.value;
 
+        for(var OCID in countersParameters[zabbixHost][zabbixKey].callbacks) {
+            if(typeof countersParameters[zabbixHost][zabbixKey].callbacks[OCID] !== 'function') {
+                log.debug('Callback not defined or callback type is not a function for ', zabbixHost, '; key ',  zabbixKey, '; OCID: ', OCID);
+                errCnt++;
+                continue;
+            }
+            countersParameters[zabbixHost][zabbixKey].callbacks[OCID](null, res);
+        }
         callback();
 
     }, function(err){

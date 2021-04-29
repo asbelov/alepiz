@@ -9,6 +9,7 @@ var SNMP = require('../SNMP/collector');
 var spawn = require('child_process').spawn; // for run external ping
 var recode = require('../../lib/recode');
 var dns = require('dns');
+var path = require('path');
 var fs = require('fs');
 var conf = require('../../lib/conf');
 conf.file('config/conf.json');
@@ -40,7 +41,7 @@ module.exports = collector;
 
 var stopScanning = false;
 var scanIDs = {};
-var discoveryIPFile = conf.get('collectors:discovery:discoveryIP');
+var discoveryIPFile = path.join(conf.get('tempDir'), conf.get('collectors:discovery:discoveryIP'));
 
 collector.get = function(param, callback) {
     var ID = Date.now();

@@ -81,7 +81,7 @@ collector.get = function(prms, callback) {
                 });
 
                 socket.on('error', function (err) {
-                    log.info('Got an error while connecting to ', host, ':', prms.port, ': ', err.message);
+                    log.debug('Got an error while connecting to ', host, ':', prms.port, ': ', err.message);
                     callback();
                 });
             });

@@ -1,0 +1,60 @@
+//
+    Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2021-2-22 0:19:05
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title verPE: Получает версию файла в ОС MS Windows
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 verPE
+                    h5.light.
+                        Получает версию исполняемого файла в формате PE
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание verPE
+                    p.
+                        verPE используется для получения версии исполняемого файла (exe, scr, sys, dll и т.д.) в формате
+                        PE (Portable Executable). (PE, «переносимый исполняемый») — формат исполняемых файлов, объектного
+                        кода и динамических библиотек, используемый в 32- и 64-разрядных версиях операционной системы Microsoft Windows.
+                        Для получения версии файла используется программа verPE.exe, которая находится в каталоге с коллектором.
+
+                    h3 Параметры
+                    ul.browser-default
+                        li.
+                            Comma separated files - список файлов, разделенных запятыми. В списке должен быть указан полный путь до файла.
+                            Пробелы до и после имени каждого файла будут удалены.
+                            Например: "C:\Windows\regedit.exe, C:\windows\notepad.exe"
+                        li.
+                            Return in version|filename format - возвращать результат в формате version|filename,
+                            например "10.0.19041.860 (WinBuild.160101.0800)|C:\Windows\regedit.exe"
+                        li.
+                            Return first result (not an array) - возвращать только первый результат, а не массив. Используется,
+                            если требуется получить версию только для одного файла. В этом случае в истории будет сохранена только информация
+                            о версии, а не массив в строковом представлении. ("10.0.19041.860" а не '["10.0.19041.860"]')
+                    h3 Возвращаемое значение
+                    p.
+                        По умолчанию возвращается версия файла ("10.0.19041.860").
+                        Если файл не содержит версии, возвращается пустая строка. Если активен параметр
+                        Return in version|filename format,
+                        возвращается версия файла и имя файла ("10.0.19041.860 (WinBuild.160101.0800)|C:\Windows\notepad.exe" или
+                        "|C:\Windows\runMe.bat")
+                    p.
+                        Если в параметре "Comma separated files" указано несколько файлов и параметр
+                        "Return first result (not an array)" не активен, происходит следующее:
+                    ul.browser-default
+                        li Весь полученный массив значений преобразуется в текст JSON и сохраняется в базу с историей значений
+                        li.
+                            Если у счетчика есть зависимые счетчики, то ALEPIZ будет вызывать их столько раз, сколько значений
+                            получено в массиве и каждый раз передавать в качестве переменной %:PARENT_VALUE:% новое значение
+                            из массива значений.
+

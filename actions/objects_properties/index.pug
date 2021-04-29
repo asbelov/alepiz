@@ -8,6 +8,8 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         title= action.name
         link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
         link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        // it really used. Don\'t remove
+        link(rel='stylesheet', href='/stylesheets/actions.css')
         meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
         script(src='/jquery/jquery.min.js')
         script(src='/jquery-ui/jquery-ui.min.js')
@@ -36,26 +38,55 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
             }
     body
     main
+        script(src= action.link + "/" + action.staticDir + "/" + "client.js")
         div.row
             div.col.s12
                 //h2= action.name
                 //p.right-align= action.description
         div.row
             div.col.s12
-                script(src= action.link + "/" + action.staticDir + "/" + "client.js")
+                ul#mainTabs.tabs
+                    li.tab.col.s6: a(href="#objectsProperties") Objects Properties
+                    li.tab.col.s6: a(href="#searchProperties") Search Properties
+            div#objectsProperties.row
+                input(type="hidden" value="1")#deleteOtherProperties
+                div.col.s12
+                    div.card
+                        div.card-content.row
+                            div.col.s11.input-field.card-title#objectsNames No objects selected
+                            div.col.s1.input-field
+                                a(href='#!')#addProperty.btn-floating.waves-effect.waves-light
+                                    i.material-icons add
+                        div.row.no-margin
+                            div.col.s12#propertiesField
+            div#searchProperties
                 div.row
                     div.col.s12
                         div.card
                             div.card-content
-                                span.card-title Objects list
-                                p Select object to edit all object properties. Select multiple objects for edit shared properties for selected objects with same names, display modes and and values. For one object, object will have only properties that are displayed. For multiple objects, displayed properties will be replaced or added to existing properties for each objects. Initially for multiple objects are displayed only shared properties
-                                p Objects list:&nbsp;
-                                    span(style="font-weight: bold")#objectsNames
-                                input(type="hidden" value="1")#deleteOtherProperties
-                    div.col.s1
-                        a(href='#!')#addProperty.btn-floating.waves-effect.waves-light
-                            i.material-icons add
-                    div.col.s12#propertiesField
+                                span.card-title Search properties
+                                p.
+                                    Enter a property name to search for objects that contain it.
+                                    The "%" wildcard matches any sequence of zero or more characters.
+                                    The "_" wildcard matches any single character.
+                                div.row
+                                    div.col.l6.m8.s10.input-field
+                                        input(type='text')#propertyName
+                                        label(for='propertyName') Property name for search
+                                    div.col.s2.input-field
+                                        a#searchPropertyBtn.waves-effect.waves-light.btn Search
+                    div.col.s12#searchResultWrapper
+                        table.highlight.bordered
+                            thead
+                                tr
+                                    th Object name
+                                    th Property name
+                                    th Property value
+                                    th Property mode
+                                    th Description
+                            tbody#searchResult
+                                tr
+                                    td(colspan="5").center-align Waiting for the input of the property name
 
     footer
         input(type="hidden" name="actionName" value= action.name)

@@ -4,7 +4,7 @@
 doctype
 html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflow-y: hidden")
     head
-        title alepiz
+        title ALEPIZ
         link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
         link(rel='stylesheet', href='/material-design-icons/material-icons.css')
         link(rel='stylesheet', href='/stylesheets/index.css')
@@ -25,11 +25,11 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
                             i.material-icons open_in_new
                         li: a(href='#modal-log-window' data-tooltip='Show log window')#logWindowBtn.modal-trigger.tooltipped
                             i.material-icons file_upload
-                        li: a(href='#modal-login' data-tooltip='Login as a GUEST')#loginBtn.modal-trigger.tooltipped.yellow-text
+                        li: a(href='#modal-login' data-tooltip='Login as a GUEST')#loginBtn.modal-trigger.tooltipped.grey-text.text-lighten-1
                             i.material-icons account_box
                         li: a(href='/' data-tooltip='Open a new tab with a context help')#helpBtn.tooltipped
                             i.material-icons help_outline
-                        li: a(href='https://www.alepiz.com' data-tooltip='Web site alepiz.com' target="__blank").tooltipped
+                        li: a(href='https://alepiz.com' data-tooltip='Web site alepiz.com' target="__blank").tooltipped
                             i.material-icons home
 
                     div.fixed-action-btn#actionButton
@@ -48,8 +48,8 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
                         div.background
                             img(src="images/background.jpg" width="100%")
                         div.col.s10.input-field
-                            textarea#searchObjects.search-textarea.materialize-textarea.black-text.hide
-                            input(type="text")#searchActions.autocomplete.black-text.no-padding
+                            textarea(style="height: 20px")#searchObjects.search-textarea.materialize-textarea.black-text.hide
+                            textarea(style="height: 20px")#searchActions.search-textarea.materialize-textarea.autocomplete.black-text
                             label
                         div.col.s1.input-field
                             i(style="cursor: pointer")#searchTip.material-icons search
@@ -83,6 +83,21 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
                         i.material-icons.prefix.small.red-text security
                         input(type="password")#userPass
                         label(for="userPass") Password
+                    div.col.l4.m8.s8.offset-l8.offset-m8.offset-s8
+                        a(href="#!")#changePasswordBtn Change password
+                div#changePasswordForm.hide
+                    div.row
+                        div.col.s0.m1.l1.input-field
+                        div.col.s12.m10.l9.input-field
+                            i.material-icons.prefix.small.red-text help
+                            input(type="password")#newUserPass1
+                            label(for="newUserPass1") New Password
+                    div.row
+                        div.col.s0.m1.l1.input-field
+                        div.col.s12.m10.l9.input-field
+                            i.material-icons.prefix.small.red-text help_outline
+                            input(type="password")#newUserPass2
+                            label(for="newUserPass2") Confirm Password
             div.modal-footer
                 a(href="#!")#login.modal-action.modal-close.waves-effect.waves-green.btn-flat Login
                 a(href="#!")#logout.modal-action.modal-close.waves-effect.waves-green.btn-flat Logout

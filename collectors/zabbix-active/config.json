@@ -16,7 +16,7 @@
             "canBeEmpty": "on"
         },
         "pollingFreq": {
-            "description": "Polling frequency for item in seconds",
+            "description": "Polling frequency in seconds. 0 for trapper",
             "checkAs": "Integer",
             "default": 30
         },

@@ -1,0 +1,229 @@
+//
+    Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2021-4-9 21:01:14
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/quill/quill.snow.css')
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        style.
+            /* used for remove strong definition in materialize.css (font-weight: 500) for enable bold text in quill editor*/
+            strong {
+                font-weight: bold !important;
+            }
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/quill/quill.js')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;',
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+        script(src='/javascripts/objectsSelector.js')
+        script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+        main
+            div(style="margin:10px;").card-panel.row
+                div.col.l8.m6.s12
+                    ul.tabs
+                        li.tab.col.s4
+                            a(href="#hint-editor-tab-panel") HINT
+                        //li(data-tab).tab.col.s3#comment-editor-tab
+                            a(href="#comment-editor-tab-panel") COMMENT
+                        li.tab.col.s4#disabled-tab
+                            a(href="#disabled-tab-panel") DISABLE
+                        li.tab.col.s4#counter-settings-tab
+                            a(href="#counter-settings-tab-panel") SETTINGS
+
+                    div#hint-editor-tab-panel.row
+                        input(type="hidden")#hint
+                        div.col.l7.m5.s12.input-field
+                            input(type="text" data-onchange-watchdog)#hint-subject
+                            label(for="hint-subject") Hint subject
+                        div.col.l3.m5.s8.input-field
+                            label
+                                input(type="checkbox" disabled)#link-hint-to-objects-cb
+                                span Link to selected objects
+                        div.col.l2.m2.s4.input-field.switch
+                            label
+                                span Off
+                                input(type='checkbox' data-switch-panel)#switchOnHint
+                                span.lever
+                                span On
+                        div.col.s12.input-field
+                            div(style="height: 400px")#hint-editor
+
+                    //div#comment-editor-tab-panel.row
+                        div.col.s12.input-field
+                            input(type="text")#comment-subject
+                            label(for="comment-subject") Comment subject
+                        div.col.s12.input-field
+                            div(style="height: 400px")#comment-editor
+
+                    div#disabled-tab-panel.row
+                        input(type="hidden")#disable-time-intervals
+                        input(type="hidden")#disableUntil
+                        input(type="hidden")#disable-comment
+                        div.col.l3.m6.s6.input-field
+                            input(type="text" data-onchange-watchdog).datepicker#disableUntilDate
+                            label(for="disableUntilDate") Disabling until date
+                        div.col.l2.m6.s6.input-field
+                            input(type="text" data-onchange-watchdog).timepicker#disableUntilTime
+                            label(for="disableUntilTime") Disabling until time
+                        div.col.l2.m4.s4.input-field
+                            input(type="text").timepicker#disableTimeIntervalFrom
+                            label(for="disableTimeIntervalFrom") From
+                        div.col.l2.m4.s4.input-field
+                            input(type="text").timepicker#disableTimeIntervalTo
+                            label(for="disableTimeIntervalTo") To
+                        div.col.l1.m2.s2.input-field
+                            a.btn-floating.waves-effect.waves-light#add-disabled-interval-btn
+                                i.material-icons add
+                        div.col.l2.m2.s2.input-field.switch
+                            label
+                                span Off
+                                input(type='checkbox' data-switch-panel)#switchOnDisable
+                                span.lever
+                                span On
+                        div(style="margin-left: 4px").col.s12
+                            div(style="padding: 1em; border: 1px solid #ddd")
+                                div#disabled-intervals No time intervals for disable events
+                        div.col.s12.input-field
+                            input(type="text" data-onchange-watchdog)#disable-comment-subject
+                            label(for="disable-comment-subject") Subject
+                        div.col.s12.input-field
+                            div(style="height: 400px")#disable-comment-editor
+
+                    div#counter-settings-tab-panel.row
+                        input(type="hidden")#counter-id
+                        div.col.s9.input-field
+                            input(type="text" data-single-event-settings data-event-settings data-onchange-watchdog)#counterName
+                            label(for="counterName") Name
+                        div.col.s1.input-field
+                            button(data-href="").btn-floating.waves-effect.waves-light#openCounterSettings
+                                i.material-icons open_in_new
+                        div.col.l2.m2.s2.input-field.switch
+                            label
+                                span Off
+                                input(type='checkbox' data-switch-panel)#switchOnSettings
+                                span.lever
+                                span On
+                        div.col.s12.input-field
+                            input(type="text" data-single-event-settings data-event-settings data-onchange-watchdog)#event-description
+                            label(for="event-description") Description
+                        div.col.s12.input-field
+                            input(type="text" data-single-event-settings data-event-settings data-onchange-watchdog)#event-pronunciation
+                            label(for="event-pronunciation") Pronunciation
+                        div.col.l6.m6.s12.input-field
+                            select(data-events-editor-select data-event-settings data-onchange-watchdog)#event-importance.materialize-select
+                            label Importance
+                        div.col.l6.m6.s12.input-field
+                            select(data-events-editor-select data-event-settings data-onchange-watchdog)#counterGroup.materialize-select
+                            label Counter group
+                        div.col.l4.m4.s6.input-field
+                            input(type="text" data-event-settings data-onchange-watchdog)#event-duration
+                            label(for="event-duration") Duration (sec)
+                        div.col.l4.m4.s6.input-field
+                            input(type="text" data-event-settings data-onchange-watchdog)#event-task-on-problem
+                            label(for="event-task-on-problem") TaskID when event occurred (0 - no task)
+                        div.col.l4.m4.s6.input-field
+                            input(type="text" data-event-settings data-onchange-watchdog)#event-task-on-solved
+                            label(for="event-task-on-solved") TaskID when event solved (0 - no task)
+                        div.col.l3.m6.s6.input-field
+                            input(type="text" data-event-settings data-onchange-watchdog)#keepHistory
+                            label(for="keepHistory") Keep history (days)
+                        //div.col.l4.m4.s6.input-field
+                            input(type="text" data-onchange-watchdog)#keepTrends
+                            label(for="keepHistory") Keep trends (days)
+                        div.col.l3.m6.s6.input-field
+                            label
+                                input(type="checkbox" data-event-settings data-onchange-watchdog)#counterDisabledCB
+                                span Disable counter
+                            input(type="hidden")#counterDisabledCBShared
+                        div.col.l3.m6.s6.input-field
+                            label
+                                input(type="checkbox" data-event-settings data-onchange-watchdog)#taskConditionCB
+                                span Condition for tasks
+                            input(type="hidden")#taskConditionCBShared
+                        div.col.l3.m6.s6.input-field
+                            label
+                                input(type="checkbox" data-event-settings data-onchange-watchdog)#debugCB
+                                span Enable debug
+                            input(type="hidden")#debugCBShared
+                        div.col.s12.input-field
+                            textarea(data-length="65535" data-event-settings data-onchange-watchdog).materialize-textarea#counterDescription
+                            label Counter description
+                            input(type="hidden")#counterDescriptionShared
+
+                div.col.l4.m6.s12
+                    ul.collapsible.z-depth-0
+                        li
+                            div.collapsible-header
+                                i.material-icons expand_more
+                                span#events-filter-header Events filter
+                            div(style="margin: 0").collapsible-body.row
+                                div.col.s12.input-field
+                                    select(data-filter-select multiple)#counters-groups-filter.materialize-select
+                                    label Counter group
+                                div.col.s12.input-field
+                                    select(data-filter-select multiple)#importance-filter.materialize-select
+                                    label Importance
+                                div.col.input-field
+                                    a.btn.waves-effect#selectAll-filter-btn Select all
+                                div.col.input-field
+                                    a.btn.waves-effect#unselectAll-filter-btn Unselect all
+                    div(style="margin:0;").row
+                        div(style="padding: 0; overflow-y: auto").col.s12.collection#events-list
+                            a(href="#!").collection-item#id-1 Event1 name
+                            a(href="#!").collection-item.active#id-2 Event2 name
+                            a(href="#!").collection-item#id-3 Event3 name
+
+        div#modalRunConfirm.modal
+            div.modal-content
+                div(data-modal-text)#modal-save-changes
+                    h4 Changes will not be saved
+                    p You have made changes to the selected events. If you continue, the changes you made will be lost.
+                    strong.red-text Do you want to continue?
+                    ul
+                        li
+                            strong Yes:&nbsp;
+                            span Continue switching without saving changes
+                        li
+                            strong No:&nbsp;
+                            span Switching, but saving the entered data
+                div(data-modal-text)#no-changes
+                    h4 No changes made
+                    p You have not made any changes and are trying to save the data.
+                    strong.red-text Do you want to continue?
+                    ul
+                        li
+                            strong Yes:&nbsp;
+                            span Continue saving unchanged data
+                        li
+                            strong No:&nbsp;
+                            span Do not save data and return to editing
+            div.modal-footer
+                a(href='#!')#modalRunConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                a(href='#!')#modalRunConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+            // end example of action

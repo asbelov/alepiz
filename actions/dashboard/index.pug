@@ -159,7 +159,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                     li#historyEvents
                         div(data-tooltip="Enable &lt;Alt&gt;+&lt;2&gt;" data-position="bottom").tooltipped.collapsible-header.active.lighten-4
                             i.material-icons history
-                            div.col.margin-0 Historical&nbsp;events
+                            div.col.margin-0#historicalEventsLabel Historical&nbsp;events
                             div.col.s5
                                 input(type="text" style="margin:0; height:2em;" placeholder="Events filter"
                                     data-tooltip='Enter filter for events. Filter will applied to all fields of tables and update events will be paused')#eventsFilter.tooltipped
@@ -167,10 +167,13 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                 span#lastUpdate
                                 span#updateTime
                             div.col.s3
-                                a(href="#!" uncheckSelected data-tooltip='Select or unselect all events').secondary-content.tooltipped
-                                    i.material-icons playlist_add_check
+                                a(href="#!" data-tooltip='Filter events by importance' data-target='importanceFilterDropDown')#importanceFilter.secondary-content.tooltipped.dropdown-trigger.hide
+                                    i#importanceFilterIcon.material-icons visibility
+                                ul#importanceFilterDropDown.dropdown-content
                                 a(href="#!" data-tooltip='Enable\\disable sound')#sound.secondary-content.tooltipped
-                                    i#soundIcon.red-text.material-icons volume_off
+                                    i#soundIcon.material-icons volume_up
+                                a(href="#!" data-tooltip='Open selected event objects in a new window')#openInNew.secondary-content.tooltipped
+                                    i.material-icons open_in_new
                                 a(href="#!" data-tooltip='Start\\Pause update events &lt;Esc&gt;')#reload.secondary-content.tooltipped
                                     i.material-icons play_arrow
                                 //a(href="#!" data-tooltip='Show\\hide commented events &lt;Alt&gt;+&lt;4&gt;')#showCommented.secondary-content.tooltipped
@@ -196,17 +199,14 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                         th(var="DURATION") Duration
                                         th(var="LAST_TIME") Last time
                                         th Info
-                                        th Select
+                                        th: a(href="#!" uncheckSelected data-tooltip='Check all or uncheck selected events').tooltipped Select
                                 tbody#historyEventsTable
                                     tr
                                         td(colspan=12 style="text-align: center;") Waiting for initializing...
                     li#currentEvents.active
                         div(data-tooltip="Enable &lt;Alt&gt;+&lt;3&gt;" data-position="bottom").tooltipped.collapsible-header.active.lighten-4
                             i.material-icons alarm
-                            div.col.s11.margin-0  Current events
-                            div.col.s1
-                                a(href="#!" uncheckSelected data-tooltip='Check all or uncheck selected events').right.secondary-content.tooltipped
-                                    i.material-icons playlist_add_check
+                            div.col.s12.margin-0  Current events
                         div.collapsible-body
                             table.bordered.highlight.responsive-table
                                 thead
@@ -221,17 +221,14 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                         th(var="DURATION") Duration
                                         th(var="LAST_TIME") Last time
                                         th Info
-                                        th Select
+                                        th: a(href="#!" uncheckSelected data-tooltip='Check all or uncheck selected events').tooltipped Select
                                 tbody#eventsTable
                                     tr
                                         td(colspan=11 style="text-align: center;") Waiting for initializing...
                     li#disabledEvents
                         div(data-tooltip="Enable &lt;Alt&gt;+&lt;4&gt;" data-position="bottom").tooltipped.collapsible-header.lighten-4
                             i.material-icons cancel
-                            div.col.s11.margin-0 Disabled events
-                            div.col.s1
-                                a(href="#!" uncheckSelected data-tooltip='Check all or uncheck selected events').right.secondary-content.tooltipped
-                                    i.material-icons playlist_add_check
+                            div.col.s12.margin-0 Disabled events
                         div.collapsible-body
                             table.bordered.highlight.responsive-table
                                 thead
@@ -248,7 +245,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                         th(var="DISABLED_INTERVALS") Disabled intervals
                                         th(var="DISABLED_USER") Disabled by user
                                         th Info
-                                        th Select
+                                        th: a(href="#!" uncheckSelected data-tooltip='Check all or uncheck selected events').tooltipped Select
                                 tbody#disabledEventsTable
                                     tr
                                         td(colspan=15 style="text-align: center;") Waiting for initializing...

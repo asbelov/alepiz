@@ -80,9 +80,18 @@ ul#collapsible-log-body {
 }
 
 div.logRecord {
-    padding: 0 !important;
+    padding: 1em 0 !important;
+    border-bottom: 1px solid #ddd;
 }
-
+div.logIcon {
+    display: inline-block;
+    position: relative;
+    top: 5px;
+}
+div.logDateStr {
+    display: inline-block;
+    margin: 0 0.5em;
+}
 .logColorDefault {
     color: grey !important;
 }

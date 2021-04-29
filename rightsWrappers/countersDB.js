@@ -121,21 +121,6 @@ rightsWrapper.getCounterByID = function(user, id, callback) {
     });
 };
 
-rightsWrapper.getCounterGroup = function (user, id, callback){
-    checkIDs(id, function(err, checkedID) {
-        if(err) return callback(err);
-
-        rightsDB.checkCounterID({
-            user: prepareUser(user),
-            id: checkedID[0]
-        }, function (err, checkedID) {
-            if (err) return callback(err);
-
-            countersDB.getCounterGroup(checkedID, callback);
-        });
-    });
-};
-
 rightsWrapper.getCounterParameters = function(user, id, callback){
     if(!id) return callback(null, []);
 
@@ -182,7 +167,7 @@ rightsWrapper.getCounterObjects = function(user, id, callback){
                 name: <variable name>,
                 objectID: <object ID for getting variable value>,
                 objectName: <objectName for getting variable value>,
-                parentCounterName: <counter name, linked to objectfor getting variable value>,
+                parentCounterName: <counter name, linked to object for getting variable value>,
                 function: <history function for applying to returned counter value>,
                 functionParameters: <comma separated string with function parameters>
             }, ...
@@ -320,3 +305,87 @@ rightsWrapper.getGroupsForObjects = function(user, IDs, callback){
         groupsDB.getGroupsForObjects(IDs, callback);
     });
 };
+
+
+rightsWrapper.getParentCountersVariables = function (user, initCountersIDs, prevCountersIDs, callback) {
+    checkIDs(initCountersIDs, function (err, countersIDs ) {
+        if(err && !countersIDs.length) {
+            return callback(new Error('Incorrect counter ID ' + JSON.stringify(initCountersIDs) + ' for getting parent counters variables: '
+                + err.message));
+        }
+
+        async.eachSeries(countersIDs, function(counterID, callback) {
+            rightsDB.checkCounterID({
+                user: prepareUser(user),
+                id: counterID,
+                errorOnNoRights: true
+            }, callback);
+        }, function(err) {
+            if(err) {
+                return callback(new Error('You has no rights for getting parent counters variables: '
+                    + err.message));
+            }
+
+            countersDB.getParentCountersVariables(countersIDs, function (err, rows) {
+                if(err) return callback(new Error('Error while getting parent counters variables: ' + err.message));
+
+                //console.log('getParentCountersVariables: ', rows);
+
+                var parentCountersIDs = rows.map(row => row.counterID).filter(id => prevCountersIDs.indexOf(id) === -1);
+                if(!parentCountersIDs.length) return callback();
+                Array.prototype.push.apply(prevCountersIDs, countersIDs);
+                rightsWrapper.getParentCountersVariables(user, parentCountersIDs, prevCountersIDs, function (err, rows1) {
+                    if(err) return callback(new Error('Error while getting parent counters variables: ' + err.message));
+
+                    //console.log('getParentCountersVariables2: ', rows1);
+
+                    var variablesNames = rows.map(row => (row.variableName ? row.variableName.toUpperCase() : ''));
+                    if(rows1 && rows1.length) {
+                        Array.prototype.push.apply(rows, rows1.filter(function (row) {
+                            if (!row.variableName) return true;
+                            if (variablesNames.indexOf(row.variableName.toUpperCase()) === -1) return true;
+                        }));
+                    }
+                    callback(null, rows);
+                })
+            });
+        });
+    });
+};
+
+rightsWrapper.getAllForCounter = function (user, initCountersIDs, callback) {
+    if(!Array.isArray(initCountersIDs) || !initCountersIDs.length) return callback(null, []); // objects has not a linked no counters
+
+    checkIDs(initCountersIDs, function (err, countersIDs ) {
+        if (err && !countersIDs.length) {
+            return callback(new Error('Incorrect counters IDs ' + JSON.stringify(initCountersIDs) +
+                ' for getting counters parameters for export counters: '
+                + err.message));
+        }
+
+        var countersRows = [];
+        async.eachSeries(countersIDs, function(counterID, callback) {
+            rightsDB.checkCounterID({
+                user: prepareUser(user),
+                id: counterID,
+                errorOnNoRights: true
+            }, function(err) {
+                if(err) return callback(new Error('You has no rights for getting counter data: ' + err.message));
+
+                countersDB.getAllForCounter(counterID, function(err, rows) {
+                    if(err) return callback(new Error('Error getting counter data for counterID: ' + counterID + ': ' + err.message));
+
+                    countersRows.push(rows);
+                    callback();
+                });
+            });
+        }, function(err) {
+            if (err) {
+                return callback(new Error('You has no rights for getting counter data: '
+                    + err.message));
+            }
+
+            callback(null, countersRows);
+        });
+    });
+}

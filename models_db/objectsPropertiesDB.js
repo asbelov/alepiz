@@ -27,11 +27,11 @@ objectsPropertiesDB.getProperties = function (objectsIDs, callback) {
                     if(err) return callback(err);
                     rows.push.apply(rows, res);
                     callback();
-                })
+                });
             }, function(err) {
                 stmt.finalize();
                 callback(err, rows);
-            })
+            });
         });
     }
 };
@@ -109,3 +109,25 @@ objectsPropertiesDB.deleteProperties = function(objectID, propertiesNames, callb
         });
     });
 };
+
+objectsPropertiesDB.getObjectsForProperty = function (propertyName, callback) {
+    log.debug('Getting objects for property: ', propertyName);
+
+    db.all('SELECT objects.name AS objectName, objects.id AS objectID, objectsProperties.name AS propName, ' +
+        'objectsProperties.value AS propVal, objectsProperties.mode AS propMode, ' +
+        'objectsProperties.description AS propDescription FROM objects ' +
+        'JOIN objectsProperties ON objects.id=objectsProperties.objectID '+
+        'WHERE objectsProperties.name LIKE ? ESCAPE "\\" ORDER BY objects.name', propertyName, callback);
+}
+
+objectsPropertiesDB.getObjectProperty = function (objectName, propertyName, callback) {
+    log.debug('Getting property ', propertyName,' for object like ', objectName);
+
+    db.all('SELECT objects.name AS objectName, objectsProperties.name AS propertyName, objectsProperties.value AS value ' +
+        'FROM objectsProperties ' +
+        'JOIN objects ON objects.ID = objectsProperties.objectID ' +
+        'WHERE objects.name LIKE $objectName ESCAPE "\\" AND objectsProperties.name = $propertyName COLLATE NOCASE', {
+        $objectName: objectName,
+        $propertyName: propertyName,
+    }, callback);
+}

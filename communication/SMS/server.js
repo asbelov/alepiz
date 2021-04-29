@@ -304,7 +304,7 @@ function createURL(query, pass, text, sender, rcpt, phonesDiv, phonePrefix, phon
         senderPhone = sender ? getPhone(sender[0].address, phonePrefix, phoneLen) : ''; // some times sender has not phone number
     for(var key in query) {
         if(query[key] === '%:TEXT:%') newQuery[key] = text;
-        else if(query[key] === '%:PHONES:%') newQuery[key] = phones.join(typeof phonesDiv !== 'string' ? phonesDiv : '');
+        else if(query[key] === '%:PHONES:%') newQuery[key] = phones.join(typeof phonesDiv === 'string' ? phonesDiv : ',');
         else if(query[key] === '%:SENDER_PHONE:%') newQuery[key] = senderPhone;
         else if(query[key] === '%:PHONE:%') multiple.push(key);
         else if(key === 'pass') newQuery[key] = pass;

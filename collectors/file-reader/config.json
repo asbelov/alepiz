@@ -1,0 +1,16 @@
+{
+    "name": "File reader",
+    "description": "",
+    "active": "",
+    "separate": "",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "fileName": {
+            "description": "File name",
+            "type": "textInputMiddle"
+        },
+        "regExp": {
+            "description": "Regular expression"
+        }
+    }
+}

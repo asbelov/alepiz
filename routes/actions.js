@@ -23,17 +23,43 @@ module.exports = router;
 var actionsForUpdate = {}; // {<actionLink>: {updateAjax: true|false, updateServer: true|false}, ...}
 
 
-// Initialising action
+// Initializing action, load and save user action configuration
 router.post('/'+conf.get('actions:dir')+'/:action', function(req, res, next) {
 
     module.sessionID = undefined;
     var actionID = req.params.action;
     var user = prepareUser(req.session.username);
+    var func = req.body.func;
 
     actions.getConfiguration(actionID, function(err, actionCfg) {
         if (err) {
-            log.error('Error while getting action configuration for "', actionID, '": ', err.message);
+            log.error('Error while getting action configuration for "', actionID, '", user: ', user,
+                ': ', err.message, ': param: ', req.body);
             return next(err);
+        }
+
+        if(func === 'setActionConfig' || func === 'getActionConfig') {
+            actionClient.actionConfig(user, func, actionID, req.body.config, function (err, row) {
+                if (err) {
+                    log.error('Can\'t ', func, ' for user: "', user, '", action: "', actionID, '": ', err.message,
+                        ': ', req.body);
+                    return next(err);
+                }
+
+                var configStr = row && row.config ? row.config : '';
+                if(configStr) {
+                    try {
+                        var config = JSON.parse(configStr)
+                    } catch (e) {
+                        config = configStr;
+                    }
+                } else config = {};
+
+                //console.log('get:', configStr, config)
+                res.json(config);
+            });
+
+            return;
         }
 
         actionClient.getSessionID({
@@ -99,7 +125,6 @@ router.post('/'+conf.get('actions:dir')+'/:action', function(req, res, next) {
                         log.error('Can\'t render action html page "', actionHomePage, '": ', err.message);
                         return next(err);
                     }
-                    //res.send(html);
 
                     res.json({
                         html: html,
@@ -132,7 +157,7 @@ router.all('/' + conf.get('actions:dir') + '/:action_sessionID/' + conf.get('act
         }
 
         if(cfg.staticDir && staticDir === cfg.staticDir){
-            rightsWrapper.checkActionRights(req.session.username, actionID, 'ajax', function(err, right){
+            rightsWrapper.checkActionRights(req.session.username, actionID, 'ajax', function(err/*, rights */){
                 if(err){
                     log.error('Can\'t check user rights for ', actionID, ' for sending static file: ', err.message);
                     return res.send();
@@ -153,6 +178,12 @@ router.all('/'+conf.get('actions:dir')+'/:action_sessionID/:mode', function(req,
 
     var actionID = req.params.action_sessionID.replace(/^(.+)_\d+$/, '$1');
     var sessionID = Number(req.params.action_sessionID.replace(/^.+_(\d+)$/, '$1'));
+
+    if(req.method !== 'GET' && req.method !== 'POST') {
+        log.error('Trying to executing action "', actionID, '" with unsupported method ', req.method,
+            '. Support only GET and POST methods');
+        return next();
+    }
 
     if(!sessionID) {
         if(req.params.mode.toLowerCase() !== 'help') {
@@ -182,6 +213,8 @@ router.all('/'+conf.get('actions:dir')+'/:action_sessionID/:mode', function(req,
             return next(err);
         }
 
+        var args = req.method === 'POST' ? req.body : req.query;
+
         // for ajax run action directly from webServer without actionClient->actionServer IPC
         // but action server connected to history and server and make too many connections
         // and when webServer is restarted, we receive an errors in log from IPC system
@@ -191,19 +224,32 @@ router.all('/'+conf.get('actions:dir')+'/:action_sessionID/:mode', function(req,
             actionID: actionID,
             executionMode: executionMode,
             user: user,
-            args: req.body,
+            args: args,
             sessionID: sessionID,
             updateAction: actionsForUpdate[actionID] ? actionsForUpdate[actionID][executionMode] : false
         }, function(err, data){
-            if(err) log.error('Error in action "', actionID, '": ', err.message);
+            if(!data) data = {actionError: ''};
+            if(err) {
+                log.error('Error in action "', actionID, '": ', err.message);
+                data.actionError = err.message;
+            }
 
             if(actionsForUpdate[actionID]) actionsForUpdate[actionID][executionMode] = false;
-            if(!data) data = {};
 
             if(executionMode === 'ajax') {
-                log.debug('Sending back for action "',actionID,'", mode: ajax: ', data);
+                log.debug('Sending back for action "',actionID,'", mode: ajax: ', data,
+                    ': ', (Buffer.isBuffer(data) ? '(buffer)' : typeof data));
                 if(typeof data === 'string') return res.send(data);
-                return res.json(data);
+                else if(typeof data === 'object' && data.type === 'Buffer' && Array.isArray(data.data)) {
+
+                    res.set({
+                        'Content-Type': 'application/octet-stream',
+                        'Content-Disposition': 'attachment' + (data.fileName ? ('; filename="' + data.fileName + '"') : ''),
+                    });
+                    res.write(Buffer.from(data.data), 'binary');
+                    res.end();
+                    return;
+                } return res.json(data);
             }
 
             // when action is finished, clear old and create new session ID

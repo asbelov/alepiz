@@ -2,8 +2,8 @@
 | name                   = ALEPIZ
 | screenshot             = [[File:ALEPIZ data browser.png|thumb|Скриншот ALEPIZ с историческими данными по объекту]]
 | released               = {{start date and age|2016|11}}
-| latest_release_version = 0.0.6<ref>{{cite web|url=https://www.alepiz.com/help/download.pug|title=Информация о последних версиях ALEPIZ}}</ref>
-| latest_release_date    = {{start date and age|2020|09|26}}
+| latest_release_version = 0.0.8<ref>{{cite web|url=https://www.alepiz.com/help/download.pug|title=Информация о последних версиях ALEPIZ}}</ref>
+| latest_release_date    = {{start date and age|2021|04|08}}
 | operating_system       = [[Microsoft Windows]]
 | programming_language   = [[Node.js]], [[JavaScript]]
 | genre                  = [[Мониторинг компьютерной сети]], [[Система управления]]

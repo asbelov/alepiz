@@ -1,0 +1,47 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-5-17 19:40:53
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title File reader: получает данные из файла
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 File reader
+                    h5.light.
+                        Получает данные из файла с помощью регулярного выражения
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание File reader
+                    p.
+                        Сборщик используется для получения данных из файла, обрабатывая содержимое файла с помощью регулярного выражения
+                    h3 Параметры
+                    ul.browser-default
+                        li.
+                            File name - полный путь до файла
+                        li.
+                            Regular expression - регулярное выражение для получения необходимого параметра. Для обработки
+                            содержимого файла используется функция JavaScript replace(/regExp/igms, "$1");
+                    p.
+                        Например, для содержимого файла:
+                    pre.
+                        [GENERAL]
+                        MAXCONN_REPLY=1
+                        MAXCONN=30
+                        MAXCONN_GLOBAL=30
+                    p.
+                        Если используется регулярное выражение "^.+?MaxConn_Global *= *(\d+).*?$", результат будет равен 30
+                    h3 Возвращаемое значение
+                    p.
+                        Сборщик возвращает данные, которые вернет регулярное выражение при обработке содержимого файла.
+
+

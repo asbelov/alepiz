@@ -132,6 +132,16 @@ usersDB.updateUser = function(userProperties, callback) {
     );
 };
 
+usersDB.updateUserPassword = function(userName, newPassword, callback) {
+    log.debug('Updating user password for ', userName);
+
+    db.run('UPDATE users SET password=$password WHERE name=$name', {
+            $name: userName,
+            $password: newPassword,
+        }, callback
+    );
+};
+
 usersDB.deleteAllRolesForUser = function(userID, callback) {
     log.debug('Deleting all user roles for user ID: ', userID);
 

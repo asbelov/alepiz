@@ -40,7 +40,8 @@ function createCountersTable(callback){
         'sourceMultiplier REAL,' +
         'keepHistory INTEGER DEFAULT 90,' +
         'keepTrends INTEGER DEFAULT 365,' +
-        'modifyTime DATETIME NOT NULL,' +
+        'modifyTime INTEGER NOT NULL,' +
+        'created INTEGER,' +
         'description TEXT,' +
         'disabled BOOLEAN,' +
         'debug BOOLEAN,' +
@@ -62,7 +63,9 @@ function createCountersUpdateEventTable(callback) {
         'parentObjectID INTEGER DEFAULT 0 REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
         'expression TEXT,' +
         'mode INTEGER NOT NULL, ' +
-        'objectFilter TEXT)',
+        'objectFilter TEXT, ' +
+        'updateEventOrder INTEGER, ' +
+        'description TEXT)',
         function(err) {
             if (err) return callback(new Error('Can\'t create countersUpdateEvents table in database: ' + err.message));
             callback();
@@ -184,7 +187,9 @@ function createVariablesTable(callback){
         'parentCounterName TEXT NOT NULL,' +
         'function TEXT,' +
         'functionParameters TEXT,' +
-        'objectName TEXT)',
+        'objectName TEXT, ' +
+        'variableOrder INTEGER, ' +
+        'description TEXT)',
         function(err) {
             if (err) return callback(new Error('Can\'t create variables table in database: ' + err.message));
             callback()
@@ -204,7 +209,9 @@ function createVariablesExpressionTable(callback) {
         'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
         'name TEXT NOT NULL,' +
         'counterID INTEGER NOT NULL REFERENCES counters(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
-        'expression TEXT NOT NULL)',
+        'expression TEXT NOT NULL, ' +
+        'variableOrder INTEGER, ' +
+        'description TEXT)',
         function(err) {
             if (err) return callback(new Error('Can\'t create variablesExpressions table in database: ' + err.message));
             callback()

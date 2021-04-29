@@ -74,8 +74,10 @@ counterSaveDB.insertCounter = function(counter, callback) {
     log.debug('Inserting new counter into the database: ', counter);
 
     db.run (
-        'INSERT INTO counters (name, collectorID, groupID, unitID, sourceMultiplier, keepHistory, keepTrends, modifyTime, description, disabled, debug, taskCondition) ' +
-        'VALUES ($name, $collectorID, $groupID, $unitID, $sourceMultiplier, $keepHistory, $keepTrends, $modifyTime, $description, $disabled, $debug, $taskCondition)', {
+        'INSERT INTO counters (name, collectorID, groupID, unitID, sourceMultiplier, keepHistory, keepTrends, ' +
+        'modifyTime, created, description, disabled, debug, taskCondition) ' +
+        'VALUES ($name, $collectorID, $groupID, $unitID, $sourceMultiplier, $keepHistory, $keepTrends, ' +
+        '$modifyTime, $created, $description, $disabled, $debug, $taskCondition)', {
             $name: counter.name,
             $collectorID: counter.collectorID,
             $groupID: counter.groupID,
@@ -84,6 +86,7 @@ counterSaveDB.insertCounter = function(counter, callback) {
             $keepHistory: counter.keepHistory,
             $keepTrends: counter.keepTrends,
             $modifyTime: Date.now(),
+            $created: Date.now(),
             $description: counter.description,
             $disabled: counter.disabled,
             $debug: counter.debug,
@@ -260,8 +263,10 @@ counterSaveDB.deleteObjectCounterID = function (objectsCountersIDs, callback) {
 counterSaveDB.insertUpdateEvents = function(counterID, updateEvents, callback) {
     log.debug('Trying to insert update events for ', counterID, ':', updateEvents);
 
-    var stmt = db.prepare('INSERT INTO countersUpdateEvents (counterID, parentCounterID, parentObjectID, expression, mode, objectFilter) ' +
-        'VALUES ($counterID, $parentCounterID, $parentObjectID, $expression, $mode, $objectFilter)',
+    var stmt = db.prepare('INSERT INTO countersUpdateEvents (counterID, parentCounterID, parentObjectID, expression, ' +
+        'mode, objectFilter, description, updateEventOrder) ' +
+        'VALUES ($counterID, $parentCounterID, $parentObjectID, $expression, $mode, $objectFilter, ' +
+        '$description, $updateEventOrder)',
         function(err) {
             if(err) return callback(err);
 
@@ -272,7 +277,9 @@ counterSaveDB.insertUpdateEvents = function(counterID, updateEvents, callback) {
                     $parentObjectID: updateEvent.objectID,
                     $expression: updateEvent.expression,
                     $mode: updateEvent.mode,
-                    $objectFilter: updateEvent.objectFilter ? updateEvent.objectFilter : null
+                    $objectFilter: updateEvent.objectFilter ? updateEvent.objectFilter : null,
+                    $description: updateEvent.description,
+                    $updateEventOrder: updateEvent.updateEventOrder,
                 }, callback);
             }, function(err) {
                 stmt.finalize();
@@ -293,19 +300,19 @@ counterSaveDB.insertUpdateEvents = function(counterID, updateEvents, callback) {
 counterSaveDB.deleteUpdateEvents = function (counterID, updateEvents, callback) {
     log.debug('Delete update events from database for counterID: ', counterID, updateEvents);
 
-    var queryPrms = [], queryStr = [];
+    var queryParams = [], queryStr = [];
 
     updateEvents.forEach(function(updateEvent) {
-        queryPrms.push(counterID, updateEvent.counterID, updateEvent.mode);
+        queryParams.push(counterID, updateEvent.counterID, updateEvent.mode);
         var partOfQueryStr = '(counterID=? AND parentCounterID=? AND mode=?';
 
         if(updateEvent.objectID) {
-            queryPrms.push(updateEvent.objectID);
+            queryParams.push(updateEvent.objectID);
             partOfQueryStr += ' AND parentObjectID=?';
         } else partOfQueryStr += ' AND parentObjectID IS NULL';
 
         if(updateEvent.expression) {
-            queryPrms.push(updateEvent.expression);
+            queryParams.push(updateEvent.expression);
             partOfQueryStr += ' AND expression=?';
         } else partOfQueryStr += ' AND expression IS NULL';
 
@@ -314,7 +321,7 @@ counterSaveDB.deleteUpdateEvents = function (counterID, updateEvents, callback) 
 
     });
 
-    db.run('DELETE FROM countersUpdateEvents WHERE ' + queryStr.join(' OR '), queryPrms, callback)
+    db.run('DELETE FROM countersUpdateEvents WHERE ' + queryStr.join(' OR '), queryParams, callback)
 };
 
 /*
@@ -330,14 +337,16 @@ counterSaveDB.insertVariables = function (counterID, variables, callback) {
     log.debug('Insert variables for ', counterID, ': ', variables);
 
     var stmt = db.prepare(
-        'INSERT INTO variables (counterID, name, objectID, parentCounterName, function, functionParameters, objectName) ' +
-        'VALUES ($counterID, $name, $objectID, $parentCounterName, $function, $functionParameters, $objectName)',
+        'INSERT INTO variables (counterID, name, objectID, parentCounterName, function, functionParameters, objectName, ' +
+        'description, variableOrder) ' +
+        'VALUES ($counterID, $name, $objectID, $parentCounterName, $function, $functionParameters, $objectName,' +
+        '$description, $variableOrder)',
         function(err){
             if(err) return callback(err);
 
             var stmtExpression = db.prepare(
-                'INSERT INTO variablesExpressions (counterID, name, expression) ' +
-                'VALUES ($counterID, $name, $expression)',
+                'INSERT INTO variablesExpressions (counterID, name, expression, description, variableOrder) ' +
+                'VALUES ($counterID, $name, $expression, $description, $variableOrder)',
 
                 function(err){
                     if(err) return callback(err);
@@ -350,7 +359,9 @@ counterSaveDB.insertVariables = function (counterID, variables, callback) {
                             stmtExpression.run({
                                 $counterID: counterID,
                                 $name: name,
-                                $expression: variables[name].expression
+                                $expression: variables[name].expression,
+                                $description: variables[name].description,
+                                $variableOrder: variables[name].variableOrder,
                             }, callback);
                         } else {
 
@@ -362,7 +373,9 @@ counterSaveDB.insertVariables = function (counterID, variables, callback) {
                                 $parentCounterName: variables[name].parentCounterName,
                                 $function: variables[name].function,
                                 $functionParameters: variables[name].functionParameters,
-                                $objectName: variables[name].objectName
+                                $objectName: variables[name].objectName,
+                                $description: variables[name].description,
+                                $variableOrder: variables[name].variableOrder,
                             }, callback)
                         }
                     }, function(err) {

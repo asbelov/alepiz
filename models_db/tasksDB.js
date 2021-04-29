@@ -18,7 +18,11 @@ tasksDB.addTask = function(userID, timestamp, name, groupID, callback) {
         $name: name,
         $groupID: groupID,
     }, function (err) {
-        callback(err, this.lastID);
+        if(err) {
+            return callback(new Error('User ' + userID + ' can\'t  add task ' + name + '; groupID: ' + groupID +
+                '; timestamp: ' + timestamp + ': ' + err.message));
+        }
+        callback(null, this.lastID);
     });
 };
 
@@ -29,7 +33,15 @@ tasksDB.updateTask = function(taskID, name, groupID, callback) {
         $taskID: taskID,
         $name: name,
         $groupID: groupID,
-    }, callback);
+    }, function(err) {
+        {
+            if(err) {
+                return callback(new Error('User ' + userID + ' can\'t  update taskID ' + taskID +'; name ' + name +
+                    '; groupID: ' + groupID + ': ' + err.message));
+            }
+            callback();
+        }
+    });
 };
 
 tasksDB.addAction = function(taskID, sessionID, startupOptions, actionsOrder, callback) {
@@ -37,7 +49,8 @@ tasksDB.addAction = function(taskID, sessionID, startupOptions, actionsOrder, ca
         [taskID, sessionID, startupOptions, actionsOrder], function(err) {
         if(err) {
             return callback(new Error('Can\'t insert new actions for task with taskID "' + taskID +
-                '", sessionID "' + sessionID + '" into the tasksActions database: ' + err.message));
+                '", sessionID "' + sessionID + '", startupOptions: ' + startupOptions +
+                ', actionsOrder: ' + actionsOrder +' into the tasksActions database: ' + err.message));
         }
         callback(null, this.lastID);
     })
@@ -47,7 +60,7 @@ tasksDB.addParameters = function(actionID, params, callback) {
     var stmt = db.prepare('INSERT INTO tasksParameters (taskActionID, name, value) VALUES (?,?,?)', function(err) {
         if(err) {
             return callback(new Error('Can\'t prepare to insert new task parameters for actionID "' + actionID +
-                '" into the tasksParameters table: ' + err.message));
+                '", params: ' + JSON.stringify(params) + ' into the tasksParameters table: ' + err.message));
         }
 
         // eachSeries used for possible transaction rollback if error occurred
@@ -56,14 +69,21 @@ tasksDB.addParameters = function(actionID, params, callback) {
             stmt.run([actionID, name, params[name]], callback);
         }, function(err) {
             stmt.finalize();
-            callback(err);
+            if(err) {
+                return callback(new Error('Error while add task parameters for action "' + actionID + '", params: ' +
+                    JSON.stringify(params) + ': ' + err.message));
+            }
+            callback();
         });
     });
 };
 
 tasksDB.getUnnamedTask = function(userID, callback){
     db.get('SELECT id FROM tasks WHERE userID=? AND name IS NULL', [userID], function(err, row){
-        if(err) return callback(new Error('Can\'t get taskID for unnamed task from tasks database: '+err.message));
+        if(err) {
+            return callback(new Error('UserID ' + userID + 'Can\'t get taskID for unnamed task from tasks database: ' +
+                err.message));
+        }
         if(!row) return callback();
         callback(null, row.id);
     });
@@ -91,7 +111,10 @@ JOIN users ON tasks.userID = users.id \
 WHERE ' + (taskID ? 'tasks.id = ?' : 'users.name = ? AND tasks.name IS NULL') +
         ' ORDER BY tasksActions.actionsOrder, tasksParameters.name',
         taskID ? [taskID] : [userName], function(err, taskParameters) {
-        if(err) return callback(new Error('Can\'t get task parameters for task ID "'+taskID+'": '+err.message));
+        if(err) {
+            return callback(new Error('Can\'t get task parameters for user ' + userName + ' and task ID ' +
+                taskID + ': ' + err.message));
+        }
         callback(null, taskParameters)
     });
 };
@@ -188,7 +211,7 @@ WHERE tasks.timestamp <= $timestampTo AND \
 (users.name = $userName OR tasks.name NOTNULL)' +
         (prm.ownerName ? ' AND users.name like $ownerName' : '') +
         (prm.taskName ? ' AND tasks.name like $taskName' : '') +
-        ' AND tasks.groupID = $groupID ORDER by tasks.timestamp DESC LIMIT 20', {
+        ' AND tasks.groupID = $groupID ORDER by tasks.timestamp DESC LIMIT 50', {
 
                     $timestampTo: timestampTo,
                     $ownerName: prm.ownerName ? prm.ownerName : undefined,
@@ -343,7 +366,7 @@ tasksDB.addRolesForGroup = function(taskGroupID, rolesIDs, callback) {
                 $taskGroupID: taskGroupID,
                 $roleID: roleID
             }, callback);
-        }, callback);
+        }, callback); // error described in the calling function
     });
 };
 
@@ -355,6 +378,7 @@ callback(err)
 tasksDB.deleteAllRolesForGroup = function(taskGroupID, callback) {
     log.debug('Deleting all tasksGroups roles for task group ID: ', taskGroupID);
 
+    // error described in the calling function
     db.run('DELETE FROM tasksGroupsRoles WHERE taskGroupID=?', taskGroupID, callback);
 };
 

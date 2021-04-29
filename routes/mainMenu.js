@@ -23,7 +23,7 @@ router.post('/mainMenu', function(req, res, next) {
     var functionName = req.body.f;
 
     if(functionName === 'getActions') actions.getConfigurationForAll(prepareUser(req.session.username), req.body.o, sendBackResult);
-    else if(functionName === 'login') user.login(req.body.user, req.body.pass, req.session, sendBackResult);
+    else if(functionName === 'login') user.login(req.body.user, req.body.pass, req.body.newPass, req.session, sendBackResult);
     else if(functionName === 'logout') user.logout(req.session, sendBackResult);
     else if(functionName === 'getCurrentUserName') user.getFullName(req.session, sendBackResult);
     else if(functionName === 'filterObjects') filterObjects(req.body.name, req.session.username, sendBackResult);
@@ -33,7 +33,7 @@ router.post('/mainMenu', function(req, res, next) {
     else if(functionName === 'getObjectsByID') rightsObjectsDB.getObjectsByIDs(req.session.username, req.body.IDs, sendBackResult);
     else sendBackResult(new Error('Unknown function "'+functionName+'"'));
 
-    function sendBackResult(err, result){
+    function sendBackResult(err, result) {
         if(err) {
             log.error(err.message);
             return res.send();
@@ -55,7 +55,7 @@ router.post('/mainMenu', function(req, res, next) {
  callback(err, objects), where
  objects: [{name: ..., id: ..., description: ..., sortPosition:...}, {...}, ...]
  */
-function filterObjects(objectsNamesStr, user, callback){
+function filterObjects(objectsNamesStr, user, callback) {
     if(!objectsNamesStr || typeof(objectsNamesStr) !== 'string')  var objectsNames = [];
     else objectsNames = objectsNamesStr.split(',');
 
@@ -63,7 +63,7 @@ function filterObjects(objectsNamesStr, user, callback){
     ObjectFilterDB.filterObjects(objectsNames, user, callback);
 }
 
-function searchObjects(initSearchStr, user, callback){
+function searchObjects(initSearchStr, user, callback) {
     if(!initSearchStr || initSearchStr.length < 2) return callback();
 
     // prepare search string to <pattern1><logical operator><pattern2><logical operator>,

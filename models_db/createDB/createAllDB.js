@@ -9,24 +9,24 @@ var countersDB = require('../../models_db/createDB/createCountersDB');
 var usersRolesRightsDB = require('../../models_db/createDB/createUsersRolesRightsDB');
 var auditUsersDB = require('../../models_db/createDB/createAuditUsersDB');
 var tasksDB = require('../../models_db/createDB/createTasksDB');
+var actionsConfig = require('../../models_db/createDB/createActions');
 
 
-module.exports = function(callback){
+module.exports = function(callback) {
     initDB(function(err) {
         if(err) return callback(err);
 
-        objectsDB(function(err){
+        objectsDB(function(err) {
             if(err) return callback(err);
             async.parallel([
-                function(callback){
-                    countersDB(callback);
-                },
-                function(callback){
+                countersDB,
+                actionsConfig,
+                function(callback) {
                     usersRolesRightsDB(function(err){
                         if(err) return callback(err);
                         async.parallel([auditUsersDB, tasksDB], callback);
                     })
-                }
+                },
             ], callback);
         })
     })

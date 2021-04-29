@@ -28,8 +28,13 @@ function initServerCommunication() {
 
     var clientIPC, truncateWatchDogInterval, restartInProgress = false;
 
-    history.connect = function(callback) {
+    history.connect = function(id, callback) {
         if(!clientIPC) {
+            if(id) {
+                parameters.separateStorageByProcess = false;
+                parameters.suffix = '-' + id;
+            }
+
             clientIPC = new IPC.client(parameters, function (err, msg, isConnecting) {
                 if (err) log.error(err.message);
                 else if (isConnecting && typeof callback === 'function') {
@@ -87,42 +92,43 @@ function initServerCommunication() {
 
 
     function truncateWalWatchdog(initParameters) {
-        var walPath = path.join(__dirname, '..', initParameters.dbPath, initParameters.dbFile  + '-wal');
 
-        // truncate watchdog
-        var truncateCounter = 0, truncateCheckInterval = 30000;
-        truncateWatchDogInterval = setInterval(function () {
-            fs.stat(walPath, function (err, stat) {
-                if(err) return log.warn('Can\'t stat file ', walPath, ': ', err.message);
-                if(!stat.size) {
-                    clearInterval(truncateWatchDogInterval);
-                    log.warn('WAL file was truncated, waiting for continue execution...');
-                    setTimeout(function () {
-                        fs.stat(walPath, function (err, stat) {
-                            if (err) log.warn('Can\'t stat file ', walPath, ': ', err.message);
-                            if((!stat || !stat.size) && truncateWatchDogInterval) {
-                                log.error('WAL file was truncated, but history is halted. Restart history...');
-                                restartHistory();
-                            }
-                        });
-                    }, 10000)
-                }
+        cache.getDBPath().forEach(function(walPath) {
+            // truncate watchdog
+            var truncateCounter = 0, truncateCheckInterval = 30000;
+            truncateWatchDogInterval = setInterval(function () {
+                fs.stat(walPath, function (err, stat) {
+                    if(err) return log.warn('Can\'t stat file ', walPath, ': ', err.message);
+                    if(!stat.size) {
+                        if(truncateWatchDogInterval) clearInterval(truncateWatchDogInterval);
+                        log.warn('WAL file was truncated, waiting for continue execution...');
+                        setTimeout(function () {
+                            fs.stat(walPath, function (err, stat) {
+                                if (err) log.warn('Can\'t stat file ', walPath, ': ', err.message);
+                                if((!stat || !stat.size) && truncateWatchDogInterval) {
+                                    log.error('WAL file was truncated, but history is halted. Restart history...');
+                                    restartHistory();
+                                }
+                            });
+                        }, 10000)
+                    }
 
-                if(truncateCounter * truncateCheckInterval > 600000) {
-                    log.error('The WAL file was not truncated, but the possible history process halt. Restart history process...');
-                    restartHistory();
-                    clearInterval(truncateWatchDogInterval);
-                    return;
-                }
+                    if(truncateCounter * truncateCheckInterval > 600000) {
+                        log.error('The WAL file was not truncated, but the possible history process halt. Restart history process...');
+                        restartHistory();
+                        if(truncateWatchDogInterval) clearInterval(truncateWatchDogInterval);
+                        return;
+                    }
 
-                for(var i = 0, size = stat.size; i < 3 && size > 1024; i++) {
-                    size = Math.round(size / 1024);
-                }
-                log.info('Waiting for truncation of WAL file (',
-                    (++truncateCounter * truncateCheckInterval) / 1000 ,'sec), size: ', size, ['B', 'KB', 'MB', 'GB'][i],
-                    ' path: ', walPath);
-            });
-        }, truncateCheckInterval);
+                    for(var i = 0, size = stat.size; i < 3 && size > 1024; i++) {
+                        size = Math.round(size / 1024);
+                    }
+                    log.info('Waiting for truncation of WAL file (',
+                        Math.ceil((++truncateCounter * truncateCheckInterval) / 60000) ,'min), size: ', size, ['B', 'KB', 'MB', 'GB'][i],
+                        ' path: ', walPath);
+                });
+            }, truncateCheckInterval);
+        });
 
         function restartHistory() {
             clientIPC.kill(function() {
@@ -132,7 +138,7 @@ function initServerCommunication() {
                             log.error('Error starting history: ', err.message);
                             log.exit('Error starting history: ', err.message);
 
-                            setTimeout(process.exit, 5000, 2);
+                            log.disconnect(function () { process.exit(2) });
                         }
 
                         log.info('History server restarted successfully');
@@ -158,9 +164,10 @@ function initServerCommunication() {
                 truncateWalWatchdog(initParameters);
                 clientIPC.sendAndReceive({type: 'initParameters', data: initParameters}, function(err) {
                     initParameters.__restart = true;
-                    clearInterval(truncateWatchDogInterval);
+                    if(truncateWatchDogInterval) clearInterval(truncateWatchDogInterval);
                     truncateWatchDogInterval = null;
-                    if(!restartInProgress) callback(err);
+                    //if(!restartInProgress)
+                        callback(err);
                     restartInProgress = true;
                 });
             },
@@ -188,6 +195,7 @@ function initServerCommunication() {
         }
 
         var record = {};
+        var value = data;
         if(typeof data === 'object') {
             // data is a prepared history record {timestamp:..., value:...}
             if(data.timestamp && 'value' in data) {
@@ -203,9 +211,10 @@ function initServerCommunication() {
                     return;
                 }
 
+                value = data.value;
                 record = {
                     timestamp: timestamp,
-                    data: data.value,
+                    data: value,
                 }
             } else { // stringify object and add to the history
                 record = {
@@ -232,7 +241,9 @@ function initServerCommunication() {
         });
 
         return {
-            value: record.data,
+            // !!! return value, not record.data, because record.data can be a string object and cannot be
+            // !!! processed on the server when multiple values are accepted at one time as an array of values
+            value: value, //  !!! not a record.data !!!
             timestamp: record.timestamp,
         };
     };
@@ -337,7 +348,7 @@ function runServerProcess() {
     var server = require('../lib/server');
     server.connect();
 
-    var restartMode = false;
+    var restartTimestamp = 0, serverIPC, stopHistoryInProgress = false;
 
     var historyProcess = new proc.child({
         module: 'history',
@@ -356,7 +367,7 @@ function runServerProcess() {
             storage.stop(function(err) {
                 if(err) log.error(err.message);
                 cache.dumpData(function() {
-                    process.exit(2);
+                    log.disconnect(function () { process.exit(2) });
                 });
             });
         },
@@ -383,7 +394,12 @@ function runServerProcess() {
         if(message.msg === 'getByTime') {
             return cache.getByTime (message.id, message.time, message.interval, message.maxRecordsCnt,
                 message.recordsType, function(err, records) {
-                callback(err, thinOutRecords(records, message.maxRecordsCnt))
+                var isDataFromTrends = records && records.length ? records[0].isDataFromTrends : false;
+                var trimmedRecords = thinOutRecords(records, message.maxRecordsCnt);
+                //if(trimmedRecords.length) {
+                    //trimmedRecords[0].isDataFromTrends = trimmedRecords.length !== records.length || isDataFromTrends;
+                //}
+                callback(err, trimmedRecords);
             });
         }
 
@@ -404,8 +420,8 @@ function runServerProcess() {
                     if (err) log.error('History init error: ', err.message, '; init parameters: ', message.data);
 
                     // init houseKeeper at 30 minutes after start every 1 hour
-                    housekeeper.run();
-                    log.info('Init housekeeper for run every ', message.data.housekeeperInterval / 1000, 'sec');
+                    housekeeper.run(parameters);
+                    log.info('Init housekeeper for run every ', Math.ceil(message.data.housekeeperInterval / 60000), 'min');
                     setInterval(function () {
                         housekeeper.run();
                     }, message.data.housekeeperInterval);
@@ -415,7 +431,7 @@ function runServerProcess() {
                     // starting IPC after all history functions are initializing
                     log.info('Starting history storage IPC...');
                     parameters.id = 'history';
-                    new IPC.server(parameters, function(err, msg, socket, messageCallback) {
+                    serverIPC = new IPC.server(parameters, function(err, msg, socket, messageCallback) {
                         if(err) log.error(err.message);
 
                         if(socket === -1) {
@@ -430,8 +446,13 @@ function runServerProcess() {
     }
 
     function stopHistory(callback) {
+        if(stopHistoryInProgress) return;
+        stopHistoryInProgress = true;
         // dumping data two times for save data when server terminated by stop timeout
-        if(restartMode) {
+        if(restartTimestamp) {
+            // add message to log.exit to prevent server.js from restarting for 5 minutes
+            log.exit('Scheduled restart of the history server...');
+
             var myLog = log.warn;
             cache.cacheServiceIsRunning(1);
         } else {
@@ -442,7 +463,7 @@ function runServerProcess() {
         cache.terminateHousekeeper = true;
 
         cache.dumpData(function() {
-            if(!restartMode) {
+            if(!restartTimestamp) {
                 if(cache.cacheServiceIsRunning()) {
                     setTimeout(function() {
                         myLog('Cache service is running, waiting...');
@@ -454,12 +475,67 @@ function runServerProcess() {
             storage.stop(function(err) {
                 if(err) myLog('Error while stopping storage processes: ' + err.message);
                 else myLog('Storage processes successfully stopped');
-                cache.dumpData(function() {
-                    myLog('History server is stopped');
-                    callback();
-                }, restartMode);
+
+                if(!serverIPC || typeof serverIPC.stop !== 'function') {
+                    myLog('IPC is not initialized')
+                    serverIPC = {
+                        stop: function (callback) { callback(); }
+                    }
+                } else myLog('Closing IPC communication...');
+
+                // Stops the server from accepting new connections and keeps existing connections
+                serverIPC.stop(function(err) {
+                    cache.dumpData(function() {
+                        myLog('History server is stopped');
+                        callback(err);
+                    }, restartTimestamp);
+                });
+
+                setTimeout(function() {
+                    cache.dumpData(function() {
+                        myLog('Timeout occurred while waiting for the closing IPC communication. History server is stopped');
+                        callback(err);
+                    }, restartTimestamp);
+                }, 60000);
             });
-        }, restartMode);
+        }, restartTimestamp);
+    }
+
+    // run after cache service will be completed
+    function waitForCacheServiceCallback(err) {
+        if(err && err.message) log.error('Cache service return error:', err.message);
+
+        if(err !== 1) log.info('Caching service is finished. Restart...');
+        restartTimestamp = Date.now();
+        cache.cacheServiceIsRunning(1); // 1 mean that restart occurred
+        if(!parameters.restartHistory && parameters.restartStorageModifier) {
+            setTimeout(afterRestartCleanup, 600000, 600000);
+
+            storage.restartStorageModifierProcess(function(err) {
+                if(err) {
+                    log.error('Error while restarting storage modifier process: ' + err.message);
+                    historyProcess.stop(12); // exitCode: process.exit(12)
+                    return;
+                }
+
+                var resumeTime = 150000; // 3 min
+                log.info('The caching service and the housekeeper is scheduled to resume in ', resumeTime / 60000,' minutes.')
+                setTimeout(afterRestartCleanup, resumeTime);
+            });
+        }
+
+        if(parameters.restartHistory) historyProcess.stop(12); // exitCode: process.exit(12)
+    }
+
+    function afterRestartCleanup(restartTimeout) {
+        if(restartTimeout && (!restartTimestamp || Date.now() - restartTimestamp < restartTimeout)) return;
+        cache.cacheServiceIsRunning(0);
+        cache.terminateCacheService(0);
+        restartTimestamp = 0;
+        cache.terminateHousekeeper = 0;
+        if(!restartTimeout) log.warn('Unpause the cache service and the housekeeper');
+        else log.warn('Unpause the cache service and the housekeeper by timeout...');
+        housekeeper.run();
     }
 
     function initScheduledRestart() {
@@ -469,16 +545,17 @@ function runServerProcess() {
             parameters.restartHistoryInterval > 0
         ) {
             if(parameters.restartHistoryInterval < parameters.cacheServiceInterval * 1.5) {
-                log.warn('Restart history time interval is too small (', parameters.restartHistoryInterval,
-                    ' sec). Setting restart history time interval to ', parameters.cacheServiceInterval * 1.5, 'sec');
+                log.warn('Restart history time interval is too small (', Math.ceil(parameters.restartHistoryInterval / 60),
+                    ' min). Setting restart history time interval to ',
+                    Math.ceil(parameters.cacheServiceInterval * 1.5 / 60), 'min');
                 parameters.restartHistoryInterval = parameters.cacheServiceInterval * 1.5;
             }
 
-            log.info('Initializing scheduled restart history storage process every ', parameters.restartHistoryInterval, 'sec');
+            log.info('Initializing scheduled restart history storage process every ',
+                Math.ceil(parameters.restartHistoryInterval / 60), 'min');
             parameters.restartHistoryInterval *= 1000;
 
             setInterval(function () {
-
                 if(!parameters.restartHistory && parameters.restartStorageQueryProcesses) {
                     log.info('Scheduled restarting history storage query processes...');
                     storage.restartStorageQueryProcesses(function(err) {
@@ -493,39 +570,21 @@ function runServerProcess() {
 
                 cache.terminateHousekeeper = true;
                 log.info('Preparing to scheduled restart history storage process...');
+                cache.addCallbackToCacheService(waitForCacheServiceCallback);
 
-                if(cache.cacheServiceIsRunning() === 1) {  // 1 mean that scheduled restart in progress
+                // 1  mean that scheduled restart in progress; 2 - wait for cache service in progress
+                if(cache.cacheServiceIsRunning() === 1 || cache.cacheServiceIsRunning() === 2) {
                     log.warn('The previous scheduled restart time of the history storage process has expired. Restart now...');
                     cache.terminateCacheService();
+                    waitForCacheServiceCallback(1);
                 } else if(cache.cacheServiceIsRunning()) { // cache service is running now
                     log.info('It is planned to restart history storage after the end of the cache maintenance...');
+                    cache.cacheServiceIsRunning(2); // wait for cache service in progress
                 } else { // cache service is not running now
                     log.info('Saving data from cache to history storage before restart...')
                     cache.startCacheService();
+                    setTimeout(cache.cacheServiceIsRunning, 1000, 2); // wait for cache service in progress
                 }
-
-                restartMode = true;
-                cache.cacheServiceIsRunning(1); // 1 mean that restart occurred
-                if(!parameters.restartHistory && parameters.restartStorageModifier) {
-                    storage.restartStorageModifierProcess(function(err) {
-                        if(err) {
-                            log.error('Error while restarting storage modifier process: ' + err.message);
-                            historyProcess.stop(12); // exitCode: process.exit(12)
-                            return;
-                        }
-
-                        setTimeout(function() {
-                            cache.cacheServiceIsRunning(0);
-                            cache.terminateCacheService(0);
-                            restartMode = false;
-                            cache.terminateHousekeeper = 0;
-                            log.warn('Unpause the cache service and the housekeeper');
-                        }, 180000);
-                    });
-                }
-
-                if(parameters.restartHistory) historyProcess.stop(12); // exitCode: process.exit(12)
-
             }, Math.round(parameters.restartHistoryInterval - parameters.restartHistoryInterval / 5));
         }
     }
@@ -585,6 +644,14 @@ function thinOutRecords(allRecords, maxRecordsCnt) {
         data: avgData,
         timestamp: avgTimestamp
     });
+
+    // add isDataFromTrends and recordsFromCache information
+    if(typeof avgRecords[0] === 'object') {
+        for(var key in allRecords[0]) {
+            if(key !== 'data' && key !== 'timestamp') avgRecords[0][key] = allRecords[0][key];
+        }
+        avgRecords[0].notTrimmedRecordsNum = allRecords.length;
+    }
 
     return avgRecords;
 }

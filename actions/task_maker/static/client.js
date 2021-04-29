@@ -89,7 +89,7 @@ var JQueryNamespace = (function ($) {
             onCloseEnd: taskUpdated,
         });
 
-        // jquery-ui functions
+        // add drag and drop form jquery-ui functions
         taskParametersAreaElm.sortable({
             stop: function() {
                 updateActionsOrder();

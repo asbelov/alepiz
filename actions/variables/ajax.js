@@ -24,7 +24,7 @@ module.exports = function(args, callback) {
     // rows: [{id:.., name:.., unitID:..., sourceMultiplier:..., groupID:..., OCID:..., objectID:..., objectName:..., objectDescription:..}, ...]
     if(func === 'getCountersForObjects') return rightsWrappersCountersDB.getCountersForObjects(args.username, args.ids, (!args.groupID || args.groupID === '0' ? null : [Number(args.groupID)]), callback);
 
-    if(func === 'getVariablesInfo') return dynamicLog.get('variables', args.OCID, callback);
+    if(func === 'getVariablesInfo') return dynamicLog.get('v', args.OCID, callback);
 
     callback(new Error('Unknown function ' + func));
 };

@@ -45,6 +45,10 @@ rightsWrapper.checkActionRights = function (initUser, actionID, executionMode, c
                 actionFolder + '", user "' + user + '": ' + err.message));
         }
 
+        if(!rights) {
+            return callback(new Error('Can\'t find user "' + user + '" for checking rights for action "' + actionID + '"'));
+        }
+
         //log.debug('Execution mode: ',executionMode, '; user: ', user, '; rights: ', rights);
 
         if(executionMode === null) return callback(null, rights);

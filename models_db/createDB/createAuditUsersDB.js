@@ -14,7 +14,7 @@ module.exports = function(callback){
         'userID INTEGER NOT NULL REFERENCES users(id) ON DELETE NO ACTION ON UPDATE CASCADE,' +
         'actionID TEXT NOT NULL,' +
         'actionName TEXT NOT NULL,' +
-        'timestamp DATETIME NOT NULL)',
+        'timestamp INTEGER NOT NULL)',
         function (err) {
             if (err) return callback(new Error('Can\'t create auditUsers table in database: ' + err.message));
 

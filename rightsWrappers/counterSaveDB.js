@@ -301,6 +301,8 @@ function updateCounter(objectsIDs, counter, counterParameters, updateEvents, var
 
                         updateObjectsCountersRelations(counterID, objectsIDs, function(err) {
                             if(err) return callback(err);
+
+                            //updateVariablesRef=oldCounterName: update variables references when counter name is changed
                             if(!counter.updateVariablesRef) return callback();
 
                             counterSaveDB.updateVariablesRefs(counter.updateVariablesRef, counter.name, function(err) {
@@ -455,7 +457,9 @@ function updateUpdateEvents(counterID, updateEvents, callback) {
                 updateEvents[i].objectID === event.objectID &&
                 updateEvents[i].expression === event.expression &&
                 updateEvents[i].mode === event.mode &&
-                updateEvents[i].objectFilter === event.objectFilter
+                updateEvents[i].objectFilter === event.objectFilter &&
+                updateEvents[i].description === event.description &&
+                updateEvents[i].updateEventOrder === event.updateEventOrder
             ) return false;
         }
         return true;

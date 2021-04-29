@@ -21,14 +21,16 @@ function onChangeObjects(objects){
 
 var JQueryNamespace = (function ($) {
     $(function () {
-        init();
+        initElements();
+        initElementsRestrictions(init);
     });
 
     // path to ajax
-    var serverURL = parameters.action.link+'/ajax';
+    var serverURL = parameters.action.link + '/ajax';
     var bodyElm,
         eventsFilterElm,
         reloadElm,
+        openInNewElm,
         reloadIconElm,
         historyEventsHeaderElm,
         historyCommentedEventsHeaderElm,
@@ -43,6 +45,9 @@ var JQueryNamespace = (function ($) {
         prevCommentDialogElm,
         createMessageElm,
         soundIconElm,
+        importanceFilterElm,
+        importanceFilterIconElm,
+        importanceFilterDropDownElm,
         pronunciations = parameters.action.pronunciation,
         updateInterval = parameters.action.updateInterval * 1000 || 30000,
         prevEvents = {},
@@ -52,6 +57,7 @@ var JQueryNamespace = (function ($) {
         quill,
         subjectElm,
         rcptChipElm,
+        replyToElm,
         rcptChipsInstances,
         emailValidateRE = /^(([^<>()\[\].,;:\s@"]+(\.[^<>()\[\].,;:\s@"]+)*)|(".+"))@(([^<>()[\].,;:\s@"]+\.)+[^<>()[\].,;:\s@"]{2,})$/i,
         lastUpdateElm,
@@ -64,7 +70,16 @@ var JQueryNamespace = (function ($) {
         hintCache = {},
         eventsData = {},
         maxEventsNumberInTable = 500,
-        gettingDataInProgress = 0;
+        gettingDataInProgress = 0,
+        updatePaused = 0,
+        actionConfig = {},
+        restrictions = {},
+        actions = [],
+        useHints = true,
+        useInfo = true,
+        useHistory = true,
+        useLinks = true,
+        importanceFilter = -1;
 
     var getDataForHistoryEvents = false;
     var getDataForCurrentEvents = false;
@@ -85,14 +100,16 @@ var JQueryNamespace = (function ($) {
         onChangeObjects: onChangeObjects
     };
 
-    function init() {
+    function initElements() {
 
         bodyElm = $('body');
         eventsFilterElm = $('#eventsFilter');
         rcptChipElm = $('#rcpt_chips');
         reloadElm = $('#reload');
+        openInNewElm = $('#openInNew');
         reloadIconElm = $('#reload i:first-child');
         subjectElm = $('#subject');
+        replyToElm = $('#replyTo');
         createMessageElm = $('#createMessage');
         hintElm = $('#hint');
         lastUpdateElm = $('#lastUpdate');
@@ -108,6 +125,13 @@ var JQueryNamespace = (function ($) {
         historyCommentedEventsHeaderElm = $('#historyCommentedEvents').find('div.collapsible-header');
 
         soundIconElm = $('#soundIcon');
+
+        importanceFilterElm = $('#importanceFilter');
+        importanceFilterIconElm = $('#importanceFilterIcon');
+        importanceFilterDropDownElm = $('#importanceFilterDropDown');
+    }
+
+    function init() {
 
         if(objects.length) $('#filteredByObjects').removeClass('hide');
 
@@ -204,21 +228,54 @@ var JQueryNamespace = (function ($) {
                     if($(el).find('tbody').find('tr').get().length === 1)
                         $(el).find('tbody').html('<tr><td colspan="10" style="text-align: center;">Updating information...</td></tr>');
 
-                    if ($(el).attr('id') === 'currentEvents' ||
-                        $(el).attr('id') === 'historyEvents' ||
-                        $(el).attr('id') === 'disabledEvents' ) startUpdate();
-                    else if($(el).attr('id') === 'historyCommentedEvents') getAndDrawCommentsTable();
+                    if ($(el).attr('id') === 'currentEvents') {
+                        actionConfig.openCurrent = true
+                        startUpdate();
+                    } else if ($(el).attr('id') === 'historyEvents') {
+                        actionConfig.openHistorical = true
+                        startUpdate();
+                    } else if ($(el).attr('id') === 'disabledEvents') {
+                        actionConfig.openDisabled = true
+                        startUpdate();
+                    } else if($(el).attr('id') === 'historyCommentedEvents') {
+                        actionConfig.openCommented = true;
+                        getAndDrawCommentsTable();
+                    } else if($(el).attr('id') === 'createMessage') actionConfig.openMessage = true;
+
+                    setActionConfig(actionConfig);
                     eventsFilterElm.focus();
                 }, 500);
             },
 
             onCloseEnd: function(el) {  // Callback for Collapsible close
-                if($(el).attr('id') === 'currentEvents') getDataForCurrentEvents = false;
-                if($(el).attr('id') === 'historyEvents') getDataForHistoryEvents = false;
-                if($(el).attr('id') === 'disabledEvents') getDataForDisabledEvents = false;
+                if($(el).attr('id') === 'currentEvents') {
+                    actionConfig.openCurrent = false;
+                    getDataForCurrentEvents = false;
+                }
+                if($(el).attr('id') === 'historyEvents') {
+                    actionConfig.openHistorical = false;
+                    getDataForHistoryEvents = false;
+                }
+                if($(el).attr('id') === 'disabledEvents') {
+                    actionConfig.openDisabled = false;
+                    getDataForDisabledEvents = false;
+                }
+                if($(el).attr('id') === 'createMessage') actionConfig.openMessage = false;
+                if($(el).attr('id') === 'historyCommentedEvents') actionConfig.openCommented = false;
+
+                setActionConfig(actionConfig);
                 eventsFilterElm.focus();
             }
         });
+
+        if(actionConfig.showMessageEditor) showMessageEditor();
+        if(actionConfig.openMessage) collapsibleInstance.open(0);
+        if(actionConfig.openHistorical) collapsibleInstance.open(1);
+        if(actionConfig.openCurrent) collapsibleInstance.open(2);
+        else if(actionConfig.openCurrent === false) collapsibleInstance.close(2);
+        if(actionConfig.openDisabled) collapsibleInstance.open(3);
+        if(actionConfig.openCommented) collapsibleInstance.open(4);
+
         startUpdate();
 
         $('#composeMessage').click(composeMessage);
@@ -243,25 +300,7 @@ var JQueryNamespace = (function ($) {
             }
         });
 
-        $('a[uncheckSelected]').click(function (e) {
-            e.stopPropagation(); // prevent collapse
-
-            var checkedCheckboxesElm = $(this).closest('li').find('input[selectEventCheckbox]:checked');
-
-            if(!checkedCheckboxesElm.length) { // select all
-                $(this).closest('li').find('tr:not(.hide)').find('input[selectEventCheckbox]').trigger('click');
-                return;
-            }
-
-            checkedCheckboxesElm.trigger('click');
-
-            if(!$('input[selectEventCheckbox]:checked').length) {
-
-                if(quill.getLength() < 2) {
-                    startUpdate();
-                }
-            }
-        });
+        initSelectAll();
 
         $('a#reloadComments').click(function (e) {
             if(!$('#historyCommentedEvents').hasClass('active')) return;
@@ -273,11 +312,9 @@ var JQueryNamespace = (function ($) {
         $('#showEditor').click(function (e) {
             e.stopPropagation(); // prevent collapse
             if(createMessageElm.hasClass('hide')) {
-                createMessageElm.removeClass('hide');
+                showMessageEditor();
                 if(!createMessageElm.hasClass('active')) collapsibleInstance.open(0);
-            } else {
-                createMessageElm.addClass('hide');
-            }
+            } else hideMessageEditor();
         });
 
         $('#commentsFrom').click(function (e) {
@@ -290,16 +327,50 @@ var JQueryNamespace = (function ($) {
 
         $('#sound').click(function (e) {
             e.stopPropagation(); // prevent collapse
-
-            if(soundIconElm.text() === 'volume_up') {
-                soundIconElm.text('volume_off');
-                soundIconElm.addClass('red-text');
-            } else {
-                soundIconElm.text('volume_up');
-                soundIconElm.removeClass('red-text');
-                new Audio(parameters.action.link + '/static/beep.wav').play();
-            }
+            if(soundIconElm.text() === 'volume_up' && restrictions.Sound !== 'alwaysOn') soundOff()
+            else soundOn();
         });
+
+        if(!restrictions.importanceFilter) importanceFilterElm.addClass('hide');
+        else {
+            importanceFilterElm.removeClass('hide');
+            var importanceHTML = '<li><a href="#!" data-importance-filter="-1">Show all</a></li>';
+            var lowerImportance = 0;
+
+            Object.keys(parameters.action.importance).sort().forEach(function (importance) {
+                importanceHTML += '<li><a href="#!" data-importance-filter="' + importance +
+                    '" data-importance-filter-color="' + parameters.action.importance[importance].color + '">' +
+                    escapeHtml(parameters.action.importance[importance].text) + '</a></li>';
+                lowerImportance = Number(importance);
+            })
+
+            importanceFilterDropDownElm.html(importanceHTML);
+            M.Dropdown.init(document.querySelectorAll('.dropdown-trigger'), {
+                coverTrigger: false,
+                constrainWidth: false,
+            });
+
+            var defaultImportanceFilterColor = importanceFilterIconElm.css('color');
+            importanceFilterElm.click(function (e) {
+                e.stopPropagation();
+            });
+            $('[data-importance-filter]').click(function (e) {
+                e.stopPropagation();
+                if (!restrictions.importanceFilter) return;
+
+                var newImportanceFilter = Number($(this).attr('data-importance-filter'));
+                if(importanceFilter === newImportanceFilter) return;
+                importanceFilter = newImportanceFilter;
+                if (importanceFilter !== -1 && importanceFilter !== lowerImportance) {
+                    importanceFilterIconElm.text('visibility_off');
+                    importanceFilterIconElm.css('color', $(this).attr('data-importance-filter-color'));
+                } else {
+                    importanceFilterIconElm.text('visibility');
+                    importanceFilterIconElm.css('color', defaultImportanceFilterColor);
+                }
+                startUpdate();
+            });
+        }
 
         $(document).keyup(function (e) {
             if (e.which === 27) { // Esc
@@ -308,32 +379,32 @@ var JQueryNamespace = (function ($) {
                 //else stopUpdate();
             }
             if(e.altKey) {
-                if (e.which === 49) { // message editor on '1'
+                if (restrictions.Message && e.which === 49) { // message editor on '1'
                     if (createMessageElm.hasClass('hide')) {
                         createMessageElm.removeClass('hide');
                         if (!createMessageElm.hasClass('active')) collapsibleInstance.open(0);
                     } else {
                         createMessageElm.addClass('hide');
                     }
-                } else if (e.which === 50) { // history events on alt+2'
+                } else if (restrictions.Historical && e.which === 50) { // history events on alt+2'
                     collapsibleInstance.close(0);
                     collapsibleInstance.open(1);
                     collapsibleInstance.close(2);
                     collapsibleInstance.close(3);
                     collapsibleInstance.close(4);
-                } else if (e.which === 51) { // current events on alt+'3'
+                } else if (restrictions.Current && e.which === 51) { // current events on alt+'3'
                     collapsibleInstance.close(0);
                     collapsibleInstance.close(1);
                     collapsibleInstance.open(2);
                     collapsibleInstance.close(3);
                     collapsibleInstance.close(4);
-                } else if (e.which === 52) { // disabled events on alt+'4'
+                } else if (restrictions.Disabled && e.which === 52) { // disabled events on alt+'4'
                     collapsibleInstance.close(0);
                     collapsibleInstance.close(1);
                     collapsibleInstance.close(2);
                     collapsibleInstance.open(3);
                     collapsibleInstance.close(4);
-                } else if (e.which === 53) { // commented events on alt+'5'
+                } else if (restrictions.Comments && e.which === 53) { // commented events on alt+'5'
                     collapsibleInstance.close(0);
                     collapsibleInstance.close(1);
                     collapsibleInstance.close(2);
@@ -343,33 +414,35 @@ var JQueryNamespace = (function ($) {
             }
         });
 
-        quill = new Quill('#editor', {
-            placeholder: 'Compose new message',
-            modules: {
-                toolbar: [
-                    ['bold', 'italic', 'underline', 'strike', 'clean'],        // toggled buttons
-                    ['blockquote', 'code-block'],
+        if(restrictions.Message) {
+            quill = new Quill('#editor', {
+                placeholder: 'Compose new message',
+                modules: {
+                    toolbar: [
+                        ['bold', 'italic', 'underline', 'strike', 'clean'],        // toggled buttons
+                        ['blockquote', 'code-block'],
 
-                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                    [{ 'script': 'sub'}, { 'script': 'super' }],      // superscript/subscript
-                    [{ 'indent': '-1'}, { 'indent': '+1' }],          // outdent/indent
+                        [{'list': 'ordered'}, {'list': 'bullet'}],
+                        [{'script': 'sub'}, {'script': 'super'}],      // superscript/subscript
+                        [{'indent': '-1'}, {'indent': '+1'}],          // outdent/indent
 
-                    [{ 'size': ['small', false, 'large', 'huge'] }],  // custom dropdown
-                    [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                        [{'size': ['small', false, 'large', 'huge']}],  // custom dropdown
+                        [{'header': [1, 2, 3, 4, 5, 6, false]}],
 
-                    [{ 'color': [] }, { 'background': [] }],          // dropdown with defaults from theme
-                    [{ 'font': [] }],
-                    [{ 'align': [] }],
-                    ['link', 'image']                                // remove formatting button
-                ]
-            },
-            theme: 'snow'
-        });
+                        [{'color': []}, {'background': []}],          // dropdown with defaults from theme
+                        [{'font': []}],
+                        [{'align': []}],
+                        ['link', 'image']                                // remove formatting button
+                    ]
+                },
+                theme: 'snow'
+            });
 
-        quill.on('editor-change', function() {
-            // set messageTopImportance to undefined when editor is empty
-            if(quill.getLength() < 2) messageTopImportance = undefined;
-        });
+            quill.on('editor-change', function () {
+                // set messageTopImportance to undefined when editor is empty
+                if (quill.getLength() < 2) messageTopImportance = undefined;
+            });
+        }
 
         eventsFilterElm.click(function (e) {
             e.stopPropagation(); // prevent collapse
@@ -413,6 +486,33 @@ var JQueryNamespace = (function ($) {
             else startUpdate();
         });
 
+        openInNewElm.click(function(e) {
+            e.stopPropagation(); // prevent collapse
+            var objectsNames = {};
+
+            $('input[counterID]:checked').closest('tr').find('td[data-object-name]').each(function () {
+                var objectName = $(this).attr('data-object-name');
+                if(objectName) objectsNames[objectName] = true;
+            });
+
+            if(!Object.keys(objectsNames).length) return;
+
+            var urlParameters = {
+                'c': encodeURIComponent(Object.keys(objectsNames).join(',')), // selected objects
+            };
+
+            if(parameters.action.actionForSeveralObjects) {
+                var actionPath = parameters.action.link.replace(/\/[^\/]+$/, '') + '/' +
+                    parameters.action.actionForSeveralObjects;
+                urlParameters.a = encodeURIComponent(actionPath); // /action/information
+            }
+
+            var url = '/?' + Object.keys(urlParameters).map(function(key) {
+                return key + '=' + urlParameters[key];
+            }).join('&');
+            window.open(url, '_blank').focus();
+        });
+
         if(parameters.action.messageTemplates.length) {
             var messageButtonsElm = $('#messageButtons');
             parameters.action.messageTemplates.forEach(function(template) {
@@ -437,14 +537,147 @@ var JQueryNamespace = (function ($) {
         });
 
         setInterval(getDataByAjax, updateInterval);
+
     }
 
-    function ajaxError (jqXHR, exception) {
+    function soundOff() {
+        soundIconElm.text('volume_off');
+        soundIconElm.addClass('red-text');
+        if(actionConfig.sound !== false) {
+            actionConfig.sound = false;
+            setActionConfig(actionConfig);
+        }
+    }
+
+    function soundOn() {
+        soundIconElm.text('volume_up');
+        soundIconElm.removeClass('red-text');
+        if(actionConfig.sound !== true) {
+            actionConfig.sound = true;
+            setActionConfig(actionConfig);
+        }
+        try {
+            new Audio(parameters.action.link + '/static/beep.wav').play();
+            // use convertToSpeech() to able to change the phrase "Voice pronunciation of events enabled"
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance(
+                convertToSpeech('Voice pronunciation of events enabled')
+            ));
+        } catch (e) {
+        }
+    }
+
+    function showMessageEditor() {
+        createMessageElm.removeClass('hide');
+        actionConfig.showMessageEditor = true;
+        setActionConfig(actionConfig);
+    }
+
+    function hideMessageEditor() {
+        createMessageElm.addClass('hide');
+        actionConfig.showMessageEditor = false;
+        setActionConfig(actionConfig);
+    }
+
+    function initElementsRestrictions(callback) {
+
+        getActionConfig(function(config) {
+            actionConfig = config;
+
+            if(actionConfig.sound === false) soundOff();
+
+            // res = {actions:[]..., restrictions: <>}
+            $.post(serverURL, {func: 'getRestrictions'}, function(res) {
+                actions = res.actions; // filter actions to display links only to actions allowed by the user
+
+                restrictions = res.restrictions;
+                if(!restrictions) {
+                    alert('Can\'t get user restrictions');
+                    return;
+                }
+                if(!restrictions.Historical) {
+                    $('#historicalEventsLabel').remove();
+                    var historyEventsElm = $('#historyEvents');
+                    historyEventsElm.find('div.collapsible-header').click(function () {
+                        return false;
+                    })
+                    historyEventsElm.find('div.collapsible-body').children().remove();
+                    getDataForHistoryEvents = false;
+                }
+                if(!restrictions.Current) {
+                    $('#currentEvents').remove();
+                    getDataForCurrentEvents = false;
+                }
+                if(!restrictions.Disabled) {
+                    $('#disabledEvents').remove();
+                    getDataForDisabledEvents = false;
+                }
+
+                if(!restrictions.Comments) $('#historyCommentedEvents').remove();
+
+                if(!restrictions.Message) {
+                    $('#createMessage').children().remove();
+                    $('#showEditor').remove();
+                } else {
+                    var actionRestrictions = restrictions.Message;
+                    if(actionRestrictions.Comments === false) $('#addAsComment').prop('disabled', true).prop('checked', false);
+                    if(actionRestrictions.Hints === false) {
+                        $('#addAsHint').prop('disabled', true).prop('checked', false);
+                        $('#addAsHintForObject').prop('disabled', true).prop('checked', false);
+                    }
+                    if(actionRestrictions.Solve === false) $('#solveProblem').prop('disabled', true).prop('checked', false);
+                    if(actionRestrictions.Enable === false) {
+                        $('#enableEvents').prop('disabled', true).prop('checked', false);
+                        $('#removeTimeIntervals').prop('disabled', true).prop('checked', false);
+                    }
+                    if(actionRestrictions.Disable === false) {
+                        $('#disableEvents').prop('disabled', true).prop('checked', false);
+                        $('#disableUntilDate').prop('disabled', true).prop('checked', false);
+                        $('#disableUntilTime').prop('disabled', true).prop('checked', false);
+                        $('#disableTimeIntervalFrom').prop('disabled', true).prop('checked', false);
+                        $('#disableTimeIntervalTo').prop('disabled', true).prop('checked', false);
+                    }
+                }
+
+                if(!restrictions.Sound) $('#soundIcon').remove();
+
+                if(!restrictions.Hints) useHints = false;
+                if(!restrictions.Info) useInfo = false;
+                if(!restrictions.History) useHistory = false;
+                if(!restrictions.Links) useLinks = false;
+
+                //console.log(restrictions);
+                callback();
+            });
+        })
+    }
+
+    function initSelectAll() {
+        $('a[uncheckSelected]').click(function (e) {
+            e.stopPropagation(); // prevent collapse
+            e.preventDefault();
+
+            var checkedCheckboxesElm = $(this).closest('table').find('input[selectEventCheckbox]:checked');
+
+            if(!checkedCheckboxesElm.length) { // select all
+                $(this).closest('table').find('tr:not(.hide)').find('input[selectEventCheckbox]').trigger('click');
+                return;
+            }
+
+            checkedCheckboxesElm.trigger('click');
+
+            if(!$('input[selectEventCheckbox]:checked').length) {
+
+                if(quill.getLength() < 2) {
+                    startUpdate();
+                }
+            }
+        });
+    }
+
+    function ajaxError (jqXHR, exception, callback) {
         bodyElm.css("cursor", "auto");
         var msg = '';
-        if (jqXHR.status === 0) {
-            msg = 'Not connect.\n Verify Network.';
-        } else if (jqXHR.status === 404) {
+        if (jqXHR.status === 404) {
             msg = 'Requested page not found. [404]';
         } else if (jqXHR.status === 500) {
             msg = 'Internal Server Error [500].';
@@ -454,10 +687,18 @@ var JQueryNamespace = (function ($) {
             msg = 'Time out error.';
         } else if (exception === 'abort') {
             msg = 'Ajax request aborted.';
+        } else if (jqXHR.status === 0) {
+            msg = 'Not connect. Verify Network.';
         } else {
             msg = 'Uncaught Error.\n' + jqXHR.responseText;
         }
-        M.toast({html: 'Web server error: ' + msg});
+        M.toast({
+            html: 'Web server error: ' + msg + ' [status: ' + jqXHR.status +
+                (exception ? '; exception: ' + exception : '')+ ']',
+            displayLength: 5000
+        });
+
+        if(typeof callback === 'function') callback();
     }
 
     function onChangeObjects(_objects) {
@@ -530,7 +771,7 @@ var JQueryNamespace = (function ($) {
                 return obj.tag;
             }).join(', ');
             $('#recipients').val(recipients);
-            if(parameters.action.replyTo) $('#replyTo').val(parameters.action.replyTo);
+
             var messageBody = quill.getHtml();
             // remove first 2 new lines and add better style to <p>
             if(addCommentElm.val()) {
@@ -580,12 +821,16 @@ var JQueryNamespace = (function ($) {
 
     function runAfterExec (data, callback) {
         lastAction = null;
-        subjectElm.val('');
-        quill.setText('');
-        applyTemplate(lastTemplate);
-        if (createMessageElm.hasClass('active')) collapsibleInstance.close(0);
+        if(restrictions.Message) {
+            subjectElm.val('');
+            quill.setText('');
+            applyTemplate(lastTemplate);
+            if (createMessageElm.hasClass('active')) collapsibleInstance.close(0);
+        }
         $('input[type=checkbox]:checked').prop('checked', false);
-        $('#addAsComment').prop('checked', true);
+        if(restrictions.Message === true || (typeof restrictions.Message === 'object' && restrictions.Message.Comments)) {
+            $('#addAsComment').prop('checked', true);
+        }
         setDisabledEventsControlPanel();
         startUpdate();
         eventsFilterElm.focus();
@@ -629,6 +874,10 @@ var JQueryNamespace = (function ($) {
             });
         } else parameters.action.rcptOptions.data = [];
 
+        if(template.replyTo) replyToElm.val(template.replyTo);
+        else if(parameters.action.replyTo) replyToElm.val(parameters.action.replyTo);
+        else replyToElm.val('');
+
         // e is a document.getElementById('rcpt_chips')
         parameters.action.rcptOptions.onChipAdd = function(e) {
             var lastChipNumber = ($(e).find('div.chip').length) - 1;
@@ -650,14 +899,18 @@ var JQueryNamespace = (function ($) {
 
 
     function getDataByAjax(callback) {
-        // saying "update paused" and exit
+        // exit and say "update paused" after 5m delay
         if(Date.now() - gettingDataInProgress < 300000 /*gettingDataInProgress*/ || (
             !getDataForHistoryEvents && !getDataForCurrentEvents && !getDataForDisabledEvents)
         ) {
-            if(soundIconElm.text() === 'volume_up') {
+            if(!updatePaused) updatePaused = Date.now();
+            if(soundIconElm.text() === 'volume_up' && Date.now() - updatePaused > 300000) {
                 try {
                     new Audio(parameters.action.link + '/static/beep.wav').play();
-                    window.speechSynthesis.speak(new SpeechSynthesisUtterance('Update paused'));
+                    // use convertToSpeech() to able to change the phrase "Update paused"
+                    window.speechSynthesis.speak(new SpeechSynthesisUtterance(
+                        convertToSpeech('Update paused')
+                    ));
                 } catch (e) {
                 }
             }
@@ -665,6 +918,7 @@ var JQueryNamespace = (function ($) {
         }
         bodyElm.css("cursor", "progress");
         gettingDataInProgress = Date.now();
+        updatePaused = 0;
 
         var objectsIDs = objects.map(function (object) {
             return object.id;
@@ -728,6 +982,7 @@ var JQueryNamespace = (function ($) {
 
     function addEventHandlersToTables(objectsIDs) {
         createFilteredEventTable();
+        makeEventsForDataBrowser();
 
         // click on row
         $('tr').click(function(e) {
@@ -814,7 +1069,7 @@ var JQueryNamespace = (function ($) {
             <th var="DURATION">Duration</th>\
             <th var="LAST_TIME">Last time</th>\
             <th>Actions</th>\
-            <th>Select</th>\
+            <th><a href="#!" uncheckSelected>Select</a></th>\
         </tr>\
     </thead>\
     <tbody id="historyEventsTableForCommentedEvents">\
@@ -827,12 +1082,15 @@ var JQueryNamespace = (function ($) {
                     }
                     hintDialogInstance.open();
                     addHintClickEvent();
+                    initSelectAll();
+                    addEventHandlersToTables(objectsIDs);
                     bodyElm.css("cursor", "auto");
                 }
             });
         });
 
         $('div.chip[data-OCIDForHistory]').click(function() {
+            var OCID = $(this).attr('data-OCIDForHistory');
             bodyElm.css("cursor", "progress");
             $.ajax({
                 type: 'POST',
@@ -840,13 +1098,11 @@ var JQueryNamespace = (function ($) {
                 url: serverURL,
                 data: {
                     func: 'getHistoryData',
-                    OCID: $(this).attr('data-OCIDForHistory')
+                    OCID: OCID,
                 },
                 error: ajaxError,
                 success: function (rows) {
-                    if (!rows) $('#hintComment').text('History data not found');
-                    else {
-                        $('#hintComment').html('\
+                    $('#hintComment').html('\
 <table class="bordered highlight responsive-table">\
     <thead>\
         <tr>\
@@ -861,7 +1117,7 @@ var JQueryNamespace = (function ($) {
             <th var="DURATION">Duration</th>\
             <th var="LAST_TIME">Last time</th>\
             <th>Actions</th>\
-            <th>Select</th>\
+            <th><a href="#!" uncheckSelected>Select</a></th>\
         </tr>\
     </thead>\
     <tbody id="historyEventsTableForHistoryData">\
@@ -870,10 +1126,11 @@ var JQueryNamespace = (function ($) {
         </tr>\
     </tbody>\
 </table>');
-                        drawHistoryEventsTable(rows, $('#historyEventsTableForHistoryData'));
-                    }
+                    drawHistoryEventsTable(rows, $('#historyEventsTableForHistoryData'));
                     hintDialogInstance.open();
                     addHintClickEvent();
+                    initSelectAll();
+                    addEventHandlersToTables(objectsIDs);
                     bodyElm.css("cursor", "auto");
                 }
             });
@@ -1065,16 +1322,16 @@ var JQueryNamespace = (function ($) {
                     }).join('; ');
                 }
 
-                var user = row.user ? "<p class='margin-0'>Created by: " + row.user + '</p>' : '';
-                var recipients = row.recipients ? "<p class='margin-0'>Message was sending to: " + row.recipients + '</p>' : '';
-                var text = '<p>' + row.comment + '</p>';
-                var time = row.timestamp ? "<p class='margin-0'>Date: " + new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, '') + '</p>' : '';
-                var disabledUntil = row.disableUntil ? '<p class="margin-0">Event will be disabled until ' + new Date(row.disableUntil).toLocaleString() + disabledTimeIntervals + '</p>' : '';
+                var user = row.user ? "<p class='margin-0'><strong>Created by: </strong>" + row.user + '</p>' : '';
+                var recipients = row.recipients ? "<p class='margin-0'><strong>Message was sending to:</strong> " + row.recipients + '</p>' : '';
+                var text = '<p>' + (row.comment ? row.comment.replace(/<ul>/gmi, '<ul class=browser-default>').replace(/<(h\d)>/gmi, '<$1 style="font-size:2em">') : '') + '</p>';
+                var time = row.timestamp ? "<p class='margin-0'><strong>Date: </strong>" + new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, '') + '</p>' : '';
+                var disabledUntil = row.disableUntil ? '<p class="margin-0"><strong>Event will be disabled until </strong>' + new Date(row.disableUntil).toLocaleString() + disabledTimeIntervals + '</p>' : '';
 
                 bodyElm.css("cursor", "auto");
                 callback({
                     subject: row.subject,
-                    text: text + user + recipients + disabledUntil + time
+                    text: text + '<br/><br/>' + user + recipients + disabledUntil + time
                 });
             }
         });
@@ -1083,10 +1340,13 @@ var JQueryNamespace = (function ($) {
     function drawHistoryEventsTable(result, elm) {
         var tablePartHTML = '';
 
+        if(!elm) elm = $('#historyEventsTable');
         if (!result || !result.length) tablePartHTML = '<tr><td colspan="12" style="text-align: center;">No history events</td></tr>';
         else {
+            var maxWidth = Math.round((elm.width() * 0.2 > $(window).width() ? $(window).width() : elm.width()) * 0.5);
             result.forEach(function (row, idx) {
                 if(idx > maxEventsNumberInTable) return;
+                if(restrictions.importanceFilter && importanceFilter > -1 && row.importance > importanceFilter) return;
 
                 var importance = getHumanImportance(row.importance);
                 // use bgcolor attribute for instead style for possible to change color of the row on mouse over
@@ -1094,8 +1354,8 @@ var JQueryNamespace = (function ($) {
                 var style = row.endTime ? '' : 'font-weight:bold;';
                 var importanceText = importance ? importance.text : row.importance;
                 var isChecked = $('input#selectHistoryEvent_'+ row.id+':checked').length ? ' checked' : '';
-                var hintLink = row.hintID ? '<div class="chip small-chip" hintID="' + row.hintID +'">hint</div> ' : '';
-                var historyLink = '<div class="chip small-chip" data-OCIDForHistory="' + row.OCID +'">history</div> ';
+                var hintLink = useHints && row.hintID ? '<div class="chip small-chip" hintID="' + row.hintID +'">hint</div> ' : '';
+                var historyLink = useHistory ? '<div class="chip small-chip" data-OCIDForHistory="' + row.OCID +'">history</div> ' : '';
 
                 tablePartHTML += '\
 <tr historyEventsRow OCID="' + row.OCID + '" importance="' +row.importance+ '" bgcolor="' + color + '" ' +
@@ -1103,15 +1363,15 @@ var JQueryNamespace = (function ($) {
     <td class="hide">' + row.id + '</td>\
     <td class="hide">' + row.OCID + '</td>\
     <td class="hide" counterName>' + row.counterName + '</td>\
-    <td>' + row.objectName + '</td>\
-    <td>' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
+    <td data-object-name="' + row.objectName +'">' + row.objectName + '</td>\
+    <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
     <td class="hide">' + importanceText + '</td>\
     <td>' + (row.startTime ? new Date(row.startTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
     <td>' + (row.endTime ? new Date(row.endTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
     <td>' + (row.startTime ? getHumanTime((row.endTime ? row.endTime : Date.now()) - row.startTime) : '-') + '</td>\
     <td>' + new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, '') + '</td>\
     <td preventCheckboxCheck class="small-padding">' +
-                    makeActionLinks(row.objectName, row.parentOCID, row.startTime, row.endTime) + hintLink + historyLink +
+                    makeActionLinks(row.objectName, row.parentOCID, row.startTime, row.endTime, row.counterID) + hintLink + historyLink +
                     '</td>\
                     <td preventCheckboxCheck>\
                         <label>\
@@ -1123,7 +1383,6 @@ var JQueryNamespace = (function ($) {
             });
         }
 
-        if(!elm) elm = $('#historyEventsTable');
         elm.html(tablePartHTML);
     }
 
@@ -1147,7 +1406,9 @@ var JQueryNamespace = (function ($) {
                 }
                 if(Date.now() - startTime > updateInterval - 10000) {
                     tooManyEventsSpoken = true;
-                    var msg = 'About ' + events.length - Object.keys(newEvents).length - Object.keys(prevEvents).length + ' new events will not be spoken';
+                    var msg = 'About ' +
+                        events.length - Object.keys(newEvents).length - Object.keys(prevEvents).length +
+                        ' new events will not be spoken';
                 } else {
                     if(event.pronunciation) msg = floatToHuman(event.pronunciation);
                     else msg = event.objectName + ': ' + floatToHuman(event.eventDescription ? event.eventDescription : event.counterName);
@@ -1176,17 +1437,20 @@ var JQueryNamespace = (function ($) {
     function drawCurrentEventsTable(result) {
         var tablePartHTML = '';
 
+        var eventsTableElm = $('#eventsTable');
         if (!result || !result.length) tablePartHTML = '<tr><td colspan="11" style="text-align: center;">No events</td></tr>';
         else {
+            var maxWidth = Math.round($(window).width() * 0.5);
             result.forEach(function (row) {
+                if(restrictions.importanceFilter && importanceFilter > -1 && row.importance > importanceFilter) return;
                 var importance = getHumanImportance(row.importance);
                 // use bgcolor attribute for instead style for possible to change color of the row on mouse over
                 var color = importance ? importance.color : 'auto';
                 var importanceText = importance ? importance.text : row.importance;
                 var isChecked = $('input#selectCurrentEvent_'+ row.id+':checked').length ? ' checked' : '';
-                var hintLink = row.hintID ? '<div class="chip small-chip" hintID="' + row.hintID +'">hint</div> ' : '';
-                var commentLink = row.commentID ? '<div class="chip small-chip" commentID="' + row.commentID +'" OCID="' + row.OCID +'">info</div> ' : '';
-                var historyLink = '<div class="chip small-chip" data-OCIDForHistory="' + row.OCID +'">history</div> ';
+                var hintLink = useHints && row.hintID ? '<div class="chip small-chip" hintID="' + row.hintID +'">hint</div> ' : '';
+                var commentLink = useInfo && row.commentID ? '<div class="chip small-chip" commentID="' + row.commentID +'" OCID="' + row.OCID +'">info</div> ' : '';
+                var historyLink = useHistory ? '<div class="chip small-chip" data-OCIDForHistory="' + row.OCID +'">history</div> ' : '';
 
                 tablePartHTML += '\
 <tr currentEventsRow OCID="' + row.OCID + '" importance="' +row.importance+ '" bgcolor="' + color + // use bgcolor attribute for instead style for possible to change color of the row on mouse over
@@ -1194,14 +1458,14 @@ var JQueryNamespace = (function ($) {
     <td class="hide">' + row.id + '</td>\
     <td class="hide">' + row.OCID + '</td>\
     <td class="hide" counterName>' + row.counterName + '</td>\
-    <td>' + row.objectName + '</td>\
-    <td>' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
+    <td data-object-name="' + row.objectName +'">' + row.objectName + '</td>\
+    <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
     <td class="hide">' + importanceText + '</td>\
     <td>' + (row.startTime ? new Date(row.startTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
     <td>' + (row.startTime ? getHumanTime(Date.now() - row.startTime) : '-') + '</td>\
     <td>' + new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, '') + '</td>\
     <td preventCheckboxCheck class="small-padding">' +
-                    makeActionLinks(row.objectName, row.parentOCID, row.startTime, row.endTime) +
+                    makeActionLinks(row.objectName, row.parentOCID, row.startTime, row.endTime, row.counterID) +
                     commentLink + hintLink + historyLink +
                     '</td>\
                     <td preventCheckboxCheck>\
@@ -1215,24 +1479,27 @@ var JQueryNamespace = (function ($) {
             speakUpNewEvents(result);
         }
 
-        $('#eventsTable').html(tablePartHTML);
+        eventsTableElm.html(tablePartHTML);
     }
 
     function drawDisableEventsTable(result) {
         var tablePartHTML = '';
 
+        var disabledEventsTableElm = $('#disabledEventsTable');
         if (!result || !result.length) tablePartHTML = '<tr><td colspan="15" style="text-align: center;">No disabled events</td></tr>';
         else {
+            var maxWidth = Math.round($(window).width() * 0.5);
             result.forEach(function (row) {
+                if(restrictions.importanceFilter && importanceFilter > -1 && row.importance > importanceFilter) return;
                 var importance = getHumanImportance(row.importance);
                 // use bgcolor attribute for instead style for possible to change color of the row on mouse over
                 var color = importance ? importance.color : 'auto';
                 var style = row.endTime ? '' : 'font-weight:bold;';
                 var importanceText = importance ? importance.text : row.importance;
                 var isChecked = $('input#selectDisabledEvent_' + row.id + ':checked').length ? ' checked' : '';
-                var hintLink = row.hintID ? '<div class="chip small-chip" hintID="' + row.hintID +'">hint</div> ' : '';
-                var commentLink = row.commentID ? '<div class="chip small-chip" commentID="' + row.commentID +'" OCID="' + row.OCID +'">info</div> ' : '';
-                var historyLink = '<div class="chip small-chip" data-OCIDForHistory="' + row.OCID +'">history</div> ';
+                var hintLink = useHints && row.hintID ? '<div class="chip small-chip" hintID="' + row.hintID +'">hint</div> ' : '';
+                var commentLink = useInfo && row.commentID ? '<div class="chip small-chip" commentID="' + row.commentID +'" OCID="' + row.OCID +'">info</div> ' : '';
+                var historyLink = useHistory ? '<div class="chip small-chip" data-OCIDForHistory="' + row.OCID +'">history</div> ' : '';
 
                 if(row.disableIntervals) { // remove same intervals
                     var disableIntervalsObj = {};
@@ -1249,8 +1516,8 @@ var JQueryNamespace = (function ($) {
     <td class="hide">' + row.id + '</td>\
     <td class="hide">' + row.OCID + '</td>\
     <td class="hide" counterName>' + row.counterName + '</td>\
-    <td>' + row.objectName + '</td>\
-    <td>' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
+    <td data-object-name="' + row.objectName +'">' + row.objectName + '</td>\
+    <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
     <td class="hide">' + importanceText + '</td>\
     <td>' + (row.startTime ? new Date(row.startTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
     <td>' + (row.endTime ? new Date(row.endTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
@@ -1258,7 +1525,7 @@ var JQueryNamespace = (function ($) {
     <td>' + disableIntervals + '</td>\
     <td>' + row.disableUser + '</td>\
     <td preventCheckboxCheck class="small-padding">' +
-                    makeActionLinks(row.objectName, row.parentOCID, row.startTime, row.endTime) +
+                    makeActionLinks(row.objectName, row.parentOCID, row.startTime, row.endTime, row.counterID) +
                     commentLink + hintLink + historyLink +
                     '</td>\
                     <td preventCheckboxCheck>\
@@ -1271,15 +1538,18 @@ var JQueryNamespace = (function ($) {
             });
         }
 
-        $('#disabledEventsTable').html(tablePartHTML);
+        disabledEventsTableElm.html(tablePartHTML);
     }
 
     function drawHistoryCommentedEventsTable(result) {
-        var tablePartHTML = '';
+        var tablePartHTML = '',
+            historyCommentedEventsTableElm = $('#historyCommentedEventsTable'),
+            maxWidth = Math.round($(window).width() * 0.5);
 
         if (!result.length) tablePartHTML = '<tr><td colspan="8" style="text-align: center;">No commented events</td></tr>';
         else {
             result.forEach(function (row) {
+                if(restrictions.importanceFilter && importanceFilter > -1 && row.importance > importanceFilter) return;
                 var importance = getHumanImportance(row.importance);
                 // use bgcolor attribute for instead style for possible to change color of the row on mouse over
                 var color = importance ? importance.color : 'auto';
@@ -1289,7 +1559,8 @@ var JQueryNamespace = (function ($) {
                 tablePartHTML += '\
 <tr historyCommentedEventsRow importance="' + row.importance + '" bgcolor="' + color +'">\
     <td class="hide">' + row.id + '</td>\
-    <td><div class="comment-body"><p class="comment-header">' + row.subject + '</p>' + row.comment +'</div></td>\
+    <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;"><div class="comment-body"><p class="comment-header">' + row.subject + '</p>' +
+                    (row.comment ? row.comment.replace(/<ul>/gmi, '<ul class=browser-default>').replace(/<(h\d)>/gmi, '<$1 style="font-size:1em;line-height:2em;margin:0;">') : '') +'</div></td>\
     <td>' + row.user +'</td>\
     <td>' + (row.recipients || '-') + '</td>\
     <td>' + new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, '') + '</td>\
@@ -1298,7 +1569,7 @@ var JQueryNamespace = (function ($) {
             });
         }
 
-        $('#historyCommentedEventsTable').html(tablePartHTML);
+        historyCommentedEventsTableElm.html(tablePartHTML);
     }
 
 
@@ -1380,7 +1651,7 @@ var JQueryNamespace = (function ($) {
                 variables[variablesInRow.OCID] = {
                     objectName: variablesInRow.OBJECT_NAME,
                     counterName: variablesInRow.COUNTER_NAME,
-                    eventDescription: variablesInRow.EVENT_DESCRIPTION,
+                    eventDescription: [variablesInRow.EVENT_DESCRIPTION],
                     action: ($(elm).closest('tbody#disabledEventsTable').length ? 'ENABLE' : 'DISABLE'),
                     disableIntervals: [interval]
                 };
@@ -1390,7 +1661,7 @@ var JQueryNamespace = (function ($) {
                 // don't add repeated event text, only add intervals for this event
                 variables[variablesInRow.OCID].disableIntervals.push(interval);
                 // variables[variablesInRow.OCID].eventDescription += '\n\n' + variablesInRow.EVENT_DESCRIPTION;
-                variables[variablesInRow.OCID].eventDescription = variablesInRow.EVENT_DESCRIPTION;
+                variables[variablesInRow.OCID].eventDescription.push(variablesInRow.EVENT_DESCRIPTION);
             }
 
             if(func === 'getHint'){
@@ -1420,67 +1691,126 @@ var JQueryNamespace = (function ($) {
             messageBody = messageBody.replace('%:NEW_DISABLE_TIME_INTERVAL:%', newTimeInterval);
         } else messageBody = '';
 
-        Object.keys(variables).forEach(function (OCID) {
-            var str = template.eventTemplate;
-            str = str.replace('%:OBJECT_NAME:%', variables[OCID].objectName);
-            str = str.replace('%:COUNTER_NAME:%', variables[OCID].counterName);
-            str = str.replace('%:EVENT_DESCRIPTION:%', variables[OCID].eventDescription);
-            str = str.replace('%:ACTION:%', variables[OCID].action);
-            str = str.replace('%:EVENT_TIME:%', variables[OCID].disableIntervals.reverse().join(template.intervalsDivider));
 
-            messageBody += str;
-        });
+        getObjectsProperties(Object.keys(variables), function(rows) {
+            var props = {};
 
-        var subject = template.subject;
-        if(subject) {
-            var objectsList = Object.keys(objectsNames).join(', ');
-            if (template.objectsListLength && objectsList.length > template.objectsListLength) {
-                objectsList = objectsList.substr(0, template.objectsListLength - 7);
-                objectsList += '... (' + Object.keys(objectsNames).length + ')';
+            if(rows && rows.length) {
+                rows.forEach(function (row) {
+                    //if (row.mode !== 0) return;
+                    if (!props[row.OCID]) props[row.OCID] = {};
+                    props[row.OCID][row.name] = row.value;
+                });
             }
 
-            var countersList = Object.keys(countersNames).join('; ');
-            if (template.countersListLength && countersList.length > template.countersListLength) {
-                countersList = countersList.substr(0, template.countersListLength - 7);
-                countersList += '... (' + Object.keys(countersNames).length + ')';
-            }
+            Object.keys(variables).forEach(function (OCID) {
+                var str = template.eventTemplate;
+                str = str.replace('%:OBJECT_NAME:%', variables[OCID].objectName);
+                str = str.replace('%:COUNTER_NAME:%', variables[OCID].counterName);
+                str = str.replace('%:EVENT_DESCRIPTION:%', variables[OCID].eventDescription.pop());
+                str = str.replace('%:ACTION:%', variables[OCID].action);
+                str = str.replace('%:EVENT_TIME:%', variables[OCID].disableIntervals.pop());
+                //str = str.replace('%:EVENT_TIME:%', variables[OCID].disableIntervals.reverse().join(template.intervalsDivider));
+                variables[OCID].eventDescription.forEach(function(eventDescription, idx) {
+                    str += template.intervalsDivider
+                        .replace('%:EVENT_DESCRIPTION:%', eventDescription)
+                        .replace('%:EVENT_TIME:%', variables[OCID].disableIntervals[idx]);
+                });
 
-            subject = subject.replace('%:OBJECTS_LIST:%', objectsList);
-            subject = subject.replace('%:COUNTERS_LIST:%', countersList);
+                if(props[OCID]) {
+                    for(var name in props[OCID]) {
+                        var re = new RegExp('%:' + name + ':%', 'gim');
+                        str = str.replace(re, props[OCID][name]);
+                    }
+                }
 
-            subjectElm.val(subjectElm.val() + subject);
-            M.updateTextFields();
-        }
-
-        quill.focus();
-        var range = quill.getSelection();
-        if(!range) var index = 0;
-        else index = range.index;
-
-        if(infoIDs.length > 1) prevCommentDialogElm.open();
-        else if(infoIDs.length === 1) {
-            makeHint(func, infoIDs[0], function(info) {
-                messageBody += '\n_________________________\nPrevious information:\n\n' +
-                    'Subject: ' + info.subject + '\n\n' +
-                    info.text.replace(/(<\/p>)|(<br.?>)/ig, '\n').replace(/<[^>]+>/g, '').replace(/\n\n+/gm, '\n').trim() +
-                    '\n_________________________\n';
-                quill.insertText(index, messageBody, {}, "user");
+                str= str.replace(/%:.+?:%/gm, '');
+                messageBody += str;
             });
-            return;
-        }
 
-        quill.insertText(index, messageBody, {}, "user");
+            var subject = template.subject;
+            if(subject) {
+                var objectsList = Object.keys(objectsNames).join(', ');
+                if (template.objectsListLength && objectsList.length > template.objectsListLength) {
+                    objectsList = objectsList.substr(0, template.objectsListLength - 7);
+                    objectsList += '... (' + Object.keys(objectsNames).length + ')';
+                }
 
-        if(messageTopImportance === undefined || maxImportance < messageTopImportance) messageTopImportance = maxImportance;
+                var countersList = Object.keys(countersNames).join('; ');
+                if (template.countersListLength && countersList.length > template.countersListLength) {
+                    countersList = countersList.substr(0, template.countersListLength - 7);
+                    countersList += '... (' + Object.keys(countersNames).length + ')';
+                }
+
+                subject = subject.replace('%:OBJECTS_LIST:%', objectsList);
+                subject = subject.replace('%:COUNTERS_LIST:%', countersList);
+
+                subjectElm.val(subjectElm.val() + subject);
+                M.updateTextFields();
+            }
+
+            quill.focus();
+            var range = quill.getSelection();
+            if(!range) var index = 0;
+            else index = range.index;
+
+            if(infoIDs.length > 1) prevCommentDialogElm.open();
+            else if(infoIDs.length === 1) {
+                makeHint(func, infoIDs[0], function(info) {
+                    messageBody += '<br/><br/>' +
+                        '_________________________________________________________________________________________' +
+                        '<br/><em>Previous information: ' +
+                        (info.subject || '') + '</em><br/><br/>' + info.text;
+                    quill.clipboard.dangerouslyPasteHTML(messageBody);
+                    //quill.insertText(index, messageBody, {}, "user");
+                });
+                return;
+            }
+
+            quill.clipboard.dangerouslyPasteHTML(messageBody);
+            //quill.insertText(index, messageBody, {}, "user");
+
+            if(messageTopImportance === undefined || maxImportance < messageTopImportance) messageTopImportance = maxImportance;
+
+        });
     }
 
-    function makeURLForDataBrowser(objectName, parentOCID, startTime, endTime) {
+    function getObjectsProperties(OCIDs, callback) {
+        $.ajax({
+            type: 'POST',
+            timeout: 10000,
+            url: serverURL,
+            data: {
+                func: 'getObjectsProperties',
+                IDs: OCIDs.join(','),
+            },
+            error: function (jqXHR, exception) { ajaxError(jqXHR, exception, callback)},
+            success: function(rows) {
+                callback(rows);
+                /*
+                if(!rows || !rows.length) return callback(text);
+
+                rows.forEach(function (row) {
+                    var re = new RegExp('%:' + row.name + ':%', 'gim');
+                    text = text.replace(re, row.value);
+                });
+
+                 */
+            }
+        });
+    }
+
+    function makeURLForDataBrowser(objectName, OCIDs, startTime, endTime) {
         var actionPath = parameters.action.link.replace(/\/[^\/]+$/, '') + '/data_browser';
 
+        if(!Array.isArray(OCIDs)) OCIDs = [OCIDs];
+
+
         var urlParameters = {
-            't': encodeURIComponent(startTime - 900000 + '-' + (endTime ? endTime + 900000 : Date.now())), // timestamps in ms
-            'l': encodeURIComponent(parentOCID), // show graph for this OCID with align to left
+            't': encodeURIComponent(Number(startTime) - 900000 + '-' + (Number(endTime) ? Number(endTime) + 900000 : Date.now())), // timestamps in ms
+            'l': encodeURIComponent(OCIDs.join('-')), // show graph for this OCID with align to left
             'n': '0', // don't autoupdate
+            'y': '0--0-',
             'a': encodeURIComponent(actionPath), // /action/data-browser
             'c': encodeURIComponent(objectName), // selected object
         };
@@ -1490,12 +1820,13 @@ var JQueryNamespace = (function ($) {
         }).join('&');
     }
 
-    function makeURLForAction(actionID, objectName) {
+    function makeURLForAction(actionID, objectName, counterID) {
         var actionPath = parameters.action.link.replace(/\/[^\/]+$/, '') + '/' + actionID;
 
         var urlParameters = {
             'a': encodeURIComponent(actionPath), // /action/objects-properties
             'c': encodeURIComponent(objectName), // selected object
+            'cid': encodeURIComponent(counterID),
         };
 
         return '/?' + Object.keys(urlParameters).map(function(key) {
@@ -1503,8 +1834,8 @@ var JQueryNamespace = (function ($) {
         }).join('&');
     }
 
-    function makeActionLinks(objectName, parentOCID, startTime, endTime) {
-        var actions = parameters.action.actions;
+    function makeActionLinks(objectName, parentOCID, startTime, endTime, counterID) {
+        if(!useLinks) return '';
 
         if(!Array.isArray(actions) || !actions.length) return '';
 
@@ -1513,16 +1844,51 @@ var JQueryNamespace = (function ($) {
 
             if(action.ID === 'data_browser') {
                 return '<div class="chip small-chip"><a href="' +
-                    makeURLForDataBrowser(objectName, parentOCID, startTime, endTime) + '" target="_blank">' +
+                    makeURLForDataBrowser(objectName, parentOCID, startTime, endTime) +
+                    '" target="_blank" data-browser="' +
+                    parentOCID + ',' + startTime + ',' + endTime + ',' + counterID + ',' + objectName + '">' +
                     action.name + '</a></div>'
             }
 
             return '<div class="chip small-chip"><a href="' +
-                makeURLForAction(action.ID, objectName) + '" target="_blank">' +
+                makeURLForAction(action.ID, objectName, counterID) + '" target="_blank">' +
                 action.name + '</a></div>';
         });
 
         return links.join('');
+    }
+
+    function makeEventsForDataBrowser() {
+        $('a[data-browser]').click(function (e) {
+            var dataStr = $(this).attr('data-browser');
+            if(!dataStr) return;
+            var [parentOCID, startTime, endTime, counterID, objectName] = dataStr.split(',');
+            if(!objectName || !counterID) return;
+
+            e.preventDefault();
+            $.ajax({
+                type: 'POST',
+                timeout: updateInterval - 3000,
+                url: serverURL,
+                data: {
+                    func: 'getCounterVariables',
+                    objectName: objectName,
+                    counterID: counterID,
+                },
+                error: ajaxError,
+                success: function (rows) { //{.. OCID:...}
+                    if(rows.actionError) console.log(rows.actionError);
+                    if(!Array.isArray(rows)) rows = [];
+
+                    var OCIDs = rows.map(row => row.OCID);
+                    OCIDs.push(parentOCID);
+
+                    e.preventDefault();
+                    var url = makeURLForDataBrowser(objectName, OCIDs, startTime, endTime);
+                    window.open(url, '_blank');
+                }
+            });
+        })
     }
 
     function createFilteredEventTable() {
@@ -1552,9 +1918,9 @@ var JQueryNamespace = (function ($) {
     function startUpdate() {
         reloadIconElm.text('play_arrow');
         reloadIconElm.removeClass('red-text');
-        if($('#historyEvents').hasClass('active')) getDataForHistoryEvents = true;
-        if($('#currentEvents').hasClass('active')) getDataForCurrentEvents = true;
-        if($('#disabledEvents').hasClass('active')) getDataForDisabledEvents = true;
+        if($('#historyEvents').hasClass('active') && restrictions.Historical) getDataForHistoryEvents = true;
+        if($('#currentEvents').hasClass('active') && restrictions.Current) getDataForCurrentEvents = true;
+        if($('#disabledEvents').hasClass('active') && restrictions.Disabled) getDataForDisabledEvents = true;
         historyEventsHeaderElm.removeClass('red');
         currentEventsHeaderElm.removeClass('red');
         disabledEventsHeaderElm.removeClass('red');
