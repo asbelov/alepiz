@@ -233,8 +233,11 @@ ORDER BY disabledEvents.eventID DESC, events.startTime DESC LIMIT 100', [OCID[0]
 
 function getDashboardDataForHistoryCommentedEvents (args, maxImportance, callback) {
 
-    var from = Number(args.from);
-    var to = new Date(new Date(Number(args.to)).setHours(23,59,59,999)).getTime();
+    // convert time from UTC for support different TZ in browser and server
+    // for UTC+10 return -600 (minutes); convert from minutes to milliseconds
+    var tzOffset = new Date().getTimezoneOffset() * 60000;
+    var from = Number(args.from) - tzOffset;
+    var to = new Date(new Date(Number(args.to) - tzOffset).setHours(23,59,59,999)).getTime();
 
     if(!to || !from || from >= to || to < 1477236595310) { // 1477236595310 = 01.01.2000
         log.warn('Error in dates interval for show comments: ', args);

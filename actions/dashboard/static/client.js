@@ -1144,14 +1144,17 @@ var JQueryNamespace = (function ($) {
         var objectsIDs = objects.map(function (object) {
             return object.id;
         });
+        // convert time to UTC for support different TZ in browser and server
+        // for UTC+10 return -600 (minutes); convert from minutes to milliseconds
+        var tzOffset = new Date().getTimezoneOffset() * 60000;
         $.ajax({
             type: 'POST',
-            timeout: 10000,
+            timeout: 60000,
             url: serverURL,
             data: {
                 func: 'getComments',
-                from: commentsFromInstance.date.getTime(),
-                to: commentsToInstance.date.getTime(),
+                from: commentsFromInstance.date.getTime() + tzOffset,
+                to: commentsToInstance.date.getTime() + tzOffset,
                 objectsIDs: objectsIDs.join(',')
             },
             error: ajaxError,

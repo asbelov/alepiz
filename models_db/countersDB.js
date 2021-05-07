@@ -16,78 +16,39 @@ module.exports = countersDB;
     return all counters for specific objects
 
     objectsIDs: array of objects IDs
-    countersGroupsIDs: array of counter groups IDs or null
     callback(err, rows)
     rows: [{id:.., name:.., unitID:..., collector:..., sourceMultiplier:..., groupID:..., OCID:..., objectID:..., objectName:..., objectDescription:..}, ...]
     OCID is a objects-counters ID
  */
-countersDB.getCountersForObjectsAndGroups = function(objectsIDs, countersGroupsIDs, callback){
-    log.debug('Try to get counters for objects ', objectsIDs, ' and groups ', countersGroupsIDs);
+countersDB.getCountersForObjectsAndGroups = function(objectsIDs, callback) {
+    log.debug('Try to get counters for objects ', objectsIDs);
 
-    // for small count of objectsIDs
-    if(objectsIDs.length < db.maxVariableNumber) {
-        var objectsIDsAndCountersGroupsIDs = [];
-        // copy from objectsIDs to objectsIDsAndCountersGroupsIDs. var objectsIDsAndCountersGroupsIDs = objectsIDs make link and objectsIDs will be spoiled
-        Array.prototype.push.apply(objectsIDsAndCountersGroupsIDs, objectsIDs);
-        var questionStrForObjects = objectsIDs.map(function () {
-            return '?'
-        }).join(',');
-
-        if (!countersGroupsIDs || !countersGroupsIDs.length) countersGroupsIDs = undefined;
-        else {
-            Array.prototype.push.apply(objectsIDsAndCountersGroupsIDs, countersGroupsIDs);
-            var questionStrForGroups = countersGroupsIDs.map(function () {
-                return '?'
-            }).join(',');
-        }
-
-        // all returned parameters are used only in data_browser. in other actions used only counter.id and counter.name
-        db.all(
-'SELECT counters.id AS id, counters.name AS name, counters.taskCondition AS taskCondition, \
-counters.unitID AS unitID, counters.collectorID AS collectorID, \
+    var rows = [];
+    var stmt = db.prepare(
+        'SELECT counters.id AS id, counters.name AS name, counters.taskCondition AS taskCondition, \
+counters.unitID AS unitID, counters.collectorID AS collectorID, counters.debug AS debug \
 counters.sourceMultiplier AS sourceMultiplier, countersGroups.id AS groupID, objectsCounters.id AS OCID, \
 objectsCounters.objectID AS objectID, objects.name AS objectName, objects.description AS objectDescription \
 FROM counters \
 JOIN countersGroups ON counters.groupID=countersGroups.id \
 JOIN objectsCounters ON objectsCounters.counterID=counters.id \
 JOIN objects ON objects.id=objectsCounters.objectID \
-WHERE objectsCounters.objectID IN (' + questionStrForObjects + ') \
-' + (countersGroupsIDs ? ' AND countersGroups.id IN (' + questionStrForGroups + ')' : '') + ' \
-ORDER BY countersGroups.name, counters.name, objects.name',
-            objectsIDsAndCountersGroupsIDs,
-            function (err, rows) {
-                if (err) {
-                    return callback(new Error('Error getting counters from database for objects ' + objectsIDs.join(',') +
-                        (countersGroupsIDs ? ' and counter groups ' + countersGroupsIDs.join(', ') : '') + ': ' + err.message));
-                }
-                callback(null, rows);
-            });
-        return;
-    }
-
-
-// for large count of objectsIDs use simple query without groups filter
-    var rows = [];
-    var stmt = db.prepare(
-'SELECT counters.id AS id, counters.name AS name, objectsCounters.id AS OCID, objectsCounters.objectID AS objectID, \
-counters.collectorID AS collectorID \
-FROM counters \
-JOIN objectsCounters ON objectsCounters.counterID=counters.id  \
-WHERE objectsCounters.objectID = ?', function(err) {
+WHERE objectsCounters.objectID = ? \
+ORDER BY countersGroups.name, counters.name, objects.name', function(err) {
         if(err) return callback(err);
 
         async.eachLimit(objectsIDs,100,function(objectID, callback) {
-            stmt.all(objectID, function(err, res) {
+            stmt.all(objectID, function(err, rowsPart) {
                 if(err) return callback(err);
-                rows.push.apply(rows, res);
+                rows.push.apply(rows, rowsPart);
                 callback();
             })
         }, function(err) {
             stmt.finalize();
             callback(err, rows);
-        })
+        });
     });
-};
+}
 
 countersDB.getCountersForGroup = function(groupID, callback) {
     log.debug('Getting all counters for group ', groupID);

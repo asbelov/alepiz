@@ -169,7 +169,8 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                         div.col.l3.m6.s6.input-field
                             label
                                 input(type="checkbox" data-event-settings data-onchange-watchdog)#debugCB
-                                span Enable debug
+                                span
+                                    a(href="#!")#showCountersWithDebug Enable debug
                             input(type="hidden")#debugCBShared
                         div.col.s12.input-field
                             textarea(data-length="65535" data-event-settings data-onchange-watchdog).materialize-textarea#counterDescription

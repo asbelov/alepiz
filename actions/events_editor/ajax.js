@@ -45,6 +45,9 @@ function ajax(args, callback) {
         });
         return;
     }
+
+    if(args.func === 'getAllCounters') return countersRightsWrapperDB.getAllCounters(args.username, callback);
+
     return callback(new Error('Ajax function is not set or unknown function "' + args.func + '"'));
 }
 

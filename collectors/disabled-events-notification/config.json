@@ -1,0 +1,21 @@
+{
+    "name": "Disabled events notification",
+    "description": "Notification about enable of disabled events",
+    "active": "",
+    "separate": "on",
+    "runCollectorSeparately": "",
+    "parameters": {
+        "daysBeforeEnable": {
+            "description": "Days before enable events",
+            "checkAs": "UNZInteger",
+            "type": "textInputShort",
+            "default": 3
+        },
+        "disablePeriod": {
+            "description": "Disable period (days)",
+            "checkAs": "UNZInteger",
+            "type": "textInputShort",
+            "default": 7
+        }
+    }
+}

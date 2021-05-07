@@ -5,6 +5,9 @@
 /**
  * Created by Alexander Belov on 25.07.2015.
  */
+var fs = require('fs');
+var path = require('path');
+
 var log = require('../../lib/log')(module);
 var collectors = require('../../lib/collectors');
 var rightsWrappersCountersDB = require('../../rightsWrappers/countersDB');
@@ -13,11 +16,13 @@ var unitsDB = require('../../models_db/countersUnitsDB');
 var history = require('../../models_history/history');
 var functions = require('../../lib/calcFunction');
 var calc = require('../../lib/calc');
+var conf = require('../../lib/conf');
+var logViewerAjax = require('../log_viewer/ajax');
 
 module.exports = function(args, callback) {
     log.debug('Starting ajax with parameters', args);
 
-    var func = args.func;
+    var func = args.func || args.function;
 
     if(!func) return callback(new Error('Ajax function is not set'));
 
@@ -74,6 +79,10 @@ module.exports = function(args, callback) {
 
     if(func === 'getParentCountersVariables') return rightsWrappersCountersDB.getParentCountersVariables(args.username, [args.id], [], callback);
 
+    if(func === 'getFilesList') return getLogFileList(args, callback);
+
+    if(func === 'getFilePart' || func === 'getFileSize') return logViewerAjax(args, callback);
+
     callback(new Error('Unknown function ' + func));
 };
 
@@ -100,4 +109,20 @@ function getFunctionsDescription() {
     functionsDescription['arithmetical operators'] = 'arithmetical operators help page\n\n' + operatorsDescription;
 
     return functionsDescription;
+}
+
+function getLogFileList(args, callback) {
+    var logPath = path.join(__dirname, '..', '..', conf.get('log:path'), 'counters');
+
+    fs.readdir(logPath, {withFileTypes: true}, function (err, filesObjArray) {
+        if (err) return callback(new Error('Can\'t read dir ' + logPath + ': ' + err.message));
+
+        var result = filesObjArray
+            .filter(f => f.isFile() && new RegExp('^' + args.IDs + '\\.\\d{6}$').test(f.name))
+            .sort((a, b) => Number(b.name.split('.')[1]) - Number(a.name.split('.')[1]))
+            .map(f => '\r' + logPath + '\r' + f.name)
+            .join('\n');
+
+        callback(null,  result);
+    });
 }

@@ -82,7 +82,8 @@ var JQueryNamespace = (function ($) {
         objects,
         selectedObjects = [],
         sharedCountersNames,
-        notSharedSuffix = ' [NOT SHARED]';
+        notSharedSuffix = ' [NOT SHARED]',
+        logViewerObj;
 
     return {
         initCountersSelector: initCountersSelector,
@@ -173,7 +174,11 @@ var JQueryNamespace = (function ($) {
             if(counterSelectorElm.val() && !$('a[href="#counterSettingsTab"]').hasClass('active')) {
                 counterIDElm.val(counterSelectorElm.val());
             }
-        });
+
+            if($('a[href="#logTab"]').hasClass('active')) {
+                initLogViewer();
+            }
+         });
 
         // get counters for selected objects from objects list
         $.post(serverURL, {
@@ -216,6 +221,61 @@ var JQueryNamespace = (function ($) {
             M.FormSelect.init(counterSelectorElm[0], {});
 
             if(typeof callback === 'function') return callback();
+        });
+    }
+
+    function initLogViewer() {
+        var counterSelectorElm = $('#counterIDSelector');
+        var counterID = counterSelectorElm.val();
+
+        var logTabSelectorElm = $('#logTabSelector');
+        if(counterID) logTabSelectorElm.removeClass('disabled');
+        else return logTabSelectorElm.addClass('disabled');
+
+        var counterName = counterSelectorElm.find('option[value="' + counterID+'"]').text();
+
+        var logViewerCfg = {
+            "IDForm": "LogViewerForm",
+            "filterFiles": "",
+            "order": "",
+            "skipDirs": "",
+            "filePath": parameters.action.link + "/../../logs/counters/",
+            "codePage": "",
+            "logViewerObj": logViewerObj,
+            "objects": [{
+                "id": counterID,
+                "name": counterName,
+            }],
+        }
+
+        Menu(logViewerCfg, LogViewer, function (_logViewerObj, fileName) {
+            logViewerObj = _logViewerObj;
+            if (fileName) logTabSelectorElm.removeClass('disabled');
+            else logTabSelectorElm.addClass('disabled');
+        });
+    }
+
+    function getDebugInfo() {
+        $.post(serverURL, {
+            func: 'getCountersForObjects'
+        }, function (rows) {
+            var countersWithDebug = [], num = 1;
+            rows.forEach(function (row) {
+                if(row.debug) {
+                    countersWithDebug.push('<a style="color:yellow" href="/?a=%2Factions%2Fcounter_settings&cid=' +
+                        row.id + '" target="_blank">' + (num++) + '. #' + row.id + ' ' + escapeHtml(row.name) + '</a><br>');
+                }
+            });
+
+            var debugCBElm = $('#debug'), showCountersWithDebugElm = $('#showCountersWithDebug');
+            if(countersWithDebug.length > 9 && !debugCBElm.is(':checked')) debugCBElm.prop('disabled', true);
+
+            showCountersWithDebugElm.unbind('click').click(function (e) {
+                e.preventDefault();
+                if(!countersWithDebug.length) M.toast({html: 'No counters with debug mode enabled'}, 1000);
+                else M.toast({html: '<span><span>Counters list with debug mode enabled:</span><br>' + countersWithDebug.join('') +
+                        '</span><button class="btn-flat toast-action" onClick="M.Toast.dismissAll();">X</button>'}, 10000);
+            });
         });
     }
 
@@ -268,6 +328,7 @@ var JQueryNamespace = (function ($) {
 
         if(!counterID) {  // if selected a "New counter", leave counter parameters unchanged and return
             $('#name').focus();
+            $('#logTabSelector').addClass('disabled');
             if(!linkedObjectsIDsElm.val().length && selectedObjects.length)
                 linkedObjectsIDsElm.objectsSelector(selectedObjects, reloadCounterListForAllVariables);
             return;
@@ -277,6 +338,9 @@ var JQueryNamespace = (function ($) {
         $.post(serverURL, {func: 'getCounterByID', id: counterID}, function(counter) {
             if(!counter) return M.toast({html: 'Error while getting counter by ID '+counterID, displayLength: 5000});
 
+            // used here only to disable or enable the LOG tab
+            // will be redraw when logTab clicked for correct size drawing
+            initLogViewer();
             $('#name').val(counter.name);
             $('#keepHistory').val(counter.keepHistory);
             $('#keepTrends').val(counter.keepTrends);
@@ -289,6 +353,7 @@ var JQueryNamespace = (function ($) {
 
             if(counter.debug) $('#debug').prop('checked', true);
             else $('#debug').prop('checked', false);
+            getDebugInfo();
 
             if(counter.taskCondition) $('#taskCondition').prop('checked', true);
             else $('#taskCondition').prop('checked', false);

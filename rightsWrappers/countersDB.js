@@ -88,7 +88,16 @@ rightsWrapper.getCountersForObjects = function(user, objectsIDs, groupsIDs, call
         }, function(err, objectsIDs){
             if(err) return callback(err);
 
-            countersDB.getCountersForObjectsAndGroups(objectsIDs, groupsIDs, callback);
+            countersDB.getCountersForObjectsAndGroups(objectsIDs, function (err, rows) {
+                if(err) {
+                    return callback(new Error('Error getting counters for objects ' + objectsIDs.join(',') +
+                        (groupsIDs ? ' and groups ' + groupsIDs.join(', ') : '') + ': ' + err.message));
+                }
+
+                if(!groupsIDs) return callback(null, rows);
+                groupsIDs = groupsIDs.map(groupID => Number(groupID));
+                return callback(null, rows.filter( row => groupsIDs.indexOf(row.groupID) !== -1) );
+            });
         });
     });
 };

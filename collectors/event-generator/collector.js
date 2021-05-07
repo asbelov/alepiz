@@ -152,12 +152,17 @@ collector.get = function(prms, _callback) {
             if(Number(prms.eventDuration) === parseInt(String(prms.eventDuration), 10)) {
                 prms.eventDuration = Number(prms.eventDuration);
                 var solve_problem = function() {
+                    solveEvent(function(err) {
+                        if(newEventID) callback(err, 1);
+                        else callback(err);
+                    })
                     prms.$variables.UPDATE_EVENT_STATE = false;
                     collector.get(prms, _callback); // use _callback()!!!
                 }
 
                 if(!prms.eventDuration || prms.eventDuration < 1) solve_problem();
-                else setTimeout(solve_problem, Number(prms.eventDuration) * 1000);
+                else setTimeout(solve_problem, prms.eventDuration * 1000);
+                return;
             }
 
             // save new event to history database too
@@ -166,6 +171,15 @@ collector.get = function(prms, _callback) {
         });
 
     } else if(prms.$variables.UPDATE_EVENT_STATE === false) {
+        solveEvent(callback);
+    } else {
+        callback(new Error('Can\'t generate event: incorrect variable value for UPDATE_EVENT_STATE (' +
+            prms.$variables.UPDATE_EVENT_STATE + ') for ' +
+            prms.$variables.OBJECT_NAME + '->' + prms.$variables.PARENT_OBJECT_NAME + ':' +
+            (prms.$variables.PARENT_COLLECTOR_NAME || 'unknown parent collector') + '=' + prms.$variables.PARENT_VALUE));
+    }
+
+    function solveEvent(callback) {
         if(eventsCache[OCID]) {
             log.info('Event solved: ', prms.$variables.OBJECT_NAME, '(', prms.$variables.COUNTER_NAME, '): importance: ',
                 prms.importance, ', time: ', new Date(eventTimestamp).toLocaleString(), ', parentOCID: ', prms.$parentID,
@@ -191,11 +205,6 @@ collector.get = function(prms, _callback) {
             // save solved event to history database too
             callback(null, 0);
         });
-    } else {
-        callback(new Error('Can\'t generate event: incorrect variable value for UPDATE_EVENT_STATE (' +
-            prms.$variables.UPDATE_EVENT_STATE + ') for ' +
-            prms.$variables.OBJECT_NAME + '->' + prms.$variables.PARENT_OBJECT_NAME + ':' +
-            (prms.$variables.PARENT_COLLECTOR_NAME || 'unknown parent collector') + '=' + prms.$variables.PARENT_VALUE));
     }
 };
 

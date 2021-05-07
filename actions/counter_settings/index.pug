@@ -51,12 +51,15 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
             div.col.s12
                 script(src='/javascripts/javaScriptEditor.js')
                 script(src='/javascripts/objectsSelector.js')
+                script(src= action.link + "/../log_viewer_" + action.sessionID + "/" + action.staticDir + "/" + "logViewer.js")
+                script(src= action.link + "/../log_viewer_" + action.sessionID + "/" + action.staticDir + "/" + "menu.js")
                 script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
                 div#tabPanel.col.s12
                     ul(style="overflow-x:hidden")#mainTabs.tabs
-                        li.tab.col.s4: a(href='#counterSettingsTab').active Counter
-                        li.tab.col.s4: a(href='#objectsLinksTab') Links
-                        li(style="overflow: auto").tab.col.s4: a(href='#variablesDefinitionsTab') Variables
+                        li.tab.col.s3: a(href='#counterSettingsTab').active Counter
+                        li.tab.col.s3: a(href='#objectsLinksTab') Links
+                        li(style="overflow: auto").tab.col.s3: a(href='#variablesDefinitionsTab') Variables
+                        li.tab.col.s3.disabled#logTabSelector: a(href='#logTab') Log
                 div#counterSettingsTab
                     div.row
                         div.col.s12
@@ -81,7 +84,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                         select(title=""
                                             description="Filter counters by objects"
                                             no-border=1)#objectsIDs
-
+                                div.row
                                     div.col.s3
                                         label
                                             input(type='checkbox' value="1")#disabled
@@ -89,7 +92,8 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                     div.col.s3
                                         label
                                             input(type='checkbox')#debug
-                                            span(data-position='top' data-tooltip='Log debug information for this counter for the "Variables" action.').tooltipped Enable debug
+                                            span(data-position='top' data-tooltip='Log debug information for this counter for the "Variables" action.').tooltipped
+                                                a(href="#!")#showCountersWithDebug Enable debug
                                     div.col.s3
                                         label
                                             input(type='checkbox')#taskCondition
@@ -174,6 +178,35 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                         a#addVariable.btn-floating: i.material-icons add_box
                         span &nbsp;
                         a#addVariableExpression.btn-floating: i.material-icons library_add
+                div#logTab
+                    div(style="height: 90vh; overflow: hidden; margin: 10px 0px 0px 10px; border: 1px solid #eee")#tmodule
+                        div.row#LogViewerForm
+                            p.input-field.col.s2
+                                select#selectService
+                                label Select service
+                            p.input-field.col.s3
+                                select#selectFile
+                                label Select file
+                            p.input-field.col.s3
+                                input(type="text")#searchInput
+                                label(for="searchInput") Search
+                            p.input-field.col
+                                a.btn-floating.waves-effect.waves-light#searchBtn
+                                    i.material-icons#searchBtnIcon search
+                            p(style="width:60px").input-field.col
+                                label
+                                    input(type="checkbox")#searchDirection
+                                    span#searchDirectionLabel up
+                            p(style="width:60px").input-field.col
+                                label
+                                    input(type="checkbox")#searchAsRegExp
+                                    span#searchAsRegExpLabel re
+                            p.input-field.col.s2
+                                select#codePage
+                                    option(value="") Default UTF-8
+                                    option(value="win1251") Windows CP-1251
+                                    option(value="cp866") MS-DOS CP-866
+                                label Code page
 
         div#counterGroupsSettings.modal.modal-fixed-footer
             div.modal-content

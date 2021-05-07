@@ -9,23 +9,25 @@ module.exports = collector;
 
 var schedules = {};
 
-collector.get = function(prms, callback) {
-    if(!prms || !prms.time) return callback(new Error('Parameter "time" is not specified'));
+collector.get = function(param, callback) {
+    if(!param || !param.time) return callback(new Error('Parameter "time" is not specified'));
+
+    //log.info('Add a new schedule: ', param.time, ' for OCID ', param.$id);
     
-    var timeParts = prms.time.split(/[^\d]+/);
+    var timeParts = param.time.split(/[^\d]+/);
     
     if(timeParts.length !== 2 || 
        Number(timeParts[0]) < 0 || Number(timeParts[0]) > 23 || 
        Number(timeParts[1]) < 0 || Number(timeParts[0]) > 59) {
-        return callback(new Error('Incorrect parameter "time": ' + prms.time + '. Waiting for time in format HH:MM (f.e. 13:25)'));
+        return callback(new Error('Incorrect parameter "time": ' + param.time + '. Waiting for time in format HH:MM (f.e. 13:25)'));
     }
     var time = Number(timeParts[0]) * 3600000 + Number(timeParts[1]) * 60000;
 
     if(!time) {
-        return callback(new Error('Can\'t parse parameter "time": ' + prms.time + '. Waiting for time in format HH:MM (f.e. 13:25)'));
+        return callback(new Error('Can\'t parse parameter "time": ' + param.time + '. Waiting for time in format HH:MM (f.e. 13:25)'));
     }
 
-    schedule(prms.$id, time, callback);
+    schedule(param.$id, time, callback);
 };
 
 /*
@@ -35,10 +37,10 @@ collector.get = function(prms, callback) {
     callback(err);
 */
 collector.destroy = function(callback) {
-    for(var id in schedules) {
-        clearTimeout(schedules[id]);
+    for(var OCID in schedules) {
+        clearTimeout(schedules[OCID]);
     }
-    log.info('Removed all schedulers: ', Object.keys(schedules));
+    log.info('Removed all schedulers for OCIDs: ', Object.keys(schedules));
     schedules = {};
     callback();
 };
@@ -51,23 +53,26 @@ collector.destroy = function(callback) {
     callback(err);
 
     objectCounterID of specific counter you can get from $id parameter
-    from the counter parameters, sending to collector.get(prms, callback) function
+    from the counter parameters, sending to collector.get(param, callback) function
 */
 collector.removeCounters = function(OCIDs, callback) {
     var removedSchedulers = [];
-    OCIDs.forEach(function(id) {
-        if(!schedules[id]) return;
+    OCIDs.forEach(function(OCID) {
+        if(!schedules[OCID]) return;
         
-        removedSchedulers.push(id);
-        clearTimeout(schedules[id]);
-        delete schedules[id];
+        removedSchedulers.push(OCID);
+        clearTimeout(schedules[OCID]);
+        delete schedules[OCID];
     });
     
-    if(removedSchedulers.length) log.info('Removed schedulers for OCIDs ', removedSchedulers, ' from ', OCIDs);
+    if(removedSchedulers.length) {
+        log.info('Removed schedulers for OCIDs ', removedSchedulers.join(', '),
+            '. Full OCIDs list for remove: ', OCIDs.join(', '));
+    }
     callback();
 };
 
-function schedule(id, time, callback) {
+function schedule(OCID, time, callback) {
     var todayMidnight = new Date();
     todayMidnight.setHours(0,0,0,0);
     var runTime = todayMidnight.getTime() + time;
@@ -75,11 +80,12 @@ function schedule(id, time, callback) {
     var now = Date.now();
     if(now >= runTime) runTime += 86400000;
 
-    log.info('Waiting for ', new Date(runTime).toLocaleString(), ' for OCID: ', id);
-    
-    schedules[id] = setTimeout(function() {
-        schedule(id, time, callback);
-        log.info('Starting at ', new Date(runTime).toLocaleString(), ' for OCID: ', id);
+    log.info('Waiting for ', new Date(runTime).toLocaleString(), ' for OCID: ', OCID);
+    if(schedules[OCID]) clearTimeout(schedules[OCID]);
+
+    schedules[OCID] = setTimeout(function() {
+        schedule(OCID, time, callback);
+        log.info('Starting at ', new Date(runTime).toLocaleString(), ' for OCID: ', OCID);
         callback(null, Date.now());
     }, runTime - now);    
 }

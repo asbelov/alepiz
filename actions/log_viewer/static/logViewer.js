@@ -4,7 +4,7 @@
 
 function LogViewer(initCfg) {
 
-    var script = parameters.action.link + '/ajax';
+    var script = initCfg.script || parameters.action.link + '/ajax';
 
     var c = {};
     var c_default = {
@@ -415,6 +415,8 @@ function LogViewer(initCfg) {
 
         canAutoReload = false;
         var fileSize = getFileSize(fileName);
+        if(!fileSize) return stopAutoReload();
+
         if (fileSize !== oldFileSize) {
             oldFileSize = fileSize;
 

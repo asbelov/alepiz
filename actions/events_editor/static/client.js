@@ -821,9 +821,36 @@ var JQueryNamespace = (function ($) {
             debugCBSharedElm.val(1);
         }
 
+        getDebugInfo();
+
         var counterDescription = getSharedEventsValues(countersIDs,'counterDescription');
         counterDescriptionElm.val(counterDescription);
         counterDescriptionSharedElm.val(counterDescription === null ? 0 : 1);
+    }
+
+    function getDebugInfo() {
+        $.post(serverURL, {
+            func: 'getAllCounters'
+        }, function (rows) {
+            var countersWithDebug = [], num = 1;
+            rows.forEach(function (row) {
+                if(row.debug) {
+                    countersWithDebug.push('<a style="color:yellow" href="/?a=%2Factions%2Fcounter_settings&cid=' +
+                        row.id + '" target="_blank">' + (num++) + '. #' + row.id + ' ' + escapeHtml(row.name) + '</a><br>');
+                }
+            });
+
+            var showCountersWithDebugElm = $('#showCountersWithDebug');
+            if(countersWithDebug.length > 9 && !debugCBElm.is(':checked')) debugCBElm.prop('disabled', true);
+            else debugCBElm.prop('disabled', false);
+
+            showCountersWithDebugElm.unbind('click').click(function (e) {
+                e.preventDefault();
+                if(!countersWithDebug.length) M.toast({html: 'No counters with debug mode enabled'}, 1000);
+                else M.toast({html: '<span><span>Counters list with debug mode enabled:</span><br>' + countersWithDebug.join('') +
+                        '</span><button class="btn-flat toast-action" onClick="M.Toast.dismissAll();">X</button>'}, 10000);
+            });
+        });
     }
 
     function getSharedEventsValues(initCountersIDs, name) {

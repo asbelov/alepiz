@@ -15,10 +15,8 @@ function Menu(cInitCfg, initMainObject, callback) {
     var searchBackElm;
     var selectServiceElm;
 
-    var reloadOnNewFile = false;
-
     var searchBackLabel = String.fromCharCode(8593);  //Up arrow in utf-8
-    var regExpLabel = '<a href="http://ru.wikipedia.org/wiki/Regexp">re</a>&nbsp;';
+    var regExpLabel = '<a href="http://ru.wikipedia.org/wiki/Regexp" target="_blank">re</a>&nbsp;';
     var replaceAllLabel = 'все';
 
     var searchElmMaxSize = 40;
@@ -27,7 +25,7 @@ function Menu(cInitCfg, initMainObject, callback) {
     var heightCorrection = 0;
     if (cInitCfg.saveResult) heightCorrection = 0;
 
-    var script = parameters.action.link + '/ajax';
+    var script = cInitCfg.script || parameters.action.link + '/ajax';
     var fileList = {};
     var selectFileElm;
     var prevFileName;
@@ -43,18 +41,17 @@ function Menu(cInitCfg, initMainObject, callback) {
     function reDrawLog(_fileName, _serviceName) {
         if(_fileName && typeof _fileName === 'string') cInitCfg.fileName = _fileName;
         if(_serviceName && typeof _serviceName === 'string') cInitCfg.serviceName = _serviceName;
-        if(!_fileName && _serviceName) cInitCfg.fileName = '';
+        if(!_fileName && _serviceName) {
+            cInitCfg.fileName = '';
+            if(typeof callback === 'function') return callback(cInitCfg.logViewerObj, _fileName);
+            else return;
+        }
         cInitCfg.codePage = codePageElm.value || '';
 
-        if (reloadOnNewFile) {
-            mainObject.set(cInitCfg.fileName, cInitCfg.serviceName, cInitCfg.codePage);
-            return;
-        }
-
+        if(!mainObject) mainObject = cInitCfg.logViewerObj;
         if (mainObject) mainObject.del();
         mainObject = new initMainObject(cInitCfg);
-        reloadOnNewFile = cInitCfg.reloadOnNewFile;
-        if(typeof callback === 'function') return callback(mainObject);
+        if(typeof callback === 'function') return callback(mainObject, _fileName);
     }
 
     function mkMenu() {
@@ -179,13 +176,14 @@ function Menu(cInitCfg, initMainObject, callback) {
     }
 
     function selectService(callback) {
-        var objects = parameters.objects;
+        var objects = cInitCfg.objects || parameters.objects;
         if (!objects || !objects.length) return callback(null, cInitCfg.serviceName);
 
         selectFileElm.onchange = function() {
             confirmOnTextChanged(selectFileElm, cInitCfg.fileName, selectFileName, callback);
         };
 
+        selectServiceElm.innerHTML = '';
         if (objects.length > 0) {
             for (var i = 0; i < objects.length; i++) {
                 var optionElm = new Option(objects[i].name, objects[i].id);
@@ -212,7 +210,7 @@ function Menu(cInitCfg, initMainObject, callback) {
 
             var selectedUncPathFile;
             for (var i = 0; i < fileList[cInitCfg.objectID].length; i++) {
-                var items = fileList[cInitCfg.objectID][i].split(':'); //ID:uncdir:file
+                var items = fileList[cInitCfg.objectID][i].split('\r'); //ID\runcdir\rfile
                 if (items[1] === undefined || items[2] === undefined) continue;
                 var uncPathFile = items[1] + '\\' + items[2];
                 var fileName = items[2];
@@ -226,7 +224,7 @@ function Menu(cInitCfg, initMainObject, callback) {
             }
             M.FormSelect.init(selectFileElm, {});
 
-            if (!prevFileName) prevFileName = (fileList[cInitCfg.objectID][0].split(':'))[2];
+            if (!prevFileName) prevFileName = (fileList[cInitCfg.objectID][0].split('\r'))[2];
 
             selectFileName(callback);
         });
@@ -245,16 +243,17 @@ function Menu(cInitCfg, initMainObject, callback) {
     }
 
     function getFilesList(ID, callback) {
-        if (fileList[ID] && !fileList[ID].length) return callback();
-
         var ai = new AJAXInteraction('', script, function (raw) {
             var List = raw.split('\n');
 
-            if (List.length < 1) return callback();
+            if (List.length < 1) {
+                setTimeout(getFilesList, 30000, ID, callback);
+                return callback(false);
+            }
             fileList[ID] = [];
-            for (var i = 0; i < List.length; i++) if (List[i]) fileList[ID].push(List[i]); //ID:uncdir:file
+            for (var i = 0; i < List.length; i++) if (List[i]) fileList[ID].push(List[i]); //ID\runcdir\rfile
 
-            callback();
+            callback(true);
         }, true);
         ai.doPost('function=getFilesList&IDs=' + ID);
     }

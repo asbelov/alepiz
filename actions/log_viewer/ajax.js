@@ -90,7 +90,7 @@ function getFilesList(args, callback) {
                 var result = '';
                 for(var objectID in services) {
                     result = services[objectID].files.map(function (file) {
-                        return objectID + ':' + services[objectID].UNC + ':' + file;
+                        return objectID + '\r' + services[objectID].UNC + '\r' + file;
                     }).join('\n');
                 }
 
@@ -186,7 +186,9 @@ function getFilePart(args, callback) {
         var direction = Number(args.direction) || 0;
         var filePos = Number(args.filePos) || 0;
         var loadSize = Number(args.loadSize) || fileSize, initLoadSize = loadSize;
-        if(filePos !== parseInt(String(filePos), 10)) return callback(new Error('Incorrect file position ' + args.filePos));
+        if(filePos !== parseInt(String(filePos), 10)) {
+            return callback(new Error('Incorrect file position ' + args.filePos));
+        }
         if(loadSize !== parseInt(String(loadSize), 10) || !loadSize)
             return callback(new Error('Incorrect load size ' + args.loadSize));
 
