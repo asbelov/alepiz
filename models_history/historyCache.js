@@ -420,30 +420,33 @@ historyCache.get = function (id, shift, num, recordsType, callback) {
             ++storageRetrievingDataComplete;
             return callback(null, records, records);
         } else {
-            if(records.length === 0) {
+            if(records.length < 2) {
                 ++storageRetrievingDataIncomplete;
-                rawRecords.push('Returned 0 records');
+                rawRecords.push('Returned ' + records.length + ' records');
                 return callback(null, null, rawRecords);
             }
-
+/*
             if(records.length === 1) {
                 ++storageRetrievingDataComplete;
                 return callback(null, records, records);
             }
+*/
 
             // calculating an avg time interval between the record timestamps
             for(var i = 2, avgTimeInterval = records[1].timestamp - records[0].timestamp; i < records.length; i++) {
                 avgTimeInterval = (avgTimeInterval + records[i].timestamp - records[i-1].timestamp) / 2;
             }
 
-            // checking for the 1477236595310 = 01/01/2000. shift is a timeFrom or timeShift; num is a timeTo or timeInterval
+            // checking for the 1477236595310 = 01/01/2000. shift is a timeFrom or timeShift; num is a timeTo or
+            // timeInterval
             var timeFrom = shift > 1477236595310 ? shift : Date.now() - shift - num;
 
             // checking for the last record timestamp is near the timeFrom timestamp
             // r.timestamp = 14:05:00, avgInterval = 30, timeFrom = 14:04:25
             if(records[0].timestamp - avgTimeInterval * 1.2 > timeFrom) {
                 ++storageRetrievingDataIncomplete;
-                rawRecords.push('avgInterval + 20%: ' + Math.round(avgTimeInterval * 1.2 / 1000) +'; timestamp - timeFrom: ' + Math.round((records[0].timestamp - timeFrom) / 1000));
+                rawRecords.push('avgInterval + 20%: ' + Math.round(avgTimeInterval * 1.2 / 1000) +
+                    '; timestamp - timeFrom: ' + Math.round((records[0].timestamp - timeFrom) / 1000));
                 return callback(null, null, rawRecords);
             }
             ++storageRetrievingDataComplete;

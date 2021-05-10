@@ -26,7 +26,7 @@ countersDB.getCountersForObjectsAndGroups = function(objectsIDs, callback) {
     var rows = [];
     var stmt = db.prepare(
         'SELECT counters.id AS id, counters.name AS name, counters.taskCondition AS taskCondition, \
-counters.unitID AS unitID, counters.collectorID AS collectorID, counters.debug AS debug \
+counters.unitID AS unitID, counters.collectorID AS collectorID, counters.debug AS debug, \
 counters.sourceMultiplier AS sourceMultiplier, countersGroups.id AS groupID, objectsCounters.id AS OCID, \
 objectsCounters.objectID AS objectID, objects.name AS objectName, objects.description AS objectDescription \
 FROM counters \

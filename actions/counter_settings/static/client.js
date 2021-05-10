@@ -272,9 +272,9 @@ var JQueryNamespace = (function ($) {
 
             showCountersWithDebugElm.unbind('click').click(function (e) {
                 e.preventDefault();
-                if(!countersWithDebug.length) M.toast({html: 'No counters with debug mode enabled'}, 1000);
+                if(!countersWithDebug.length) M.toast({html: 'No counters with debug mode enabled', displayLength: 10000});
                 else M.toast({html: '<span><span>Counters list with debug mode enabled:</span><br>' + countersWithDebug.join('') +
-                        '</span><button class="btn-flat toast-action" onClick="M.Toast.dismissAll();">X</button>'}, 10000);
+                        '</span><button class="btn-flat toast-action" onClick="M.Toast.dismissAll();">X</button>', displayLength: 10000});
             });
         });
     }
