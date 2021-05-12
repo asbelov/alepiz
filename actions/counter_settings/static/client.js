@@ -216,6 +216,7 @@ var JQueryNamespace = (function ($) {
             counterSelectorElm.change(fillForm);
 
             if(counterIDElm.val()) counterSelectorElm.val(counterIDElm.val());
+            else if(counterSelectorElm.val()) counterIDElm.val(counterSelectorElm.val());
             if(!counterSelectorElm.val()) counterIDElm.val(''); // if select don't have same value with counterIDElm then remove value from counterIDElm
 
             M.FormSelect.init(counterSelectorElm[0], {});

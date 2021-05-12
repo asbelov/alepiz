@@ -174,9 +174,10 @@ collector.get = function(prms, _callback) {
         solveEvent(callback);
     } else {
         callback(new Error('Can\'t generate event: incorrect variable value for UPDATE_EVENT_STATE (' +
-            prms.$variables.UPDATE_EVENT_STATE + ') for ' +
-            prms.$variables.OBJECT_NAME + '->' + prms.$variables.PARENT_OBJECT_NAME + ':' +
-            (prms.$variables.PARENT_COLLECTOR_NAME || 'unknown parent collector') + '=' + prms.$variables.PARENT_VALUE));
+            prms.$variables.UPDATE_EVENT_STATE + ') can be "true|false|undefined" for ' +
+            prms.$variables.OBJECT_NAME + '->' + prms.$variables.PARENT_OBJECT_NAME + ': parent counter "' +
+            (prms.$variables.PARENT_COUNTER_NAME  || 'Undefined parent counter: ' +
+                prms.$variables.PARENT_COUNTER_NAME) + '" value: ' + prms.$variables.PARENT_VALUE));
     }
 
     function solveEvent(callback) {

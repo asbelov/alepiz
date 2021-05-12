@@ -130,6 +130,23 @@
         })
     };
 
+    var entityMap = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+        '/': '&#x2F;',
+        '`': '&#x60;',
+        '=': '&#x3D;'
+    };
+
+    function escapeHtml(string) {
+        return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+            return entityMap[s];
+        });
+    }
+
     // init object selector
     // initObjects - array of objects [{id: object1ID, name: object1Name}, {id: object2ID, name: object2Name, ...]
     // initCallback will be called when added or removes objects in objects selector
@@ -169,18 +186,18 @@
             var customObjectClassName = $(elm).attr('add-custom-object');
             var variableMode = customObjectClassName ? customObjectClassName.toUpperCase().indexOf('VARIABLE') !== -1 : false;
             var useAdditionalObjectsList = $(elm).attr('get-objects-from-additional-objects-list');
-            if(description) description = '<p>'+description+'</p>';
+            if(description) description = '<p>' + escapeHtml(description) + '</p>';
             else description = '';
 
             $(elm).prop('multiple', 'multiple').addClass('hide').after(
                 '<div class="card'+(noBorder ? ' z-depth-0':'')+'">' +
                     '<div class="card-content'+(noBorder ? ' no-padding':'')+'">' +
-                        '<span class="card-title black-text">' + title + '</span>' + description +
+                        '<span class="card-title black-text">' + escapeHtml(title) + '</span>' + description +
                         '<div class="input-field row" id="' + prefixID + 'objects-panel"></div>' +
                     '</div>' +
                     '<div class="card-action">' +
                         '<a href="#!" id="' + prefixID + 'add-selected-objects">Add selected objects</a>' +
-                        (customObjectClassName ? '<a href="#!" id="' + prefixID + 'add-custom-object">Add ' + customObjectClassName + '</a>' : '') +
+                        (customObjectClassName ? '<a href="#!" id="' + prefixID + 'add-custom-object">Add ' + escapeHtml(customObjectClassName) + '</a>' : '') +
                         '<a href="#!" id="' + prefixID + 'remove-all-objects">Remove all objects</a>' +
                     '</div>' +
                 '</div>'
@@ -343,7 +360,7 @@
                 var start = 0;
                 var end = objects[id].length;
             } else {
-                var lastPageNumber = Math.ceil(objects[id].length / maxObjects);
+                //var lastPageNumber = Math.ceil(objects[id].length / maxObjects);
                 start = (pageNum - 1) * maxObjects;
                 end = pageNum * maxObjects;
                 if(end > objects[id].length) end = objects[id].length;
@@ -360,7 +377,7 @@
             }
 
             objectsPanelElm.append('<div class="chip mark-first-letter" ' + prefixID + 'object-id="' + objectID + '"><span>' +
-                objectName + '</span><i class="close material-icons">close</i></div>');
+                escapeHtml(objectName) + '</span><i class="close material-icons">close</i></div>');
 
             $('div[' + prefixID + 'object-id="'+ objectID+'"]').click(function() {
                 for(var i = 0; i < objects[id].length; i++) {
@@ -474,7 +491,7 @@
                 }
 
                 if(!initMode) appendObject(newObject.id, newObject.name);
-                if(elmTag === 'SELECT') values.push('<option value="' + newObject.id + '" selected>' + newObject.name + '</option>');
+                if(elmTag === 'SELECT') values.push('<option value="' + newObject.id + '" selected>' + escapeHtml(newObject.name) + '</option>');
                 else values.push({
                     id: newObject.id,
                     name: newObject.name

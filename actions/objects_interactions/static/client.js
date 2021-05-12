@@ -255,7 +255,8 @@ var JQueryNamespace = (function ($) {
                 '<label><input type="radio" name="interact_' + objectID + '" id="different_' + objectID + '" ' +
                 'value="different:' + objectID + '" class="with-gap" checked/>' +
                 '<span class="tooltipped" data-position="top" ' +
-                'data-tooltip="'+objectName+' interact with ' +differentInteractions.join(', ')+ '"></span></label>' +
+                'data-tooltip="' + escapeHtml(objectName) + ' interact with ' +
+                escapeHtml(differentInteractions.join(', ')) + '"></span></label>' +
                 '</td>';
         }
 
@@ -266,27 +267,28 @@ var JQueryNamespace = (function ($) {
             // don't use tooltip here, it was remain after deleting row
             '<i class="material-icons right" style="margin-left:0">delete</i></a>' +
             '</td>' +
-            '<td><span ' + objectTooltip + '>' + objectName + '</span>' +
+            '<td><span ' + objectTooltip + '>' + escapeHtml(objectName) + '</span>' +
             '</td>' +
             '<td class="center-align">' +
             '<label><input type="radio" name="interact_' + objectID + '" id="include_' + objectID + '"' +
                 ' value="include:' + objectID + '" class="with-gap"' + checked.include + '/>' +
             '<span class="tooltipped" data-position="top" ' +
-                'data-tooltip="Include ' + objectName + ' in ' + editedObjectNamesStr + '">' +
+                'data-tooltip="Include ' + escapeHtml(objectName) + ' in ' + escapeHtml(editedObjectNamesStr) + '">' +
             '</span></label>' +
             '</td>' +
             '<td class="center-align">' +
             '<label><input type="radio" name="interact_' + objectID + '" id="included_' + objectID + '" ' +
                 'value="included:' + objectID + '" class="with-gap"' + checked.included + '/>' +
             '<span class="tooltipped" data-position="top" ' +
-                'data-tooltip="Include ' + editedObjectNamesStr + ' in ' + objectName + '">' +
+                'data-tooltip="Include ' + escapeHtml(editedObjectNamesStr) + ' in ' + escapeHtml(objectName) + '">' +
             '</span></label>' +
             '</td>' +
             '<td class="center-align">' +
             '<label><input type="radio" name="interact_' + objectID + '" id="intersect_' + objectID + '" ' +
             'value="intersect:' + objectID + '" class="with-gap"' + checked.intersect + '/>' +
             '<span class="tooltipped" data-position="top" ' +
-            'data-tooltip="Select only similar objects, included in '+editedObjectNamesStr+' and '+objectName+'">' +
+            'data-tooltip="Select only similar objects, included in ' + escapeHtml(editedObjectNamesStr) +
+                ' and ' + escapeHtml(objectName) + '">' +
             '</span></label>' +
             '</td>' +
             '<td class="center-align">' +
@@ -294,14 +296,16 @@ var JQueryNamespace = (function ($) {
                 'value="exclude:' + objectID + '" class="with-gap"' + checked.exclude + '/>' +
             '<span class="tooltipped" data-position="top" ' +
                 //'data-tooltip="Objects from '+editedObjectNamesStr+' excluding similar objects from '+objectName+'">' +
-                'data-tooltip="Only different objects, included in '+editedObjectNamesStr+' and '+objectName+'">' +
+                'data-tooltip="Only different objects, included in ' + escapeHtml(editedObjectNamesStr) +
+                ' and ' + escapeHtml(objectName) + '">' +
             '</span></label>' +
             '</td>' +
             '<td class="center-align hide">' +
             '<label><input type="radio" name="interact_' + objectID + '" id="excluded_' + objectID + '" ' +
                 'value="excluded:' + objectID + '" class="with-gap"' + checked.excluded + '/>' +
             '<span class="tooltipped" data-position="top" ' +
-                'data-tooltip="Objects from '+objectName+' excluding similar objects from '+editedObjectNamesStr+'">' +
+                'data-tooltip="Objects from ' + escapeHtml(objectName) + ' excluding similar objects from ' +
+                escapeHtml(editedObjectNamesStr) + '">' +
             '</span></label>' +
             '</td>' +
             '</td>' +

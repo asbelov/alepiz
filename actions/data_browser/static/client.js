@@ -116,9 +116,9 @@ var JQueryNamespace = (function ($) {
                         var data = [];
                         for(var key in dataInfo[name]) {
                             if(key === 'data' || key === 'timestamp') continue;
-                            data.push(key + ': ' + dataInfo[name][key]);
+                            data.push(escapeHtml(key + ': ' + dataInfo[name][key]));
                         }
-                        html.push('<li><b>' + name + '</b></li><li>' + data.join('<li></li>') + '</li></>' );
+                        html.push('<li><b>' + escapeHtml(name) + '</b></li><li>' + data.join('<li></li>') + '</li></>' );
                     }
                     debugDataParametersElm.html('<ul>' + html.join('<br/>') + '</ul>');
                 }
@@ -1408,8 +1408,8 @@ var JQueryNamespace = (function ($) {
     function drawGraph(graphData){
 
         var options = {
-            title : graphProperties.title,
-            subtitle: graphProperties.subtitle,
+            title : escapeHtml(graphProperties.title),
+            subtitle: escapeHtml(graphProperties.subtitle),
             xaxis : {
                 mode : 'time',
                 timeMode: 'local',

@@ -324,7 +324,9 @@ function LogViewer(initCfg) {
         }
 
 // Make bones after length of skeleton and before skelPosition
-        for (var i = skeleton.length; i < skelPosition; i++) mkBone(i);
+        if(text !== -1) {
+            for (var i = skeleton.length; i < skelPosition; i++) mkBone(i, -1);
+        }
 
         itsNotAScroll = true;
         var oldScrollPos = logElm.scrollTop;
