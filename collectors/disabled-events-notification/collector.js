@@ -60,7 +60,7 @@ collector.get = function(param, callback) {
                 new Date(checkTime).toLocaleString().replace(/\.\d\d\d\d,/, '') +
                 ') and was disabled on ' + param.disablePeriod + ' days: ' + err.message));
         }
-log.info('Events: ', rows);
+        log.debug('Events: ', rows);
         var results = rows.map(function (row) {
             var disabledTimeIntervals = '';
             if (row.disableUntil && row.disableIntervals) {
@@ -74,7 +74,6 @@ log.info('Events: ', rows);
                     return from + '-' + to;
                 }).join('; ');
             }
-log.info('Intervals: ', disabledTimeIntervals);
             return {
                 counterID: row.counterID,
                 objectName: row.objectName,
@@ -85,7 +84,7 @@ log.info('Intervals: ', disabledTimeIntervals);
                 timeIntervals: disabledTimeIntervals || '-',
             };
         });
-log.info('result: ', results);
+        log.info('result: ', results);
         callback(null, results);
     });
 };

@@ -2,9 +2,9 @@
     Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
     Created on 2021-4-30 13:59:36
 doctype
-html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
     head
-        title Collector name
+        title Disabled events notification: Информирует о скором включении отключенных событий
         link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
         link(rel='stylesheet', href='/material-design-icons/material-icons.css')
         meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
@@ -15,14 +15,53 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         header
             div.row
                 div.col.s12.m10.offset-m1
-                    h1 Collector name
+                    h1 Disabled events notification
                     h5.light.
-                        Collector name usually used for collect something
+                        Информирует о скором включении отключенных событий
         main
             div.row
                 div.col.s12.m10.offset-m1
-                    h3 Collector name description
+                    h3 Описание Disabled events notification
                     p.
-                        Collector name used for collect something and show something for you
-                        You can use this collector for get some data from something
+                        Коллектор может быть использован для генерации сообщений о том, что
+                        срок отключения событий истекает и они в скором времени будут включены.
+                        Отключить событие можно только для определенных объектов.
+                        Поэтому коллектор возвращает структуру с данными по каждому  событию,
+                        привязанному к объекту.
+                    h3 Параметры
+                    ul.browser-default
+                        li.
+                            Days before enable events - за сколько дней до включения события требуется информирование
+                        li.
+                            Disable period (days) - Информирование будет производится только для событий, которые
+                            были отключены на количество дней, установленное в этом параметре
+                    h3 Возвращаемое значение
+                    p.
+                        Возвращается структура JSON с данными для каждой пары объект-счетчик,
+                        для которых событие будет включено через время, определенное параметрами коллектора:
+                    div.card-panel
+                        pre.
+                            {
+                                counterID: Идентификатор счетчика,
+                                objectName: Имя объекта,
+                                counterName: Имя счетчика,
+                                disableUntil: Дата и время до которой событие было отключено,
+                                disableTime: Дата и время, когда было отключено событие,
+                                user: Пользователь, который отключил событие,
+                                timeIntervals: Временные интервалы на которые было отключено событие,
+                            }
+                    p.
+                        Для генерации событий и отображении их в Dashboard следует использовать счетчик с коллектором
+                        Events generator. Для этого ему необходимо установить зависимость от счетчика с коллектором
+                        Disabled events notification, создать переменные с данными, полученными от родительского счетчика
+                        и формировать требуемую информацию, например:
+                    div.card-panel
+                        pre.
+                            Event #%:COUNTER_ID:% "%:OBJECT_NAME:%:%:COUNTER_NAME:%" will be enabled on %:DISABLE_UNTIL:%
+                    p.
+                        Для получения данных из структуры, возвращаемой коллектором Disabled events notification
+                        можно использовать функцию getValueFromJSONStr().
+                        Например, getValueFromJSONStr(%:PARENT_VALUE:%, "objectName") вернет имя объекта, а
+                        getValueFromJSONStr(%:PARENT_VALUE:%, "disableUntil") вернет дату и время до которого
+                        событие было отключено.
 

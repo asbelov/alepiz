@@ -1,0 +1,64 @@
+//
+    Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2021-4-30 13:59:36
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Disabled events notification: Informs about the upcoming enable of disabled events
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Disabled events notification
+                    h5.light.
+                        Informs about the upcoming enable of disabled events
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Disabled events notification description
+                    p.
+                        The collector can be used to generate messages indicating that time of events disable are about
+                        to expire and events will be enabled soon. The event can be disabled only for certain objects.
+                        Therefore, the collector returns a data structure for each event associated with the object.
+                    h3 Parameters
+                    ul.browser-default
+                        li.
+                            Days before enable events - how many days before the event is enabled
+                        li.
+                            Disable period (days) - Notification will be made only for events that have been disabled
+                            for the number of days set in this parameter
+                    h3 Returned value
+                    p.
+                        A JSON structure is returned with data for each counter object pair, for which the event will
+                        be enabled after the time specified by the collector parameters:
+                    div.card-panel
+                        pre.
+                            {
+                                counterID: counter ID,
+                                objectName: object name,
+                                counterName: counter name,
+                                disableUntil: Date and time until which the event was disabled,
+                                disableTime: Date and time when the event was disabled,
+                                user: User who disabled the event,
+                                timeIntervals: Time intervals for which the event was disabled,
+                            }
+                    p.
+                        To generate events and display them in the Dashboard, use a counter with the Events generator
+                        collector. To do this, you needs to set a dependency on the counter with the
+                        Disabled events notification collector, create variables with the data received from the
+                        parent counter and generate the required information, for example:
+                    div.card-panel
+                        pre.
+                            Event #%:COUNTER_ID:% "%:OBJECT_NAME:%:%:COUNTER_NAME:%" will be enabled on %:DISABLE_UNTIL:%
+                    p.
+                        You can use the getValueFromJSONStr() function to get data from the JSON structure returned
+                        by the Disabled events notification collector. For example,
+                        getValueFromJSONStr(%: PARENT_VALUE:%, "objectName") will return the name of the object,
+                        and getValueFromJSONStr(%: PARENT_VALUE:%, "disableUntil") will return the date and time
+                        before which the event was disabled.
