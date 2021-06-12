@@ -1,4 +1,4 @@
-#define   Version    "0.0.9"
+#define   Version    "0.0.10"
 #define   AppName    "ALEPIZ"
 #define   AppId     "{EABD44EE-0DAD-4337-ADC6-A37A930BADC7}"
 #define   AppCopyright  "Copyright (c) 2020 Alexander Belov <asbel@alepiz.com>"

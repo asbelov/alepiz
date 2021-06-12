@@ -2,7 +2,7 @@
 | name                   = ALEPIZ
 | screenshot             = [[File:ALEPIZ data browser.png|thumb|Скриншот ALEPIZ с историческими данными по объекту]]
 | released               = {{start date and age|2016|11}}
-| latest_release_version = 0.0.9<ref>{{cite web|url=https://alepiz.com/help/download.pug|title=Информация о последних версиях ALEPIZ}}</ref>
+| latest_release_version = 0.0.10beta<ref>{{cite web|url=https://alepiz.com/help/download.pug|title=Информация о последних версиях ALEPIZ}}</ref>
 | latest_release_date    = {{start date and age|2021|05|14}}
 | operating_system       = [[Microsoft Windows]]
 | programming_language   = [[Node.js]], [[JavaScript]]
