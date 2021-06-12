@@ -39,15 +39,39 @@ rightsWrapper.checkActionRights = function (initUser, actionID, executionMode, c
 
     if(!actionFolder) return callback(new Error('Can\'t find action folder for action ' + actionID + ', user: ' + user));
 
-    rightsDB.checkActionRights(user, actionID, actionFolder, function(err, rights) {
+    rightsDB.checkActionRights(user, actionID, actionFolder, function(err, rightsRows) {
         if(err) {
             return callback(new Error('Can\'t check rights for action "' + actionID + '", action folder "' +
                 actionFolder + '", user "' + user + '": ' + err.message));
         }
 
-        if(!rights) {
+        if(!rightsRows.length) {
             return callback(new Error('Can\'t find user "' + user + '" for checking rights for action "' + actionID + '"'));
         }
+
+        var rights = {
+            view: 0,
+            run: 0,
+            makeTask: 0,
+            priority: 0,
+        };
+        // when the user has more than one role, the query will return more than one row
+        // priority:
+        //      1 if the action does not exist in the rightsAction table,
+        //      2 if this is an action group,
+        //      3 if this is an action.
+        rightsRows.forEach(function (row) {
+            // if the priority of the row is higher than the priority of rights, then replace the rights to the row
+            if(rights.priority < row.priority) rights = row;
+            else if(rights.priority === row.priority) {
+                // if the priority of the row is equal to the priority of the rights, then set the lowest of the found rights
+                for (var key in rights) {
+                    if(rights[key] > row[key]) rights[key] = row[key];
+                }
+            }
+        });
+
+        delete rights.priority;
 
         //log.debug('Execution mode: ',executionMode, '; user: ', user, '; rights: ', rights);
 

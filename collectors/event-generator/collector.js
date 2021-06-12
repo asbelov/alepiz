@@ -18,13 +18,15 @@ var systemUser = conf.get('systemUser') || 'system';
 var saveRepeatEventsCacheInterval = conf.get('collectors:event-generator:saveRepeatEventsCacheInterval') * 1000 || 15000;
 var runTaskOnProblem = conf.get('collectors:event-generator:runTaskOnProblem');
 var runTaskOnSolve = conf.get('collectors:event-generator:runTaskOnSolve');
-var isInitializing = false;
-var isEventProcessed = false;
-var db, eventsCache = {}, repeatEventsCache = {}, disabledEventsCache = {}, collectorActionsQueue = [];
+var isInitializing = 0;
+var isEventProcessed = 0;
+var db, eventsCache = {}, repeatEventsCache = {}, disabledEventsCache = {},
+    collectorHighPriorityActionsQueue = [], collectorActionsQueue = [],
+    eventNum = 0, prevEventNum = 0, prevErrorTime = 0, processedEventsParam = 'You can not view this message';
 /*
     get data and return it to server
 
-    prms - object with collector parameters {
+    param - object with collector parameters {
         <parameter1>: <value>,
         <parameter2>: <value>,
         ....
@@ -43,44 +45,67 @@ var db, eventsCache = {}, repeatEventsCache = {}, disabledEventsCache = {}, coll
 */
 
 collector.isEventDisabled = isEventDisabled; // for ajax
-collector.get = function(prms, _callback) {
+collector.get = function(param, _callback) {
 
-    if(typeof prms !== 'object') return _callback(new Error('Parameters are not set or error'));
+    if(typeof param !== 'object') return _callback(new Error('Parameters are not set or error'));
 
-    prms.$dataTimestamp = Date.now();
+    param.$dataTimestamp = Date.now();
 
     if(isEventProcessed) {
-        collectorActionsQueue.push({
-            prms: prms,
-            callback: _callback
-        });
+        if(param.action) {
+            collectorHighPriorityActionsQueue.push({
+                param: param,
+                callback: _callback
+            });
+        } else {
+            collectorActionsQueue.push({
+                param: param,
+                callback: _callback
+            });
+        }
 
-        if(collectorActionsQueue.length > 100 && Math.round(collectorActionsQueue.length / 10) ===  collectorActionsQueue.length / 10)
-            log.warn('Queue length for write events to database too big: ', collectorActionsQueue.length);
-
+        if((collectorActionsQueue.length > 100 &&
+                Math.round(collectorActionsQueue.length / 10) === collectorActionsQueue.length / 10) ||
+            (collectorHighPriorityActionsQueue.length > 10 &&
+                Math.round(collectorHighPriorityActionsQueue.length / 10) === collectorHighPriorityActionsQueue.length / 10)
+        ) {
+            log.warn('Events actions queue: ',
+                collectorHighPriorityActionsQueue.length, '; write events queue: ', collectorActionsQueue.length,
+                (prevEventNum ? '; processing speed: ' +
+                    Math.round((eventNum - prevEventNum) / (Date.now() - prevErrorTime) / 1000 ) + ' events/sec.' : ''),
+                '; last event processed: ', (Date.now() - isEventProcessed), 'ms',
+                (Date.now() - isEventProcessed > 5000 ? '; last event params: ' + processedEventsParam : '')
+                );
+            prevEventNum = eventNum;
+            prevErrorTime = Date.now();
+        } else {
+            prevEventNum = prevErrorTime = 0;
+        }
         return;
     }
-    isEventProcessed = true;
+
+    isEventProcessed = Date.now();
+    processedEventsParam = JSON.stringify(param);
 
     if(!isInitializing) {
-        isInitializing = true;
+        isInitializing = Date.now();
         initDB( function (err, initDB, _eventsCache, _disabledEventsCache) {
             if(err) {
-                isInitializing = isEventProcessed = false;
+                isInitializing = isEventProcessed = 0;
                 return _callback(err);
             }
 
             dbReplication(initDB, 'events', function (err, replicationDB) {
                 if(err) {
-                    isInitializing = isEventProcessed = false;
+                    isInitializing = isEventProcessed = 0;
                     return _callback(err);
                 }
 
                 db = replicationDB;
                 eventsCache = _eventsCache;
                 disabledEventsCache = _disabledEventsCache;
-                isEventProcessed = false;
-                collector.get(prms, _callback);
+                isEventProcessed = 0;
+                collector.get(param, _callback);
                 setInterval(saveRepeatedEventsToCache, saveRepeatEventsCacheInterval);
                 log.info('Initializing events system is completed');
             })
@@ -91,36 +116,40 @@ collector.get = function(prms, _callback) {
     function callback(err, result) {
         _callback(err, result);
 
-        isEventProcessed = false;
-        if(!collectorActionsQueue.length) return;
-        var collectorAction = collectorActionsQueue.shift();
-        collector.get(collectorAction.prms, function(err, result) {
+        isEventProcessed = 0;
+        ++eventNum;
+        if(!collectorHighPriorityActionsQueue.length && !collectorActionsQueue.length) return;
+
+        var collectorAction = collectorHighPriorityActionsQueue.length ?
+            collectorHighPriorityActionsQueue.shift() : collectorActionsQueue.shift();
+
+        collector.get(collectorAction.param, function(err, result) {
             collectorAction.callback(err, result);
         });
     }
 
 
-    if(prms.action) return runAction(prms, callback);
+    if(param.action) return runAction(param, callback);
 
-    var OCID = prms.$id;
-    var eventTimestamp = prms.$variables.UPDATE_EVENT_TIMESTAMP ? prms.$variables.UPDATE_EVENT_TIMESTAMP : prms.$dataTimestamp;
+    var OCID = param.$id;
+    var eventTimestamp = param.$variables.UPDATE_EVENT_TIMESTAMP ? param.$variables.UPDATE_EVENT_TIMESTAMP : param.$dataTimestamp;
 
     if(Number(OCID) !== parseInt(String(OCID), 10) || !Number(OCID) ||
-        Number(prms.$counterID) !== parseInt(String(prms.$counterID), 10) || !Number(prms.$counterID) ||
-        typeof prms.$variables !== 'object' || !prms.$variables.OBJECT_NAME || !prms.$variables.COUNTER_NAME) {
-        return callback(new Error('Some parameters are not correct: ' + JSON.stringify(prms)));
+        Number(param.$counterID) !== parseInt(String(param.$counterID), 10) || !Number(param.$counterID) ||
+        typeof param.$variables !== 'object' || !param.$variables.OBJECT_NAME || !param.$variables.COUNTER_NAME) {
+        return callback(new Error('Some parameters are not correct: ' + JSON.stringify(param)));
     }
 
-    // prms.$variables.UPDATE_EVENT_STATE === undefined when we has not an update event expression
-    if(prms.$variables.UPDATE_EVENT_STATE === true || prms.$variables.UPDATE_EVENT_STATE === undefined) {
+    // param.$variables.UPDATE_EVENT_STATE === undefined when we has not an update event expression
+    if(param.$variables.UPDATE_EVENT_STATE === true || param.$variables.UPDATE_EVENT_STATE === undefined) {
         // !!!don't touch this horror
         if(disabledEventsCache[OCID]) {
             if(disabledEventsCache[OCID].disableUntil < Date.now()) enableEvents({ events: [{OCID: OCID}] });
             else {
                 if(isEventDisabled(disabledEventsCache[OCID].intervals)) {
                     if(!eventsCache[OCID]) {
-                        log.info('Disabled event occurred: ', prms.$variables.OBJECT_NAME, '(', prms.$variables.COUNTER_NAME, '): importance: ',
-                            prms.importance, ', time: ', new Date(eventTimestamp).toLocaleString(), ', parentOCID: ', prms.$parentID,
+                        log.info('Disabled event occurred: ', param.$variables.OBJECT_NAME, '(', param.$variables.COUNTER_NAME, '): importance: ',
+                            param.importance, ', time: ', new Date(eventTimestamp).toLocaleString(), ', parentOCID: ', param.$parentID,
                             ', OCID: ', OCID, ', disabled: ', disabledEventsCache[OCID]);
                     }
                     return callback();
@@ -129,39 +158,39 @@ collector.get = function(prms, _callback) {
         }
 
         if(!eventsCache[OCID]) {
-            log.info('Event occurred: ', prms.$variables.OBJECT_NAME, '(', prms.$variables.COUNTER_NAME, '): importance: ',
-                prms.importance, ', time: ', new Date(eventTimestamp).toLocaleString(), ', parentOCID: ', prms.$parentID,
+            log.info('Event occurred: ', param.$variables.OBJECT_NAME, '(', param.$variables.COUNTER_NAME, '): importance: ',
+                param.importance, ', time: ', new Date(eventTimestamp).toLocaleString(), ', parentOCID: ', param.$parentID,
                 ', OCID: ', OCID);
         }
 
-        onEvent(OCID, prms.$objectID, prms.$counterID, prms.$variables.OBJECT_NAME, prms.$variables.COUNTER_NAME, prms.$parentID,
-            prms.importance, prms.eventDescription, eventTimestamp, prms.$dataTimestamp, prms.pronunciation, function(err, newEventID) {
+        onEvent(OCID, param.$objectID, param.$counterID, param.$variables.OBJECT_NAME, param.$variables.COUNTER_NAME, param.$parentID,
+            param.importance, param.eventDescription, eventTimestamp, param.$dataTimestamp, param.pronunciation, function(err, newEventID) {
 
             if(err) return callback(err);
 
-            if(prms.problemTaskID && runTaskOnProblem) {
+            if(param.problemTaskID && runTaskOnProblem) {
                 task.runTask({
                     userName: systemUser,
-                    taskID: prms.problemTaskID,
-                    variables: prms.$variables,
+                    taskID: param.problemTaskID,
+                    variables: param.$variables,
                 },function(err) {
                     if(err) log.error(err.message);
                 });
             }
 
-            if(Number(prms.eventDuration) === parseInt(String(prms.eventDuration), 10)) {
-                prms.eventDuration = Number(prms.eventDuration);
+            if(Number(param.eventDuration) === parseInt(String(param.eventDuration), 10)) {
+                param.eventDuration = Number(param.eventDuration);
                 var solve_problem = function() {
                     solveEvent(function(err) {
                         if(newEventID) callback(err, 1);
                         else callback(err);
                     })
-                    prms.$variables.UPDATE_EVENT_STATE = false;
-                    collector.get(prms, _callback); // use _callback()!!!
+                    param.$variables.UPDATE_EVENT_STATE = false;
+                    collector.get(param, _callback); // use _callback()!!!
                 }
 
-                if(!prms.eventDuration || prms.eventDuration < 1) solve_problem();
-                else setTimeout(solve_problem, prms.eventDuration * 1000);
+                if(!param.eventDuration || param.eventDuration < 1) solve_problem();
+                else setTimeout(solve_problem, param.eventDuration * 1000);
                 return;
             }
 
@@ -170,20 +199,20 @@ collector.get = function(prms, _callback) {
             else callback();
         });
 
-    } else if(prms.$variables.UPDATE_EVENT_STATE === false) {
+    } else if(param.$variables.UPDATE_EVENT_STATE === false) {
         solveEvent(callback);
     } else {
         callback(new Error('Can\'t generate event: incorrect variable value for UPDATE_EVENT_STATE (' +
-            prms.$variables.UPDATE_EVENT_STATE + ') can be "true|false|undefined" for ' +
-            prms.$variables.OBJECT_NAME + '->' + prms.$variables.PARENT_OBJECT_NAME + ': parent counter "' +
-            (prms.$variables.PARENT_COUNTER_NAME  || 'Undefined parent counter: ' +
-                prms.$variables.PARENT_COUNTER_NAME) + '" value: ' + prms.$variables.PARENT_VALUE));
+            param.$variables.UPDATE_EVENT_STATE + ') can be "true|false|undefined" for ' +
+            param.$variables.OBJECT_NAME + '->' + param.$variables.PARENT_OBJECT_NAME + ': parent counter "' +
+            (param.$variables.PARENT_COUNTER_NAME  || 'Undefined parent counter: ' +
+                param.$variables.PARENT_COUNTER_NAME) + '" value: ' + param.$variables.PARENT_VALUE));
     }
 
     function solveEvent(callback) {
         if(eventsCache[OCID]) {
-            log.info('Event solved: ', prms.$variables.OBJECT_NAME, '(', prms.$variables.COUNTER_NAME, '): importance: ',
-                prms.importance, ', time: ', new Date(eventTimestamp).toLocaleString(), ', parentOCID: ', prms.$parentID,
+            log.info('Event solved: ', param.$variables.OBJECT_NAME, '(', param.$variables.COUNTER_NAME, '): importance: ',
+                param.importance, ', time: ', new Date(eventTimestamp).toLocaleString(), ', parentOCID: ', param.$parentID,
                 ', OCID: ', OCID);
         } else var dontRunTask = true;
         onSolvedEvent(OCID, eventTimestamp, function(err) {
@@ -193,11 +222,11 @@ collector.get = function(prms, _callback) {
 
             if(runTaskOnSolve &&
                 (!disabledEventsCache[OCID] || !isEventDisabled(disabledEventsCache[OCID].intervals)) &&
-                prms.solvedTaskID && !dontRunTask) {
+                param.solvedTaskID && !dontRunTask) {
                 task.runTask({
                     userName: systemUser,
-                    taskID: prms.solvedTaskID,
-                    variables: prms.$variables,
+                    taskID: param.solvedTaskID,
+                    variables: param.$variables,
                 },function(err) {
                     if(err) log.error(err.message);
                 });
@@ -225,7 +254,7 @@ collector.removeCounters = function(OCIDs, callback) {
 
 collector.destroy = function(callback) {
     log.warn('Destroying collector event-generator');
-    isInitializing = false;
+    isInitializing = 0;
     eventsCache = {};
     if(db && typeof db.sendReplicationData === 'function') db.sendReplicationData(callback);
     else callback();

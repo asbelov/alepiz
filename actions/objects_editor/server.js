@@ -66,35 +66,38 @@ function editObjects(user, parameters, callback){
         if (err) return callback(err);
 
         var countersObjectsLinkage = {}, OCIDsForDelete = [], OCIDsToInsert = [],
-            newCountersIDs = typeof parameters.linkedCoutersIDs === 'string' ? parameters.linkedCoutersIDs.split(',') : [];
-        objectsCountersLinkage.forEach(function (counter) {
-            if(!countersObjectsLinkage[counter.id]) countersObjectsLinkage[counter.id] = {};
-            countersObjectsLinkage[counter.id][counter.objectID] = counter.OCID;
+            newCountersIDs = typeof parameters.linkedCountersIDs === 'string' ? parameters.linkedCountersIDs.split(',') : [];
 
-            if(Object.keys(countersObjectsLinkage[counter.id]).length === objectsIDs.length) {
-                if(newCountersIDs.indexOf(String(counter.id)) === -1) {
-                    for(var objectID in countersObjectsLinkage[counter.id]) {
-                        OCIDsForDelete.push({
-                            objectID: Number(objectID),
-                            counterID: counter.id
-                        });
+        if(parameters.linkedCountersIDs && parameters.linkedCountersIDs.trim() !== '0') {
+            objectsCountersLinkage.forEach(function (counter) {
+                if (!countersObjectsLinkage[counter.id]) countersObjectsLinkage[counter.id] = {};
+                countersObjectsLinkage[counter.id][counter.objectID] = counter.OCID;
+
+                if (Object.keys(countersObjectsLinkage[counter.id]).length === objectsIDs.length) {
+                    if (newCountersIDs.indexOf(String(counter.id)) === -1) {
+                        for (var objectID in countersObjectsLinkage[counter.id]) {
+                            OCIDsForDelete.push({
+                                objectID: Number(objectID),
+                                counterID: counter.id
+                            });
+                        }
                     }
                 }
-            }
-        });
+            });
 
-        newCountersIDs.forEach(function (counterID) {
-            if(Number(counterID) !== parseInt(counterID, 10)) return;
+            newCountersIDs.forEach(function (counterID) {
+                if (Number(counterID) !== parseInt(counterID, 10)) return;
 
-            objectsIDs.forEach(function (objectID) {
-                if(!countersObjectsLinkage[counterID] || !countersObjectsLinkage[counterID][objectID]) {
-                    OCIDsToInsert.push({
-                        objectID: Number(objectID),
-                        counterID: Number(counterID)
-                    });
-                }
-            })
-        });
+                objectsIDs.forEach(function (objectID) {
+                    if (!countersObjectsLinkage[counterID] || !countersObjectsLinkage[counterID][objectID]) {
+                        OCIDsToInsert.push({
+                            objectID: Number(objectID),
+                            counterID: Number(counterID)
+                        });
+                    }
+                })
+            });
+        }
 
         transactionDB.begin(function (err) {
             if (err) return callback(new Error('Error begin transaction for edit objects ' + String(newObjects) + ': ' + err.message));

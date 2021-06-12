@@ -195,8 +195,12 @@ rightsDB.checkActionRights = function(user, actionID, actionFolder, callback){
     // user 'system' has all rights for all actions
     if(user === systemUser) return callback(null, {view: 1, run: 1, makeTask: 1});
 
-    db.get('\
-SELECT rightsForActions.view AS view, rightsForActions.run AS run, rightsForActions.makeTask AS makeTask \
+    db.all('\
+SELECT rightsForActions.view AS view, rightsForActions.run AS run, rightsForActions.makeTask AS makeTask,\
+CASE WHEN EXISTS (SELECT * FROM rightsForActions ra WHERE ra.actionName = $actionID AND usersRoles.roleID=ra.roleID) THEN 3 \
+WHEN EXISTS (SELECT * FROM rightsForActions ra WHERE ra.actionName =  $actionFolder AND usersRoles.roleID=ra.roleID) THEN 2 \
+ELSE 1 \
+END AS priority \
 FROM rightsForActions \
 JOIN usersRoles ON usersRoles.roleID=rightsForActions.roleID \
 JOIN users ON users.id=usersRoles.userID \

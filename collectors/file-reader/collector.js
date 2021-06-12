@@ -13,7 +13,7 @@ var maxFileSize = 1048576; // 1MB
 /*
     get data and return it to server
 
-    prms - object with collector parameters {
+    param - object with collector parameters {
         <parameter1>: <value>,
         <parameter2>: <value>,
         ....
@@ -39,29 +39,38 @@ var maxFileSize = 1048576; // 1MB
     result - object {timestamp: <timestamp>, value: <value>} or simple value
 */
 
-collector.get = function(prms, callback) {
+collector.get = function(param, callback) {
 
-    if(!prms.fileName || !prms.regExp) {
-        return callback(new Error('Incorrect parameters fileName: ' + prms.fileName + '; regExp: ' + prms.regExp));
+    if(!param.fileName || !param.regExp) {
+        return callback(new Error('Incorrect parameters: fileName: ' + param.fileName + '; regExp: ' + param.regExp));
     }
     try {
-        var re = new RegExp(prms.regExp, 'igms');
+        var re = new RegExp(param.regExp, 'igms');
     } catch(e) {
-        return callback(new Error('Incorrect regExp: ' + prms.regExp + ': ' + e.message));
+        return callback(new Error('Incorrect regExp: ' + param.regExp + ': ' + e.message));
     }
     // removes whitespace from both ends of a string
-    prms.fileName = prms.fileName.trim();
+    param.fileName = param.fileName.trim();
     
-    fs.stat(prms.fileName, function(err, stat) {
-        if(err) return callback(new Error('Can\'t stat file ' + prms.fileName + ': ' + err.message));
-        if(!stat.isFile()) return callback(new Error('Not a file: ' + prms.fileName));
+    fs.stat(param.fileName, function(err, stat) {
+        if(err) {
+            if(!param.dontLogErrors) log.warn('Can\'t stat file ' + param.fileName + ': ' + err.message);
+            return callback();
+        }
+        if(!stat.isFile()) {
+            if(!param.dontLogErrors) log.warn('Not a file: ' + param.fileName);
+            return callback();
+        }
        
         if(stat.size > maxFileSize || stat.size === 0) {
-            return callback(new Error('Size of the file ' + prms.fileName + ' is too big or zero: ' +
+            return callback(new Error('Size of the file ' + param.fileName + ' is too big or zero: ' +
                 Math.round(stat.size / 1024 / 1024) + 'MB'));
         }
-        fs.readFile(prms.fileName, 'utf8', function(err, data) {
-			if(err) return callback(new Error('Can\'t open file ' + prms.fileName + ': ' + err.message));
+        fs.readFile(param.fileName, 'utf8', function(err, data) {
+			if(err) {
+                if(!param.dontLogErrors) log.warn('Can\'t open file ' + param.fileName + ': ' + err.message);
+			    return callback();
+            }
             
             var result = data.replace(re, '$1');
             callback(null, result);

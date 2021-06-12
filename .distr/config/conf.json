@@ -303,63 +303,30 @@
     },
     "collectors": {
         "dir": "collectors",
-        "timer": {
+        "defaultSettings": {
             "localAddress": "127.0.0.1",
             "serverAddress": "127.0.0.1",
             "port": 10170
         },
-        "zabbix-active": {
-            "localAddress": "127.0.0.1",
-            "serverAddress": "127.0.0.1",
-            "port": 10171,
-            "logZabbixAgentErrors": true
-        },
-        "zabbix-active-add": {
-            "localAddress": "127.0.0.1",
-            "serverAddress": "127.0.0.1",
-            "port": 10172,
-            "logZabbixAgentErrors": true
-        },
-        "ping": {
-            "localAddress": "127.0.0.1",
-            "serverAddress": "127.0.0.1",
-            "port": 10170
-        },
-        "zabbix": {
-            "localAddress": "127.0.0.1",
-            "serverAddress": "127.0.0.1",
-            "port": 10170
+        "discovery": {
+            "discoveryIP": "discoveryIP.txt"
         },
         "event-generator": {
             "dbPath": "db",
             "dbFile": "events.db",
             "saveRepeatEventsCacheInterval": 15,
             "runTaskOnProblem": true,
-            "runTaskOnSolve": true,
-            "localAddress": "127.0.0.1",
-            "serverAddress": "127.0.0.1",
-            "port": 10170
+            "runTaskOnSolve": true
         },
-        "events-aggregator": {
-            "localAddress": "127.0.0.1",
-            "serverAddress": "127.0.0.1",
-            "port": 10170
+        "zabbix-active": {
+            "port": 10171,
+            "logZabbixAgentErrors": true
         },
-        "discovery": {
-            "localAddress": "127.0.0.1",
-            "serverAddress": "127.0.0.1",
-            "port": 10170,
-            "discoveryIP": "discoveryIP.txt"
-        },
-        "scheduler": {
-            "localAddress": "127.0.0.1",
-            "serverAddress": "127.0.0.1",
-            "port": 10170
+        "zabbix-active-add": {
+            "port": 10172,
+            "logZabbixAgentErrors": true
         },
         "mssql": {
-            "localAddress": "127.0.0.1",
-            "serverAddress": "127.0.0.1",
-            "port": 10170,
             "connectionTimeoutSec": 25,
             "queryTimeoutSec": 25
         }

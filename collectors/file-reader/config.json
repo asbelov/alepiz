@@ -11,6 +11,11 @@
         },
         "regExp": {
             "description": "Regular expression"
+        },
+        "dontLogErrors": {
+            "description": "Don't log errors",
+            "canBeEmpty": "on",
+            "type": "checkbox"
         }
     }
 }

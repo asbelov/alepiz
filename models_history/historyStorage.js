@@ -4,6 +4,7 @@
 
 var async = require('async');
 var path = require('path');
+var fs = require('fs');
 
 var log = require('../lib/log')(module);
 var proc = require('../lib/proc');
@@ -155,7 +156,7 @@ storage.stop = function(callback) {
 };
 
 storage.kill = function() {
-    if(storageModifyingProcess && typeof storageModifyingProcess.killAll() === 'function') storageModifyingProcess.killAll();
+    if(storageModifyingProcess && typeof storageModifyingProcess.killAll === 'function') storageModifyingProcess.killAll();
     if(storageQueryingProcesses && typeof storageQueryingProcesses.killAll ==='function') storageQueryingProcesses.killAll();
 };
 
@@ -445,7 +446,6 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
     var transactionInProgress = false;
     var transactionsFunctions = [];
     var callbackOnStop;
-    var lastModifierRestartTime = Date.now();
     var repl = require('../lib/dbReplication');
 
     var slowRecords = {
@@ -480,13 +480,13 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
     if(isTransactionProcess && isTransactionProcess === transProcessArgID) {
         var dbReplication = function(initDB, id, callback) {
             transactionInProgress = true;
-            log.info('Truncate WAL journal file for ', dbPath,'...');
-            initDB.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(err) {
-                if (err) log.error('Can\'t truncate WAL journal file for ', dbPath, ':', err.message);
+            //log.info('Truncate WAL journal file for ', dbPath,'...');
+            //initDB.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(err) {
+            //    if (err) log.error('Can\'t truncate WAL journal file for ', dbPath, ':', err.message);
 
-                log.info('Optimizing database ', dbPath);
-                initDB.exec('PRAGMA optimize', function (err) {
-                    if (err) log.error('Can\'t optimize database ', dbPath, ': ', err.message);
+            //    log.info('Optimizing database ', dbPath);
+            //    initDB.exec('PRAGMA optimize', function (err) {
+            //        if (err) log.error('Can\'t optimize database ', dbPath, ': ', err.message);
 
                     transactionInProgress = false;
                     log.info('Loading trends data...');
@@ -500,8 +500,8 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
                         }
                     });
 
-                });
-            });
+                //});
+            //});
             repl(initDB, id, callback);
             //});
         };
@@ -885,7 +885,7 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
         }, function(trendsTableName) {
             if(trendsTableName) return callback(trendsTableName);
 
-            log.info('Using numbers table for get ', maxRecordsCnt,' records for object ', id,
+            log.debug('Using numbers table for get ', maxRecordsCnt,' records for object ', id,
                 ', time interval: ', (new Date(timeFrom)).toLocaleString(), ' - ', (new Date(timeTo)).toLocaleString(),
                 '; required time interval: ', Math.round(requiredTimeInterval), 'min; ',
                 ' records in trends: ', debugInfo.join('; '));
@@ -946,13 +946,32 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
             if(err) return callback(err);
             if(typeof callbackOnStop === 'function') return callback(new Error('Can\'t run new transaction while stopping'));
 
-            db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(err) {
-                if (err) log.error('Can\'t truncate WAL journal file: ', err.message);
-                if(typeof callbackOnStop === 'function') return callback(new Error('Can\'t run new transaction while stopping'));
+            var walPath = dbPath.replace(/\.db$/i, '.wal');
+            fs.stat(walPath, function (err, stat) {
+                if(err) log.debug('Can\'t stat file ', walPath, ': ', err.message);
+                var logOperations = false;
+                if(stat && stat.size) {
+                    for(var i = 0, size = stat.size; i < 3 && size > 1024; i++) size = Math.round(size / 1024);
+                    log.info('Truncate WAL journal file size: ', size, ['B', 'KB', 'MB', 'GB'][i],
+                        ' path: ', walPath, ', db path: ', dbPath, '...');
+                    logOperations = true;
+                }
+                db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function (err) {
+                    if (err) log.error('Can\'t truncate WAL journal file: ', err.message);
+                    else if(logOperations) log.info('Truncate WAL journal file is completed');
+                    if (typeof callbackOnStop === 'function') return callback(new Error('Can\'t run new transaction while stopping'));
 
-                db.exec('BEGIN', function (err) {
-                    if (err) return callback(new Error('Can\'t start transaction for storage database: ' + err.message));
-                    callback();
+                    if(logOperations) log.info('Optimizing database ', dbPath);
+                    initDB.exec('PRAGMA optimize', function (err) {
+                        if (err) log.error('Can\'t optimize database ', dbPath, ': ', err.message);
+                        else if(logOperations) log.info('Optimize WAL journal file is completed, starting transaction...');
+                        if (typeof callbackOnStop === 'function') return callback(new Error('Can\'t run new transaction while stopping'));
+
+                        db.exec('BEGIN', function (err) {
+                            if (err) return callback(new Error('Can\'t start transaction for storage database: ' + err.message));
+                            callback();
+                        });
+                    });
                 });
             });
         });

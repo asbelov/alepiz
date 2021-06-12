@@ -42,6 +42,29 @@ collector.get = function(param, callback) {
     var zabbixHostname = param.zabbixHostname.toLowerCase();
     var key = param.itemParameters ? param.item+'['+param.itemParameters+']' : param.item;
 
+    if(!counters[zabbixHostname] || !counters[zabbixHostname].length) counters[zabbixHostname] = [];
+    // update counter parameters for existing OCID
+    else if(Number(param.$id) && countersIDX[param.$id] && countersIDX[param.$id].num !== undefined) {
+        var num = countersIDX[param.$id].num;
+        var oldZabbixHostname = countersIDX[param.$id].zabbixHostname;
+
+        // for different old and new zabbixHostnames at first deleting existing counter
+        if (zabbixHostname !== oldZabbixHostname) collector.removeCounters([param.$id]);
+        // for equal zabbixHostnames replace old parameters to the new
+        else if (counters[zabbixHostname][num]) {
+            counters[zabbixHostname][num] = {
+                key: key,
+                delay: Number(param.pollingFreq),
+                lastlogsize: 0,
+                mtime: 0,
+            };
+
+            log.info('Replace param for counters with existing OCID ', param.$id, ' and equal hostnames "', zabbixHostname,
+                '": ', counters[zabbixHostname][num]);
+            var dontCreateNewCounter = true;
+        }
+    }
+
     // add parameters even if a counter for this OCID exists, because the parameters may have changed
     var isCounterExist = false;
     if(!countersParameters[zabbixHostname]) countersParameters[zabbixHostname] = {};
@@ -51,49 +74,41 @@ collector.get = function(param, callback) {
     ) {
         countersParameters[zabbixHostname][key.toLowerCase()] = {
             callbacks: {},
-            onlyNumeric: !!param.onlyNumeric,
         };
     } else isCounterExist = true;
     countersParameters[zabbixHostname][key.toLowerCase()].callbacks[param.$id] = callback;
+    countersParameters[zabbixHostname][key.toLowerCase()].onlyNumeric = !!param.onlyNumeric;
 
     throttling.init(zabbixHostname + '-' + key.toLowerCase(), param, collector);
 
-    if(!counters[zabbixHostname] || !counters[zabbixHostname].length) counters[zabbixHostname] = [];
-    else if(Number(param.$id) && countersIDX[param.$id]) {
-        var num = countersIDX[param.$id].num;
-
-        if(num !== undefined && counters[zabbixHostname][num]) {
-            counters[zabbixHostname][num] = {
-                key: key,
-                delay: Number(param.pollingFreq),
-                lastlogsize: 0,
-                mtime: 0,
-            };
-
-            log.debug('Request to getting data from existing OCID ', param.$id, ', hostname "', zabbixHostname, '": ', counters[zabbixHostname][num]);
-            return;
-        }
-    }
+    if(dontCreateNewCounter) return;
 
     countersIDX[param.$id] = {
-        num: counters[zabbixHostname].length,
-        zabbixHostname: zabbixHostname
+        num: counters[zabbixHostname].length, // number of the counters with equal zabbixHostname
+        zabbixHostname: zabbixHostname,
     };
     counters[zabbixHostname].push({
 		key: key,
 		delay: Number(param.pollingFreq),
         lastlogsize: 0,
-        mtime: 0
+        mtime: 0,
     });
-    log.info('Adding ', (isCounterExist? 'to existing counter an additional' : 'a new counter with'), ' OCID ', param.$id,' for hostname "',
-        zabbixHostname, '": ', counters[zabbixHostname][counters[zabbixHostname].length-1]);
+    if(isCounterExist) {
+        log.info('Adding an additional OCID ', param.$id, ' to existing counter "', zabbixHostname,
+            '": ', counters[zabbixHostname][counters[zabbixHostname].length-1]);
+    } else {
+        log.info('Adding a new counter with OCID ', param.$id, ' for hostname   "',
+            zabbixHostname, '": ', counters[zabbixHostname][counters[zabbixHostname].length - 1]);
+    }
 };
 
 collector.init = function(newServerPort) {
     serverPort = newServerPort;
 };
 
+// must be a synced function ar rewrite removing counters with existing OCID and different zabbixHostnames above
 collector.removeCounters = function(OCIDs, callback) {
+    if(!callback) callback = function () {};
     if(!OCIDs.length) return callback();
 
     var existingOCIDs = [];

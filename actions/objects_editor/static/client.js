@@ -141,7 +141,7 @@ var JQueryNamespace = (function ($) {
                 }
             });
 
-            var countersIDsElm = $('input#linkedCoutersIDs');
+            var countersIDsElm = $('input#linkedCountersIDs');
 
             var countersChips = {};
             data.counters.forEach(function (counter) {
@@ -163,7 +163,7 @@ var JQueryNamespace = (function ($) {
 
             setCountersIDsElm();
 
-            // set value of 'input#linkedCoutersIDs' to comma separated counters IDs
+            // set value of 'input#linkedCountersIDs' to comma separated counters IDs
             function setCountersIDsElm() {
                 countersIDsElm.val(linkedCountersInstance.chipsData.map(function (chip) {
                     return Number(chip.tag.replace(/^.+\(#(\d+)\)$/, '$1'));

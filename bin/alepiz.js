@@ -34,8 +34,9 @@ var IPC = require('../lib/IPC');
 
 
 service.run (function () {
+    var stopTimeout = conf.get('serviceStopTimeout') || 120000;
     setTimeout(function() {
-        log.exit('Service was not stopped in timeout. Exiting');
+        log.exit('ALEPIZ was not stopped in timeout ' + (stopTimeout / 1000) + ' sec. Exiting');
 
         log.exit('Trying stop the server...');
         server.stop(function () {});
@@ -46,7 +47,7 @@ service.run (function () {
                 setTimeout(process.exit, 15000, 6); // process.exit(6) for search
             });
         });
-    }, conf.get('serviceStopTimeout') || 120000);
+    }, stopTimeout);
 
     stop(function() {
         service.stop(0);
@@ -62,8 +63,8 @@ start(function() {
 
 function restart() {
     if(history.cacheServiceIsRunning()){
-        log.warn('Waiting for finishing saving data to DB before restart ALEPIZ');
-        return setTimeout(restart, 60000);
+        log.warn('Waiting for finishing saving data to DB before restart ALEPIZ...');
+        return setTimeout(restart, 15000);
     }
 
     log.warn('Restarting ALEPIZ...');

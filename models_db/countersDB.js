@@ -198,7 +198,7 @@ countersDB.getCountersForFirstCalculation = function(objectsIDs, countersIDs, ca
 
 
 /*
-    get counters parameters for specific counters IDs
+    get counters parameters for specific objects and counters IDs
 
     OCIDsArray - array with objectCounterIDs
     callback(err, data)

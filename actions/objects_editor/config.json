@@ -38,6 +38,9 @@
     },
     "disabled": {
       "description": "Disabled (1) or enabled (empty) objects for collecting data from counters"
+    },
+    "linkedCountersIDs": {
+      "description": "Comma separated linked counters ID. If \"0\" then linked counters will be unchanged"
     }
   }
 }

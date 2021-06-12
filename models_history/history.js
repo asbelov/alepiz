@@ -1,6 +1,9 @@
 /*
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
+/*
+ * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+ */
 
 /**
  * Created by Alexander Belov on 16.10.2016.
@@ -91,9 +94,10 @@ function initServerCommunication() {
     }
 
 
-    function truncateWalWatchdog(initParameters) {
+    function truncateWalWatchdog(initParameters, callback) {
 
-        cache.getDBPath().forEach(function(walPath) {
+        cache.getDBPath().forEach(function(dbPath) {
+            var walPath = dbPath.replace(/\.db$/i, '.wal');
             // truncate watchdog
             var truncateCounter = 0, truncateCheckInterval = 30000;
             truncateWatchDogInterval = setInterval(function () {
@@ -107,7 +111,7 @@ function initServerCommunication() {
                                 if (err) log.warn('Can\'t stat file ', walPath, ': ', err.message);
                                 if((!stat || !stat.size) && truncateWatchDogInterval) {
                                     log.error('WAL file was truncated, but history is halted. Restart history...');
-                                    restartHistory();
+                                    restartHistory(callback);
                                 }
                             });
                         }, 10000)
@@ -115,7 +119,7 @@ function initServerCommunication() {
 
                     if(truncateCounter * truncateCheckInterval > 600000) {
                         log.error('The WAL file was not truncated, but the possible history process halt. Restart history process...');
-                        restartHistory();
+                        restartHistory(callback);
                         if(truncateWatchDogInterval) clearInterval(truncateWatchDogInterval);
                         return;
                     }
@@ -130,19 +134,10 @@ function initServerCommunication() {
             }, truncateCheckInterval);
         });
 
-        function restartHistory() {
+        function restartHistory(callback) {
             clientIPC.kill(function() {
                 setTimeout( function() {
-                    history.start(initParameters, function(err) {
-                        if(err) {
-                            log.error('Error starting history: ', err.message);
-                            log.exit('Error starting history: ', err.message);
-
-                            log.disconnect(function () { process.exit(2) });
-                        }
-
-                        log.info('History server restarted successfully');
-                    });
+                    history.start(initParameters, callback);
                 }, 5000);
             });
         }
@@ -161,13 +156,12 @@ function initServerCommunication() {
             restartAfterErrorTimeout: 10000,
             onStart: function(err) {
                 if(err) return callback(new Error('Can\'t run history server: ' + err.message));
-                truncateWalWatchdog(initParameters);
+                //truncateWalWatchdog(initParameters, callback);
                 clientIPC.sendAndReceive({type: 'initParameters', data: initParameters}, function(err) {
                     initParameters.__restart = true;
                     if(truncateWatchDogInterval) clearInterval(truncateWatchDogInterval);
                     truncateWatchDogInterval = null;
-                    //if(!restartInProgress)
-                        callback(err);
+                    if(typeof callback === 'function') callback(err);
                     restartInProgress = true;
                 });
             },
