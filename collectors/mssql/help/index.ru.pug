@@ -108,22 +108,5 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                             В случае успешного подключения возвращается 1, в случае неуспешного - 0.
                             Если SQL запрос указан, но подключиться к серверу не удалось, возвращается JSON в виде
                             {"unableToConnect": "&lt;error message&gt;"}
-                    h3 Настройки
-                    ul.browser-default
-                        li connectionTimeoutSec - таймаут для подключения к MSSQL, если не установлено, то 2 сек
-                        li queryTimeoutSec- таймаут для выполнения SQL запроса, если не установлено, то 2 сек
-                    p Настройки сборщика можно установить в файле config/conf.json в объекте collectors => mssql:
-                    div.card-panel
-                        span
-                            pre.
-                                ...
-                                "collectors": {
-                                ...
-                                    "mssql": {
-                                        "connectionTimeoutSec": 5,
-                                        "queryTimeoutSec": 3
-                                    }
-                                }
-                                ...
-
-
+                        li Connection timeout (sec) - таймаут для подключения к MSSQL, если не установлено, то 2 сек
+                        li Query timeout (sec) - таймаут для выполнения SQL запроса, если не установлено, то 2 сек

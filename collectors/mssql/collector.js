@@ -4,8 +4,6 @@
 
 const mssql = require("msnodesqlv8");
 var log = require('../../lib/log')(module);
-var conf = require('../../lib/conf');
-conf.file('config/conf.json');
 
 
 var collector = {};
@@ -81,8 +79,8 @@ collector.get = function(param, callback) {
     if(param.database) config.push('Database={' + param.database.replace(/^{(.+?)}$/, '$1') + '}');
     if(param.trusted) config.push('Trusted_Connection=' + (param.trusted ? 'yes' : 'no'));
 
-    var connectionTimeout = Number(conf.get('collectors:mssql:connectionTimeoutSec')) || 2;
-    var queryTimeout = Number(conf.get('collectors:mssql:queryTimeoutSec')) || 2;
+    var connectionTimeout = param.connectionTimeoutSec || 2;
+    var queryTimeout = param.queryTimeoutSec || 2;
 
     if(connectionTimeout !== parseInt(String(connectionTimeout), 10) || connectionTimeout < 1) connectionTimeout = 2;
     if(queryTimeout !== parseInt(String(queryTimeout), 10) || queryTimeout < 1) queryTimeout = 2;

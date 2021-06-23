@@ -204,7 +204,7 @@ countersDB.getCountersForFirstCalculation = function(objectsIDs, countersIDs, ca
     callback(err, data)
     data = [{OCID: <OCID>, name: <parameter name>, value: <parameter value>}, ...]
     parameter value can be a variable %:<var>:%
- */
+*/
 countersDB.getCountersParameters = function(OCIDsArray, callback){
     log.debug('Getting parameters for objectCountersIDs ', OCIDsArray);
 

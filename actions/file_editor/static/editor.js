@@ -74,7 +74,7 @@ function Editor(initCfg) {
 
         try {
             resultElm = document.getElementById(c.IDResult);
-            resultElm.id = 'result_' + c.id;
+            //resultElm.id = 'result_' + c.id;
             resultElm.style.display = 'none';
         } catch (e) {
             alert('Can\'t initialize element for saving result of save file operation with ID: ' + c.IDResult + ': ' + e.message);
@@ -104,6 +104,10 @@ function Editor(initCfg) {
             initCodeMirror(editElm, textareaElm, parentElm);
         };
         if (document.readyState === "complete") initCodeMirror(editElm, textareaElm, parentElm);
+    }
+
+    this.focus = function() {
+        editor.focus();
     }
 
     this.set = function (initFileName, serviceName, codePage) {

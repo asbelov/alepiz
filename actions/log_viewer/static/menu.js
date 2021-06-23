@@ -51,6 +51,7 @@ function Menu(cInitCfg, initMainObject, callback) {
         if(!mainObject) mainObject = cInitCfg.logViewerObj;
         if (mainObject) mainObject.del();
         mainObject = new initMainObject(cInitCfg);
+        if( typeof mainObject.focus === 'function') setTimeout(mainObject.focus, 100);
         if(typeof callback === 'function') return callback(mainObject, _fileName);
     }
 
@@ -163,15 +164,16 @@ function Menu(cInitCfg, initMainObject, callback) {
         }
     }
 
-    function confirmOnTextChanged(elm, prevValue, callback, callbackParameter) {
+    function confirmOnTextChanged(elm, prevValue, callback) {
         if(typeof mainObject.isChanged === 'function' && mainObject.isChanged()) {
-            if(confirm('The text has been modified but not saved. Discard all changes?')) callback(callbackParameter);
+            if(confirm('The text has been modified but not saved. Discard all changes?')) callback();
             else {
                 elm.value = prevValue;
                 M.FormSelect.init(elm, {});
+                if( typeof mainObject.focus === 'function') setTimeout(mainObject.focus, 100)
             }
         } else {
-            callback(callbackParameter);
+            callback();
         }
     }
 
@@ -180,7 +182,9 @@ function Menu(cInitCfg, initMainObject, callback) {
         if (!objects || !objects.length) return callback(null, cInitCfg.serviceName);
 
         selectFileElm.onchange = function() {
-            confirmOnTextChanged(selectFileElm, cInitCfg.fileName, selectFileName, callback);
+            confirmOnTextChanged(selectFileElm, cInitCfg.fileName, function () {
+                selectFileName(callback);
+            });
         };
 
         selectServiceElm.innerHTML = '';
@@ -194,7 +198,9 @@ function Menu(cInitCfg, initMainObject, callback) {
                 selectServiceElm.options.add(optionElm);
             }
             selectServiceElm.onchange = function () {
-                confirmOnTextChanged(selectServiceElm, cInitCfg.objectID, selectFile, callback);
+                confirmOnTextChanged(selectServiceElm, cInitCfg.objectID, function () {
+                    selectFile(callback);
+                });
             };
         }
         M.FormSelect.init(selectServiceElm, {});

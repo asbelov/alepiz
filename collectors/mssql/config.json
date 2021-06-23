@@ -41,6 +41,18 @@
             "canBeEmpty": "on",
             "default": "master"
         },
+        "connectionTimeoutSec": {
+            "description": "Connection timeout (sec)",
+            "checkAs": "UInteger",
+            "type": "textInputShort",
+            "default": 2
+        },
+        "queryTimeoutSec": {
+            "description": "Query timeout (sec)",
+            "checkAs": "UInteger",
+            "type": "textInputShort",
+            "default": 2
+        },
         "query": {
             "description": "MSSQL Query (check connection when empty)",
             "canBeEmpty": "on",

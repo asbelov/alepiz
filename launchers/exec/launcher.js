@@ -22,25 +22,39 @@ param = {
  */
 module.exports = function(param, args, callback){
     var executable = param.executable;
-    var workingDir = param.cwd;
+    var workingDir = param.cwd || args.cwd || '';
     var timeout = param.timeout || 0;
-    var stdinData = param.stdinData;
+    var stdinData = param.stdinData || args.stdinData;
     var callbackAlreadyRunning = false, startTime = Date.now();
 
-    if(!executable || !fs.existsSync(executable)) {
-        return callback(new Error('[exec]: can\'t find executable: ' + executable));
+    if(!path.isAbsolute(workingDir)) workingDir = path.join(__dirname, '..', '..', workingDir);
+
+    var executablePath = workingDir ? path.join(workingDir, executable) : executable;
+    if(!executable || !fs.existsSync(executablePath)) {
+        return callback(new Error('[exec]: can\'t find executable: ' + executablePath));
     }
 
     if(Number(timeout) !== parseInt(String(timeout), 10)) {
         return callback(new Error('[exec]: set unexpected timeout : ' + timeout));
     } else timeout = Number(timeout);
 
-    log.debug('[exec]: starting ', executable);
+    if(args.programArgs) {
+        try {
+            var programArgs = JSON.parse(args.programArgs);
+        } catch(e) {
+            return callback(new Error('[exec]: can\'t parse arguments ' + args.programArgs + ' as JSON: ' + e.message))
+        }
+        if(!Array.isArray(programArgs)) {
+            return callback(new Error('[exec]: Arguments ' + args.programArgs + ' is not a stringified JSON array'))
+        }
+    } else programArgs = [];
+
+    log.info('[exec]: starting ', executable);
 
     // one time I got exception when call cp.spawn()
     var proc;
     try {
-        proc = cp.spawn(executable, args, {
+        proc = cp.spawn(executable, programArgs, {
             cwd: workingDir || path.join(__dirname, '..', '..'),
             windowsHide: true,
             timeout: timeout,
