@@ -1,0 +1,38 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-5-17 19:53:53
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Zabbix active add: получает данные от Zabbix агентов в активном режиме или в режиме trapper. Порт 10056
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Zabbix active add
+                    h5.light.
+                        Получает данные от Zabbix агентов в активном режиме работы агентов или в режиме trapper
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание Zabbix active add
+                    p.
+                        Сборщик используется для получения данных от Zabbix агентов, работающих в активном режиме.
+                        Отличие от сборщика Zabbix active заключается в том, что Zabbix active add принимает
+                        соединения на TCP порт 10057, а Zabbix active на TCP порт 10051.
+                    p.
+                        В некоторых случаях Zabbix агент не справляется с объемом запрашиваемых данных от ALEPIZ.
+                        В этом случае требуется установка еще одной копии Zabbix агент и разделения запросов
+                        между ними. Для подключения ко второй копии Zabbix агента используется данный сборщик.
+                    p.
+                        Подробную информацию об использовании сборщика можно посмотреть на странице помощи
+                        сборщика #[a(href="/collectors/zabbix-active/help/") Zabbix active].
+
+
+

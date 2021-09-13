@@ -7,13 +7,14 @@ var path = require('path');
 var fs = require('fs');
 
 var log = require('../lib/log')(module);
+//var proc = require('../lib/threads');
 var proc = require('../lib/proc');
 var exitHandler = require('../lib/exitHandler');
 var sqlite = require('../lib/sqlite');
 var countersDB = require('../models_db/countersDB');
-var parameters = require('../models_history/historyParameters');
 
 var transProcessArgID = 'trans';
+//if(!proc.isMainThread) runProcessForQueries(proc.workerData[2], proc.workerData[3]);  //standalone process
 if(!module.parent) runProcessForQueries(process.argv[2], process.argv[3]);  //standalone process
 
 var storage = {};
@@ -24,22 +25,29 @@ module.exports = storage;
 var trendsTimeIntervals = [10, 30, 60];
 var selectQueryQueue = [], queriesInProgress = 0;
 var storageQueryingProcesses, storageModifyingProcess;
+var parameters = {};
 
 
 function getDbPaths() {
-    var dbPaths = [path.join(__dirname, '..', parameters.dbPath, parameters.dbFile)];
     if(Array.isArray(parameters.db) && parameters.db.length) {
-        dbPaths = parameters.db.map(function (obj) {
-            if(obj.relative) return path.join(__dirname, '..', obj.path, obj.file);
-            else return path.join(obj.path, obj.file);
-        })
+        var dbPaths = parameters.db.map(function (obj) {
+            if (obj && obj.path && obj.file) {
+                if(obj.relative) return path.join(__dirname, '..', obj.path, obj.file);
+                else return path.join(obj.path, obj.file);
+            } else log.error('Can\'t create DB path from ', parameters.db, ': ', obj);
+        });
+    } else if (parameters.dbPath && parameters.dbFile) {
+        dbPaths = [path.join(__dirname, '..', parameters.dbPath, parameters.dbFile)];
     }
+
     return dbPaths;
 }
 
 storage.getDbPaths = getDbPaths;
 
-storage.initStorage = function (callback) {
+storage.initStorage = function (initParameters, callback) {
+
+    parameters = initParameters;
 
     var dbPaths = getDbPaths();
     async.eachSeries(dbPaths, initDB, function (err) {
@@ -61,7 +69,7 @@ storage.initStorage = function (callback) {
         }, 120000);
 
         log.info('Starting main storage process for processing transaction...');
-        storageModifyingProcess = new proc.parent({
+        var initStorageModifyingProcess = new proc.parent({
             childProcessExecutable: __filename,
             args: [transProcessArgID, '%:childID:%'],
             killTimeout: 1800000, // waiting for finishing all transactions
@@ -69,44 +77,54 @@ storage.initStorage = function (callback) {
             childrenNumber: dbPaths, //If array, then number will be equal to array length and %:childID:% will be set to array item
             module: 'historyStorage:writer',
             cleanUpCallbacksPeriod: 86400000,
-        }, function (err, storageModifyingProcess) {
+        }, function (err, _storageModifyingProcess) {
             if (err) {
                 return callback(new Error('Can\'t initializing main storage process for processing transaction: ' + err.message));
             }
 
-            storageModifyingProcess.startAll(function (err) {
+            _storageModifyingProcess.startAll(function (err) {
                 if (err) {
                     return callback(new Error('Can\'t run main storage process for processing transaction: ' + err.message));
                 }
 
-                storageModifyingProcess.sendToAll({
+                log.info('Sending parameters to main storage process for processing transaction...');
+                _storageModifyingProcess.sendAndReceiveToAll({
                     parameters: parameters,
-                });
+                }, function(err) {
+                    if (err) log.error('Error sending parameters to storage processes for processing transaction: ', err.message);
+                    storageModifyingProcess = initStorageModifyingProcess;
 
-                log.info('Starting storage processes for getting data from database...');
-                storageQueryingProcesses = new proc.parent({
-                    childProcessExecutable: __filename,
-                    killTimeout: 60000,
-                    restartAfterErrorTimeout: 200,
-                    module: 'historyStorage:reader',
-                    cleanUpCallbacksPeriod: 86400000,
-                }, function (err, storageQueryingProcesses) {
-                    if (err) {
-                        return callback(new Error('Can\'t initializing storage processed for for getting data from database: ' + err.message));
-                    }
-
-                    storageQueryingProcesses.startAll(function (err) {
+                    log.info('Starting storage processes for getting data from database...');
+                    var initStorageQueryingProcesses = new proc.parent({
+                        childProcessExecutable: __filename,
+                        killTimeout: 60000,
+                        restartAfterErrorTimeout: 200,
+                        module: 'historyStorage:reader',
+                        cleanUpCallbacksPeriod: 86400000,
+                        childrenNumber: parameters.storageQueryingProcessesNum || 0,
+                    }, function (err, _storageQueryingProcesses) {
                         if (err) {
-                            return callback(new Error('Can\'t run storage processed for for getting data from database: ' + err.message));
+                            return callback(new Error('Can\'t initializing storage processes for for getting data from database: ' + err.message));
                         }
 
-                        storageQueryingProcesses.sendToAll({
-                            parameters: parameters,
-                        });
+                        _storageQueryingProcesses.startAll(function (err) {
+                            if (err) {
+                                return callback(new Error('Can\'t run storage processes for for getting data from database: ' + err.message));
+                            }
 
-                        callback();
+                            log.info('Sending parameters to storage processes for for getting data from database...');
+                            _storageQueryingProcesses.sendAndReceiveToAll({
+                                parameters: parameters,
+                            }, function(err) {
+                                if (err) log.error('Error sending parameters to storage processes for for getting data from database: ', err.message);
+                                storageQueryingProcesses = initStorageQueryingProcesses;
+                                callback();
+                            });
+                        });
                     });
                 });
+
+
             });
         });
     });
@@ -204,7 +222,7 @@ function childFunc() {
         // get one query result, run to process one query from queue
         if (selectQueryQueue.length) childFunc.apply(this, selectQueryQueue.shift());
 
-        //if(funcName === 'config') { log.info('Func: ', funcName, ' send: ', args); log.info('Func: ', funcName, ' recv: ', data); }
+        //if(funcName === 'config') { log.info('Func: ', funcName, ' send: ', args); log.info('Func: ', funcName, ' receive: ', data); }
         callback(null, data);
     });
 }
@@ -371,7 +389,20 @@ storage.getLastRecordTimestampForValue = function () {
     childFunc.apply(this, args);
 };
 
-// callback
+// callback(null,
+//  [   {    id: 1625308767715,    timestamp: 1625308768388,    result: { len: 0, timestamp: 0 }  },
+//      {    id: 1625308767711,    timestamp: 1625308768388,    result: { len: 0, timestamp: 0 }  },
+//  [length]: 2]
+//  );
+storage.getTransactionsQueueInfo = function () {
+    var args = Array.prototype.slice.call(arguments);
+    args.push('getTransactionsQueueInfo'); // add last parameter (funcName)
+    args.push(1); // add last parameter (dontPushToQueue)
+
+    childFunc.apply(this, args);
+}
+
+// transactionDescription, callback
 storage.beginTransaction = function () {
     var args = Array.prototype.slice.call(arguments);
     args.push('beginTransaction'); // add last parameter (funcName)
@@ -443,7 +474,8 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
     var functions = {};
     var trendsData = new Map();
     var objectsParameters; // it's new Map(), but it must be undefined to be checked on initialization
-    var transactionInProgress = false;
+    var transactionInProgress = 0;
+    var transactionDescriptionInProgress = '';
     var transactionsFunctions = [];
     var callbackOnStop;
     var repl = require('../lib/dbReplication');
@@ -453,17 +485,112 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
         recordsNumAvg: 0,
         recordsNum: 0,
     };
-    setInterval(function() {
-        if(!slowRecords.timeAvg) return;
-        log.warn('Slow queries avg time: ', Math.round(slowRecords.timeAvg / 1000),' sec; avg records number/query: ',
-            Math.round(slowRecords.recordsNumAvg), '; all records number: ', slowRecords.recordsNum);
-        slowRecords = {
-            timeAvg: 0,
-            recordsNumAvg: 0,
-            recordsNum: 0,
-        };
-    }, 60000);
 
+    new proc.child({
+        module: 'historyStorage',
+        cleanUpCallbacksPeriod: 86400000,
+        onMessage: onMessage,
+        onStop: onStop,
+        onDestroy: function () {
+            if(initDB && typeof initDB.close === 'function') {
+                initDB.close(function (err) {
+                    if (err) log.exit('Error while close storage DB: ' + err.message);
+                    else log.exit('Storage DB closed successfully');
+                });
+            }
+        },
+        onDisconnect: function () {  // exit on disconnect from parent (then server will be restarted)
+            log.exit('History storage process ' + process.pid + ' was disconnected from server unexpectedly. Exiting');
+            onStop(function () {
+                log.disconnect(function () { process.exit(2) });
+            });
+        },
+    });
+
+    // starting after receiving message with parameters from parent
+    function init(callback) {
+        setInterval(function() {
+            if(!slowRecords.timeAvg) return;
+            log.warn('Slow queries avg time: ', Math.round(slowRecords.timeAvg / 1000),' sec; avg records number/query: ',
+                Math.round(slowRecords.recordsNumAvg), '; all records number: ', slowRecords.recordsNum);
+            slowRecords = {
+                timeAvg: 0,
+                recordsNumAvg: 0,
+                recordsNum: 0,
+            };
+        }, 60000);
+
+
+        if(isTransactionProcess && isTransactionProcess === transProcessArgID) {
+            var dbReplication = function(initDB, id, callback) {
+                //transactionInProgress = Date.now();
+                // transactionDescriptionInProgress = 'Truncate WAL journal';
+                //log.info('Truncate WAL journal file for ', dbPath,'...');
+                //initDB.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(err) {
+                //    if (err) log.error('Can\'t truncate WAL journal file for ', dbPath, ':', err.message);
+
+                //    log.info('Optimizing database ', dbPath);
+                //    initDB.exec('PRAGMA optimize', function (err) {
+                //        if (err) log.error('Can\'t optimize database ', dbPath, ': ', err.message);
+
+                //transactionInProgress = 0;
+                // transactionDescriptionInProgress = '';
+                log.info('Loading trends data...');
+                loadTrendsData(initDB, function(err) {
+                    if(err) log.error(err.message);
+                    else log.info('Loading trends data is complete');
+
+                    if (transactionsFunctions.length) {
+                        log.warn('Starting ', transactionsFunctions.length, ' delayed transactions');
+                        functions.beginTransaction(transactionsFunctions.shift());
+                    }
+                });
+
+                //});
+                //});
+                repl(initDB, id, callback);
+                //});
+            };
+        } else {
+            dbPath = getDbPaths()[0];
+            dbReplication = function(initDB, id, callback) { callback(null, initDB); };
+        }
+
+        sqlite.init(dbPath, function (err, _initDB) {
+            if (err) {
+                log.exit('Can\'t initialize storage database ' + dbPath + ': ' + err.message);
+                log.disconnect(function () {
+                    log.disconnect(function () { process.exit(2) });
+                });
+                return;
+            }
+
+            initDB = _initDB;
+
+            dbReplication(_initDB, 'history', function (err, replicationDB) {
+                if (err) {
+                    log.error('Can\'t initialize replication for storage database ' + dbPath + ': ' + err.message);
+                    log.disconnect(function () {
+                        log.disconnect(function () { process.exit(2) });
+                    });
+                }
+
+                db = replicationDB;
+                if(typeof db.sendReplicationData !== 'function') db.sendReplicationData = function(callback) { callback(); };
+
+                db.exec("PRAGMA synchronous = OFF", function (err) {
+                    if (err) log.error('Can\'t apply "PRAGMA synchronous = OFF to storage DB": ', err.message);
+
+                    db.exec("PRAGMA journal_mode = WAL", function (err) {
+                        if (err) log.error('Can\'t apply "PRAGMA journal_mode = WAL to storage DB": ', err.message);
+
+                        log.info('Init history storage child ', process.pid, ' for ', dbPath, ' is complete');
+                        callback();
+                    });
+                });
+            });
+        });
+    }
 
     function addSlowRecord(receiveTime, recordsNum) {
         if(slowRecords.timeAvg) {
@@ -476,91 +603,6 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
         }
         slowRecords.recordsNum += recordsNum;
     }
-
-    if(isTransactionProcess && isTransactionProcess === transProcessArgID) {
-        var dbReplication = function(initDB, id, callback) {
-            transactionInProgress = true;
-            //log.info('Truncate WAL journal file for ', dbPath,'...');
-            //initDB.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(err) {
-            //    if (err) log.error('Can\'t truncate WAL journal file for ', dbPath, ':', err.message);
-
-            //    log.info('Optimizing database ', dbPath);
-            //    initDB.exec('PRAGMA optimize', function (err) {
-            //        if (err) log.error('Can\'t optimize database ', dbPath, ': ', err.message);
-
-                    transactionInProgress = false;
-                    log.info('Loading trends data...');
-                    loadTrendsData(initDB, function(err) {
-                        if(err) log.error(err.message);
-                        else log.info('Loading trends data is complete');
-
-                        if (transactionsFunctions.length) {
-                            log.warn('Starting ', transactionsFunctions.length, ' delayed transactions');
-                            functions.beginTransaction(transactionsFunctions.shift());
-                        }
-                    });
-
-                //});
-            //});
-            repl(initDB, id, callback);
-            //});
-        };
-    } else {
-        dbPath = getDbPaths()[0];
-        dbReplication = function(initDB, id, callback) { callback(null, initDB); };
-    }
-
-    sqlite.init(dbPath, function (err, _initDB) {
-        if (err) {
-            log.exit('Can\'t initialize storage database ' + dbPath + ': ' + err.message);
-            log.disconnect(function () {
-                log.disconnect(function () { process.exit(2) });
-            });
-            return;
-        }
-
-        initDB = _initDB;
-
-        dbReplication(_initDB, 'history', function (err, replicationDB) {
-            if (err) {
-                log.error('Can\'t initialize replication for storage database ' + dbPath + ': ' + err.message);
-                log.disconnect(function () {
-                    log.disconnect(function () { process.exit(2) });
-                });
-            }
-
-            db = replicationDB;
-            if(typeof db.sendReplicationData !== 'function') db.sendReplicationData = function(callback) { callback(); };
-
-            db.exec("PRAGMA synchronous = OFF", function (err) {
-                if (err) log.error('Can\'t apply "PRAGMA synchronous = OFF to storage DB": ', err.message);
-
-                db.exec("PRAGMA journal_mode = WAL", function (err) {
-                    if (err) log.error('Can\'t apply "PRAGMA journal_mode = WAL to storage DB": ', err.message);
-
-                    log.info('Init history storage child ', process.pid, ' complete');
-                    new proc.child({
-                        module: 'historyStorage',
-                        cleanUpCallbacksPeriod: 86400000,
-                        onMessage: onMessage,
-                        onStop: onStop,
-                        onDestroy: function () {
-                            _initDB.close(function (err) {
-                                if (err) log.exit('Error while close storage DB: ' + err.message);
-                                else log.exit('Storage DB closed successfully');
-                            });
-                        },
-                        onDisconnect: function () {  // exit on disconnect from parent (then server will be restarted)
-                            log.exit('History storage process ' + process.pid + ' was disconnected from server unexpectedly. Exiting');
-                            onStop(function () {
-                                log.disconnect(function () { process.exit(2) });
-                            });
-                        },
-                    });
-                });
-            });
-        });
-    });
 
     function onMessage(message, callback) {
         if (message && message.restart) {
@@ -583,6 +625,7 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
         // init parameters
         if(message && typeof message.parameters === 'object') {
             parameters = message.parameters;
+            init(callback);
             return;
         }
 
@@ -608,7 +651,8 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
     function onStop(callback) {
         if(!transactionInProgress) {
             // prevent to run transaction
-            transactionInProgress = true;
+            transactionInProgress = Date.now();
+            transactionDescriptionInProgress = 'Stopping storage';
             callbackOnStop = function(err) {
                 if (err) log.error('Error while committing an unexpected transaction: ' + err.message);
                 else log.error('Unexpected transaction committed successfully');
@@ -616,8 +660,14 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
 
             var timeToWaitForDB = isTransactionProcess === transProcessArgID ? 300 : 15; //sec
 
+            if(!initDB || typeof initDB.close !== 'function') {
+                if (typeof callback === 'function') callback();
+                callback = null;
+                return;
+            }
+
             log.warn('Closing the database for ', (isTransactionProcess === transProcessArgID ?
-                    ('transactions process ' + dbPath + '...') : 'queries process...'));
+                ('transactions process ' + dbPath + '...') : 'queries process...'));
 
             initDB.close(function (err) {
                 if (err) {
@@ -627,19 +677,35 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
                     log.warn('Storage DB closed successfully for ', (isTransactionProcess === transProcessArgID ?
                         ('transactions process ' + dbPath) : 'queries process'));
                 }
+                if(!db || typeof db.sendReplicationData !== 'function') {
+                    if (typeof callback === 'function') callback();
+                    callback = null;
+                    return;
+                }
                 db.sendReplicationData(function (err) {
                     if (err) log.error('Error while sending replication data: ' + err.message);
 
                     clearTimeout(terminateTimeout);
-                    if(typeof callback === 'function') callback();
+                    if (typeof callback === 'function') callback();
                     callback = null;
                 });
             });
+
         } else {
             var waitingTimeout = setTimeout(function() {
-                log.warn('Continue waiting while last transaction is committed for ' + dbPath + '...');
+                log.warn('Continue waiting while last transaction is committed for ' + dbPath +
+                    '.... Transaction queue: ', transactionsFunctions.length,
+                    (transactionInProgress ?
+                        ', last transaction started at ' + (new Date(transactionInProgress)).toLocaleString() +
+                        '(' + transactionDescriptionInProgress + ')' :
+                        ', no transaction in progress'));
             }, 30000);
-            log.warn('Waiting while last transaction is committed for ' + dbPath + '...');
+            log.warn('Continue waiting while last transaction is committed for ' + dbPath +
+                '.... Transaction queue: ', transactionsFunctions.length,
+                (transactionInProgress ?
+                    ', last transaction started at ' + (new Date(transactionInProgress)).toLocaleString() +
+                        '(' + transactionDescriptionInProgress + ')':
+                    ', no transaction in progress'));
 
             // clear transaction queue
             transactionsFunctions = [];
@@ -648,16 +714,28 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
             // function will running after transaction.commit
             callbackOnStop = function(err) {
                 // prevent to run transaction
-                transactionInProgress = true;
+                transactionInProgress = Date.now();
+                transactionDescriptionInProgress = 'Stopping storage after commit';
                 clearTimeout(waitingTimeout);
                 if (err) log.error('Error while commit transaction for ' + dbPath + ': ' + err.message);
                 else log.warn('Transaction commit successfully for ' + dbPath);
+
+                if(!initDB || typeof initDB.close !== 'function') {
+                    if (typeof callback === 'function') callback();
+                    callback = null;
+                    return;
+                }
 
                 log.warn('Closing the database after commit transaction for ' + dbPath + '...');
                 initDB.close(function (err) {
                     if (err) log.error('Error while close storage DB after commit transaction for ' + dbPath + ': ' + err.message);
                     else log.warn('Storage DB closed successfully after commit transaction for ' + dbPath);
 
+                    if(!db || typeof db.sendReplicationData !== 'function') {
+                        if (typeof callback === 'function') callback();
+                        callback = null;
+                        return;
+                    }
                     log.warn('Sending cached transaction to replication server for ' + dbPath + '...');
                     db.sendReplicationData(function (err) {
                         if (err) log.error('Error while sending transaction for ' + dbPath + ': ' + err.message);
@@ -673,6 +751,11 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
 
         var terminateTimeout = setTimeout(function () {
             log.warn('Cannot close database ', dbPath, ' in ', timeToWaitForDB,'sec. Terminate...');
+            if(!db || typeof db.sendReplicationData !== 'function') {
+                if (typeof callback === 'function') callback();
+                callback = null;
+                return;
+            }
             db.sendReplicationData(function (err) {
                 if (err) log.error('Error while sending replication data: ' + err.message);
                 if(typeof callback === 'function') callback();
@@ -701,6 +784,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
             if(cnt > parameters.queryMaxResultStrings) cnt = parameters.queryMaxResultStrings;
         }
 
+        if(!db || typeof db.all !== 'function') {
+            return callback(new Error('Can\'t get records from storage database: DB is not initialized'));
+        }
         db.all('SELECT data, timestamp FROM ' + tableType + ' WHERE objectID=$id ' + timeStampCondition +
             'ORDER BY timestamp DESC LIMIT $count OFFSET $offset', {
             $id: id,
@@ -720,6 +806,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
             if(recordsType > 0) return callback(null, records1.reverse());
 
             if(cnt > parameters.queryMaxResultStrings) cnt = parameters.queryMaxResultStrings;
+            if(!db || typeof db.all !== 'function') {
+                return callback(new Error('Can\'t get records from storage database: DB is not initialized'));
+            }
             db.all('SELECT data, timestamp FROM strings WHERE objectID=$id ' + timeStampCondition +
                 'ORDER BY timestamp DESC LIMIT $count OFFSET $offset', {
                 $id: id,
@@ -768,6 +857,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
         } else cnt = parameters.queryMaxResultStrings;
 
         getTableName(id, timeFrom, timeTo, maxRecordsCnt, recordsType, function(tableType) {
+            if(!db || typeof db.all !== 'function') {
+                return callback(new Error('Can\'t get records from storage database: DB is not initialized'));
+            }
             /*
             Note that the BETWEEN operator is inclusive. It returns true when the test_expression is less than or equal
             to high_expression and greater than or equal to the value of low_expression:
@@ -802,6 +894,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
 
                 if(cnt > parameters.queryMaxResultStrings) cnt = parameters.queryMaxResultStrings;
 
+                if(!db || typeof db.all !== 'function') {
+                    return callback(new Error('Can\'t get records from storage database: DB is not initialized'));
+                }
                 db.all('SELECT data, timestamp FROM strings WHERE objectID=$id AND ' +
                     'timestamp BETWEEN $timeFrom AND $timeTo ORDER BY timestamp DESC LIMIT $queryMaxResult', {
                     $id: id,
@@ -864,6 +959,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
         // trendsTables = [2, 10, 30, 60]; idx = 2; trendsTimeIntervals.slice(0,idx+1).reverse() = [30, 10, 2];
         async.each(trendsTimeIntervals.slice(0, idx + 1).reverse(), function (trendTimeInterval, callback) {
             var trendsTableName = 'trends' + trendTimeInterval + 'min';
+            if(!db || typeof db.all !== 'function') {
+                return callback(new Error('Can\'t get table name: DB is not initialized'));
+            }
             db.all('SELECT count(*) AS num FROM ' + trendsTableName + ' WHERE objectID=$id AND timestamp BETWEEN $timeFrom AND $timeTo', {
                 $id: id,
                 $timeFrom: timeFrom,
@@ -898,6 +996,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
         else table = 'strings';
 
         var startTime = Date.now();
+        if(!db || typeof db.get !== 'function') {
+            return callback(new Error('Can\'t get records from storage database: DB is not initialized'));
+        }
         db.get('SELECT timestamp FROM ' + table + ' WHERE objectID=$id AND data=$value ORDER BY timestamp DESC LIMIT 1', {
             $id: id,
             $value: value
@@ -922,6 +1023,10 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
 
         objectsParameters = new Map();
         log.info('The initial loading of object parameters into the cache is performed before starting first transaction');
+
+        if(!db || typeof db.all !== 'function') {
+            return callback(new Error('Can\'t get data from objects table from storage database: DB is not initialized'));
+        }
         db.all('SELECT * FROM objects', function (err, rows) { // id, type, cachedRecords
             if (err) return callback(new Error('Can\'t get data from objects table from storage database: ' + err.message));
 
@@ -933,14 +1038,39 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
         });
     }
 
-    functions.beginTransaction = function(callback) {
+    functions.getTransactionsQueueInfo = function(callback) {
+        if(!transactionInProgress && transactionsFunctions.length) {
+            log.warn('Starting ', transactionsFunctions.length, ' halted transactions');
+            functions.beginTransaction(transactionsFunctions.shift());
+        }
+        return callback(null, {
+            len: transactionsFunctions.length,
+            timestamp: transactionInProgress,
+            description: transactionDescriptionInProgress,
+        });
+    }
+
+    functions.beginTransaction = function(description, callback) {
+        if(typeof description === 'object' && typeof description.callback === 'function') {
+            callback = description.callback;
+            description = description.description;
+        }
         if(typeof callbackOnStop === 'function') return callback(new Error('Can\'t run new transaction while stopping'));
 
         if(transactionInProgress) {
-            transactionsFunctions.push(callback);
+            /*
+            log.info(Date.now(), ' Adding transaction to queue: ', description, '(', transactionsFunctions.length, ') now processing ',
+                transactionDescriptionInProgress, ' form ', (new Date(transactionInProgress).toLocaleString()),
+                ': ', transactionInProgress);
+             */
+            transactionsFunctions.push({
+                description: description,
+                callback: callback,
+            });
             return;
         }
-        transactionInProgress = true;
+        transactionInProgress = Date.now();
+        transactionDescriptionInProgress = description;
 
         getObjectsParameters(function(err) {
             if(err) return callback(err);
@@ -956,19 +1086,29 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
                         ' path: ', walPath, ', db path: ', dbPath, '...');
                     logOperations = true;
                 }
+                if(!db || typeof db.exec !== 'function') {
+                    return callback(new Error('Can\'t run new transaction: DB is not initialized'));
+                }
                 db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function (err) {
                     if (err) log.error('Can\'t truncate WAL journal file: ', err.message);
                     else if(logOperations) log.info('Truncate WAL journal file is completed');
                     if (typeof callbackOnStop === 'function') return callback(new Error('Can\'t run new transaction while stopping'));
 
                     if(logOperations) log.info('Optimizing database ', dbPath);
+                    if(!initDB || typeof initDB.exec !== 'function') {
+                        return callback(new Error('Can\'t run new transaction: DB is not initialized'));
+                    }
                     initDB.exec('PRAGMA optimize', function (err) {
                         if (err) log.error('Can\'t optimize database ', dbPath, ': ', err.message);
                         else if(logOperations) log.info('Optimize WAL journal file is completed, starting transaction...');
                         if (typeof callbackOnStop === 'function') return callback(new Error('Can\'t run new transaction while stopping'));
 
+                        if(!db || typeof db.exec !== 'function') {
+                            return callback(new Error('Can\'t run new transaction: DB is not initialized'));
+                        }
                         db.exec('BEGIN', function (err) {
                             if (err) return callback(new Error('Can\'t start transaction for storage database: ' + err.message));
+                            //log.info(Date.now(), ' Starting transaction:  ', transactionDescriptionInProgress, ': ', transactionInProgress);
                             callback();
                         });
                     });
@@ -980,33 +1120,59 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
     functions.commitTransaction = function(err, _callback) {
 
         function callback(err) {
-            if(typeof callbackOnStop === 'function') callbackOnStop(err);
-            _callback(err);
+            if(err) log.warn('Error in transaction "', transactionDescriptionInProgress, '": ', err);
+            if(typeof callbackOnStop === 'function') {
+                if(err) log.info('Stopping database after transaction "', transactionDescriptionInProgress ,'" error...');
+                callbackOnStop(err);
+            }
+            clearInterval(commitWatchdog);
+            if(err) log.info('Truncating DB after transaction "', transactionDescriptionInProgress, '" error...');
+            if(err) log.info('Truncating DB after transaction "', transactionDescriptionInProgress,'" error is finished');
+
+            //log.info(Date.now(), ' Finishing transaction: ', transactionDescriptionInProgress, ': ', transactionInProgress, ' (', transactionsFunctions.length, ')');
+            transactionInProgress = 0;
+            transactionDescriptionInProgress = '';
+            if(transactionsFunctions.length) functions.beginTransaction(transactionsFunctions.shift());
+            if(typeof _callback === 'function') _callback(err);
+            else {
+                log.warn('Commit of transaction is finished after timeout, error: ', err);
+            }
+            _callback = null;
         }
 
+        var commitWatchdog = setInterval(function () {
+            var error = 'Commit or rollback transaction timeout: ' + transactionDescriptionInProgress + ', started at ' +
+                (new Date(transactionInProgress)).toLocaleString() +
+                ' (' + transactionInProgress + '), queue: ' + transactionsFunctions.length;
+            log.warn(error);
+            //callback(new Error(error));
+        }, parameters.timeoutForCommitTransaction);
+
         if(err) {
+            if(!db || typeof db.exec !== 'function') {
+                return callback(new Error('Can\'t run rollback transaction: DB is not initialized'));
+            }
             db.exec('ROLLBACK', function(errRollback) {
-                if(errRollback) return callback(new Error(err.message + '; and can\'t rollback transaction for storage database :' + errRollback.message));
-
-
-                db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(err) {
-                    if (err) log.error('Can\'t truncate WAL journal file: ', err.message);
-
-                    transactionInProgress = false;
-                    if(transactionsFunctions.length) functions.beginTransaction(transactionsFunctions.shift());
+                if(!db || typeof db.exec !== 'function') {
+                    return callback(new Error('Can\'t run rollback transaction: DB is not initialized'));
+                }
+                db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(truncateErr) {
+                    if (truncateErr) log.error('Can\'t truncate WAL journal file: ', truncateErr);
+                    if (errRollback) return callback(new Error(err.message + '; and can\'t rollback transaction for storage database :' + errRollback.message));
                     callback(err);
                 });
             });
         } else {
+            if(!db || typeof db.exec !== 'function') {
+                return callback(new Error('Can\'t run commit transaction: DB is not initialized'));
+            }
             db.exec('COMMIT', function (err) {
-                if (err) return callback(new Error('Can\'t commit transaction for storage database: ' + err.message));
-
-                //log.info('Truncate WAL journal file');
-                db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function (err) {
-                    if (err) log.error('Can\'t truncate WAL journal file: ', err.message);
-
-                    transactionInProgress = false;
-                    if(transactionsFunctions.length) functions.beginTransaction(transactionsFunctions.shift());
+                if(!db || typeof db.exec !== 'function') {
+                    return callback(new Error('Can\'t run rollback transaction: DB is not initialized'));
+                }
+                db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(truncateErr) {
+                    if (truncateErr) log.error('Can\'t truncate WAL journal file: ', truncateErr);
+                    if (err) return callback(new Error('Can\'t commit transaction for storage database: ' + err.message));
                     callback();
                 });
             });
@@ -1019,16 +1185,37 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
             daysToKeepHistory = 0;
         }
 
-        functions.beginTransaction(function(err) {
+        if(!IDs.length) return callback();
+
+        functions.beginTransaction('Delete records IDs: ' + IDs.join(', '), function(err) {
             if(err) return callback(err);
 
+            //log.info(Date.now(), ' Starting del transaction:  ', transactionDescriptionInProgress, ': ', transactionInProgress);
             delRecords(IDs, daysToKeepHistory, daysToKeepTrends, function(err) {
+                //log.info(Date.now(), ' Finishing del transaction: ', transactionDescriptionInProgress, ': ', transactionInProgress, ' (', transactionsFunctions.length, '): ', err);
                 functions.commitTransaction(err, callback);
-            })
-        })
+            });
+        });
     };
 
-    function delRecords(IDs, daysToKeepHistory, daysToKeepTrends, callback) {
+    function delRecords(IDs, daysToKeepHistory, daysToKeepTrends, _callback) {
+
+        var deleteRecordsDebugInfo = ['recordsIDs:  ' + IDs.join(',') + '; hist: ' + daysToKeepHistory + '; trends: ' + daysToKeepTrends];
+        var callback = function (err) {
+            clearTimeout(deleteRecordWatchdog);
+            if(typeof _callback === 'function') _callback(err);
+            else {
+                log.warn('Delete record ', IDs, ' finished after timeout and rollback transaction, error: ', err,
+                    '; stack: ', deleteRecordsDebugInfo);
+            }
+        }
+
+        var deleteRecordWatchdog = setTimeout(function () {
+            log.warn('Delete record timeout (', parameters.timeoutForDeleteObjectRecords * IDs.length / 1000,
+                'sec). Starting rollback. Stack: ' + deleteRecordsDebugInfo.join('; '));
+            _callback(new Error('Delete record timeout. Stack: ' + deleteRecordsDebugInfo.join('; ')));
+            _callback = null;
+        }, parameters.timeoutForDeleteObjectRecords * IDs.length);
 
         if (daysToKeepHistory) {
             var now = new Date();
@@ -1039,18 +1226,32 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
             d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToKeepTrends);
             var timestampForTrends = d.getTime();
 
+            if(!db || typeof db.prepare !== 'function') {
+                return callback(new Error('Can\'t delete records from storage database: DB is not initialized'));
+            }
             var stmtNumbers = db.prepare('DELETE FROM numbers WHERE objectID=$id AND timestamp<$timestamp', function (err) {
+                deleteRecordsDebugInfo.push('stmtNumbers ' + err);
                 if (err) return callback(new Error('Can\'t prepare to remove data from numbers table for objects: ' +
                     IDs.join(',') + ' and for ' + daysToKeepHistory + ' days: ' + err.message));
 
+                if(!db || typeof db.prepare !== 'function') {
+                    return callback(new Error('Can\'t delete records from storage database: DB is not initialized'));
+                }
                 var stmtStrings = db.prepare('DELETE FROM strings WHERE objectID=$id AND timestamp<$timestamp', function (err) {
+                    deleteRecordsDebugInfo.push('stmtStrings ' + err);
                     if (err) return callback(new Error('Can\'t prepare to remove data from strings table for objects: ' +
                         IDs.join(',') + ' and for : ' + daysToKeepHistory + ' days: ' + err.message));
 
                     var stmtTrends = {};
                     async.each(trendsTimeIntervals, function (timeInterval, callback) {
+                        deleteRecordsDebugInfo.push('stmtTrends ' + timeInterval + err);
+
+                        if(!db || typeof db.prepare !== 'function') {
+                            return callback(new Error('Can\'t delete records from storage database: DB is not initialized'));
+                        }
                         stmtTrends[timeInterval] = db.prepare('DELETE FROM trends' + timeInterval + 'min WHERE objectID=$id AND timestamp<$timestamp', function (err) {
                             if (err) return callback(new Error('Can\'t prepare to delete data from trends' + timeInterval + 'min table for objects ' + IDs.join(', ') + ': ' + err.messgage));
+
                             callback();
                         });
                     }, function (err) {
@@ -1062,23 +1263,24 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
                                 $id: id,
                                 $timestamp: timestampForHistory,
                             }, function (err) {
+                                deleteRecordsDebugInfo.push('stmtNumbers run ' + err);
                                 if (err) return callback(new Error('Can\'t remove data from numbers table for object: ' + id +
                                     ' and for ' + daysToKeepHistory + ' days: ' + err.message));
-
                                 stmtStrings.run({
                                     $id: id,
                                     $timestamp: timestampForHistory,
                                 }, function (err) {
+                                    deleteRecordsDebugInfo.push('stmtStrings run ' + err);
                                     if (err) return callback(new Error('Can\'t remove data from strings table for object: ' + id +
                                         ' and for ' + daysToKeepHistory + ' days: ' + err.message));
-
-                                    async.each(trendsTimeIntervals, function (timeInterval, callback) {
+                                    async.eachSeries(trendsTimeIntervals, function (timeInterval, callback) {
                                         stmtTrends[timeInterval].run({
                                             $id: id,
                                             // remove trends data with time interval less then 1 hours like history data
                                             // (keepHistory time).
                                             $timestamp: timeInterval < 60 ? timestampForHistory: timestampForTrends,
                                         }, function (err) {
+                                            deleteRecordsDebugInfo.push('stmtTrends ' + timeInterval + ' run ' + err);
                                             if (err) return callback(new Error('Can\'t delete data from trends' +
                                                 timeInterval + 'min table for objectID: ' + id + ': ' + err.message));
                                             callback();
@@ -1092,19 +1294,25 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
                             trendsTimeIntervals.forEach(function (timeInterval) {
                                 stmtTrends[timeInterval].finalize();
                             });
+                            deleteRecordsDebugInfo.push('finish ' + err);
                             callback(err);
                         });
                     });
                 })
             })
         } else {
+            if(!db || typeof db.prepare !== 'function') {
+                return callback(new Error('Can\'t delete records from storage database: DB is not initialized'));
+            }
             var stmt = db.prepare('DELETE FROM objects WHERE id=?', function (err) {
+                deleteRecordsDebugInfo.push('stmtObjects ' + err);
                 if (err) return callback(new Error('Can\'t prepare to remove all data for objects: ' +
                     IDs.join(',') + ' from storage: ' + err.message));
 
                 async.eachSeries(IDs, function (id, callback) {
 
                     stmt.run(id, function (err) {
+                        deleteRecordsDebugInfo.push('stmtObject ' + id + ': ' + err);
                         if (err) return callback(new Error('Can\'t remove all data for object: ' + id + ' from storage: ' + err.message));
 
                         objectsParameters.delete(id);
@@ -1112,6 +1320,7 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
                     })
                 }, function (err) {
                     stmt.finalize();
+                    deleteRecordsDebugInfo.push('finish ' + err);
                     callback(err);
                 });
             })
@@ -1123,6 +1332,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
      */
 
     function loadTrendsData(db, callback) {
+        if(!db || typeof db.all !== 'function') {
+            return callback(new Error('Can\'t load trends from storage database: DB is not initialized'));
+        }
         db.all('SELECT id, trends FROM objects', function(err, rows) {
             if (err) return callback(new Error('Can\'t load trends data from DB: ' + err.message));
 
@@ -1150,6 +1362,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
     function saveTrendData(id, trendsStr, callback) {
         if(!trendsStr) return callback();
 
+        if(!db || typeof db.all !== 'function') {
+            return callback(new Error('Can\'t save trends from storage database: DB is not initialized'));
+        }
         db.run('UPDATE objects SET trends=$trendsStr WHERE id=$id', {
             $trendsStr: trendsStr,
             $id: id
@@ -1175,6 +1390,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
             return;
         }
 
+        if(!db || typeof db.prepare !== 'function') {
+            return callback(new Error('Can\'t work with storage database: DB is not initialized'));
+        }
         stmt = db.prepare(sql, function(err) {
             if(err) return callback(err);
             stmt.run(param, function(err) {
@@ -1198,6 +1416,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
                 };
             else
                 updateObjectParameters = function (callback) {
+                    if(!db || typeof db.run !== 'function') {
+                        return callback(new Error('Can\'t work with storage database: DB is not initialized'));
+                    }
                     db.run('UPDATE objects SET cachedRecords=$cachedRecords WHERE id=$id', {
                         $cachedRecords: newObjectParameters.cachedRecords,
                         $id: id
@@ -1237,7 +1458,8 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
                         ' table for object id ' + id + ', timestamp: ' + record.timestamp + ', data: ' + record.data +
                         ': ' + err.message));
 
-                    if (!isNumber) return callback();
+                    // don\'t save trends for strings and when keepTrends = 0
+                    if (!isNumber || !newObjectParameters.keepTrends) return callback();
 
                     // save trends
                     // trendsData[id] = {"10":{"timestamp":1609863584322,"data":0.5127103117898119},"30":{"timestamp":1609862915322,"data":0.5127103117898119},"60":{"timestamp":1609861114626,"data":0.5127103117898119},"prevRecordTimestamp":1609863794413}
@@ -1325,7 +1547,7 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
      callback(err)
      */
     functions.createStorage = function (id, objectParameters, callback) {
-        functions.beginTransaction(function(err) {
+        functions.beginTransaction('Create objectID: ' + id,function(err) {
             if(err) return callback(err);
 
             createStorage(id, objectParameters, function(err) {
@@ -1338,6 +1560,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
         if (objectParameters === undefined) objectParameters = {cachedRecords: parameters.initCachedRecords};
         else if (!objectParameters.cachedRecords) objectParameters.cachedRecords = parameters.initCachedRecords;
 
+        if(!db || typeof db.run !== 'function') {
+            return callback(new Error('Can\'t create new storage in database: DB is not initialized'));
+        }
         log.info('Creating new storage for object id: ', id, '. Storage parameters: ', objectParameters);
         db.run('INSERT INTO objects (id, cachedRecords, type) VALUES (?, ?, ?)',
             [id, objectParameters.cachedRecords, 0], function (err) {
@@ -1351,6 +1576,10 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
     functions.removeZombiesFromStorage = function (callback) {
         log.info('Removing zombies objects from storage');
 
+        if(!db || typeof db.all !== 'function') {
+            return callback(new Error('Error removing zombies objects from storage: DB is not initialized'));
+        }
+
         db.all('SELECT * FROM objects', function (err, rows) { // id, type, cachedRecords
             if (err) return callback(new Error('Can\'t get data from objects table from storage database: ' + err.message));
 
@@ -1358,21 +1587,24 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
                 return row.id
             });
 
-            countersDB.getObjectsCounters(OCIDs, function(err, rows) {
-                if(err) return callback(new Error('Can\'t get data from objectsCounters table: ' + err.message));
+            countersDB.getObjectsCounters(OCIDs, function (err, rows) {
+                if (err) return callback(new Error('Can\'t get data from objectsCounters table: ' + err.message));
 
-                if(rows.length === OCIDs.length) {
+                if (rows.length === OCIDs.length) {
                     log.info('Zombies objects are not found in the storage');
                     return callback();
                 }
 
                 var zombiesOCIDs = [];
                 rows.forEach(function (row) {
-                    if(OCIDs.indexOf(row.id) === -1) zombiesOCIDs.push(row.id);
+                    if (OCIDs.indexOf(row.id) === -1) zombiesOCIDs.push(row.id);
                 });
 
                 functions.delRecords(zombiesOCIDs, function (err) {
-                    if(err) return callback('Error removing zombies objects from the storage: ' + err.message);
+                    if (err) {
+                        return callback(new Error('Error removing zombies objects from the storage: ' +
+                            err.message));
+                    }
 
                     log.info('Done removing zombie objects from storage. Removed ', zombiesOCIDs.length, ' objects');
                     callback();
@@ -1387,6 +1619,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
                 return callback(new Error('Can\'t get incorrect or undefined parameter name from config table'));
             }
 
+            if(!db || typeof db.all !== 'function') {
+                return callback(new Error('Can\'t get parameter ' + name + ' from config table: DB not initialized'));
+            }
             db.all('SELECT * FROM config WHERE name = ?', name, function(err, rows) {
                 if(err) return callback(new Error('Can\'t get parameter ' + name + ' from config table: ' + err.message));
                 if(rows.length < 1) return callback();
@@ -1405,6 +1640,9 @@ function runProcessForQueries(isTransactionProcess, dbPath) {
                     '" value to config table'));
             }
 
+            if(!db || typeof db.run !== 'function') {
+                return callback(new Error('Can\'t insert config value into the storage database: DB is not initialized'));
+            }
             db.run('INSERT INTO config (name, value) VALUES ($name, $value) ON CONFLICT (name) DO UPDATE SET value=$value', {
                 $name: name,
                 $value: String(value),

@@ -28,6 +28,11 @@
             "description": "Maximum execution time for warningin the log (ms)",
             "checkAs": "UNZInteger",
             "default": 300000
+        },
+        "dontLogErrors": {
+            "description": "Do not output errors to the log file",
+            "canBeEmpty": "on",
+            "type": "checkbox"
         }
     }
 }

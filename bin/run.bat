@@ -1,0 +1,1 @@
+D:\alepiz\nodejs\alepiz.exe --experimental-worker --expose-gc --max-old-space-size=6144 D:\alepiz\bin\alepiz.js

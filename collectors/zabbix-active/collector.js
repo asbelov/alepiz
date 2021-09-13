@@ -28,6 +28,8 @@ var server;
 var isServerRunning = false;
 var stopServerInProgress = false;
 var logZabbixAgentErrors = conf.get('collectors:zabbix-active:logZabbixAgentErrors');
+var logZabbixAgentErrorObtainPerformanceInformation =
+    conf.get('collectors:zabbix-active:logZabbixAgentErrorObtainPerformanceInformation');
 
 collector.get = function(param, callback) {
 
@@ -279,7 +281,10 @@ function sendToZabbix(err, data, socket){
 
     log.debug('ZBX send ', socket.remoteAddress, ':', socket.remotePort,': length: ',data.length,', data: ', zabbixData.toString());
 
-    socket.write(zabbixData);
+    // callback for async sending data
+    socket.write(zabbixData, function (err) {
+        if(err) log.info('Ca,\'t send data to zabbix: ', err.message);
+    });
     //socket.pipe(socket);
     //socket.destroy();
 }
@@ -342,8 +347,13 @@ function reqAgentData(result, callback){
             return callback();
         }
 
-        if(data.state && logZabbixAgentErrors)
-            log.info('Zabbix agent returned error for active check ', data.host, ':', data.key, ': ', data.value);
+        if(data.state && logZabbixAgentErrors) {
+            //console.log(logZabbixAgentErrorObtainPerformanceInformation, data.host, ':', data.key, ': ',data.value)
+            if(logZabbixAgentErrorObtainPerformanceInformation ||
+                data.value !== 'Cannot obtain performance information from collector.') {
+                log.info('Zabbix agent returned error for active check ', data.host, ':', data.key, ': ', data.value);
+            }
+        }
 
         // return only numeric values
         if(countersParameters[zabbixHost][zabbixKey].onlyNumeric) {

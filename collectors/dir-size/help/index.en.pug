@@ -45,6 +45,11 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                         li.
                             Maximum execution time after which a warning will appear in the log (ms) - Maximum lead time
                              calculations, after which a warning will be added to the log file.
+                        li.
+                            Do not output errors to the log file - do not output errors about files and directories
+                            processing to the log file. In some cases, the absence of a directory or file with which
+                            the collector works can be the norm and errors will clog the log files.
+                            In this case, it makes sense to disable error output.
                     h3 Returned value
                     p.
                         Directory size in bytes

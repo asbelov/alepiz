@@ -9,6 +9,6 @@
   "author": "Alexander Belov <asbel@alepiz.com>",
   "license": "GPL-3.0",
   "dependencies": {
-    "net-snmp": "^2.6.7"
+    "net-snmp": "^2.10.1"
   }
 }

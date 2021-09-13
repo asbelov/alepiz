@@ -84,12 +84,15 @@ module.exports = function(args, callback) {
                     return callback();
                 }
 
+                var messageBodyHTML = '<div id="JSON-representation" hidden>\n' + args.hiddenMessageData +
+                    '\n</div>\n' + args.message;
+
                 communication.send({
                     message: {
                         to: args.recipients,
                         subject: args.subject,
                         replyTo: args.replyTo || undefined,
-                        html: args.message,
+                        html: messageBodyHTML,
                     },
                     sender: args.username,
                     mediaID: 'email',

@@ -12,6 +12,8 @@ var parameters = {
     serverAddress: "127.0.0.1",
     maxSocketErrorsCnt: 500, // for IPC system
     serverPort: 10163,
+    workersNum: 0,
+    exitOnNoClients: 180000,
     cacheServiceInterval: 600, //sec
     restartHistoryInterval: 5400, // sec = 1 hour 30 minutes
     restartStorageModifier: false,
@@ -35,10 +37,14 @@ var parameters = {
     slowQueueSec: 15,
     cacheServiceExitTimeout: 86400000, // exit when running more then 24 hours
     cacheServiceTimeout: 3600000, // terminate cache service when running more then 1 hour
-    cacheServiceTimeoutForSaveObjectRecords: 600000, // terminate cache service when saving records for object more then 10 min
+    cacheServiceTimeoutForSaveObjectRecords: 300000, // terminate cache service when saving records for object more then 5 min
+    timeoutForDeleteObjectRecords: 60000, // terminate delete operation when delete delayed more then 60 sec per object id
+    timeoutForCommitTransaction: 180000, // log slow committed transaction (more then 3 min)
     housekeeperInterval: 1800000, // how often houseKeeper will running
     housekeeperWaitTimeout: 1200000, // time to wait until the housekeeper is not checked or not made changes
     housekeeperWatchdogCheckInterval: 300000, // time interval for checking housekeeper
+    storageQueryingProcessesNum: 0, // Number of storage querying processes. if 0 then number will be equal to CPUs number.
+    reloadKeepHistoryInterval: 300000, // every 5min reload KeepHistory settings. Send data to history only if KeepHistory !== 0
 
     init: function (initParameters) {
         for (var parameter in initParameters) {

@@ -62,6 +62,7 @@ var JQueryNamespace = (function ($) {
         emailValidateRE = /^(([^<>()\[\].,;:\s@"]+(\.[^<>()\[\].,;:\s@"]+)*)|(".+"))@(([^<>()[\].,;:\s@"]+\.)+[^<>()[\].,;:\s@"]{2,})$/i,
         lastUpdateElm,
         updateTimeElm,
+        hiddenMessageDataElm,
         messageTopImportance,
         maxMessageImportance = 0,
         commentsFromInstance,
@@ -118,6 +119,8 @@ var JQueryNamespace = (function ($) {
         timeIntervalsElm = $('#timeIntervalsForRemove');
         enableEventsElm = $('#enableEvents');
         disabledEventsControlElm = $('#disabledEventsControl');
+
+        hiddenMessageDataElm = $('#hiddenMessageData');
 
         historyEventsHeaderElm = $('#historyEvents').find('div.collapsible-header');
         currentEventsHeaderElm = $('#currentEvents').find('div.collapsible-header');
@@ -1366,7 +1369,7 @@ var JQueryNamespace = (function ($) {
     <td class="hide">' + row.id + '</td>\
     <td class="hide">' + row.OCID + '</td>\
     <td class="hide" counterName>' + row.counterName + '</td>\
-    <td data-object-name="' + row.objectName +'">' + row.objectName + '</td>\
+    <td data-object-name="' + row.objectName +'">' + escapeHtml(row.objectName) + '</td>\
     <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
     <td class="hide">' + importanceText + '</td>\
     <td>' + (row.startTime ? new Date(row.startTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
@@ -1461,7 +1464,7 @@ var JQueryNamespace = (function ($) {
     <td class="hide">' + row.id + '</td>\
     <td class="hide">' + row.OCID + '</td>\
     <td class="hide" counterName>' + row.counterName + '</td>\
-    <td data-object-name="' + row.objectName +'">' + row.objectName + '</td>\
+    <td data-object-name="' + row.objectName +'">' + escapeHtml(row.objectName) + '</td>\
     <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
     <td class="hide">' + importanceText + '</td>\
     <td>' + (row.startTime ? new Date(row.startTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
@@ -1519,14 +1522,14 @@ var JQueryNamespace = (function ($) {
     <td class="hide">' + row.id + '</td>\
     <td class="hide">' + row.OCID + '</td>\
     <td class="hide" counterName>' + row.counterName + '</td>\
-    <td data-object-name="' + row.objectName +'">' + row.objectName + '</td>\
+    <td data-object-name="' + row.objectName +'">' + escapeHtml(row.objectName) + '</td>\
     <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
     <td class="hide">' + importanceText + '</td>\
     <td>' + (row.startTime ? new Date(row.startTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
     <td>' + (row.endTime ? new Date(row.endTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
     <td>' + new Date(row.disableUntil).toLocaleString().replace(/\.\d\d(\d\d),/, '.$1') + '</td>\
     <td>' + disableIntervals + '</td>\
-    <td>' + row.disableUser + '</td>\
+    <td>' +  escapeHtml(row.disableUser) + '</td>\
     <td preventCheckboxCheck class="small-padding">' +
                     makeActionLinks(row.objectName, row.parentOCID, row.startTime, row.endTime, row.counterID) +
                     commentLink + hintLink + historyLink +
@@ -1562,10 +1565,10 @@ var JQueryNamespace = (function ($) {
                 tablePartHTML += '\
 <tr historyCommentedEventsRow importance="' + row.importance + '" bgcolor="' + color +'">\
     <td class="hide">' + row.id + '</td>\
-    <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;"><div class="comment-body"><p class="comment-header">' + row.subject + '</p>' +
+    <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;"><div class="comment-body"><p class="comment-header">' + escapeHtml(row.subject) + '</p>' +
                     (row.comment ? row.comment.replace(/<ul>/gmi, '<ul class=browser-default>').replace(/<(h\d)>/gmi, '<$1 style="font-size:1em;line-height:2em;margin:0;">') : '') +'</div></td>\
-    <td>' + row.user +'</td>\
-    <td>' + (row.recipients || '-') + '</td>\
+    <td>' + escapeHtml(row.user) +'</td>\
+    <td>' + escapeHtml(row.recipients || '-') + '</td>\
     <td>' + new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, '') + '</td>\
     <td preventCheckboxCheck class="small-padding">' + commentLink + eventLink + '</td>\
 </tr>';
@@ -1601,7 +1604,7 @@ var JQueryNamespace = (function ($) {
     }
 
     function floatToHuman(str) {
-        return str.replace(/(\d+\.\d\d)\d+/g, '$1');
+        return escapeHtml(str.replace(/(\d+\.\d\d)\d+/g, '$1'));
     }
 
     function getHumanImportance(importance) {
@@ -1706,14 +1709,30 @@ var JQueryNamespace = (function ($) {
                 });
             }
 
+            var hiddenData = [];
             Object.keys(variables).forEach(function (OCID) {
+                var hiddenDataPart = {};
+                // template.hiddenData: <VARIABLE_NAME>: <Variable Name in hiddenData Object>,
+                // f.e. {"ZABBIX_HOSTNAME": "ServerName", ...}
+                var hiddenVariables = typeof template.hiddenData === 'object' ? template.hiddenData : {};
+
+                var mainProps = {
+                    OBJECT_NAME: variables[OCID].objectName,
+                    COUNTER_NAME: variables[OCID].counterName,
+                    EVENT_DESCRIPTION: variables[OCID].eventDescription.pop(),
+                    ACTION: variables[OCID].action,
+                    EVENT_TIME: variables[OCID].disableIntervals.pop(),
+                    //EVENT_TIME: variables[OCID].disableIntervals.reverse().join(template.intervalsDivider
+                };
+
                 var str = template.eventTemplate;
-                str = str.replace('%:OBJECT_NAME:%', variables[OCID].objectName);
-                str = str.replace('%:COUNTER_NAME:%', variables[OCID].counterName);
-                str = str.replace('%:EVENT_DESCRIPTION:%', variables[OCID].eventDescription.pop());
-                str = str.replace('%:ACTION:%', variables[OCID].action);
-                str = str.replace('%:EVENT_TIME:%', variables[OCID].disableIntervals.pop());
-                //str = str.replace('%:EVENT_TIME:%', variables[OCID].disableIntervals.reverse().join(template.intervalsDivider));
+
+                for(var name in mainProps) {
+                    var re = new RegExp('%:' + name + ':%', 'gim');
+                    str = str.replace(re, mainProps[name]);
+                    if(hiddenVariables[name]) hiddenDataPart[hiddenVariables[name]] = mainProps[name];
+                }
+
                 variables[OCID].eventDescription.forEach(function(eventDescription, idx) {
                     str += template.intervalsDivider
                         .replace('%:EVENT_DESCRIPTION:%', eventDescription)
@@ -1721,15 +1740,19 @@ var JQueryNamespace = (function ($) {
                 });
 
                 if(props[OCID]) {
-                    for(var name in props[OCID]) {
-                        var re = new RegExp('%:' + name + ':%', 'gim');
+                    for(name in props[OCID]) {
+                        re = new RegExp('%:' + name + ':%', 'gim');
                         str = str.replace(re, props[OCID][name]);
+                        if(hiddenVariables[name]) hiddenDataPart[hiddenVariables[name]] = props[OCID][name];
                     }
                 }
 
                 str= str.replace(/%:.+?:%/gm, '');
                 messageBody += str;
+                if(Object.keys(hiddenDataPart).length) hiddenData.push(hiddenDataPart);
             });
+
+            hiddenMessageDataElm.val(JSON.stringify(hiddenData));
 
             var subject = template.subject;
             if(subject) {

@@ -85,7 +85,8 @@ countersDB.getCounterParameters = function(counterID, callback){
 countersDB.getKeepHistoryAndTrends = function(callback){
     log.debug('Getting keep history and trends parameter for all objects');
 
-    db.all('SELECT objectsCounters.id AS OCID, counters.keepHistory AS history, counters.keepTrends AS trends ' +
+    db.all('SELECT objectsCounters.id AS OCID, counters.keepHistory AS history, counters.keepTrends AS trends, ' +
+        'counters.name AS name ' +
         'FROM counters JOIN objectsCounters ON counters.id=objectsCounters.counterID',
         function(err, row){
             if(err) return callback(new Error('Error getting keep history and trends parameter for all objects: '+err.message));

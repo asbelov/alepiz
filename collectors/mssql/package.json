@@ -9,6 +9,6 @@
   "author": "Alexander Belov <asbel@alepiz.com>",
   "license": "GPL-3.0",
   "dependencies": {
-    "msnodesqlv8": "^2.0.5"
+    "msnodesqlv8": "^2.2.0"
   }
 }

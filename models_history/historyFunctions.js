@@ -280,7 +280,7 @@ functions.delta.description = 'Difference between the maximum and minimum values
 
 
 functions.last = function(id, parameters, callback) {
-    if(!parameters || !parameters[0]) { // last() = last(#0)
+    if(!parameters || (!parameters[0] && !parameters[1])) { // last() = last(#0)
         var shift = 0;
         var num = '#1'; // getByIdx
     } else {
@@ -292,11 +292,11 @@ functions.last = function(id, parameters, callback) {
     cache.get(id, shift, num, null, function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "last('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 
-        if(!records || !records[0]) return callback(null, {records: rawRecords});
+        if(!records || !records.length) return callback(null, {records: rawRecords});
 
         //if(!records[0]) return callback(new Error('Error in records returned for "last('+parameters.join(', ')+')" function for objectID: '+ id + ': ' + JSON.stringify(records)));
 
-        var result = records[0].data;
+        var result = records[records.length - 1].data;
         log.debug('FUNC: last(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {
             data: result,

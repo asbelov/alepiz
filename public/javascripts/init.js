@@ -28,6 +28,8 @@ var initJQueryNamespace = (function($){
                 uncheckedID: []
             };
 
+            initObjectsFiltersTab();
+
             // for create top level objects list for additional objects list
             createFilteredObjectsList(null, function(){
                 objectsInAdditionalObjectsTab = getObjectsFromObjectsList();
@@ -113,6 +115,7 @@ var initJQueryNamespace = (function($){
         objectsTabSwitchElm,
         additionalObjectsTabSwitchElm,
         actionsTabSwitchElm,
+        filterTabSwitchElm,
 
         selectAllObjBtnElm,
         walletBtnElm,
@@ -169,6 +172,7 @@ var initJQueryNamespace = (function($){
         objectsTabSwitchElm = $('#objectsTabSwitch');
         additionalObjectsTabSwitchElm = $('#additionalObjectsTabSwitch');
         actionsTabSwitchElm = $('#actionsTabSwitch');
+        filterTabSwitchElm = $('#filterTabSwitch');
 
         selectAllObjBtnElm = $('#selectAllObjBtn');
         walletBtnElm = $('#walletBtn');
@@ -287,6 +291,29 @@ var initJQueryNamespace = (function($){
         selectAllObjBtnElm.removeClass('hide');
     }
 
+    function initObjectsFiltersTab() {
+
+        // filterNames: [<name1>m <name2>,...]
+        $.post('/mainMenu', {f: 'getObjectsFilterNames'}, function(filterNames) {
+            if(!filterNames || !filterNames.length) {
+                filterTabSwitchElm.parent().addClass('hide');
+                return;
+            }
+
+            filterTabSwitchElm.parent().removeClass('hide');
+            var html = filterNames.map(function (filterName, idx) {
+                return '<li><a class="row object" data-position="right">' +
+                    '<div class="col s1 object-checkbox">' +
+                        '<label><input type="checkbox" id="filter-' + idx + '"></label>' +
+                    '</div>' +
+                    '<div class="col s11 truncate object-label">' + filterName +'</div>' +
+                '</a></li>';
+            }).join('\n');
+
+            $('#objectsFilter').html(html);
+        });
+    }
+
     // init events
     function initEvents() {
 
@@ -361,6 +388,8 @@ var initJQueryNamespace = (function($){
             // recreate action menu if it changed
             //createActionsMenu(null, null, true);
         });
+
+        filterTabSwitchElm.click(initObjectsFiltersTab);
 
         // Search objects when enter something in search string
         var minSearchStrLength = 2, prevSearchStrLength = 0, useGlobalSearch = false;

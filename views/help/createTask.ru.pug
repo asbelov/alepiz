@@ -1,0 +1,75 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-5-19 17:00:12
+doctype
+html
+    head
+        title Пример создания задачи
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/stylesheets/material-design-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javaScripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Пример создания задачи
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h2 Добавление действий в задачу
+                    p.
+                        Попробуем сделать задачу, которая будет создавать новый объект - новый хост и добавлять ему в качестве
+                        свойства - имя хоста. Задачи в дальнейшем можно будет использовать для автоматизации
+                        обнаружения хостов в сети.
+                        Для этого необходимо заполнить параметры действия Configuration\Objects creator как на скриншоте
+                        и нажать на кнопку сохранения действия
+                        #[a.btn-small.btn-floating.waves-effect.waves-light.yellow.darken-2: i.material-icons playlist_add]
+                    img(src="./images/help.taskSaveAction1.png" width="1024").materialboxed.card-panel.hoverable
+                    p.
+                        В качестве параметров в действии будем использовать переменные, которые определим при
+                        формировании счетчиков, для обнаружения хостов в сети
+                    p.
+                        Далее выбираем действие Configuration\Objects properties, заполняем его параметры и
+                        нажимаем на кнопку сохранения действия
+                        #[a.btn-small.btn-floating.waves-effect.waves-light.yellow.darken-2: i.material-icons playlist_add]
+                    img(src="./images/help.taskSaveAction2.png" width="1024").materialboxed.card-panel.hoverable
+                    p.
+                        Некоторые параметры действий в процессе их сохранения невозможно установить так, чтобы они
+                        подходили для выполнения задачи. Но их можно будет исправить в процессе редактирования задачи.
+                        В нашем примере это параметр из элемента Object list: ALEPIZ. Вместо него должен быть
+                        результат выполнения предыдущего действия Objects creator: идентификатор
+                        созданного объекта.
+
+                    h2 Редактирование задачи
+                    p Открываем действие Configuration\Task Maker и видим действия, которые мы добавили в новую безымянную задачу:
+                    img(src="./images/help.taskNewTask.png" width="1024").materialboxed.card-panel.hoverable
+
+                    p.
+                        Перетаскиваем мышкой задачи, чтобы расположить их в правильной последовательности: сначала создание
+                        объекта, затем добавление свойства объекту:
+                    img(src="./images/help.taskNewOrderedTask.png" width="1024").materialboxed.card-panel.hoverable
+
+                    p.
+                        Редактируем действие Object Properties и заменяем объект ALEPIZ на
+                        системную переменную %:PREV_ACTION_RESULT:%, значение которой будет равно идентификатору
+                        объекта, созданного предыдущим действием Objects creator. Для этого необходимо нажать на
+                        действие Object properties. Откроется форма редактирования параметров действия. Далее
+                        в поле Edited objects необходимо нажать на REMOVE ALL OBJECTS и удалить объект ALEPIZ.
+                        Посте этого нажать на ADD VARIABLE, ввести имя переменной PREV_ACTION_RESULT и нажать на
+                        кнопку "+"
+                    img(src="./images/help.taskNewEditedActionInTask.png" width="1024").materialboxed.card-panel.hoverable
+                    p.
+                        Заполняем Task name - "Create a new server", выбираем Group to task - "Discovery tasks"
+                        (если нужной группы не существует, можно создать ее с помощью действия
+                        Configuration\Tasks groups editor)
+                        и нажимаем на кнопку запуска действия (красного цвета),
+                        для того, чтобы сохранить изменения:
+                    img(src="./images/help.taskSaveEditedTask.png" width="1024").materialboxed.card-panel.hoverable
+
+                    p.
+                        Задача пропадет из списка, потому что выбрана группа Default group. Используя Select task
+                        group, выбираем группу Discovery tasks и видим созданную нами задачу:
+                    img(src="./images/help.taskNewSavedTask.png" width="1024").materialboxed.card-panel.hoverable

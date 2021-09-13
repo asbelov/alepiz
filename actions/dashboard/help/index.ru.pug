@@ -252,6 +252,13 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                             li subject - Текст, который будет вставлен в конец темы сообщения
                                             li bodyHeader - Текст в формате HTML, который будет вставлен перед телом сообщения
                                             li eventTemplate - Шаблон в формате HTML для строки текста для каждого события в теле сообщения
+                                            li.
+                                                hiddenData - JSON объект с перечнем переменных и их расшифровки.
+                                                Если он указан, то данные в виде JSON массива объектов появятся в
+                                                начале письма в теге DIV HTML
+                                                (&lt;div id=&quot;JSON-representation&quot; hidden&gt; .... &lt;/div&gt;).
+                                                Может быть использовано для последующего
+                                                разбора письма автоматическими системами.
                                             li intervalsDivider - Текст в формате HTML для формы короткой записи повторяющихся событий
                                             li objectsListLength - максимальное количество объектов в списке
                                             li countersListLength - максимальное количество счетчиков в списке
@@ -265,7 +272,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                             соответствующий текст в редакторе сообщений. Далее для браузера Chrome
                                             в поле редактора
                                             нажать правую кнопку мышки и выбрать "Посмотреть код",
-                                            либо нажать комбинацию клавишь &lt;Ctrl&gt;+&lt;Shift&gt;+&lt;I&gt;.
+                                            либо нажать комбинацию клавиш &lt;Ctrl&gt;+&lt;Shift&gt;+&lt;I&gt;.
                                             Требуемое форматирование появится в окне консоли браузера. Его необходимо
                                             перенести в настройки.
                                         p Переменные, используемые в теме сообщения (subject)
@@ -297,6 +304,36 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                             li %:EVENT_DESCRIPTION:% - описание события
                                             li %:EVENT_TIME:% - время, когда произошло событие
 
+                                        p.
+                                            Пример для настройки hiddenData:
+                                        pre.
+                                            &quot;hiddenData&quot;: {
+                                                &quot;SERVICE_NAME&quot;: &quot;Service&quot;,
+                                                &quot;HOSTNAME&quot;: &quot;Host&quot;,
+                                                &quot;OBJECT_NAME&quot;: &quot;Object&quot;,
+                                                &quot;UNC_PATH&quot;: &quot;Path&quot;,
+                                                &quot;EVENT_DESCRIPTION&quot;: &quot;Description&quot;,
+                                                &quot;EVENT_TIME&quot;: &quot;Time&quot;
+                                            }
+                                        p.
+                                            При определении соответствующих свойств объектов в ALEPIZ
+                                            в теле письма появится следующая информация:
+                                        pre.
+                                            &lt;div id=&quot;JSON-representation&quot; hidden&gt;
+                                            [{
+                                                &quot;Object&quot;:&quot;SYSTEM [SERVER4]&quot;,
+                                                &quot;Description&quot;:&quot;Free memory not monitored 17min&quot;,
+                                                &quot;Time&quot;:&quot;11.07 10:39:59 - 11.07 10:44:59 (5min)&quot;,
+                                                &quot;Host&quot;:&quot;SERVER4&quot;
+                                            },{
+                                                &quot;Object&quot;:&quot;MAIN_SERVICE {SERVER42}&quot;,
+                                                &quot;Description&quot;:&quot;Connections are not monitored&quot;,
+                                                &quot;Time&quot;:&quot;11.07 07:28:29 - 11.07 07:29:29 (1min)&quot;,
+                                                &quot;Host&quot;:&quot;SERVER4&quot;,
+                                                &quot;Service&quot;:&quot;MAIN_SERVICE&quot;,
+                                                &quot;Path&quot;:&quot;\\\\SERVER4\\SERVICES\\MAIN_SRVICE\\&quot;,
+                                            }]
+                                            &lt;/div&gt;
                                         ul.collapsible
                                             li
                                                 div.collapsible-header #[i.material-icons settings] Пример объекта actionsMessageTemplates (нажмите для того, чтобы развернуть)
@@ -321,6 +358,14 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                                                 &quot;countersListLength&quot;: 300,
                                                                 &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(230,0,0);\&quot;&gt;Events list:&lt;/strong&gt;&lt;/h3&gt;&quot;,
                                                                 &quot;eventTemplate&quot;: &quot;&lt;p&gt;&lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt; %:ZABBIX_HOSTNAME:%&lt;/p&gt;&quot;,
+                                                                &quot;hiddenData&quot;: {
+                                                                    &quot;SERVICE_NAME&quot;: &quot;Service&quot;,
+                                                                    &quot;HOSTNAME&quot;: &quot;Host&quot;,
+                                                                    &quot;OBJECT_NAME&quot;: &quot;Object&quot;,
+                                                                    &quot;UNC_PATH&quot;: &quot;Path&quot;,
+                                                                    &quot;EVENT_DESCRIPTION&quot;: &quot;Description&quot;,
+                                                                    &quot;EVENT_TIME&quot;: &quot;Time&quot;
+                                                                },
                                                                 &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                                             },
                                                             &quot;solveProblem&quot;: {
@@ -584,6 +629,14 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                                 &quot;subject&quot;: &quot;%:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
                                                 &quot;objectsListLength&quot;: 100,
                                                 &quot;countersListLength&quot;: 300,
+                                                &quot;hiddenData&quot;: {
+                                                    &quot;SERVICE_NAME&quot;: &quot;Service&quot;,
+                                                    &quot;HOSTNAME&quot;: &quot;Host&quot;,
+                                                    &quot;OBJECT_NAME&quot;: &quot;Object&quot;,
+                                                    &quot;UNC_PATH&quot;: &quot;Path&quot;,
+                                                    &quot;EVENT_DESCRIPTION&quot;: &quot;Description&quot;,
+                                                    &quot;EVENT_TIME&quot;: &quot;Time&quot;
+                                                },
                                                 &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(230,0,0);\&quot;&gt;Events list:&lt;/strong&gt;&lt;/h3&gt;&quot;,
                                                 &quot;eventTemplate&quot;: &quot;&lt;p&gt;&lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt; %:ZABBIX_HOSTNAME:%&lt;/p&gt;&quot;,
                                                 &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;

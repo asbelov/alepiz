@@ -20,7 +20,7 @@
         "saveResult": true,
         "replaceElm": true,
         "reloadOnNewFile": true,
-        "filterFiles": "(\\.ini$)|(\\.xml$)|(\\.dsc$)|(\\.cmd$)|(\\.bat$)|(\\.cfg$)|(\\.data$)|(\\.tmpl$)|(\\.json$)",
+        "filterFiles": "(\\.ini$)|(\\.xml$)|(\\.dsc$)|(\\.cmd$)|(\\.bat$)|(\\.cfg$)|(\\.data$)|(\\.tmpl$)|(\\.json$)|(\\.txt$)",
         "order": "conf.json,config,main",
         "skipDirs": "old_version,sav,certs,!scripts",
         "filePath": "CONFIG_FILES_PATH"

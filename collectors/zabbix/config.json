@@ -1,6 +1,6 @@
 {
     "name": "Zabbix passive",
-    "description": "Server getting data from zabbix agents. Use \"Zabbix active\" collector for reduce servers loading",
+    "description": "The server receives data from zabbix agents. Use Zabbix active collector to reduce server load",
     "active": "",
     "separate": "on",
     "runCollectorSeparately": "",

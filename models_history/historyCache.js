@@ -17,6 +17,7 @@ var path = require('path');
 var parameters = require('../models_history/historyParameters');
 var log = require('../lib/log')(module);
 var storage = require('../models_history/historyStorage');
+var countersDB = require('../models_db/countersDB'); // for init housekeeper
 
 var historyCache = {};
 module.exports = historyCache;
@@ -30,6 +31,11 @@ var recordsFromCacheCnt = 0;
 var recordsFromStorageCnt = 0;
 var storageRetrievingDataComplete = 0;
 var storageRetrievingDataIncomplete = 0;
+var historyAddOperationsCnt = 0;
+var duplicateRecordsCnt = 0;
+var lateAndSkippedRecordsCnt = 0;
+var lateRecordsCnt = 0;
+
 
 historyCache.terminateHousekeeper = false;
 
@@ -47,21 +53,35 @@ historyCache.init = function (initParameters, callback){
     loadDataFromDumpToCache(dumpPath, function(err) {
         if(err) return callback(err); // only if can\'t close dump file
 
-        storage.initStorage(function(err) {
+        storage.initStorage(parameters, function(err) {
             if(err) return callback(err);
 
             setInterval(cacheService, parameters.cacheServiceInterval * 1000); // sec
-            setInterval(function() {
-                log.info('Records returned from cache\\storage: ', recordsFromCacheCnt, '\\', recordsFromStorageCnt,
-                    '; required data found\\not found: ', storageRetrievingDataComplete,
-                    '\\', storageRetrievingDataIncomplete);
-                recordsFromCacheCnt = recordsFromStorageCnt = 0;
-                storageRetrievingDataComplete = storageRetrievingDataIncomplete = 0;
-            }, 60000);
+            setTimeout(printHistoryInfo, 30000);
 
             callback();
         });
     });
+
+    function printHistoryInfo() {
+        historyCache.getTransactionsQueueInfo(function (err, transQueue) {
+            log.info('Records returned from cache\\storage: ', recordsFromCacheCnt, '\\', recordsFromStorageCnt,
+                '; records new\\duplicate\\late30sec\\lateNotInserted: ',
+                historyAddOperationsCnt,'\\', duplicateRecordsCnt, '\\', lateRecordsCnt, '\\', lateAndSkippedRecordsCnt,
+                '; storage retrieving data complete\\incomplete: ', storageRetrievingDataComplete,
+                '\\', storageRetrievingDataIncomplete,
+                '; transaction queue: ', transQueue.len,
+                (transQueue.timestamp ?
+                    ', last transaction started at ' + (new Date(transQueue.timestamp)).toLocaleString()  +
+                    '(' + transQueue.description + ')' :
+                    ', no transaction in progress'));
+
+            recordsFromCacheCnt = recordsFromStorageCnt = 0;
+            storageRetrievingDataComplete = storageRetrievingDataIncomplete = 0;
+            historyAddOperationsCnt = duplicateRecordsCnt = lateRecordsCnt = lateAndSkippedRecordsCnt = 0;
+            setTimeout(printHistoryInfo, 40000);
+        });
+    }
 };
 
 historyCache.getDBPath = storage.getDbPaths;
@@ -149,6 +169,7 @@ historyCache.add = function (id, newRecord){
 
     //log.debug('Adding data to history: id ', id, ' newRecord: ', newRecord);
     id = Number(id);
+    ++historyAddOperationsCnt;
     if(!cache.has(id)) {
         createNewCacheObject(id);
         cache.get(id).records = [newRecord];
@@ -183,6 +204,7 @@ historyCache.add = function (id, newRecord){
                         ') less then latest record (',
                         new Date(cacheObj.records[0].timestamp).toLocaleString() + '.' + cacheObj.records[0].timestamp % 1000,
                         ') in the cache. New record: ', newRecord, ', latest in cache: ', cacheObj.records[0]);
+                    ++lateAndSkippedRecordsCnt;
                 } else {
                     // inserting new record into the cache in position according to new record timestamp for save correct records order
                     for (var i = recordsInCacheCnt - 2; i >= 0; i--) {
@@ -240,9 +262,11 @@ function checkDuplicateRecords(recordsInCacheCnt, id, idx, newRecord) {
         log.debug('Received duplicate record ', id, ' with a timestamp ',
             new Date(newRecord.timestamp).toLocaleString() + '.' + newRecord.timestamp % 1000,
             ': ', newRecord.data);
+        ++duplicateRecordsCnt;
 
         return true;
     }
+    if(Date.now() - newRecord.timestamp > 30000) ++lateRecordsCnt;
     return false
 }
 
@@ -257,9 +281,8 @@ historyCache.del = function (IDs, daysToKeepHistory, daysToKeepTrends, callback)
 
     if(!daysToKeepHistory) {
         var lastTimeToKeepHistory = 0;
-        log.info('Removing objects from history: ', IDs);
-    }
-    else {
+        //log.info('Removing objects from history: ', IDs);
+    } else {
         var now = new Date();
         lastTimeToKeepHistory = new Date(now.setDate(now.getDate() - daysToKeepHistory)).getTime();
     }
@@ -286,8 +309,7 @@ historyCache.del = function (IDs, daysToKeepHistory, daysToKeepTrends, callback)
                 if (!daysToKeepHistory) {
                     cache.delete(id)
                     functions.delete(id)
-                }
-                else {
+                } else {
                     if (cacheObj.records[0] && cacheObj.records[0].timestamp <= lastTimeToKeepHistory) {
                         for (var recordsToDelete = 1; recordsToDelete < cacheObj.records.length; recordsToDelete++) {
                             if (cacheObj.records[recordsToDelete].timestamp >= lastTimeToKeepHistory) break;
@@ -379,6 +401,7 @@ historyCache.get = function (id, shift, num, recordsType, callback) {
     }
 
     getFromHistory(id, shift, num, 0, recordsType, function (err, rawRecords, isGotAllRecords) {
+        //if(id === 155103) log.info(id, ': shift: ', shift, '; num: ', num, '; isRequiredAllRecords: ', isRequiredAllRecords, '; rawRecords: ', rawRecords, '; isGotAllRecords: ', isGotAllRecords);
         if(err) {
             ++storageRetrievingDataIncomplete;
             Array.isArray(rawRecords) ? rawRecords.push(err.message) : rawRecords = err.message;
@@ -816,182 +839,242 @@ function calculateCacheSize(cacheObj, recordsFromStorage, recordsFromCache) {
     return cacheObj.cachedRecords;
 }
 
+/*
+Saving history cache to database
+ */
 function cacheService(callback) {
     if(cacheServiceIsRunning > 0 && cacheServiceIsRunning < 100) return; // waiting for scheduled restart
-    log.info('Saving cache data to database...');
+    historyCache.getTransactionsQueueInfo(function (err, transQueue) {
+        log.info('Saving cache data to database... Transaction queue length: ', transQueue.len,
+            (transQueue.timestamp ?
+                ', last transaction started at ' + (new Date(transQueue.timestamp)).toLocaleString() +
+                '(' + transQueue.description + ')' :
+                ', no transaction in progress')
+        );
 
-    if(typeof(callback) !== 'function') {
-        callback = function(err) {
-            if(err) log.error(err.message);
+        if (typeof (callback) !== 'function') {
+            callback = function (err) {
+                if (err) log.error(err.message);
+            }
         }
-    }
 
-    if(cacheServiceIsRunning) {
-        log.warn('Cache service was running at ', (new Date(cacheServiceIsRunning)).toLocaleString(), '. Prevent to start another copy of service');
-        if(Date.now() - cacheServiceIsRunning < parameters.cacheServiceExitTimeout) return callback(); // < 24 hours
+        if (cacheServiceIsRunning) {
+            log.warn('Cache service was running at ', (new Date(cacheServiceIsRunning)).toLocaleString(), '. Prevent to start another copy of service');
+            if (Date.now() - cacheServiceIsRunning < parameters.cacheServiceExitTimeout) return callback(); // < 24 hours
 
-        log.exit('Cache service was running at ' + (new Date(cacheServiceIsRunning)).toLocaleString() + '. It\'s too long. Something was wrong. Exiting...');
-        log.disconnect(function () { process.exit(2) });
-    }
-
-    if(terminateCacheService) {
-        log.warn('Received command for terminating cache service. Exiting');
-        if(typeof cacheServiceCallback === 'function') {
-            cacheServiceCallback(new Error('Cache service was terminated'));
-            cacheServiceCallback = null;
+            log.exit('Cache service was running at ' + (new Date(cacheServiceIsRunning)).toLocaleString() + '. It\'s too long. Something was wrong. Exiting...');
+            log.disconnect(function () {
+                process.exit(2)
+            });
         }
-        return callback();
-    }
 
-    cacheServiceIsRunning = Date.now();
-    var allSavedRecords = 0;
-    var savedObjects = 0, savedRecords = 0, savedTrends = 0,
-        timeInterval = 60000, nextTimeToPrint = Date.now() + timeInterval;
-    storage.beginTransaction(function (err) {
-        if(err) {
-            if(typeof cacheServiceCallback === 'function') {
-                cacheServiceCallback(err);
+        if (terminateCacheService) {
+            log.warn('Received command for terminating cache service. Exiting');
+            if (typeof cacheServiceCallback === 'function') {
+                cacheServiceCallback(new Error('Cache service was terminated'));
                 cacheServiceCallback = null;
             }
-            return callback(err);
+            return callback();
         }
 
-        // cacheObj = {savedCnt:, cachedRecords:, records: [{data:, timestamp:},...]}
-        var recordsForRemoveFromCache = new Map();
-        async.eachLimit(Array.from(cache.keys()), 10,function (id, callback) {
-            if(terminateCacheService) return callback();
-
-            if(cacheServiceIsRunning > 100 && // it is not a scheduled restart
-                Date.now() - cacheServiceIsRunning > parameters.cacheServiceTimeout) { // 1 hour
-                log.warn('Cache service was running at ' + (new Date(cacheServiceIsRunning)).toLocaleString() +
-                    '. It\'s too long. Something was wrong. Terminating...');
-                terminateCacheService = Date.now();
-                // cache service will terminated because now if(terminateCacheService) condition will be always true
-                return callback();
-            }
-
-            // print progress every 1 minutes
-            ++savedObjects;
-            if(nextTimeToPrint < Date.now()) {
-                nextTimeToPrint = Date.now() + timeInterval;
-                var objectsCnt = cache.size;
-                log.info('Saved cache to database ', Math.ceil(savedObjects * 100 / objectsCnt),
-                    '% (', savedObjects, '/', objectsCnt, ' objects, ', savedRecords, ' records, ', savedTrends,' trends)');
-            }
-
-            // object may be removed while processing cache saving operation or nothing to save
-            var cacheObj = cache.get(id);
-
-            // cacheObj.records.length <= cacheObj.savedCnt - are all records saved in the DB?
-            if(!cacheObj || !cacheObj.records || cacheObj.records.length <= cacheObj.savedCnt) return callback();
-
-            var callbackAlreadyCalled = false;
-            var watchDogTimerID = setTimeout(function () {
-                callbackAlreadyCalled = true;
-                terminateCacheService = Date.now();
-                log.error('Time to saving records for object ' + id + ' form cache to database too long (',
-                    (parameters.cacheServiceTimeoutForSaveObjectRecords / 60000),
-                    'min). Stop waiting to save records for an object and terminating cache service');
-                callback();
-            }, parameters.cacheServiceTimeoutForSaveObjectRecords); // 10 min
-
-            // savedCnt - Number of saved records (3)
-            // copy to recordsForSave 0 to end (9) - savedCnt (3)
-            var recordsForSave = cacheObj.records.slice(cacheObj.savedCnt);
-            storage.saveRecordsForObject(id, {
-                savedCnt: cacheObj.savedCnt,
-                cachedRecords: cacheObj.cachedRecords
-            }, recordsForSave, function(err, savedData) {
-                /*
-                savedData for 2 running storage servers can be:
-                savedData: [
-                  {
-                    id: 1,
-                    timestamp: 1611082763939,
-                    result: { savedRecords: 3, savedTrends: 0 }
-                  },
-                  {
-                    id: 0,
-                    timestamp: 1611082763984,
-                    result: { savedRecords: 3, savedTrends: 0 }
-                  }
-                ]
-
-                 */
-                //console.log('savedData:', savedData);
-                clearTimeout(watchDogTimerID);
-                if(err) {
-                    log.error('Error while saving records for ', id, ': ', err.message);
-                    return callbackAlreadyCalled ? null : callback();
-                }
-                var recordsInCache = cacheObj.records.length;
-
-                // all counters used for information
-                allSavedRecords += recordsInCache - cacheObj.savedCnt;
-                savedRecords += recordsForSave.length;
-
-                var unnecessaryCachedRecordsCnt =  recordsInCache - cacheObj.cachedRecords;
-                if(unnecessaryCachedRecordsCnt < 0) unnecessaryCachedRecordsCnt = 0;
-                cacheObj.savedCnt += recordsForSave.length;
-
-                if(savedData && savedData[0] && savedData[0].result && savedData[0].result.savedTrends) {
-                    savedTrends += savedData[0].result.savedTrends;
-                }
-
-                recordsForRemoveFromCache.set(id, unnecessaryCachedRecordsCnt > cacheObj.savedCnt ?
-                    cacheObj.savedCnt : unnecessaryCachedRecordsCnt);
-
-                return callbackAlreadyCalled ? null : callback();
-            });
-        }, function(err) {
-            storage.commitTransaction(err, function(err) {
-                // removing records from cache after commit transactions
-                // and calculate records number
-                if(!err) { // error will include async error
-                    var allRecordsInCache = 0, allRecordsInCacheWas = 0, allUnnecessaryRecordsCnt = 0;
-                    for (var id of cache.keys()) {
-                        var cacheObj = cache.get(id);
-                        if (!Array.isArray(cacheObj.records)) continue;
-                        allRecordsInCacheWas += cacheObj.records.length;
-
-                        var recordsForRemoveFromCacheObj = recordsForRemoveFromCache.get(id)
-                        if (recordsForRemoveFromCacheObj) {
-                            cacheObj.records.splice(0, recordsForRemoveFromCacheObj);
-                            cacheObj.savedCnt = cacheObj.savedCnt > recordsForRemoveFromCacheObj ?
-                                cacheObj.savedCnt - recordsForRemoveFromCacheObj : 0;
-                            allUnnecessaryRecordsCnt += recordsForRemoveFromCacheObj;
-                        }
-
-                        allRecordsInCache += cacheObj.records.length;
-                    }
-                }
-
-                log.info('Saving cache to database is ', ( terminateCacheService ? 'terminated' : 'finished' ),
-                    (err ? ' with error: ' + err.message : ''),
-                    '. Records removed from cache: ', allUnnecessaryRecordsCnt,
-                    '. Saving from cache to storage: records: ', allSavedRecords, ', trends: ', savedTrends,
-                    '. Records in a cache was: ', allRecordsInCacheWas, ', now: ', allRecordsInCache);
-
-
-                if(!terminateCacheService && fs.existsSync(dumpPath)) {
-                    log.info('Deleting old dump file ', dumpPath);
-                    try {
-                        fs.unlinkSync(dumpPath);
-                    } catch (err) {
-                        log.warn('Can\'t delete dump file ' + dumpPath + ': ' + err.message);
-                    }
-                }
-
-                // terminateCacheService = 1 when receiving external signal for terminateCacheService
-                // in other cases terminateCacheService equal to Date.now()
-                if(terminateCacheService === 1) log.exit('Saving cache to database was terminated');
-                else terminateCacheService = 0;
-                if(cacheServiceIsRunning > 100) cacheServiceIsRunning = 0; // it is not a scheduled restart
-                callback();
-                if(typeof cacheServiceCallback === 'function') {
-                    cacheServiceCallback();
+        cacheServiceIsRunning = Date.now();
+        var allSavedRecords = 0;
+        var savedObjects = 0, savedRecords = 0, savedTrends = 0,
+            timeInterval = 60000, nextTimeToPrint = Date.now() + timeInterval;
+        storage.beginTransaction('Saving cache data to database', function (err) {
+            if (err) {
+                if (typeof cacheServiceCallback === 'function') {
+                    cacheServiceCallback(err);
                     cacheServiceCallback = null;
                 }
+                return callback(err);
+            }
+
+            // cacheObj = {savedCnt:, cachedRecords:, records: [{data:, timestamp:},...]}
+            var recordsForRemoveFromCache = new Map();
+            /*
+            SELECT objectsCounters.id AS OCID, counters.keepHistory AS history, counters.keepTrends AS trends
+            FROM counters JOIN objectsCounters ON counters.id=objectsCounters.counterID
+             */
+            countersDB.getKeepHistoryAndTrends(function(err, rows) {
+                if(err) return callback(new Error('Can\'t get information about data keeping period'));
+
+                var houseKeeperData = {};
+                rows.forEach(function (row) {
+                    houseKeeperData[row.OCID] = {
+                        history: row.history,
+                        trends: row.trends,
+                        name: row.name, // counterName
+                    }
+                });
+
+                async.eachLimit(Array.from(cache.keys()), 10, function (id, callback) {
+                    if (terminateCacheService) return callback();
+
+                    // don\'t save history for keepHistory = 0
+                    if(!houseKeeperData[id] || !houseKeeperData[id].history) {
+                        //log.info ('Skipping to save obj ', id, ': ', houseKeeperData[id])
+                        return callback();
+                    }
+
+                    if (cacheServiceIsRunning > 100 && // it is not a scheduled restart
+                        Date.now() - cacheServiceIsRunning > parameters.cacheServiceTimeout) { // 1 hour
+                        log.warn('Cache service was running at ' + (new Date(cacheServiceIsRunning)).toLocaleString() +
+                            '. It\'s too long. Something was wrong. Terminating...');
+                        terminateCacheService = Date.now();
+                        // cache service will terminated because now if(terminateCacheService) condition will be always true
+                        return callback();
+                    }
+
+                    // print progress every 1 minutes
+                    ++savedObjects;
+                    if (nextTimeToPrint < Date.now()) {
+                        nextTimeToPrint = Date.now() + timeInterval;
+                        var objectsCnt = cache.size;
+                        log.info('Saved cache to database ', Math.ceil(savedObjects * 100 / objectsCnt),
+                            '% (', savedObjects, '/', objectsCnt, ' objects, ', savedRecords, ' records, ', savedTrends, ' trends)');
+                    }
+
+                    // object may be removed while processing cache saving operation or nothing to save
+                    var cacheObj = cache.get(id);
+
+                    // cacheObj.records.length <= cacheObj.savedCnt - are all records saved in the DB?
+                    if (!cacheObj || !cacheObj.records || cacheObj.records.length <= cacheObj.savedCnt) return callback();
+
+                    var callbackAlreadyCalled = false;
+                    var watchDogTimerID = setTimeout(function () {
+                        callbackAlreadyCalled = true;
+                        terminateCacheService = Date.now();
+                        log.error('Time to saving records for OCID ' + id + ' (counter: ', houseKeeperData[id].name,
+                            ') form cache to database too long (',
+                            (parameters.cacheServiceTimeoutForSaveObjectRecords / 60000),
+                            'min). Stop waiting to save records for an object and terminating cache service');
+                        callback();
+                    }, parameters.cacheServiceTimeoutForSaveObjectRecords); // 10 min
+
+                    var startTime = cacheObj.records[0].timestamp,
+                        endTime = cacheObj.records[cacheObj.records.length - 1].timestamp;
+                    // more then one record per second
+                    if(endTime - startTime > 30000 &&
+                        cacheObj.records.length > 100 &&
+                        cacheObj.records.length / ((endTime - startTime)  / 1000) > 1
+                    ) {
+                        log.warn('For OCID ', id ,' (counter: ', houseKeeperData[id].name,
+                            ') a large amount of data will be saved: ', cacheObj.records.length,
+                            ' records in ', Math.round((endTime - startTime) / 1000 ),' seconds: ',
+                            Math.round(cacheObj.records.length / ((endTime - startTime)  / 1000)), ' records/sec');
+                    }
+
+                    // savedCnt - Number of saved records (3)
+                    // copy to recordsForSave 0 to end (9) - savedCnt (3)
+                    var recordsForSave = cacheObj.records.slice(cacheObj.savedCnt);
+                    storage.saveRecordsForObject(id, {
+                        savedCnt: cacheObj.savedCnt,
+                        cachedRecords: cacheObj.cachedRecords,
+                        keepTrends: houseKeeperData[id] ? (houseKeeperData[id].trends || 0) : 0,
+                    }, recordsForSave, function (err, savedData) {
+                        /*
+                        savedData for 2 running storage servers can be:
+                        savedData: [
+                          {
+                            id: 1,
+                            timestamp: 1611082763939,
+                            result: { savedRecords: 3, savedTrends: 0 }
+                          },
+                          {
+                            id: 0,
+                            timestamp: 1611082763984,
+                            result: { savedRecords: 3, savedTrends: 0 }
+                          }
+                        ]
+
+                         */
+                        //console.log('savedData:', savedData);
+                        clearTimeout(watchDogTimerID);
+                        if (err) {
+                            log.error('Error while saving records for ', id, ' (counter: ', houseKeeperData[id].name,
+                            '): ', err.message);
+                            return callbackAlreadyCalled ? null : callback();
+                        }
+                        var recordsInCache = cacheObj.records.length;
+
+                        // all counters used for information
+                        allSavedRecords += recordsInCache - cacheObj.savedCnt;
+                        savedRecords += recordsForSave.length;
+
+                        var unnecessaryCachedRecordsCnt = recordsInCache - cacheObj.cachedRecords;
+                        if (unnecessaryCachedRecordsCnt < 0) unnecessaryCachedRecordsCnt = 0;
+                        cacheObj.savedCnt += recordsForSave.length;
+
+                        if (savedData && savedData[0] && savedData[0].result && savedData[0].result.savedTrends) {
+                            savedTrends += savedData[0].result.savedTrends;
+                        }
+
+                        recordsForRemoveFromCache.set(id, unnecessaryCachedRecordsCnt > cacheObj.savedCnt ?
+                            cacheObj.savedCnt : unnecessaryCachedRecordsCnt);
+
+                        return callbackAlreadyCalled ? null : callback();
+                    });
+                }, function (err) {
+                    storage.commitTransaction(err, function (err) {
+                        // removing records from cache after commit transactions
+                        // and calculate records number
+                        if (!err) { // error will include async error
+                            var allRecordsInCache = 0, allRecordsInCacheWas = 0, allUnnecessaryRecordsCnt = 0;
+                            for (var id of cache.keys()) {
+                                var cacheObj = cache.get(id);
+                                if (!Array.isArray(cacheObj.records)) continue;
+                                allRecordsInCacheWas += cacheObj.records.length;
+
+                                var recordsForRemoveFromCacheObj = recordsForRemoveFromCache.get(id);
+                                if (recordsForRemoveFromCacheObj) {
+
+                                    // [0,1,2,3,4,5]; recordsForRemoveFromCacheObj = 3
+                                    // slice(3) = [3,4,5]; splice(0, 3) = [3,4,5]
+                                    // slice used for create a new array and cleanup memory
+                                    cacheObj.records = cacheObj.records.slice(recordsForRemoveFromCacheObj);
+                                    //cacheObj.records.splice(0, recordsForRemoveFromCacheObj);
+
+                                    cacheObj.savedCnt = cacheObj.savedCnt > recordsForRemoveFromCacheObj ?
+                                        cacheObj.savedCnt - recordsForRemoveFromCacheObj : 0;
+                                    allUnnecessaryRecordsCnt += recordsForRemoveFromCacheObj;
+                                } else if(recordsForRemoveFromCacheObj === undefined) {
+                                    allUnnecessaryRecordsCnt += cacheObj.records.length;
+                                    cacheObj.records = [];
+                                }
+
+                                allRecordsInCache += cacheObj.records.length;
+                            }
+                        }
+
+                        log.info('Saving cache to database is ', (terminateCacheService ? 'terminated' : 'finished'),
+                            (err ? ' with error: ' + err.message : ''),
+                            '. Records removed from cache: ', allUnnecessaryRecordsCnt,
+                            '. Saving from cache to storage: records: ', allSavedRecords, ', trends: ', savedTrends,
+                            '. Records in a cache was: ', allRecordsInCacheWas, ', now: ', allRecordsInCache);
+
+
+                        if (!terminateCacheService && fs.existsSync(dumpPath)) {
+                            log.info('Deleting old dump file ', dumpPath);
+                            try {
+                                fs.unlinkSync(dumpPath);
+                            } catch (err) {
+                                log.warn('Can\'t delete dump file ' + dumpPath + ': ' + err.message);
+                            }
+                        }
+
+                        // terminateCacheService = 1 when receiving external signal for terminateCacheService
+                        // in other cases terminateCacheService equal to Date.now()
+                        if (terminateCacheService === 1) log.exit('Saving cache to database was terminated');
+                        else terminateCacheService = 0;
+                        if (cacheServiceIsRunning > 100) cacheServiceIsRunning = 0; // it is not a scheduled restart
+                        callback();
+                        if (typeof cacheServiceCallback === 'function') {
+                            cacheServiceCallback();
+                            cacheServiceCallback = null;
+                        }
+                    });
+                });
             });
         });
     });
@@ -1028,4 +1111,24 @@ historyCache.dumpData = function(callback, isScheduled) {
         return setTimeout(historyCache.dumpData, 1000, callback, isScheduled);
     }
     if(typeof callback === 'function') callback();
+};
+
+historyCache.getTransactionsQueueInfo = function(callback) {
+    storage.getTransactionsQueueInfo(function (err, transQueueArr) {
+        //log.info('getTransactionsQueueInfo: ', transQueueArr);
+        if(err) return callback(err, {});
+        var transQueue = {description: ''}, desc = {};
+        if (Array.isArray(transQueueArr)) {
+            transQueueArr.forEach(function (data) {
+                if (!transQueue.len || transQueue.len < data.result.len) transQueue.len = data.result.len;
+                if (!transQueue.timestamp || transQueue.timestamp > data.result.timestamp) {
+                    transQueue.timestamp = data.result.timestamp
+                }
+                if(data.result.description) desc[data.result.description] = true;
+            });
+            transQueue.description = Object.keys(desc).join('; ');
+        }
+
+        return callback(null, transQueue);
+    });
 };

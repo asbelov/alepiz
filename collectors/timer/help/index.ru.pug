@@ -4,7 +4,7 @@
 doctype
 html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
     head
-        title Timer: генератор событий через интевалы времени
+        title Timer: генератор событий через интервалы времени
         link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
         link(rel='stylesheet', href='/material-design-icons/material-icons.css')
         meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
@@ -26,13 +26,13 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         Сборщик генерирует события через определенные параметром интервалы времени. Он
                         может использоваться для периодического запуска зависимых от него пассивных
                         сборщиков, если требуется собирать данные через определенные интервалы времени. Обычно при
-                        настройке счетчиков на основе этого сборщика, время сохранения истории и трендов
+                        настройке счетчиков на основе этого сборщика, период сохранения истории и трендов
                         устанавливают в 0, чтобы не расходовать зря дисковое пространство.
                     h3 Параметры
                     ul.browser-default
                         li.
                             Events will be generated at this time interval -
-                            Время в секундах, через которое будет генерироваться событие
+                            Интервал времени в секундах, через который будет генерироваться событие
                     h3 Настройки
                     p.
                         Настройки сборщика хранятся в файле config/conf.json в секции collectors.timer

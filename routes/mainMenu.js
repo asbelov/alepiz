@@ -14,6 +14,8 @@ var actions = require('./../lib/actionsConf');
 var user = require('../lib/user');
 var logRecords = require('../lib/logRecords');
 var prepareUser = require('../lib/utils/prepareUser');
+var conf = require('../lib/conf');
+conf.file('config/conf.json');
 
 module.exports = router;
 
@@ -27,6 +29,7 @@ router.post('/mainMenu', function(req, res, next) {
     else if(functionName === 'logout') user.logout(req.session, sendBackResult);
     else if(functionName === 'getCurrentUserName') user.getFullName(req.session, sendBackResult);
     else if(functionName === 'filterObjects') filterObjects(req.body.name, req.session.username, sendBackResult);
+    else if(functionName === 'getObjectsFilterNames') getObjectsFilterNames(sendBackResult);
     else if(functionName === 'getObjects') getObjectsByNames(req.body.name, req.session.username, sendBackResult);
     else if(functionName === 'searchObjects') searchObjects(req.body.searchStr, req.session.username, sendBackResult);
     else if(functionName === 'getLogRecords') logRecords.getRecords(req.session.username, req.body.lastID, req.body.sessionsIDs, sendBackResult);
@@ -46,6 +49,14 @@ router.post('/mainMenu', function(req, res, next) {
         res.json(result);
     }
 });
+
+function getObjectsFilterNames(callback) {
+    var cfg = conf.get();
+    if(!Array.isArray(cfg.objectsFilter)) return callback();
+
+    var filterNames = cfg.objectsFilter.map(item => item.name);
+    return callback(null, filterNames);
+}
 
 /*
  Get filter objects using objects interactions rules and get objects parameters

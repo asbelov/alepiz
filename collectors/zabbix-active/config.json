@@ -1,6 +1,6 @@
 {
     "name": "Zabbix active",
-    "description": "Zabbix agent ask from server, what data it need and then send this data to server",
+    "description": "Zabbix agent requests from the server what data it needs, and then sends this data to the serverr",
     "active": "on",
     "separate": "",
     "runCollectorSeparately": "",

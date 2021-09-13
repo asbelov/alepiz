@@ -876,12 +876,13 @@ var JQueryNamespace = (function ($) {
                     var objectsCountersValues = data.history;
                     //var isDataFromTrends = data.isDataFromTrends;
                     dataInfo = {};
-
                     if (!objectsCountersValues || !Object.keys(objectsCountersValues).length) {
+                        /*
                         if(drawingHistoryInProgress > 1) {
                             drawingHistoryInProgress = 0;
-                            return drawHistory(callback)
+                            return  drawHistory(callback)
                         }
+                        */
                         drawingHistoryInProgress = 0;
                         bodyElm.css("cursor", "auto");
                         if (typeof (callback) === 'function') callback();
@@ -981,10 +982,12 @@ var JQueryNamespace = (function ($) {
                     });
 
                     prepareDataForGraph(objectsCountersValues);
+                    /*
                     if(drawingHistoryInProgress > 1) {
                         drawingHistoryInProgress = 0;
                         return drawHistory(callback)
                     }
+                    */
                     drawingHistoryInProgress = 0;
                     bodyElm.css("cursor", "auto");
                     scrollIframe();
@@ -994,10 +997,12 @@ var JQueryNamespace = (function ($) {
         } else {
             historyDataElm.empty();
             prepareDataForGraph({});
+            /*
             if(drawingHistoryInProgress > 1) {
                 drawingHistoryInProgress = 0;
                 return drawHistory(callback)
             }
+            */
             drawingHistoryInProgress = 0;
             dataInfo = {};
             M.Toast.dismissAll();

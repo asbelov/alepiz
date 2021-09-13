@@ -11,13 +11,17 @@ var cp = require('child_process');
 param = {
     executable: path to executable
     timeout: timeout, while waiting for end of execution
+    cwd - working dir
     stdinData: if set, then write stdinData to the stdin of the executable
     dontLogStdout: if set, then did not log stdout
     dontLogStderr: if set then did not log stderr
     returnStdout: if set, then return stdout in callback(null, stdOut)
     env: <object> Environment key-value pairs. Default process.env
 
-    args - array of command line arguments
+    args:
+        programArgs - array or stringified array of command line arguments
+        cwd - working dir
+        stdinData: if set, then write stdinData to the stdin of the executable
 }
  */
 module.exports = function(param, args, callback){
@@ -26,30 +30,29 @@ module.exports = function(param, args, callback){
     var timeout = param.timeout || 0;
     var stdinData = param.stdinData || args.stdinData;
     var callbackAlreadyRunning = false, startTime = Date.now();
+    var initProgramArgs = param.programArgs || args.programArgs || [];
 
     if(!path.isAbsolute(workingDir)) workingDir = path.join(__dirname, '..', '..', workingDir);
-
-    var executablePath = workingDir ? path.join(workingDir, executable) : executable;
-    if(!executable || !fs.existsSync(executablePath)) {
-        return callback(new Error('[exec]: can\'t find executable: ' + executablePath));
-    }
 
     if(Number(timeout) !== parseInt(String(timeout), 10)) {
         return callback(new Error('[exec]: set unexpected timeout : ' + timeout));
     } else timeout = Number(timeout);
 
-    if(args.programArgs) {
-        try {
-            var programArgs = JSON.parse(args.programArgs);
-        } catch(e) {
-            return callback(new Error('[exec]: can\'t parse arguments ' + args.programArgs + ' as JSON: ' + e.message))
-        }
+    if(initProgramArgs) {
+        if(typeof initProgramArgs === 'string') {
+            try {
+                var programArgs = JSON.parse(initProgramArgs);
+            } catch (e) {
+                return callback(new Error('[exec]: can\'t parse arguments ' + initProgramArgs + ' as JSON: ' + e.message))
+            }
+        } else programArgs = initProgramArgs;
+
         if(!Array.isArray(programArgs)) {
-            return callback(new Error('[exec]: Arguments ' + args.programArgs + ' is not a stringified JSON array'))
+            return callback(new Error('[exec]: Arguments ' + initProgramArgs + ' is not an array or stringified JSON array'))
         }
     } else programArgs = [];
 
-    log.info('[exec]: starting ', executable);
+    log.info('[exec]: starting ', executable, ' ', programArgs.join(' '));
 
     // one time I got exception when call cp.spawn()
     var proc;

@@ -9,9 +9,6 @@
  * Created by Alexander Belov on 16.10.2016.
  */
 
-var fs = require('fs');
-var path = require('path');
-
 var log = require('../lib/log')(module);
 var IPC = require('../lib/IPC');
 var proc = require('../lib/proc');
@@ -20,6 +17,7 @@ var cache = require('../models_history/historyCache');
 var storage = require('../models_history/historyStorage');
 var functions = require('../models_history/historyFunctions');
 var housekeeper = require('../models_history/historyHousekeeper');
+var countersDB = require('../models_db/countersDB');
 
 var history = {};
 module.exports = history;
@@ -29,7 +27,24 @@ else runServerProcess(); //standalone process
 
 function initServerCommunication() {
 
-    var clientIPC, truncateWatchDogInterval, restartInProgress = false;
+    var clientIPC, truncateWatchDogInterval, restartInProgress = false, usedToSaveDataToHistory = false;
+    var houseKeeperData = {};
+
+    // used for skip sending data to history with keepHistory = 0
+    function getHouseKeeperData() {
+        if (!usedToSaveDataToHistory) return;
+        countersDB.getKeepHistoryAndTrends(function (err, rows) {
+            if (err) return log.error('Can\'t get information about data keeping period');
+
+            var newHouseKeeperData = {}
+            rows.forEach(function (row) {
+                if (row.history === 0) newHouseKeeperData[row.OCID] = 0;
+            });
+
+            houseKeeperData = newHouseKeeperData;
+            setTimeout(getHouseKeeperData, parameters.reloadKeepHistoryInterval);
+        });
+    }
 
     history.connect = function(id, callback) {
         if(!clientIPC) {
@@ -93,7 +108,7 @@ function initServerCommunication() {
         })(funcName);
     }
 
-
+/*
     function truncateWalWatchdog(initParameters, callback) {
 
         cache.getDBPath().forEach(function(dbPath) {
@@ -142,6 +157,7 @@ function initServerCommunication() {
             });
         }
     }
+ */
 
 
     // returning list of all functions
@@ -149,6 +165,11 @@ function initServerCommunication() {
 
     // starting history server and IPC system
     history.start = function (initParameters, callback) {
+        //parameters.init(initParameters);
+
+        // if run history.start(), then clientIPC use proc IPC communication
+        // for exchange messages to the parent process
+        // in all other cases run history.connect() and use net IPC communication
         clientIPC = new proc.parent({
             childrenNumber: 1,
             childProcessExecutable: __filename,
@@ -156,7 +177,7 @@ function initServerCommunication() {
             restartAfterErrorTimeout: 10000,
             onStart: function(err) {
                 if(err) return callback(new Error('Can\'t run history server: ' + err.message));
-                //truncateWalWatchdog(initParameters, callback);
+                //truncateWalWatchdog(parameters, callback);
                 clientIPC.sendAndReceive({type: 'initParameters', data: initParameters}, function(err) {
                     initParameters.__restart = true;
                     if(truncateWatchDogInterval) clearInterval(truncateWatchDogInterval);
@@ -226,13 +247,19 @@ function initServerCommunication() {
             return;
         }
 
-        clientIPC.send({
-            msg: 'add',
-            id: id,
-            record: record
-        }, function (err) {
-            if (err) log.error(err.message);
-        });
+        if(!usedToSaveDataToHistory) {
+            usedToSaveDataToHistory = true;
+            getHouseKeeperData();
+        }
+
+        // send data to history only if counter.keepHistory != 0
+        if(houseKeeperData[id] !== 0) {
+            clientIPC.send({
+                msg: 'add',
+                id: id,
+                record: record
+            });
+        }
 
         return {
             // !!! return value, not record.data, because record.data can be a string object and cannot be
@@ -369,7 +396,12 @@ function runServerProcess() {
 
     function processMessage(message, socket, callback) {
 
-        if(message.msg === 'add') return cache.add(message.id, message.record);
+        if(message.msg === 'add') {
+            cache.add(message.id, message.record);
+            // callback used only for cleanup callback stack from IPC cluster worker
+            // empty data will not be sent to history client
+            return callback();
+        }
 
         if(message.msg === 'createStorage')
             return storage.createStorage(message.id, {cachedRecords: parameters.initCachedRecords}, callback);
@@ -388,7 +420,7 @@ function runServerProcess() {
         if(message.msg === 'getByTime') {
             return cache.getByTime (message.id, message.time, message.interval, message.maxRecordsCnt,
                 message.recordsType, function(err, records) {
-                var isDataFromTrends = records && records.length ? records[0].isDataFromTrends : false;
+                //var isDataFromTrends = records && records.length ? records[0].isDataFromTrends : false;
                 var trimmedRecords = thinOutRecords(records, message.maxRecordsCnt);
                 //if(trimmedRecords.length) {
                     //trimmedRecords[0].isDataFromTrends = trimmedRecords.length !== records.length || isDataFromTrends;
@@ -403,7 +435,7 @@ function runServerProcess() {
             if(typeof functions[message.funcName] !== 'function')
                 return log.error('Unknown history function "',message.funcName,'". Message object: ',message);
 
-            //log.debug('Executing history function ',msg.funcName,'. Message object: ',msg);
+            //log.info('Executing history function ',message.funcName,'. Message object: ',message);
             return functions[message.funcName](message.id, message.parameters, callback);
         }
 
@@ -425,7 +457,7 @@ function runServerProcess() {
                     // starting IPC after all history functions are initializing
                     log.info('Starting history storage IPC...');
                     parameters.id = 'history';
-                    serverIPC = new IPC.server(parameters, function(err, msg, socket, messageCallback) {
+                    serverIPC = new IPC.cluster(parameters, function(err, msg, socket, messageCallback) {
                         if(err) log.error(err.message);
 
                         if(socket === -1) {

@@ -31,7 +31,9 @@ var backupServer = require('../lib/dbBackup');
 var taskServer = require('../lib/taskServer');
 var dynamicLog = require('../lib/dynamicLog');
 var IPC = require('../lib/IPC');
+var proc = require('../lib/proc');
 
+console.log('Starting ALEPIZ...');
 
 service.run (function () {
     var stopTimeout = conf.get('serviceStopTimeout') || 120000;

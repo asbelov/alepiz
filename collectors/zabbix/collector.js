@@ -79,8 +79,13 @@ collector.get = function(param, callback) {
                 zabbixData.writeUInt32LE(sentData.length, 5);
                 zabbixData.writeUInt32LE(0, 9);
                 zabbixData = Buffer.concat([zabbixData, Buffer.from(sentData)]);
-                socket.write(zabbixData); // new protocol after zabbix-agent 4.0 with header
-                //socket.write(data); // old protocol, version before zabbix-agent 4.0 without header
+                // async write to socket
+                socket.write(zabbixData, function(err) {
+                    if(err) log.info('Can\'t write data to socket: ', err.message);
+                }); // new protocol after zabbix-agent 4.0 with header
+                //socket.write(data, function(err) { // old protocol, version before zabbix-agent 4.0 without header
+                //    if(err) log.info('Can\'t write data to socket: ', err.message);
+                //});
             });
 
             var data = Buffer.alloc(0);
