@@ -7,41 +7,34 @@ var async = require('async');
 var log = require('../lib/log')(module);
 var IPC = require('../lib/IPC');
 var proc = require('../lib/proc');
-var threads = require('../lib/threads');
 var collectorsCfg = require('../lib/collectors');
-var conf = require('../lib/conf');
-const { type } = require('os');
-conf.file('config/conf.json');
-
-// collectorPath, serverAddressIPC, serverPortIPC
-if(!module.parent) return runCollector(process.argv[2], process.argv[3], process.argv[4]);  //standalone process
-
+var Conf = require('../lib/conf');
+const confServer = new Conf('config/server.json');
 
 var activeCollector = {};
 module.exports = activeCollector;
-var collectors = new Map(), collectorsObj = new Map();
+
+var collectors = {}, collectorsObj = {};
 /* collectors[serverAddress + ':' + port] = {
     names: <array of collectors names>
     IPC: <clientIPC for connect to collectors>
 }*/
 
-activeCollector.startCollector = startCollector;
-
 activeCollector.startAll = function (killTimeout, onExit, callback) {
-    var activeCollectors = new Map();
-    collectors = new Map();
-    console.log('Active collectors!!!!')
+    var activeCollectors = {};
+    var separateCollectors = {};
+    collectors = {};
+
     collectorsCfg.get(null, function (err, _collectorsObj) {
         if (err) return callback(err);
 
-        collectorsObj = new Map(Object.entries(_collectorsObj));
+        collectorsObj = _collectorsObj;
 
-        for(var collectorName of collectorsObj.keys()) {
+        for(var collectorName in collectorsObj) {
             getCollectorParameters(collectorName);
         }
 
-        async.each(Array.from(collectorsObj.keys()), function (collectorName, callback) {
-            var collectorCfg = collectorsObj.get(collectorName);
+        async.eachOf(collectorsObj, function (collectorCfg, collectorName, callback) {
             // it is not the same as a separate collector. This means that we can receive data from the collector once at a time.
             if (!collectorCfg.active && !collectorCfg.separate) return callback();
 
@@ -51,77 +44,78 @@ activeCollector.startAll = function (killTimeout, onExit, callback) {
                     return callback();
                 }
 
-                // collector was started before
-                if(!collectorProcess) return callback();
-
-                if (!activeCollectors.has(collectorName)) {
-                    activeCollectors.set(collectorName, collectorProcess);
-                    log.info('Starting ', collectorProcess.type ,' collector ', collectorName, ' successfully');
+                if (!activeCollectors[collectorName] && collectorCfg.active) {
+                    activeCollectors[collectorName] = collectorProcess;
+                    log.info('Starting active collector ', collectorName, ' successfully');
                     callback();
+                } else if (!separateCollectors[collectorName] && collectorCfg.separate) {
+                    separateCollectors[collectorName] = collectorProcess;
+                    log.info('Starting separate collector ', collectorName, ' successfully');
+                    callback();
+                    // if collector is already running and restarting and callback always called before, don't call callback
                 } else log.error('Collector ', collectorName, ' already running and now run again');
             });
         }, function (err) {
-            callback(err, activeCollectors);
+            callback(err, activeCollectors, separateCollectors);
         });
     });
 };
 
 function getCollectorParameters(collectorName) {
-    if(!collectorsObj.has(collectorName)) collectorsObj.set(collectorName, {});
+    if(!collectorsObj[collectorName]) collectorsObj[collectorName] = {};
 
-    var serverAddress = collectorsObj.get('serverAddress') ||
-        conf.get('collectors:'+collectorName+':serverAddress') ||
-        conf.get('collectors:defaultSettings:serverAddress');
+    var serverAddress = collectorsObj.serverAddress ||
+        confServer.get('collectors:' + collectorName + ':serverAddress') ||
+        confServer.get('collectors:defaultSettings:serverAddress');
 
-    if(serverAddress) collectorsObj.get(collectorName).serverAddress = serverAddress;
+    if(serverAddress) collectorsObj[collectorName].serverAddress = serverAddress;
 
-    var localAddress = collectorsObj.get('localAddress') ||
-            conf.get('collectors:'+collectorName+':localAddress') ||
-            conf.get('collectors:defaultSettings:localAddress');
+    var localAddress = collectorsObj.localAddress ||
+            confServer.get('collectors:' + collectorName + ':localAddress') ||
+            confServer.get('collectors:defaultSettings:localAddress');
 
-    if (localAddress) collectorsObj.get(collectorName).localAddress = localAddress;
+    if(localAddress) collectorsObj[collectorName].localAddress = localAddress;
 
-    var port = collectorsObj.get('port') ||
-            conf.get('collectors:'+collectorName+':port') ||
-            conf.get('collectors:defaultSettings:port');
+    var port = collectorsObj.port ||
+            confServer.get('collectors:' + collectorName + ':port') ||
+            confServer.get('collectors:defaultSettings:port');
 
-    if (port) collectorsObj.get(collectorName).port = port;
+    if(port) collectorsObj[collectorName].port = port;
 }
 
 function startCollector(collectorName, killTimeout, onExit, callback) {
 
-    var serverAddress = collectorsObj.get(collectorName).serverAddress,
-        localAddress = collectorsObj.get(collectorName).localAddress,
-        port = collectorsObj.get(collectorName).port;
+    var serverAddress = collectorsObj[collectorName].serverAddress,
+        localAddress = collectorsObj[collectorName].localAddress,
+        port = collectorsObj[collectorName].port;
 
-    if(collectors.has(serverAddress + ':' + port)) return callback();
+    if(collectors[serverAddress + ':' + port]) return callback();
 
     if(!port || port !== parseInt(port, 10))
         return callback(new Error('TCP port for active collectors ' + collectorName +
-            ' is not specified or error ('+ port + '). Set it in general conf.json'));
+            ' is not specified or error ('+ port + '). Set it in conf/server.json'));
 
-    if(!serverAddress) return callback(new Error('Server address for active collector ' + collectorName +
-        ' is not specified ('+ serverAddress + '). Set it in general conf.json'));
+    if(!serverAddress) return callback(new Error('Server IP address for active collector ' + collectorName +
+        ' is not specified ('+ serverAddress + '). Set it in conf/server.json'));
 
-    if(!localAddress) return callback(new Error('Local address for active collector ' + collectorName +
-        ' is not specified ('+ localAddress + '). Set it in general conf.json'));
+    if(!localAddress) return callback(new Error('Local IP address for active collector ' + collectorName +
+        ' is not specified ('+ localAddress + '). Set it in conf/server.json'));
 
     var collectorsNames = getCollectorNamesWithSameIPAndPort(serverAddress, port);
-    collectors.set(serverAddress + ':' + port, {
+    collectors[serverAddress + ':' + port] = {
         names: collectorsNames,
-    });
+    };
 
     new proc.parent({
-        childProcessExecutable: __filename,
+        childProcessExecutable: path.join(__dirname, 'activeCollectorServer.js'),
         args: [collectorsNames.join(','), serverAddress, port],
         childrenNumber: 1,
-        onChildExit: function() { onExit(collectorName); },
-        restartAfterErrorTimeout: 0, // we will restart server with all children after exit one of children
-        killTimeout: killTimeout - 2000, // set kill timeout less then in server for success restart
+        restartAfterErrorTimeout: 3000, // we will restart server with all children after exit one of children
+        killTimeout: killTimeout - 2000, // set kill timeout less than in server for success restart
         module: 'activeCollector',
     }, function(err, collectorProc) {
         if(err) {
-            collectors.delete(serverAddress + ':' + port);
+            delete collectors[serverAddress + ':' + port];
             return callback(new Error('Error occurred while initializing active collectors ' +
                 collectorsNames.join(',') + ': ' + err.message));
         }
@@ -130,7 +124,7 @@ function startCollector(collectorName, killTimeout, onExit, callback) {
             callback(err, {
                 stop: collectorProc.stopAll,
                 kill: collectorProc.killAll,
-                type: collectorsObj.get(collectorName).active ? 'active' : 'separate',
+                sendAll: collectorProc.sendAll,
             });
         });
     });
@@ -139,9 +133,9 @@ function startCollector(collectorName, killTimeout, onExit, callback) {
 function getCollectorNamesWithSameIPAndPort(serverAddress, port) {
     // searching collectors with same IP and port
     var collectorsNames = [];
-    for(var anotherCollectorName of collectorsObj.keys()) {
-        if(serverAddress && serverAddress === collectorsObj.get(anotherCollectorName).serverAddress &&
-            port && port === collectorsObj.get(anotherCollectorName).port
+    for(var anotherCollectorName in collectorsObj) {
+        if(serverAddress && serverAddress === collectorsObj[anotherCollectorName].serverAddress &&
+            port && port === collectorsObj[anotherCollectorName].port
         ) collectorsNames.push(anotherCollectorName);
     }
 
@@ -151,81 +145,89 @@ function getCollectorNamesWithSameIPAndPort(serverAddress, port) {
 
 activeCollector.connect = function (collectorName, callback) {
     if(!collectorName) return callback(new Error('Collector name is not set for connect to active collector'));
+    // already connected
+    if(collectorsObj[collectorName] && collectorsObj[collectorName].IPC) {
+        return callback(null, collectorsObj[collectorName].IPC);
+    }
 
     connectToCollector(collectorName, function (err, clientIPC) {
         if(err) return callback(err);
 
-        activeCollector.disconnect = clientIPC.disconnect;
-
         /* if connected */
-        var collector = {};
+        var collector = new Collector(collectorName, clientIPC);
 
-        collector.get = function (param, callback) {
-            clientIPC.sendAndPermanentReceive({
-                name: collectorName,
-                type: 'get',
-                data: param,
-            }, callback);
-        };
-
-        collector.removeCounters = function (OCIDs, callback) {
-            clientIPC.sendAndReceive({
-                name: collectorName,
-                type: 'removeCounters',
-                data: OCIDs
-            }, callback);
-        };
-
-        collector.throttlingPause = function (throttlingPause, callback) {
-            clientIPC.sendAndReceive({
-                name: collectorName,
-                type: 'throttlingPause',
-                data: throttlingPause
-            }, callback);
-        };
-
-        collector.destroy = function (callback) {
-            clientIPC.sendAndReceive({
-                name: collectorName,
-                type: 'destroy',
-            }, callback);
-        };
-
-        collector.sendMsg = function (message, callback) {
-            var send = typeof callback === 'function' ? clientIPC.sendAndReceive : clientIPC.send;
-            send({
-                name: collectorName,
-                type: 'serverMsg',
-                data: message
-            }, callback);
-        }
-
+        if(!collectorsObj[collectorName]) collectorsObj[collectorName] = {};
+        collectorsObj[collectorName].IPC = collector;
         callback(null, collector);
     });
 };
+
+function Collector(collectorName, clientIPC) {
+    this.get = function (param, callback) {
+        clientIPC.sendAndPermanentReceive({
+            name: collectorName,
+            type: 'get',
+            data: param,
+        }, callback);
+    };
+
+    this.getOnce = function (param, callback) {
+        clientIPC.sendAndReceive({
+            name: collectorName,
+            type: 'getOnce',
+            data: param,
+        }, callback);
+    };
+
+    this.removeCounters = function (OCIDs, callback) {
+        clientIPC.sendAndReceive({
+            name: collectorName,
+            type: 'removeCounters',
+            data: OCIDs
+        }, callback);
+    };
+
+    this.throttlingPause = function (throttlingPause, callback) {
+        clientIPC.sendAndReceive({
+            name: collectorName,
+            type: 'throttlingPause',
+            data: throttlingPause
+        }, callback);
+    };
+
+    this.destroy = function (callback) {
+        clientIPC.sendAndReceive({
+            name: collectorName,
+            type: 'destroy',
+        }, callback);
+    };
+
+    this.sendToServer = function (message) {
+        clientIPC.send(message);
+    };
+}
 
 function connectToCollector(collectorName, callback) {
     var reconnectInProgress = false;
 
     getCollectorParameters(collectorName);
-    getCollectorParameters(collectorName);
-    var serverAddress = collectorsObj.get(collectorName).serverAddress,
-        localAddress = collectorsObj.get(collectorName).localAddress,
-        port = collectorsObj.get(collectorName).port;
+    var serverAddress = collectorsObj[collectorName].serverAddress,
+        localAddress = collectorsObj[collectorName].localAddress,
+        port = collectorsObj[collectorName].port;
 
-    // connectToCollector and startAll can be in different processes
+    // connectToCollector and startAll can be in different process
     // init collectors again
-    if(!collectors.has(serverAddress + ':' + port)) {
-        collectors.set(serverAddress + ':' + port, {
+    if(!collectors[serverAddress + ':' + port]) {
+        collectors[serverAddress + ':' + port] = {
             names: getCollectorNamesWithSameIPAndPort(serverAddress, port)
-        });
+        };
     }
 
     // already connected
-    if(collectors.get(serverAddress + ':' + port).IPC) return callback(null, collectors.get(serverAddress + ':' + port).IPC);
+    if(collectors[serverAddress + ':' + port].IPC) return callback(null, collectors[serverAddress + ':' + port].IPC);
 
     // run IPC system
-    collectors.get(serverAddress + ':' + port).IPC = new IPC.client({
+    collectors[serverAddress + ':' + port].IPC = new IPC.client({
         serverAddress: serverAddress,
         serverPort: port,
         localAddress: localAddress,
@@ -241,116 +243,8 @@ function connectToCollector(collectorName, callback) {
 
         if (!isConnected) return log.warn('Receiving unexpected message: ', message);
 
-        if(err) collectors.get(serverAddress + ':' + port).IPC = null;
-        callback(err, collectors.get(serverAddress + ':' + port).IPC);
+        if(err) collectors[serverAddress + ':' + port].IPC = null;
+        callback(err, collectors[serverAddress + ':' + port].IPC);
     });
 }
 
-/*
- node.exe = process.argv[0]
- __filename = process.argv[1]
- collectorNamesStr = process.argv[2] (comma separated collector names)
- serverAddress = process.argv[3] (server IP address for IPC)
- serverPort = process.argv[4] (server port for IPC)
- */
-function runCollector(collectorNamesStr, serverAddress, serverPort) {
-
-    var history = require('../models_history/history');
-
-    var stopInProgress = false;
-    var collectorNames = collectorNamesStr.split(',');
-    var collectorsObj = new Map()
-
-    collectorNames.forEach(function (collectorName) {
-        var collectorPath = path.join(__dirname, '..', conf.get('collectors:dir'), collectorName, 'collector.js');
-        try {
-            log.info('Attaching new collector ', collectorName, ': ', collectorPath );
-            collectorsObj.set(collectorName, require(collectorPath));
-        } catch (err) {
-            log.error('Error attaching active collector ', collectorName,' code ', collectorPath, ': ', err.message);
-        }
-    });
-
-    history.connect(serverPort, function () {
-        new IPC.server({
-            serverAddress: serverAddress,
-            serverPort: serverPort,
-            id: collectorNamesStr,
-        }, function (err, message, socket, callback) {
-            if (err) {
-                if (stopInProgress) return;
-                stopInProgress = true;
-
-                log.exit(err.message);
-                destroyCollectors(function () {
-                    log.disconnect(function () { process.exit(2) });
-                });
-                return;
-            }
-
-            // on connect
-            if (socket === -1) {
-                log.info('Active collectors ', collectorNamesStr, ' starting and listening ', serverAddress, ':', serverPort, ' for IPC');
-                stopInProgress = false;
-                new proc.child({
-                    module: 'activeCollector',
-                    onStop: function (callback) {
-                        if (stopInProgress) return callback();
-                        stopInProgress = true;
-                        log.warn('Stopping ' + collectorNamesStr);
-
-                        destroyCollectors(callback);
-                    },
-                    onDestroy: destroyCollectors,
-                    onDisconnect: function () {  // exit on disconnect from parent (then server will be restarted)
-                        log.exit('Active collectors ' + collectorNamesStr +
-                            ' was disconnected from parent unexpectedly. Exiting');
-                        log.disconnect(function () { process.exit(2) });
-                    },
-                });
-                return;
-            }
-
-            // on message received
-            if (!message || !message.type || !message.name ||
-                !collectorsObj.has(message.name) || typeof collectorsObj.get(message.name)[message.type] !== 'function') {
-                callback();
-                return log.info('Unknown active collector message for ', collectorNamesStr, ': ', message);
-            }
-
-            try {
-                if (message.data !== undefined) {
-                    if (message.type !== 'get') collectorsObj.get(message.name)[message.type](message.data, callback);
-                    else { // save collector data to history
-                        collectorsObj.get(message.name).get(message.data, function (err, result) {
-                            //if(Number(message.data.id$) === 155101) log.warn('Add record ', message.data.$id, ':', result, ': ', message);
-                            //log.warn('Add record ', message.data.$id, ':', result, ': ', message);
-                            callback(err, history.add(message.data.$id, result));
-                        });
-                    }
-                } else collectorsObj.get(message.name)[message.type](callback);
-            } catch (e) {
-                log.error('Error running collector function ', collectorNamesStr, ': ', message.name, '.', message.type, ': ', e.stack, ' (data: ', message.data, ')');
-            }
-        });
-    });
-
-    function destroyCollectors(callback) {
-        async.each(Array.from(collectorsObj.keys()), function (collectorName, callback) {
-            var collector = collectorsObj.get(collectorName);
-            if(collector && typeof collector.destroy === 'function') {
-                collector.destroy(function (err) {
-                    if(err) log.error(collectorName, ': ', err.message);
-                    callback();
-                });
-            } else callback();
-        }, function () {
-            log.warn('All active and separate collectors are stopped');
-            if(typeof callback === 'function') callback();
-        });
-    }
-
-    function startServers(callback) {
-        
-    }
-}

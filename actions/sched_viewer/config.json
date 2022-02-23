@@ -3,6 +3,7 @@
     "description": "View service schedule",
     "homePage": "index",
     "ajaxServer": "ajax.js",
+    "startAjaxAsThread": true,
     "staticDir": "static",
     "showWhenNoObjectsSelected": true,
     "onChangeObjectMenuEvent": "callback:onChangeObjects",

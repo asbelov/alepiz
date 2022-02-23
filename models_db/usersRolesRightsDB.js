@@ -3,10 +3,10 @@
  */
 
 var async = require('async');
-var db = require('../lib/db');
+var db = require('./db');
 var log = require('../lib/log')(module);
-var conf = require('../lib/conf');
-conf.file('config/conf.json');
+var Conf = require('../lib/conf');
+const conf = new Conf('config/common.json');
 var systemUser = conf.get('systemUser') || 'system';
 var reloadRightsInterval = ( conf.get('reloadRightsIntervalSec') || 180 ) * 1000;
 
@@ -72,7 +72,7 @@ WHERE isDeleted=0', function(err, rows) {
             callback();
         });
         callbacksQueue = [];
-        log.info('Loading objects rights from DB to cache is complete. Loaded ', rows.length, ' roles.');
+        //log.info('Loading objects rights from DB to cache is complete. Loaded ', rows.length, ' roles.');
     });
 }
 
@@ -135,11 +135,12 @@ rightsDB.checkObjectsIDs = function(p, callback) {
  Checking user rights for specific counter ID.
  If user has not rights for linked objects to counter, then user also has not rights to counter
  look at checkObjectsRightsWrapper description for other p.* values
- p.id - counters id for check
+ p.id - counter id for check
  p.errorOnNoRights - generate error when you has no rights for some objects counters
  callback(err, id): id is a counter id
  */
 rightsDB.checkCounterID = function(p, callback) {
+    if(!p.id) return callback();
 
     db.all('SELECT objectID FROM objectsCounters WHERE counterID=?', p.id, function(err, rows) {
 

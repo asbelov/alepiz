@@ -3,7 +3,7 @@
  */
 
 var log = require('../../lib/log')(module);
-var db = require('../../lib/db');
+var db = require('../db');
 
 
 module.exports = function(callback){

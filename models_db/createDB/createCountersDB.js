@@ -3,13 +3,13 @@
  */
 
 var log = require('../../lib/log')(module);
-var db = require('../../lib/db');
+var db = require('../db');
 var async = require('async');
 
 module.exports = function(callback){
     log.debug('Creating counters, counterParameters, countersGroups, countersUnits, objectsCounters, variables tables in database');
 
-    async.parallel([
+    async.series([
         createCountersGroupsTable,
         createCountersUnitsTable
     ], function(err){
@@ -18,7 +18,7 @@ module.exports = function(callback){
         createCountersTable(function(err){
             if(err) return callback(err);
 
-            async.parallel([
+            async.series([
                 createCountersUpdateEventTable,
                 createCounterParametersTable,
                 createObjectsCountersTable,
@@ -95,7 +95,7 @@ function createCountersGroupsTable(callback){
         if (err) return callback(new Error('Can\'t create countersGroups table in database: ' + err.message));
 
         db.get('SELECT COUNT(*) as count FROM countersGroups', [], function (err, row) {
-            if (err || row.count) return callback();
+            if (err || (row && row.count)) return callback();
 
             log.debug('Table countersGroups is empty, inserting initial values into countersGroups table');
             db.run(

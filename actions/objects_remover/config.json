@@ -5,11 +5,15 @@
   "ajaxServer": "ajax.js",
   "execMethod": "post",
   "launcher": "nodeModule",
-  "launcherPrms": { "javaScript": "server.js" },
+    "startAjaxAsThread": true,
+    "launcherPrms": {
+        "javaScript": "server.js",
+        "startAsThread": true
+    },
   "staticDir": "static",
   "callbackBeforeExec": "callbackBeforeExec",
   "onChangeObjectMenuEvent": "callback:onChangeObjects",
-  "timeout": 60,
+  "timeout": 180,
   "showWhenNoObjectsSelected": false,
   "outputFormat": "text",
   "descriptionTemplate": "Removing objects: %:o:%.",

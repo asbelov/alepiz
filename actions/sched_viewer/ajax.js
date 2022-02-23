@@ -98,40 +98,43 @@ module.exports = function(args, callback) {
                                 var stopTimeOCID = stopTimeRow.id;
                                 var serviceStateOCID = serviceStateRow.id;
 
-                                history.getByIdx(startTimeOCID, 0, historyDataCnt, 0, function (err, startData) {
-                                    if (err) {
-                                        log.warn('Can\'t get history data for start times for objectID ' + objectID + ': ' + err.message);
-                                        return callback();
-                                    }
-                                    if(!startData || !startData.length) {
-                                        log.warn('History data for counter ' + startTimeCounterName + ' not found');
-                                    }
+                                history.connect('actionScheduleViewer', function() {
 
-                                    history.getByIdx(stopTimeOCID, 0, historyDataCnt, 0, function (err, stopData) {
+                                    history.getByIdx(startTimeOCID, 0, historyDataCnt, 0, function (err, startData) {
                                         if (err) {
-                                            log.warn('Can\'t get history data for stop times for objectID ' + objectID + ': ' + err.message);
+                                            log.warn('Can\'t get history data for start times for objectID ' + objectID + ': ' + err.message);
                                             return callback();
                                         }
-                                        if(!stopData || !stopData.length) {
-                                            log.warn('History data for counter ' + stopTimeCounterName + ' not found');
+                                        if (!startData || !startData.length) {
+                                            log.warn('History data for counter ' + startTimeCounterName + ' not found');
                                         }
 
-                                        history.getByIdx(serviceStateOCID, 0, 1, 0, function (err, serviceStateData) {
+                                        history.getByIdx(stopTimeOCID, 0, historyDataCnt, 0, function (err, stopData) {
                                             if (err) {
-                                                log.warn('Can\'t get history data for service state for objectID ' + objectID + ': ' + err.message);
+                                                log.warn('Can\'t get history data for stop times for objectID ' + objectID + ': ' + err.message);
                                                 return callback();
                                             }
-                                            if(!serviceStateData || !serviceStateData.length) {
-                                                log.warn('History data for counter ' + serviceStateName + ' not found');
+                                            if (!stopData || !stopData.length) {
+                                                log.warn('History data for counter ' + stopTimeCounterName + ' not found');
                                             }
 
-                                            historyData[objectID] = {
-                                                name: object.name,
-                                                start: startData,
-                                                stop: stopData,
-                                                state: serviceStateData[0].data,
-                                            };
-                                            callback();
+                                            history.getByIdx(serviceStateOCID, 0, 1, 0, function (err, serviceStateData) {
+                                                if (err) {
+                                                    log.warn('Can\'t get history data for service state for objectID ' + objectID + ': ' + err.message);
+                                                    return callback();
+                                                }
+                                                if (!serviceStateData || !serviceStateData.length) {
+                                                    log.warn('History data for counter ' + serviceStateName + ' not found');
+                                                }
+
+                                                historyData[objectID] = {
+                                                    name: object.name,
+                                                    start: startData,
+                                                    stop: stopData,
+                                                    state: serviceStateData[0].data,
+                                                };
+                                                callback();
+                                            });
                                         });
                                     });
                                 });

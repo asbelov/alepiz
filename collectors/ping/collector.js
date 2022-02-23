@@ -3,14 +3,18 @@
  */
 
 var recode = require('../../lib/recode');
+const Conf = require("../../lib/conf");
 var log = require('../../lib/log')(module);
+const confCollectors = new Conf('config/collectors.json');
+const confSettings = new Conf(confCollectors.get('dir') + '/ping/settings.json');
+
 
 /*
 Collector ping targets using raw-socket module.
 !!! Return data in milliseconds, not seconds !!!
 * forking process with raw-socket, received message from parent, pinging targets
 * on packet loss collector stop pinging using internal raw-socket module, run external ping program and
-* checking, is packet loss really occur. Because some time raw-socket skip packet and it needing for packet
+* checking, is packet loss really occur. Because some time raw-socket skip packet, and it's needing for packet
 * loss checking
 * if external ping received 60 echo reply packets, collector try to switch to internal ping for target
 * while new packet loss will occur
@@ -140,8 +144,8 @@ function initServerCommunication() {
         addressPrepare(prms.host, function(err, address, family) {
             if(err) {
                 // don't run callback(err) for retrying resolve host in the next time
-                log.error('Can\'t resolve IP address for Internet domain host name ', prms.host, ': ', err.message, ' Retry after 10 minutes');
-                setTimeout(collector.get, 600000, prms, callback);
+                log.error('Can\'t resolve IP address for Internet domain host name ', prms.host, ': ', err.message, ' Retry after 9 minutes');
+                setTimeout(collector.get, 540000, prms, callback);
                 return;
             }
 
@@ -190,7 +194,8 @@ function initServerCommunication() {
     // running (forking) ping server and process signals and messages from it
     function runServer(callback) {
 
-        log.info('Ping: running server');
+        log.info('Ping: running server. External ping is ',
+            confSettings.get('dontUseExternalPing') ? 'disabled' : 'enabled');
 
         //if(serverProcess && typeof serverProcess.kill === 'function') serverProcess.kill();
         serverProcess = cp.fork(__filename);
@@ -302,7 +307,8 @@ function initServerCommunication() {
 
         // if received legal RTT or received any value from external ping.exe,
         // sending received value into the Database end exit
-        if(message.data.value > 0 || message.data.externalPing) {
+        if(message.data.value > 0 || message.data.externalPing ||
+            confSettings.get('dontUseExternalPing')) {
 
             targets[address].callback(null, {
                 value: message.data.value,
@@ -318,7 +324,7 @@ function initServerCommunication() {
         if(serverProcess) serverProcess.send({type: 'destroyTarget', data: address });
 
         // stopping switch to external ping if external ping for this host already running
-        // I don't known how, but some time it's happened. May be after notebook hibernation
+        // I don't know how, but some time it's happened. May be after notebook hibernation
         if(externalPingProcesses[address] && externalPingProcesses[address].pid) {
             return log.warn('Trying to switch from internal ping server to ping using external program, but external ping for ',
                 targets[address].host, '(', address, ') already running with PID ',
@@ -475,7 +481,7 @@ function runServerProcess() {
                     setInterval(watchdog, 1000);
                     setInterval(function() {
                         log.info('Ping hosts: ', Object.keys(targets).join(', '));
-                    }, 300000);
+                    }, 360000);
                     setTimeout(function () {
                         process.send({type: 'initCompleted'});
                     }, 200);

@@ -2,10 +2,12 @@
 * Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
 * Created on 2021-4-30 13:59:36
 */
-var path = require('path');
-var log = require('../../lib/log')(module);
-var sqlite = require('../../lib/sqlite');
-var conf = require('../../lib/conf');
+const path = require('path');
+const log = require('../../lib/log')(module);
+const Database = require('better-sqlite3');
+const Conf = require('../../lib/conf');
+const confCollectors = new Conf('config/collectors.json');
+const confOptionsEventGenerator = new Conf(confCollectors.get('dir') + '/event-generator/settings.json');
 
 var collector = {};
 module.exports = collector;
@@ -46,47 +48,46 @@ collector.get = function(param, callback) {
     
     var checkTime = Date.now() + Number(param.daysBeforeEnable) * 86400000;
     var disablePeriod = Number(param.disablePeriod) * 86400000;
-    
-    db.all('SELECT events.counterID AS counterID, events.objectName AS objectName, events.counterName AS counterName, ' +
-       'disabledEvents.disableUntil AS disableUntil, disabledEvents.timestamp AS timestamp,' +
-        'disabledEvents.user AS user, disabledEvents.intervals AS disableIntervals ' +
-        'FROM disabledEvents JOIN events ON disabledEvents.eventID = events.id ' +
-        'WHERE disabledEvents.disableUntil < ? AND disabledEvents.disableUntil - disabledEvents.timestamp > ?',
-        [checkTime, disablePeriod], function(err, rows) {
-        
-        if(err) {
-            return callback(new Error('Can\'t get disabled events info which will be enable after ' +
-				param.daysBeforeEnable + ' days (after ' +
-                new Date(checkTime).toLocaleString().replace(/\.\d\d\d\d,/, '') +
-                ') and was disabled on ' + param.disablePeriod + ' days: ' + err.message));
-        }
-        log.debug('Events: ', rows);
-        var results = rows.map(function (row) {
-            var disabledTimeIntervals = '';
-            if (row.disableUntil && row.disableIntervals) {
-                var intervals = row.disableIntervals.split(';'),
-                    lastMidnight = new Date(new Date().setHours(0, 0, 0, 0)).getTime(); // last midnight
 
-                disabledTimeIntervals = intervals.map(function (interval) {
-                    var fromTo = interval.split('-');
-                    var from = new Date(lastMidnight + Number(fromTo[0])).toLocaleTimeString().replace(/:\d\d$/, '');
-                    var to = new Date(lastMidnight + Number(fromTo[1])).toLocaleTimeString().replace(/:\d\d$/, '');
-                    return from + '-' + to;
-                }).join('; ');
-            }
-            return {
-                counterID: row.counterID,
-                objectName: row.objectName,
-                counterName: row.counterName,
-                disableUntil: new Date(row.disableUntil).toLocaleString().replace(/\.\d\d\d\d,/, ''),
-                disableTime: new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, ''),
-                user: row.user,
-                timeIntervals: disabledTimeIntervals || '-',
-            };
-        });
-        log.info('result: ', results);
-        callback(null, results);
+    try {
+        var rows = db.prepare('SELECT events.counterID AS counterID, events.objectName AS objectName, events.counterName AS counterName, ' +
+            'disabledEvents.disableUntil AS disableUntil, disabledEvents.timestamp AS timestamp,' +
+            'disabledEvents.user AS user, disabledEvents.intervals AS disableIntervals ' +
+            'FROM disabledEvents JOIN events ON disabledEvents.eventID = events.id ' +
+            'WHERE disabledEvents.disableUntil < ? AND disabledEvents.disableUntil - disabledEvents.timestamp > ?')
+            .all([checkTime, disablePeriod]);
+    } catch(err) {
+        return callback(new Error('Can\'t get disabled events info which will be enable after ' +
+            param.daysBeforeEnable + ' days (after ' +
+            new Date(checkTime).toLocaleString().replace(/\.\d\d\d\d,/, '') +
+            ') and was disabled on ' + param.disablePeriod + ' days: ' + err.message));
+    }
+    log.debug('Events: ', rows);
+    var results = rows.map(function (row) {
+        var disabledTimeIntervals = '';
+        if (row.disableUntil && row.disableIntervals) {
+            var intervals = row.disableIntervals.split(';'),
+                lastMidnight = new Date(new Date().setHours(0, 0, 0, 0)).getTime(); // last midnight
+
+            disabledTimeIntervals = intervals.map(function (interval) {
+                var fromTo = interval.split('-');
+                var from = new Date(lastMidnight + Number(fromTo[0])).toLocaleTimeString().replace(/:\d\d$/, '');
+                var to = new Date(lastMidnight + Number(fromTo[1])).toLocaleTimeString().replace(/:\d\d$/, '');
+                return from + '-' + to;
+            }).join('; ');
+        }
+        return {
+            counterID: row.counterID,
+            objectName: row.objectName,
+            counterName: row.counterName,
+            disableUntil: new Date(row.disableUntil).toLocaleString().replace(/\.\d\d\d\d,/, ''),
+            disableTime: new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, ''),
+            user: row.user,
+            timeIntervals: disabledTimeIntervals || '-',
+        };
     });
+    log.info('result: ', results);
+    callback(null, results);
 };
 
 /*
@@ -101,25 +102,26 @@ collector.destroy = function(callback) {
     */
     if(db) {
         log.warn('Request received to destroy the collector. Closing the database ...');
-        db.close(callback);
+        try {
+            db.close();
+        } catch (err) {
+            return callback(err);
+        }
     }
-    else callback();
+    callback();
 };
 
 function initDB(param, callback) {
     var dbPath = path.join(__dirname, '..', '..',
-        conf.get('collectors:event-generator:dbPath'),
-        conf.get('collectors:event-generator:dbFile'));
+        confOptionsEventGenerator.get('dbPath'),
+        confOptionsEventGenerator.get('dbFile'));
 
-    sqlite.init(dbPath, function (err, _db) {
-        if (err) return callback(new Error('Can\'t initialise event database ' + dbPath + ': ' + err.message));
+    try {
+        db = new Database(dbPath, {readonly: true, fileMustExist: true});
+    } catch (err) {
+        return callback(new Error('Can\'t initialise event database ' + dbPath + ': ' + err.message));
+    }
 
-        _db.exec('PRAGMA journal_mode = WAL', function (err) {
-            if (err) return callback(new Error('Can\'t set journal mode to WAL: ' + err.message));
-
-            db = _db;
-            log.info('Initializing events system database is completed');
-            return collector.get(param, callback);
-        });
-    });
+    log.info('Initializing events system database is completed');
+    return collector.get(param, callback);
 }

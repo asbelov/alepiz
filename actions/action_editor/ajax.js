@@ -6,20 +6,20 @@ var fs = require('fs');
 var path = require('path');
 var async = require('async');
 var log = require('../../lib/log')(module);
-var conf = require('../../lib/conf');
-conf.file('config/conf.json');
+var Conf = require('../../lib/conf');
+const confActions = new Conf('config/actions.json');
 var help = require('../../lib/help');
 
 module.exports = function(args, callback) {
     log.debug('Starting ajax '+__filename+' with parameters', args);
 
-    conf.reload();
+    confActions.reload();
     if(args.func === 'getActions') return getActions(args.username, callback);
 
     if(args.func === 'getFiles') return getFiles(args.ID, callback);
 
     if(!args.name) return callback(new Error('Action name is not specified for getting help data'));
-    var dir = path.join(__dirname, '..', '..', conf.get('actions:dir'), args.name);
+    var dir = path.join(__dirname, '..', '..', confActions.get('dir'), args.name);
 
     if(args.func === 'getHelpLanguages') {
         return help.getLanguages(dir, null, function(err, languages) {
@@ -32,7 +32,7 @@ module.exports = function(args, callback) {
 
 function getActions(user, callback) {
 
-    var actionsDir = path.join(__dirname, '..', '..', conf.get('actions:dir'));
+    var actionsDir = path.join(__dirname, '..', '..', confActions.get('dir'));
 
     fs.readdir(actionsDir, function (err, actionsIDs) {
         if(err) return callback(new Error('Can\'t get actions list from ' + actionsDir + ': ' + err.message));
@@ -59,7 +59,7 @@ function getActions(user, callback) {
         }, function () {
             callback(null, {
                 actions: actions,
-                layout: conf.get('actions:layout'),
+                layout: confActions.get('layout'),
             });
         });
     });
@@ -67,7 +67,7 @@ function getActions(user, callback) {
 
 function getFiles(actionID, callback) {
 
-    var actionDir = path.join(__dirname, '..', '..', conf.get('actions:dir'), actionID);
+    var actionDir = path.join(__dirname, '..', '..', confActions.get('dir'), actionID);
     var configPath = path.join(actionDir, 'config.json');
 
     fs.readFile(configPath, 'utf8', function (err, actionCfgStr) {

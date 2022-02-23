@@ -3,14 +3,14 @@
 * Created on 2020-10-2 2:33:37
 */
 
-var path = require('path');
+const path = require('path');
 //var log = require('../../lib/log')(module);
-var sqlite = require('../../lib/sqlite');
-var db = require('../../lib/db');
-var objectsDB = require('../../models_db/objectsDB');
-var countersDB = require('../../models_db/countersDB');
-var conf = require('../../lib/conf');
-conf.file('config/conf.json');
+const Database = require('better-sqlite3');
+const objectsDB = require('../../models_db/objectsDB');
+const countersDB = require('../../models_db/countersDB');
+const Conf = require('../../lib/conf');
+const confCollectors = new Conf('config/collectors.json');
+const confSettings = new Conf(confCollectors.get('dir') + '/event-generator/settings.json');
 
 var collector = {};
 module.exports = collector;
@@ -55,33 +55,34 @@ collector.get = function(param, callback) {
             if(err) return callback(new Error(err + ' for ' + JSON.stringify(param)));
 
             if(!eventDB) return callback(); // collector was destroyed
-            eventDB.all('SELECT * FROM events WHERE endTime IS NULL AND counterID IN (' + 
-                        (new Array(countersIDs.length)).fill('?').join(',') + ')', countersIDs, 
-                        function(err, eventsRows) {
-                if(err) return callback('Can\'t get data from events table for counter: ' + 
-                                        param.counterName + '(' + countersIDs.join(',') + '): ' + err );
+            try {
+                var eventsRows = eventDB.prepare('SELECT * FROM events WHERE endTime IS NULL AND counterID IN (' +
+                    (new Array(countersIDs.length)).fill('?').join(',') + ')').all(countersIDs);
+            } catch(err) {
+                return callback('Can\'t get data from events table for counter: ' +
+                    param.counterName + '(' + countersIDs.join(',') + '): ' + err);
+            }
 
-                if(!eventsRows.length) return callback(null, 0);
+            if(!eventsRows.length) return callback(null, 0);
 
-                getObjectID(param.$id, param.objectName, function(err, objectID) {
+            getObjectID(param.$id, param.objectName, function(err, objectID) {
+                if(err) return callback(new Error(err + ' for ' + JSON.stringify(param)));
+
+                getObjectsIDsFromGroup(param.$id, objectID, function(err, objectsIDs) {
                     if(err) return callback(new Error(err + ' for ' + JSON.stringify(param)));
 
-                    getObjectsIDsFromGroup(param.$id, objectID, function(err, objectsIDs) {
-                        if(err) return callback(new Error(err + ' for ' + JSON.stringify(param)));
+                    if(!objectsIDs.length) return callback();
 
-                        if(!objectsIDs.length) return callback();
-
-                        var foundEventsNum = 0, copyObjectsIDs = objectsIDs.slice();
-                        eventsRows.forEach(function(eventRow) {
-                            var pos = copyObjectsIDs.indexOf(eventRow.objectID);
-                            if(pos !== -1) {
-                                ++foundEventsNum;
-                                copyObjectsIDs[pos] = null;
-                            }
-                        });
-                        //log.info('Events found: ', eventsRows.length, ', objects in group: ', objectsIDs.length)
-                        callback(null, Math.round(foundEventsNum * 100 / objectsIDs.length));
+                    var foundEventsNum = 0, copyObjectsIDs = objectsIDs.slice();
+                    eventsRows.forEach(function(eventRow) {
+                        var pos = copyObjectsIDs.indexOf(eventRow.objectID);
+                        if(pos !== -1) {
+                            ++foundEventsNum;
+                            copyObjectsIDs[pos] = null;
+                        }
                     });
+                    //log.info('Events found: ', eventsRows.length, ', objects in group: ', objectsIDs.length)
+                    callback(null, Math.round(foundEventsNum * 100 / objectsIDs.length));
                 });
             });
         });
@@ -98,12 +99,13 @@ collector.destroy = function(callback) {
     cache = {};
     if(!eventDB) return callback();
 
-    eventDB.close(function(err) {
+    try {
+        eventDB.close()
         eventDB = null;
-        db.close(function() {
-            callback(err);
-        });
-    });
+    } catch(err) {
+        return callback(err);
+    }
+    callback();
 };
 
 /*
@@ -127,21 +129,21 @@ function init(param, callback) {
     if(eventDB) return callback();
 
     var dbPath = path.join(__dirname, '..', '..',
-		conf.get('collectors:event-generator:dbPath'),
-        conf.get('collectors:event-generator:dbFile'));
+		confSettings.get('dbPath'),
+        confSettings.get('dbFile'));
 
-    sqlite.init(dbPath, function (err, _eventDB) {
-        if (err) return callback(new Error('Can\'t initialise event database ' + dbPath + ': ' + err));
-        
-        eventDB = _eventDB;
-        
-        setTimeout(function() {
-            for(var id in cache) {
-                if(Date.now() - cache[id].timestamp > 900000) delete cache[id]; 
-            }
-        }, 60000);
-        callback();
-    });
+    try {
+        eventDB = new Database(dbPath, {readonly: true, fileMustExist: true});
+    } catch (err) {
+        return callback(new Error('Can\'t initialise event database ' + dbPath + ': ' + err.message));
+    }
+
+    setTimeout(function() {
+        for(var id in cache) {
+            if(Date.now() - cache[id].timestamp > 900000) delete cache[id];
+        }
+    }, 60000);
+    callback();
 }
 
 function getCounterID(id, counterName, callback) {

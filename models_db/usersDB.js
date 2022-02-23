@@ -3,7 +3,7 @@
  */
 
 //var log = require('../lib/log')(module);
-var db = require('../lib/db');
+var db = require('./db');
 var async = require('async');
 var log = require('../lib/log')(module);
 
@@ -53,7 +53,7 @@ JOIN roles ON usersRoles.roleID=roles.id \
 LEFT JOIN userCommunication ON userCommunication.userID=users.id \
 LEFT JOIN userCommunicationPriorities ON userCommunicationPriorities.userCommunicationID = userCommunication.id \
 WHERE users.isDeleted=0' + (userName ? ' AND users.name=?' : '') + ' ORDER BY users.name',
-        userName ? userName : undefined, callback);
+        userName ? userName : [], callback);
 };
 
 usersDB.getCommunicationMediaForUsers = function(users, callback) {
@@ -99,8 +99,8 @@ usersDB.addUser = function(userProperties, callback) {
         $name: userProperties.name,
         $fullName: userProperties.fullName,
         $password: userProperties.password
-    }, function(err) {
-        callback(err, this.lastID);
+    }, function (err, info) {
+        callback(err, this.lastID === undefined ? info.lastInsertRowid : this.lastID);
     });
 };
 
@@ -115,7 +115,10 @@ usersDB.addRolesForUser = function(userID, rolesIDs, callback) {
                 $userID: userID,
                 $roleID: roleID
             }, callback);
-        }, callback);
+        }, function (err) {
+            stmt.finalize();
+            callback(err);
+        });
     })
 };
 
@@ -153,8 +156,8 @@ usersDB.addCommunicationMedia = function(userID, mediaID, address, callback) {
         $userID: userID,
         $mediaID: mediaID,
         $address: address,
-    }, function(err) {
-        callback(err, this.lastID);
+    }, function (err, info) {
+        callback(err, this.lastID === undefined ? info.lastInsertRowid : this.lastID);
     });
 };
 

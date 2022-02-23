@@ -37,100 +37,86 @@ function getData(args, callback) {
 
     if(!objects.length) return callback();
 
-    // SELECT * FROM objects WHERE id=? and check for user rights ti the objects
-    objectsDB.getObjectsByIDs(args.username, objects.map(o => o.id), function (err, objectsRows) {
-        if (err && (!objectsRows || !objectsRows.length)) return callback(err);
+    history.connect('actionInformation', function() {
 
-        var result = {},
-            objectsID2Name = {},
-            objectsIDs = objectsRows.map(function (row) {
-                result[row.name] = {};
-                objectsID2Name[row.id] = row.name;
-                return row.id;
-            });
 
-        // SELECT * FROM objectsProperties WHERE objectID IN (..) = [{id, objectID, name, value, description, mode}, ..]
-        objectsPropertiesDB.getProperties(objectsIDs, function (err, rows) {
-            if (err) {
-                return callback(new Error('Can\'t get objects properties :' + err.message + '(' + args.objects + ')'));
-            }
+        // SELECT * FROM objects WHERE id=? and check for user rights ti the objects
+        objectsDB.getObjectsByIDs(args.username, objects.map(o => o.id), function (err, objectsRows) {
+            if (err && (!objectsRows || !objectsRows.length)) return callback(err);
 
-            var props2TableHeads = new Map(),
-                counters2TableHeads = new Map(),
-                countersNames = new Set(),
-                tableHeads = new Map(),
-                historyFunctions = new Set(history.getFunctionList().map(f => f.name)); // to check if the function name exists
-
-            for(var name in cfg.properties) {
-                var prop = cfg.properties[name];
-                if (prop.property) {
-                    props2TableHeads.set(prop.property, name);
-                } else if (prop.counter) {
-                    if(prop.history_function) { // prop.history_function f.e. 'min(300)'
-                        // .trim() - remove spaces
-                        // .slice(0, -1) - remove last ')'
-                        // .split('(')) - split to function name and function parameters
-                        var arr = prop.history_function.trim().slice(0, -1).split('(');
-                        var functionName = arr.shift().trim();
-                        if (!historyFunctions.has(functionName)) {
-                            log.warn('Incorrect history function ', prop.history_function, ' for ', prop.counter, ' in action configuration. Skip it');
-                            continue;
-                        }
-                        // join('('): if parameters contained "(" characters, they will be separated.
-                        // split function parameters from string to array
-                        var param = arr.join('(').split(/[ ]*,[ ]*/).map(function (parameter) {
-                            // try to convert Gb, Mb, Kb, B or date\time to numeric or return existing parameter
-                            var hasExclamation = false;
-                            if(String(parameter).charAt(0) === '!') {
-                                parameter = parameter.slice(1);
-                                hasExclamation = true;
-                            }
-                            return hasExclamation ? '!' + String(calc.convertToNumeric(parameter)) : calc.convertToNumeric(parameter);
-                        });
-                    }
-                    if(!counters2TableHeads.has(prop.counter)) counters2TableHeads.set(prop.counter, []);
-                    var functionsArr = counters2TableHeads.get(prop.counter);
-
-                    functionsArr.push({
-                        tableHead: name,
-                        name: functionName || 'last',
-                        param: param || [],
-                        axisY: prop.axisY,
-                    });
-
-                    countersNames.add(prop.counter);
-                }
-                tableHeads.set(name, false);
-            }
-
-            rows.forEach(function (row) {
-                var tableHead = props2TableHeads.get(row.name), objectName = objectsID2Name[row.objectID];
-                if(!tableHead) return;
-                result[objectName][tableHead] = {
-                    rawResult: row.value,
-                    result: resultProcessing(cfg.properties[tableHead], row.value)
-                };
-                tableHeads.set(tableHead, true);
-            });
-
-            if(!countersNames.size) {
-                callback(null, {
-                    result: result,
-                    tableHeads: getTableHeadsArr(tableHeads),
+            var result = {},
+                objectsID2Name = {},
+                objectsIDs = objectsRows.map(function (row) {
+                    result[row.name] = {};
+                    objectsID2Name[row.id] = row.name;
+                    return row.id;
                 });
-                return;
-            }
 
-            // SELECT name, id FROM counters WHERE name IN (...)
-            countersDB.getCountersIDsByNames(Array.from(countersNames.keys()), function (err, rows) {
+            // SELECT * FROM objectsProperties WHERE objectID IN (..) = [{id, objectID, name, value, description, mode}, ..]
+            objectsPropertiesDB.getProperties(objectsIDs, function (err, rows) {
                 if (err) {
-                    return callback(new Error('Can\'t get counters information: ' + err.message +
-                        ' for counters: ' + countersNames.join(', ')));
+                    return callback(new Error('Can\'t get objects properties :' + err.message + '(' + args.objects + ')'));
                 }
 
-                var countersIDs2Names = new Map(rows.map(row => [row.id, row.name]));
+                var props2TableHeads = new Map(),
+                    counters2TableHeads = new Map(),
+                    countersNames = new Set(),
+                    tableHeads = new Map(),
+                    historyFunctions = new Set(history.getFunctionList().map(f => f.name)); // to check if the function name exists
 
-                if(!countersIDs2Names.size) {
+                for (var name in cfg.properties) {
+                    var prop = cfg.properties[name];
+                    if (prop.property) {
+                        props2TableHeads.set(prop.property, name);
+                    } else if (prop.counter) {
+                        if (prop.history_function) { // prop.history_function f.e. 'min(300)'
+                            // .trim() - remove spaces
+                            // .slice(0, -1) - remove last ')'
+                            // .split('(')) - split to function name and function parameters
+                            var arr = prop.history_function.trim().slice(0, -1).split('(');
+                            var functionName = arr.shift().trim();
+                            if (!historyFunctions.has(functionName)) {
+                                log.warn('Incorrect history function ', prop.history_function, ' for ', prop.counter, ' in action configuration. Skip it');
+                                continue;
+                            }
+                            // join('('): if parameters contained "(" characters, they will be separated.
+                            // split function parameters from string to array
+                            var param = arr.join('(').split(/[ ]*,[ ]*/).map(function (parameter) {
+                                // try to convert Gb, Mb, Kb, B or date\time to numeric or return existing parameter
+                                var hasExclamation = false;
+                                if (String(parameter).charAt(0) === '!') {
+                                    parameter = parameter.slice(1);
+                                    hasExclamation = true;
+                                }
+                                return hasExclamation ? '!' + String(calc.convertToNumeric(parameter)) : calc.convertToNumeric(parameter);
+                            });
+                        }
+                        if (!counters2TableHeads.has(prop.counter)) counters2TableHeads.set(prop.counter, []);
+                        var functionsArr = counters2TableHeads.get(prop.counter);
+
+                        functionsArr.push({
+                            tableHead: name,
+                            name: functionName || 'last',
+                            param: param || [],
+                            axisY: prop.axisY,
+                        });
+
+                        countersNames.add(prop.counter);
+                    }
+                    tableHeads.set(name, false);
+                }
+
+                rows.forEach(function (row) {
+                    var tableHead = props2TableHeads.get(row.name), objectName = objectsID2Name[row.objectID];
+                    if (!tableHead) return;
+                    result[objectName][tableHead] = {
+                        rawResult: row.value,
+                        result: resultProcessing(cfg.properties[tableHead], row.value)
+                    };
+                    tableHeads.set(tableHead, true);
+                });
+
+                if (!countersNames.size) {
                     callback(null, {
                         result: result,
                         tableHeads: getTableHeadsArr(tableHeads),
@@ -138,34 +124,16 @@ function getData(args, callback) {
                     return;
                 }
 
-                // SELECT * FROM objectsCounters WHERE objectsCounters.objectID IN (..)
-                countersDB.getCountersForObjects(objectsIDs, function (err, rows) {
+                // SELECT name, id FROM counters WHERE name IN (...)
+                countersDB.getCountersIDsByNames(Array.from(countersNames.keys()), function (err, rows) {
                     if (err) {
-                        return callback(new Error('Can\'t get OCIDs: ' + err.message +
-                            ' for objects: ' + args.objects));
+                        return callback(new Error('Can\'t get counters information: ' + err.message +
+                            ' for counters: ' + countersNames.join(', ')));
                     }
 
-                    var historyItems = [];
-                    rows.forEach(function (row) {
-                        var counterName = countersIDs2Names.get(row.counterID)
-                        if(objectsIDs.indexOf(row.objectID) === -1 || !counterName) return;
+                    var countersIDs2Names = new Map(rows.map(row => [row.id, row.name]));
 
-                        var functions = counters2TableHeads.get(counterName);
-                        if(!functions) return;
-                        //console.log('!!!functions: ', functions, counters2TableHeads);
-                        functions.forEach(function (func) {
-                            historyItems.push({
-                                OCID: row.id,
-                                objectName: objectsID2Name[row.objectID],
-                                func: func.name,
-                                param: func.param,
-                                tableHead: func.tableHead,
-                                axisY: func.axisY,
-                            });
-                        })
-                    });
-
-                    if(!historyItems.length) {
+                    if (!countersIDs2Names.size) {
                         callback(null, {
                             result: result,
                             tableHeads: getTableHeadsArr(tableHeads),
@@ -173,38 +141,74 @@ function getData(args, callback) {
                         return;
                     }
 
-                    async.each(historyItems, function (item, callback) {
-                        var funcParameters = item.param.slice();
-                        funcParameters.unshift(item.OCID);
+                    // SELECT * FROM objectsCounters WHERE objectsCounters.objectID IN (..)
+                    countersDB.getCountersForObjects(objectsIDs, function (err, rows) {
+                        if (err) {
+                            return callback(new Error('Can\'t get OCIDs: ' + err.message +
+                                ' for objects: ' + args.objects));
+                        }
 
-                        // closure for save item
-                        (function(_item) {
-                            funcParameters.push(function(err, res) {
-                                if(err) {
-                                    log.warn('Can\'t get history data for ', _item, ': ', err.message);
-                                    return callback();
-                                }
+                        var historyItems = [];
+                        rows.forEach(function (row) {
+                            var counterName = countersIDs2Names.get(row.counterID)
+                            if (objectsIDs.indexOf(row.objectID) === -1 || !counterName) return;
 
-                                result[_item.objectName][_item.tableHead] = {
-                                    OCID: _item.OCID,
-                                    axisY: _item.axisY,
-                                    rawResult: res.data,
-                                    result: resultProcessing(cfg.properties[_item.tableHead], res.data)
-                                };
-                                tableHeads.set(_item.tableHead, true);
-                                callback();
+                            var functions = counters2TableHeads.get(counterName);
+                            if (!functions) return;
+                            //console.log('!!!functions: ', functions, counters2TableHeads);
+                            functions.forEach(function (func) {
+                                historyItems.push({
+                                    OCID: row.id,
+                                    objectName: objectsID2Name[row.objectID],
+                                    func: func.name,
+                                    param: func.param,
+                                    tableHead: func.tableHead,
+                                    axisY: func.axisY,
+                                });
+                            })
+                        });
+
+                        if (!historyItems.length) {
+                            callback(null, {
+                                result: result,
+                                tableHeads: getTableHeadsArr(tableHeads),
                             });
-                        })(item);
+                            return;
+                        }
 
-                        history[item.func].apply(this, funcParameters);
-                    }, function () {
-                        callback(null, {
-                            result: result,
-                            tableHeads: getTableHeadsArr(tableHeads),
+                        async.each(historyItems, function (item, callback) {
+                            var funcParameters = item.param.slice();
+                            funcParameters.unshift(item.OCID);
+
+                            // closure for save item
+                            (function (_item) {
+                                funcParameters.push(function (err, res) {
+                                    if (err) {
+                                        log.warn('Can\'t get history data for ', _item, ': ', err.message);
+                                        return callback();
+                                    }
+
+                                    result[_item.objectName][_item.tableHead] = {
+                                        OCID: _item.OCID,
+                                        axisY: _item.axisY,
+                                        rawResult: res.data,
+                                        result: resultProcessing(cfg.properties[_item.tableHead], res.data)
+                                    };
+                                    tableHeads.set(_item.tableHead, true);
+                                    callback();
+                                });
+                            })(item);
+
+                            history[item.func].apply(this, funcParameters);
+                        }, function () {
+                            callback(null, {
+                                result: result,
+                                tableHeads: getTableHeadsArr(tableHeads),
+                            });
                         });
                     });
-                });
-            })
+                })
+            });
         });
     });
 }

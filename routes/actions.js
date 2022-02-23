@@ -6,7 +6,8 @@ var express = require('express');
 var path = require('path');
 var async = require('async');
 var log = require('../lib/log')(module);
-var conf = require('../lib/conf');
+var Conf = require('../lib/conf');
+const confActions = new Conf('config/actions.json');
 var prepareUser = require('../lib/utils/prepareUser');
 var rightsWrapper = require('../rightsWrappers/actions');
 var actions = require('../lib/actionsConf');
@@ -14,7 +15,7 @@ var browserLog = require('../lib/browserLog'); // used for delete messages count
 
 var userDB = require('../models_db/usersDB');
 
-var actionClient = require('../lib/actionClient');
+var actionClient = require('../serverActions/actionClient');
 //var actionServer = require('../lib/actionServer');
 
 var router = express.Router();
@@ -24,7 +25,7 @@ var actionsForUpdate = {}; // {<actionLink>: {updateAjax: true|false, updateServ
 
 
 // Initializing action, load and save user action configuration
-router.post('/'+conf.get('actions:dir')+'/:action', function(req, res, next) {
+router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
 
     module.sessionID = undefined;
     var actionID = req.params.action;
@@ -137,11 +138,11 @@ router.post('/'+conf.get('actions:dir')+'/:action', function(req, res, next) {
 });
 
 // sending static files from action's static dir
-router.all('/' + conf.get('actions:dir') + '/:action_sessionID/' + conf.get('actions:staticDir') + '/*', function(req, res){
+router.all('/' + confActions.get('dir') + '/:action_sessionID/' + confActions.get('staticDir') + '/*', function(req, res){
 
     var actionID = req.params.action_sessionID.replace(/^(.+)_\d+$/, '$1');
     var sessionID = Number(req.params.action_sessionID.replace(/^.+_(\d+)$/, '$1'));
-    var staticDir = conf.get('actions:staticDir');
+    var staticDir = confActions.get('staticDir');
     var staticFile = req.params[0];
 
     if(!sessionID) {
@@ -162,7 +163,7 @@ router.all('/' + conf.get('actions:dir') + '/:action_sessionID/' + conf.get('act
                     log.error('Can\'t check user rights for ', actionID, ' for sending static file: ', err.message);
                     return res.send();
                 }
-                var fullPathToStaticFile = path.join(__dirname, '..', conf.get('actions:dir'), actionID, staticDir, staticFile);
+                var fullPathToStaticFile = path.join(__dirname, '..', confActions.get('dir'), actionID, staticDir, staticFile);
                 log.debug('Sending static file ', fullPathToStaticFile);
                 return res.sendFile(fullPathToStaticFile);
             });
@@ -173,21 +174,21 @@ router.all('/' + conf.get('actions:dir') + '/:action_sessionID/' + conf.get('act
 
 // running ajax or server script for view action or for executing action
 // :mode can be: server|ajax|makeTask
-router.all('/'+conf.get('actions:dir')+'/:action_sessionID/:mode', function(req, res, next){
+router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, res, next){
 
 
     var actionID = req.params.action_sessionID.replace(/^(.+)_\d+$/, '$1');
     var sessionID = Number(req.params.action_sessionID.replace(/^.+_(\d+)$/, '$1'));
 
     if(req.method !== 'GET' && req.method !== 'POST') {
-        log.error('Trying to executing action "', actionID, '" with unsupported method ', req.method,
+        log.error('Trying to execute action "', actionID, '" with unsupported method ', req.method,
             '. Support only GET and POST methods');
         return next();
     }
 
     if(!sessionID) {
         if(req.params.mode.toLowerCase() !== 'help') {
-            log.error('Trying to executing action "', actionID, '" with undefined session ID');
+            log.error('Trying to execute action "', actionID, '" with undefined session ID');
         }
         return next();
     }
@@ -195,7 +196,7 @@ router.all('/'+conf.get('actions:dir')+'/:action_sessionID/:mode', function(req,
     module.sessionID = sessionID;
 
     if(!actionID) {
-        log.error('Trying to executing action but action ID is not defined');
+        log.error('Trying to execute action but action ID is not defined');
         return next();
     }
 

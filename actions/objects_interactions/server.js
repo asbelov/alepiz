@@ -9,7 +9,7 @@ var async = require('async');
 var rightsWrapper = require('../../rightsWrappers/objectsDB');
 var transactionDB = require('../../models_db/transaction');
 var log = require('../../lib/log')(module);
-var server = require('../../lib/server');
+var server = require('../../server/counterProcessor');
 
 // interaction types: 0 - include; 1 - intersect, 2 - exclude
 

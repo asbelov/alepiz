@@ -4,6 +4,7 @@
     "active": "",
     "separate": "",
     "runCollectorSeparately": "",
+    "runCollectorAsThread": "on",
     "parameters": {
         "host": {
             "description": "Host name"

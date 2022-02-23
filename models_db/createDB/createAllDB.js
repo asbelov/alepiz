@@ -18,13 +18,13 @@ module.exports = function(callback) {
 
         objectsDB(function(err) {
             if(err) return callback(err);
-            async.parallel([
+            async.series([
                 countersDB,
                 actionsConfig,
                 function(callback) {
                     usersRolesRightsDB(function(err){
                         if(err) return callback(err);
-                        async.parallel([auditUsersDB, tasksDB], callback);
+                        async.series([auditUsersDB, tasksDB], callback);
                     })
                 },
             ], callback);

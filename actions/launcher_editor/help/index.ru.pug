@@ -125,7 +125,8 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                             */
 
                             var log = require('../../lib/log')(module);
-                            var conf = require('../../lib/conf');
+                            var Conf = require('../../lib/conf');
+                            const confActions = new Conf('config/actions.json');
                             var path = require("path");
 
                             var servers = {};
@@ -135,7 +136,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                     return callback(new Error('Java script file is not specified for launcher "nodeModule"'));
                                 }
 
-                                var javaScript = path.join(__dirname, '..', '..', conf.get('actions:dir'), prms.actionID, prms.javaScript);
+                                var javaScript = path.join(__dirname, '..', '..', confActions.get('dir'), prms.actionID, prms.javaScript);
 
                                 if(!servers[javaScript] || prms.updateAction) {
                                     try {

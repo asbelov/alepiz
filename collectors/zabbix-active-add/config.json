@@ -4,6 +4,7 @@
     "active": "on",
     "separate": "",
     "runCollectorSeparately": "",
+    "runCollectorAsThread": "on",
     "parameters": {
         "zabbixHostname": {
             "description": "Value of parameter \"hostname\" from zabbix_agentd.conf"

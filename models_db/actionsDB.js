@@ -3,7 +3,7 @@
  */
 
 
-var db = require('../lib/db');
+var db = require('./db');
 
 var actionsDB = {};
 module.exports = actionsDB;

@@ -2,7 +2,7 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var db = require('../lib/db');
+var db = require('./db');
 
 var auditUsers = {};
 module.exports = auditUsers;

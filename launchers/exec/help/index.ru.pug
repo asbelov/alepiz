@@ -66,6 +66,22 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                             dontLogStderr - (true|false) не выводить в лог данные из потока stderr
                         li.
                             returnStdout - (true|false) вернуть данные из потока stdout
+                        li.
+                            returnStderr - (true|false) вернуть данные из потока stderr
+                        li.
+                            returnCode - (true|false) вернуть exit code
+                    h3 Возвращаемые параметры
+                    p.
+                        Лаунчер возвращает объект.
+                        В зависимости от установки параметров returnStdout, returnStderr, returnCode объект может
+                        содержать stdout, stderr, exit code процесса
+                    pre.
+                        {
+                            "stdout": <multiline string>,
+                            "stderr": <multiline string>,
+                            "exitCode": <Number>
+                        }
+
                     h3 Параметры, передаваемые из пользовательского интерфейса
                     p.
                         Если указаны соответствующие параметры в конфигурационном файле действия, параметры, переданные

@@ -4,6 +4,7 @@
     "active": "",
     "separate": "",
     "runCollectorSeparately": "",
+    "runCollectorAsThread": "on",
     "parameters": {
         "hosts": {
             "description": "Comma separated IPv4 or IPv6 addresses or host names",

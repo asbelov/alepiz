@@ -4,7 +4,11 @@
   "homePage": "index",
   "ajaxServer": "ajax.js",
   "launcher": "nodeModule",
-  "launcherPrms": { "javaScript": "server.js" },
+    "startAjaxAsThread": true,
+    "launcherPrms": {
+        "javaScript": "server.js",
+        "startAsThread": true
+    },
   "staticDir": "static",
   "callbackBeforeExec": "callbackBeforeExec",
   "onChangeObjectMenuEvent": "nothing",

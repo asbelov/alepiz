@@ -4,6 +4,7 @@
     "active": "",
     "separate": "on",
     "runCollectorSeparately": "",
+    "runCollectorAsThread": "",
     "parameters": {
         "eventDescription": {
             "description": "Description of event will be show on dashboard",

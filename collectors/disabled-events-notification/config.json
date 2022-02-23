@@ -2,8 +2,9 @@
     "name": "Disabled events notification",
     "description": "Notification about enable of disabled events",
     "active": "",
-    "separate": "on",
+    "separate": "",
     "runCollectorSeparately": "",
+    "runCollectorAsThread": "on",
     "parameters": {
         "daysBeforeEnable": {
             "description": "Days before enable events",

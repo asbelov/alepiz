@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
@@ -53,6 +53,7 @@ var JQueryNamespace = (function ($) {
         prevEvents = {},
         lastAction,
         lastTemplate,
+        defaultTemplate,
         collapsibleInstance,
         quill,
         subjectElm,
@@ -80,7 +81,8 @@ var JQueryNamespace = (function ($) {
         useInfo = true,
         useHistory = true,
         useLinks = true,
-        importanceFilter = -1;
+        importanceFilter = -1,
+        templateSelectedManual = false;
 
     var getDataForHistoryEvents = false;
     var getDataForCurrentEvents = false;
@@ -161,11 +163,13 @@ var JQueryNamespace = (function ($) {
             setDefaultDate: true,
         });
 
+        var commentsInterval = Number(parameters.action.commentsInterval) === parseInt(String(parameters.action.commentsInterval), 10) &&
+            Number(parameters.action.commentsInterval) > 1 ? Number(parameters.action.commentsInterval) : 2;
         commentsFromInstance = M.Datepicker.init(document.getElementById('commentsFrom'), {
             firstDay: 1,
             format: 'dd mmmm, yyyy',
             setDefaultDate: true,
-            defaultDate: new Date(Date.now() - 604800000), // 7 days in ms
+            defaultDate: new Date(Date.now() - (86400000 * commentsInterval)), // default is 2 days
             onClose: function() {
                 // prevent change state of collapsible element
                 if($('#historyCommentedEvents').hasClass('active')) collapsibleInstance.close(4);
@@ -245,6 +249,7 @@ var JQueryNamespace = (function ($) {
                         getAndDrawCommentsTable();
                     } else if($(el).attr('id') === 'createMessage') actionConfig.openMessage = true;
 
+                    // function from init.js
                     setActionConfig(actionConfig);
                     eventsFilterElm.focus();
                 }, 500);
@@ -266,6 +271,7 @@ var JQueryNamespace = (function ($) {
                 if($(el).attr('id') === 'createMessage') actionConfig.openMessage = false;
                 if($(el).attr('id') === 'historyCommentedEvents') actionConfig.openCommented = false;
 
+                // function from init.js
                 setActionConfig(actionConfig);
                 eventsFilterElm.focus();
             }
@@ -287,6 +293,7 @@ var JQueryNamespace = (function ($) {
             lastAction = null;
             quill.setText('');
             subjectElm.val('').focus();
+            applyTemplate(lastTemplate);
         });
 
         rcptChipElm.keypress(function (e) {
@@ -340,7 +347,9 @@ var JQueryNamespace = (function ($) {
             var importanceHTML = '<li><a href="#!" data-importance-filter="-1">Show all</a></li>';
             var lowerImportance = 0;
 
-            Object.keys(parameters.action.importance).sort().forEach(function (importance) {
+            Object.keys(parameters.action.importance).sort(function(max, min) {
+                return max - min;
+            }).forEach(function (importance) {
                 importanceHTML += '<li><a href="#!" data-importance-filter="' + importance +
                     '" data-importance-filter-color="' + parameters.action.importance[importance].color + '">' +
                     escapeHtml(parameters.action.importance[importance].text) + '</a></li>';
@@ -525,22 +534,46 @@ var JQueryNamespace = (function ($) {
 
                 messageButtonsElm.append(buttonElm);
 
-                if(template.default) applyTemplate(template);
+                if(template.default) {
+                    defaultTemplate = template;
+                    applyTemplate(template);
+                }
 
                 buttonElm.click(function (e) {
                     e.stopPropagation();
                     applyTemplate(template);
-                })
+                    templateSelectedManual = true;
+                });
+
+                if(Array.isArray(template.autoApplyFor)) {
+                    template.autoApplyFor.forEach((condition) => {
+                        condition.objectNameRE = convertReStr2Re(condition.objectNameRE);
+                        condition.counterNameRE = convertReStr2Re(condition.counterNameRE);
+                        condition.eventDescriptionRE = convertReStr2Re(condition.eventDescriptionRE);
+                    });
+                }
             });
         }
-
 
         M.Tooltip.init(document.querySelectorAll('.tooltipped'), {
             enterDelay: 2000
         });
 
         setInterval(getDataByAjax, updateInterval);
+    }
 
+    function convertReStr2Re(reStrArr) {
+        if(!Array.isArray(reStrArr)) return reStrArr;
+        var reArray = [];
+        reStrArr.forEach((reStr) => {
+            try {
+                reArray.push( new RegExp(reStr, 'ig'));
+            } catch (err) {
+                console.log('Can\'t make RE from', reStr, 'for', reStrArr, ':', err.message);
+                M.toast({html: 'Can\'t make RE from' + reStr + 'for' + reStrArr + ':' + err.message, displayLength: 10000});
+            }
+        });
+        return reArray;
     }
 
     function soundOff() {
@@ -548,6 +581,8 @@ var JQueryNamespace = (function ($) {
         soundIconElm.addClass('red-text');
         if(actionConfig.sound !== false) {
             actionConfig.sound = false;
+
+            // function from init.js
             setActionConfig(actionConfig);
         }
     }
@@ -557,11 +592,13 @@ var JQueryNamespace = (function ($) {
         soundIconElm.removeClass('red-text');
         if(actionConfig.sound !== true) {
             actionConfig.sound = true;
+
+            // function from init.js
             setActionConfig(actionConfig);
         }
         try {
             new Audio(parameters.action.link + '/static/beep.wav').play();
-            // use convertToSpeech() to able to change the phrase "Voice pronunciation of events enabled"
+            // use convertToSpeech() for able to change the phrase "Voice pronunciation of events enabled"
             window.speechSynthesis.speak(new SpeechSynthesisUtterance(
                 convertToSpeech('Voice pronunciation of events enabled')
             ));
@@ -572,17 +609,22 @@ var JQueryNamespace = (function ($) {
     function showMessageEditor() {
         createMessageElm.removeClass('hide');
         actionConfig.showMessageEditor = true;
+
+        // function from init.js
         setActionConfig(actionConfig);
     }
 
     function hideMessageEditor() {
         createMessageElm.addClass('hide');
         actionConfig.showMessageEditor = false;
+
+        // function from init.js
         setActionConfig(actionConfig);
     }
 
     function initElementsRestrictions(callback) {
 
+        // function from init.js
         getActionConfig(function(config) {
             actionConfig = config;
 
@@ -679,7 +721,7 @@ var JQueryNamespace = (function ($) {
 
     function ajaxError (jqXHR, exception, callback) {
         bodyElm.css("cursor", "auto");
-        var msg = '';
+        var msg;
         if (jqXHR.status === 404) {
             msg = 'Requested page not found. [404]';
         } else if (jqXHR.status === 500) {
@@ -791,18 +833,18 @@ var JQueryNamespace = (function ($) {
                 else return callback(new Error('Please set date and time for disabled event'));
 
                 if(disableUntil > Date.now()) $('#disableUntil').val(disableUntil);
-                else return callback(new Error('Please set the limit of date and time for disabled event more then current time'));
+                else return callback(new Error('Please set the limit of date and time for disabled event more than current time'));
 
                 var timeStrFrom = $('#disableTimeIntervalFrom').val();
                 var timeStrTo = $('#disableTimeIntervalTo').val();
                 var timeIntervalFrom = getTimeFromStr(timeStrFrom);
                 var timeIntervalTo = getTimeFromStr(timeStrTo);
 
-                if(timeIntervalFrom !== undefined && timeIntervalTo !== undefined) {
+                if(timeIntervalFrom !== 0 && timeIntervalTo !== 0) {
                     if (timeIntervalTo > timeIntervalFrom)
                         $('#disableTimeInterval').val(String(timeIntervalFrom) + '-' + String(timeIntervalTo));
                     else {
-                        return callback(new Error('Please set correct time interval: last time less then first time: ' +
+                        return callback(new Error('Please set correct time interval: last time less than first time: ' +
                             timeStrFrom + ' - ' + timeStrTo));
                     }
                 } else {
@@ -827,7 +869,9 @@ var JQueryNamespace = (function ($) {
         if(restrictions.Message) {
             subjectElm.val('');
             quill.setText('');
-            applyTemplate(lastTemplate);
+            if(templateSelectedManual) templateSelectedManual = false;
+            //else applyTemplate(lastTemplate);
+            applyTemplate(defaultTemplate);
             if (createMessageElm.hasClass('active')) collapsibleInstance.close(0);
         }
         $('input[type=checkbox]:checked').prop('checked', false);
@@ -850,7 +894,7 @@ var JQueryNamespace = (function ($) {
     function applyTemplate (template) {
         var _maxMessageImportance = template.importance !== undefined ? Number(template.importance) : 0;
         if(messageTopImportance !== undefined && _maxMessageImportance > messageTopImportance) {
-            M.toast({html: 'Can\'t use template. Importance of added events is higher then allowed in template', displayLength: 5000});
+            M.toast({html: 'Can\'t use template. Importance of added events is higher than allowed in template', displayLength: 5000});
             return;
         }
         maxMessageImportance = _maxMessageImportance;
@@ -902,7 +946,7 @@ var JQueryNamespace = (function ($) {
 
 
     function getDataByAjax(callback) {
-        // exit and say "update paused" after 5m delay
+        // exit and say "update paused" after 5 minutes delay
         if(Date.now() - gettingDataInProgress < 300000 /*gettingDataInProgress*/ || (
             !getDataForHistoryEvents && !getDataForCurrentEvents && !getDataForDisabledEvents)
         ) {
@@ -910,7 +954,7 @@ var JQueryNamespace = (function ($) {
             if(soundIconElm.text() === 'volume_up' && Date.now() - updatePaused > 300000) {
                 try {
                     new Audio(parameters.action.link + '/static/beep.wav').play();
-                    // use convertToSpeech() to able to change the phrase "Update paused"
+                    // use convertToSpeech() for able to change the phrase "Update paused"
                     window.speechSynthesis.speak(new SpeechSynthesisUtterance(
                         convertToSpeech('Update paused')
                     ));
@@ -1064,6 +1108,8 @@ var JQueryNamespace = (function ($) {
             <th var="EVENT_UD" class="hide"></th>\
             <th var="OCID" class="hide"></th>\
             <th var="COUNTER_NAME" class="hide"></th>\
+            <th var="START_TIME_MS" class="hide"></th>\
+            <th var="END_TIME_MS" class="hide"></th>\
             <th var="OBJECT_NAME">Object</th>\
             <th var="EVENT_DESCRIPTION">Description</th>\
             <th var="IMPORTANCE" class="hide">Importance</th>\
@@ -1112,6 +1158,8 @@ var JQueryNamespace = (function ($) {
             <th var="EVENT_UD" class="hide"></th>\
             <th var="OCID" class="hide"></th>\
             <th var="COUNTER_NAME" class="hide"></th>\
+            <th var="START_TIME_MS" class="hide"></th>\
+            <th var="END_TIME_MS" class="hide"></th>\
             <th var="OBJECT_NAME">Object</th>\
             <th var="EVENT_DESCRIPTION">Description</th>\
             <th var="IMPORTANCE" class="hide">Importance</th>\
@@ -1251,12 +1299,13 @@ var JQueryNamespace = (function ($) {
     }
 
 
-    // multiple select or unselect events with same counter name
-    // elm is a checkBox
+    /** Multiple select or unselect events with same counter name
+     * @param {jQuery} clickedCheckboxElm - is a checkBox jquery elm
+     */
     function multipleSelectElmWithCtrl(clickedCheckboxElm) {
         var counterID = clickedCheckboxElm.attr('counterID');
 
-        // there is a new changed state of checkbox after click
+        // this is the new changed state of the checkbox after click
         var newCheckedProp = clickedCheckboxElm.is(':checked');
 
         // find all inputs in the current table (tbody) with attribute counterID whth equal <counterID> of selected checkbox
@@ -1264,9 +1313,12 @@ var JQueryNamespace = (function ($) {
         clickedCheckboxElm.closest('tbody').find('input[counterID="' + counterID+ '"]').prop('checked', newCheckedProp);
     }
 
-    function multipleSelectOnClickWithShift(elm) {
+    /** Multiple selection of several events in order (like selection when pressed Shift)
+     * @param {jQuery} clickedCheckboxElm - is a checkBox jquery elm
+     */
+    function multipleSelectOnClickWithShift(clickedCheckboxElm) {
         var upElements = [], downElements = [], elementsForSelect;
-        var trElm = elm.closest('tr');
+        var trElm = clickedCheckboxElm.closest('tr');
 
         for(var upNearestTR = trElm.prev(), downNearestTR = trElm.next();
             upNearestTR.length || downNearestTR.length;
@@ -1346,7 +1398,10 @@ var JQueryNamespace = (function ($) {
     function drawHistoryEventsTable(result, elm) {
         var tablePartHTML = '';
 
-        if(!elm) elm = $('#historyEventsTable');
+        if(!elm) {
+            elm = $('#historyEventsTable');
+            var skipFilterAttr = '';
+        } else skipFilterAttr = ' data-skip-search-filter ';
         if (!result || !result.length) tablePartHTML = '<tr><td colspan="12" style="text-align: center;">No history events</td></tr>';
         else {
             var maxWidth = Math.round((elm.width() * 0.2 > $(window).width() ? $(window).width() : elm.width()) * 0.5);
@@ -1365,10 +1420,12 @@ var JQueryNamespace = (function ($) {
 
                 tablePartHTML += '\
 <tr historyEventsRow OCID="' + row.OCID + '" importance="' +row.importance+ '" bgcolor="' + color + '" ' +
-                    'style="cursor: pointer;' + style + '">\
+                    skipFilterAttr + 'style="cursor: pointer;' + style + '">\
     <td class="hide">' + row.id + '</td>\
     <td class="hide">' + row.OCID + '</td>\
     <td class="hide" counterName>' + row.counterName + '</td>\
+    <td class="hide">' + row.startTime + '</td>\
+    <td class="hide">' + row.endTime + '</td>\
     <td data-object-name="' + row.objectName +'">' + escapeHtml(row.objectName) + '</td>\
     <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
     <td class="hide">' + importanceText + '</td>\
@@ -1459,11 +1516,13 @@ var JQueryNamespace = (function ($) {
                 var historyLink = useHistory ? '<div class="chip small-chip" data-OCIDForHistory="' + row.OCID +'">history</div> ' : '';
 
                 tablePartHTML += '\
-<tr currentEventsRow OCID="' + row.OCID + '" importance="' +row.importance+ '" bgcolor="' + color + // use bgcolor attribute for instead style for possible to change color of the row on mouse over
+<tr currentEventsRow OCID="' + row.OCID + '" importance="' +row.importance+ '" bgcolor="' + color + // use bgcolor attribute instead style for possible to change color of the row on mouse over
                     '" style="cursor: pointer;">\
     <td class="hide">' + row.id + '</td>\
     <td class="hide">' + row.OCID + '</td>\
     <td class="hide" counterName>' + row.counterName + '</td>\
+    <td class="hide">' + row.startTime + '</td>\
+    <td class="hide">' + row.endTime + '</td>\
     <td data-object-name="' + row.objectName +'">' + escapeHtml(row.objectName) + '</td>\
     <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
     <td class="hide">' + importanceText + '</td>\
@@ -1522,6 +1581,8 @@ var JQueryNamespace = (function ($) {
     <td class="hide">' + row.id + '</td>\
     <td class="hide">' + row.OCID + '</td>\
     <td class="hide" counterName>' + row.counterName + '</td>\
+    <td class="hide">' + row.startTime + '</td>\
+    <td class="hide">' + row.endTime + '</td>\
     <td data-object-name="' + row.objectName +'">' + escapeHtml(row.objectName) + '</td>\
     <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
     <td class="hide">' + importanceText + '</td>\
@@ -1638,18 +1699,17 @@ var JQueryNamespace = (function ($) {
 
         var infoIDs = [];
 
+        var templatesForAutoApply = {};
         checkedEventsElms.forEach(function(elm) {
             var trElm = $(elm).closest('tr');
             var importance = Number(trElm.attr('importance'));
             if(maxImportance === undefined || importance < maxImportance) maxImportance = importance;
 
             var tdElements = trElm.find('td').get(), variablesInRow = {};
-
             trElm.closest('table').find('th').get().forEach(function(thElm, idx) {
                 var name = $(thElm).attr('var');
                 if(name) variablesInRow[name] = $(tdElements[idx]).text();
             });
-
             if(!variablesInRow.END_TIME) variablesInRow.END_TIME = 'NOW';
             var interval = variablesInRow.START_TIME + ' - ' + variablesInRow.END_TIME + ' (' + variablesInRow.DURATION + ')';
 
@@ -1663,6 +1723,86 @@ var JQueryNamespace = (function ($) {
                 };
                 objectsNames[variablesInRow.OBJECT_NAME] = true;
                 countersNames[variablesInRow.COUNTER_NAME] = true;
+
+                parameters.action.messageTemplates.forEach(function(template) {
+                    /*
+                    autoApplyFor: [{
+                        "actions": ["addAsComment", "disableEvents", "enableEvents"]
+                        "importance": [0,1],
+                        "objectNameRE": ["\\{[^\\}]+\\}$"],
+                        "counterNameRE": [],
+                        "eventDescriptionRE": [".*100Gb.*"]
+                        "startEventTimeLessMin": 10,
+                        "endEventTimeLessMin": 10
+                    }, {...}, ...]
+                    */
+
+                    if(!Array.isArray(template.autoApplyFor)) return;
+                    //console.log('template.autoApplyFor', template.autoApplyFor)
+                    for(var i = 0; i < template.autoApplyFor.length; i++) {
+                        var condition = template.autoApplyFor[i];
+
+                        if(Array.isArray(condition.actions) && condition.actions.indexOf(lastAction) === -1) {
+                            //console.log('condition.actions', condition.actions, lastAction)
+                            continue;
+                        }
+
+                        if(Array.isArray(condition.importance) && condition.importance.indexOf(maxImportance) === -1) {
+                            //console.log('condition.importance', condition.importance, maxImportance)
+                            continue;
+                        }
+
+                        if(condition.startEventTimeLessMin && variablesInRow.START_TIME_MS &&
+                            Date.now() - Number(condition.startEventTimeLessMin) * 60000 > Number(variablesInRow.START_TIME_MS)) {
+                            console.log('condition.startEventTimeLessMin', condition.startEventTimeLessMin, variablesInRow.START_TIME_MS)
+                            continue;
+                        }
+
+                        if(condition.endEventTimeLessMin && variablesInRow.END_TIME_MS &&
+                            variablesInRow.END_TIME !== 'NOW' &&
+                            Date.now() - Number(condition.endEventTimeLessMin) * 60000 > Number(variablesInRow.END_TIME_MS)) {
+                            //console.log('condition.endEventTimeLessMin', condition.endEventTimeLessMin, variablesInRow.END_TIME_MS)
+                            continue;
+                        }
+
+                        if(Array.isArray(condition.objectNameRE)) {
+                            for(var j = 0; j < condition.objectNameRE.length; j++) {
+                                if(!condition.objectNameRE[j].test(variablesInRow.OBJECT_NAME)) {
+                                    j = -1;
+                                    break;
+                                }
+                            }
+                            //console.log('condition.objectNameRE', condition.objectNameRE, variablesInRow.OBJECT_NAME, j)
+                            if(j === -1) continue;
+                        }
+
+                        if(Array.isArray(condition.counterNameRE)) {
+                            for(j = 0; j < condition.counterNameRE.length; j++) {
+                                if(!condition.counterNameRE[j].test(variablesInRow.COUNTER_NAME)) {
+                                    j = -1;
+                                    break;
+                                }
+                            }
+                            //console.log('condition.counterNameRE', condition.counterNameRE, variablesInRow.COUNTER_NAME, j)
+                            if(j === -1) continue;
+                        }
+
+                        if(Array.isArray(condition.eventDescriptionRE)) {
+                            for(j = 0; j < condition.eventDescriptionRE.length; j++) {
+                                if(!condition.eventDescriptionRE[j].test(variablesInRow.EVENT_DESCRIPTION)) {
+                                    j = -1;
+                                    break;
+                                }
+                            }
+                            //console.log('condition.eventDescriptionRE', condition.eventDescriptionRE, variablesInRow.EVENT_DESCRIPTION, j)
+                            if(j === -1) continue;
+                        }
+
+                        templatesForAutoApply[template.name] = template;
+                        break;
+                    }
+                });
+
             } else {
                 // don't add repeated event text, only add intervals for this event
                 variables[variablesInRow.OCID].disableIntervals.push(interval);
@@ -1680,8 +1820,35 @@ var JQueryNamespace = (function ($) {
             if(id && infoIDs.indexOf(Number(id)) === -1) infoIDs.push(Number(id));
         });
 
+        if(!templateSelectedManual) {
+            //console.log('templatesForAutoApply', templatesForAutoApply)
+            var templatesNames = Object.keys(templatesForAutoApply);
+            templatesForAutoApply = Object.values(templatesForAutoApply);
+            if (templatesForAutoApply.length) {
+                if (templatesForAutoApply.length > 1) {
+                    M.toast({
+                        html: 'Multiple templates found for the current message (' + '"' +
+                            templatesNames.join('", "') + '"' + '). Templates will not be applied',
+                        displayLength: 5000
+                    });
+                } else {
+                    if (JSON.stringify(templatesForAutoApply[0]) !== JSON.stringify(lastTemplate)) {
+                        M.toast({
+                            html: '<b>Attention!!! Message template was changed from "' + lastTemplate.name + '" to "' +
+                                templatesNames[0] + '"</b>',
+                            displayLength: 3000,
+                        });
+                    }
+                    lastTemplate = templatesForAutoApply[0];
+                }
+            }
+        }
+
         if(maxMessageImportance === undefined || maxImportance < maxMessageImportance) {
-            M.toast({html: 'Can\'t compose message. Importance of selected events is higher then allowed in message template', displayLength: 5000});
+            M.toast({
+                html: 'Can\'t compose message. Importance of selected events is higher than allowed in message template',
+                displayLength: 5000
+            });
             return;
         }
 
@@ -1754,6 +1921,9 @@ var JQueryNamespace = (function ($) {
 
             hiddenMessageDataElm.val(JSON.stringify(hiddenData));
 
+            subjectElm.val('');
+            applyTemplate(lastTemplate);
+
             var subject = template.subject;
             if(subject) {
                 var objectsList = Object.keys(objectsNames).join(', ');
@@ -1777,8 +1947,8 @@ var JQueryNamespace = (function ($) {
 
             quill.focus();
             var range = quill.getSelection();
-            if(!range) var index = 0;
-            else index = range.index;
+            //if(!range) var index = 0;
+            //else index = range.index;
 
             if(infoIDs.length > 1) prevCommentDialogElm.open();
             else if(infoIDs.length === 1) {
@@ -1835,7 +2005,7 @@ var JQueryNamespace = (function ($) {
         var urlParameters = {
             't': encodeURIComponent(Number(startTime) - 900000 + '-' + (Number(endTime) ? Number(endTime) + 900000 : Date.now())), // timestamps in ms
             'l': encodeURIComponent(OCIDs.join('-')), // show graph for this OCID with align to left
-            'n': '0', // don't autoupdate
+            'n': '0', // don't auto update
             'y': '0--0-',
             'a': encodeURIComponent(actionPath), // /action/data-browser
             'c': encodeURIComponent(objectName), // selected object
@@ -1924,6 +2094,7 @@ var JQueryNamespace = (function ($) {
         if (searchStr.length) {
             rows.find("input[selectEventCheckbox]:checked").closest('tr').removeClass('hide');
             rows.filter(":icontains('" + searchStr + "')").removeClass('hide');
+            rows.find("[data-skip-search-filter]").removeClass('hide');
         } else {
             rows.removeClass('hide');
         }
@@ -1954,9 +2125,10 @@ var JQueryNamespace = (function ($) {
         getDataByAjax();
     }
 
-    /*
-        returned date string in format DD MonthName, YYYY
-        date: date object (new Date())
+    /**
+     * Convert Date to string in "DD MonthName, YYYY" format
+     * @param {Date} date - date object (new Date())
+     * @return {string} string in format DD MonthName, YYYY
      */
     function getDateString(date) {
         if(!date) date = new Date();
@@ -1964,31 +2136,29 @@ var JQueryNamespace = (function ($) {
         return date.getDate() + ' ' + parameters.action.monthNames[date.getMonth()] + ', ' + date.getFullYear();
     }
 
-    /*
-        Converting date string in format DD MonthName, YYYY to ms
-
-        dateStr: date string in format DD MonthName, YYYY
-        return time from 1.1.1970 in ms
+    /**
+     *  Convert date string in "DD MonthName, YYYY" format to ms
+     *  @param {string} dateStr - date string in format DD MonthName, YYYY
+     *  @return {number} time from 1.1.1970 in ms
      */
     function getDateTimestampFromStr(dateStr) {
-        if(!dateStr) return;
+        if(!dateStr) return Date.now();
         var dateParts = dateStr.match(/^(\d\d?)\s([^,]+),\s(\d\d\d\d)$/);
-        if(dateParts === null) return;
+        if(dateParts === null) return Date.now();
         var monthNum = parameters.action.monthNames.indexOf(dateParts[2]);
         return new Date(Number(dateParts[3]), monthNum, Number(dateParts[1])).getTime();
     }
 
 
-    /*
-        Converting time string in format HH:MM to ms
-
-        timeStr: time string in format HH:MM
-        return time in ms
+    /**
+     * Convert time string in "HH:MM" format to ms
+     * @param {string} timeStr - time string in format HH:MM
+     * @return {number} time in ms
      */
     function getTimeFromStr(timeStr) {
-        if(!timeStr) return;
+        if(!timeStr) return 0;
         var timeParts = timeStr.match(/^(\d\d?):(\d\d?)$/);
-        if(timeParts === null) return;
+        if(timeParts === null) return 0;
         return Number(timeParts[1]) * 3600000 + Number(timeParts[2]) * 60000;
     }
 

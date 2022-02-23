@@ -116,6 +116,7 @@ var initJQueryNamespace = (function($){
         additionalObjectsTabSwitchElm,
         actionsTabSwitchElm,
         filterTabSwitchElm,
+        filterExpressionEditorElm,
 
         selectAllObjBtnElm,
         walletBtnElm,
@@ -131,9 +132,11 @@ var initJQueryNamespace = (function($){
 
         actionsTooltipInstances,
         objectsTooltipInstances,
+        filterTooltipInstances,
         sideNavInstance,
         modalLoginInstance,
         modalLogInstance,
+        modalChangeObjectsFilterInstance,
 
         iframeDOMElm,
 
@@ -173,6 +176,7 @@ var initJQueryNamespace = (function($){
         additionalObjectsTabSwitchElm = $('#additionalObjectsTabSwitch');
         actionsTabSwitchElm = $('#actionsTabSwitch');
         filterTabSwitchElm = $('#filterTabSwitch');
+        filterExpressionEditorElm = $('#filterExpressionEditor');
 
         selectAllObjBtnElm = $('#selectAllObjBtn');
         walletBtnElm = $('#walletBtn');
@@ -218,6 +222,8 @@ var initJQueryNamespace = (function($){
         modalLogWindowsInstance = M.Modal.init(document.getElementById('modal-log-window'), {
             onCloseEnd: stoppingRetrievingLog
         });
+
+        modalChangeObjectsFilterInstance = M.Modal.init(document.getElementById('modal-change-objects-filter-expr'), {});
 
         M.Tabs.init(document.getElementById('tabs'), {});
         M.Collapsible.init(document.querySelectorAll('.collapsible'), {});
@@ -291,27 +297,122 @@ var initJQueryNamespace = (function($){
         selectAllObjBtnElm.removeClass('hide');
     }
 
-    function initObjectsFiltersTab() {
+    function getCheckedFilterNames() {
+        return $('input[data-object-filter]:checked').map(function() {
+            return $(this).attr('data-object-filter');
+        }).get();
+    }
 
-        // filterNames: [<name1>m <name2>,...]
+    function getFilterExpression() {
+        var expressionElms = filterExpressionEditorElm.find('div.chip[data-object-filter-expr-item]');
+        if(!expressionElms.length) return '';
+
+        var expression = expressionElms.map(function () {
+            var exprItem = $(this).text();
+
+            if (exprItem === 'AND') exprItem = ' && ';
+            else if (exprItem === 'OR') exprItem = ' || ';
+            else if (exprItem !== '(' && exprItem !== ')') exprItem = '%:' + exprItem + ':%';
+
+            return exprItem;
+        }).get();
+
+        return expression.join('');
+    }
+
+    function initObjectsFiltersTab() {
+        var objectsFilterElm = $('#objectsFilter');
+        // filterNames: [{name:..., description:...}, {}...]
         $.post('/mainMenu', {f: 'getObjectsFilterNames'}, function(filterNames) {
             if(!filterNames || !filterNames.length) {
+                objectsFilterElm.empty();
                 filterTabSwitchElm.parent().addClass('hide');
                 return;
             }
 
             filterTabSwitchElm.parent().removeClass('hide');
-            var html = filterNames.map(function (filterName, idx) {
-                return '<li><a class="row object" data-position="right">' +
+            objectsTabSwitchElm.text('OBJECTS');
+            var checkedFilterNames = getCheckedFilterNames();
+
+            var htmlTail = '<li id="changeFilterExpression" class="hide">' +
+                '<a class="row object">' +
+                    '<div class="col s11 truncate object-label blue-text right-align" ' +
+                        'style="text-decoration: underline">Change filter expression</div>' +
+                '</a></li>'
+
+            var html = filterNames.map(function (filterObj) {
+                var filterName = filterObj.name;
+                var filterDescription = filterObj.description || '';
+                var checked = checkedFilterNames.indexOf(filterName) === -1 ? '' : ' checked'
+                return '<li data-object-filter-li>' +
+                    '<a class="tooltipped row object" data-object-filter-list data-position="right" data-tooltip="' + filterDescription +'">' +
                     '<div class="col s1 object-checkbox">' +
-                        '<label><input type="checkbox" id="filter-' + idx + '"></label>' +
+                        '<label>' +
+                            '<input type="checkbox" data-object-filter="' + filterName + '"' + checked +'/>' +
+                            '<span></span>' +
+                        '</label>' +
                     '</div>' +
-                    '<div class="col s11 truncate object-label">' + filterName +'</div>' +
+                    '<div class="col s11 truncate object-label" data-object-filter-label>' + filterName +'</div>' +
                 '</a></li>';
             }).join('\n');
 
-            $('#objectsFilter').html(html);
+
+            // remove old tooltips
+            if(filterTooltipInstances && filterTooltipInstances.length) {
+                filterTooltipInstances.forEach(function (instance) {
+                    instance.destroy();
+                });
+            }
+            $('div.material-tooltip').remove();
+
+            objectsFilterElm.html(html + htmlTail);
+
+            filterTooltipInstances = M.Tooltip.init(document.querySelectorAll('a[data-object-filter-list]'), {
+                enterDelay: 500
+            });
+
+            var changeFilterExpressionElm = $('#changeFilterExpression');
+            if(getCheckedFilterNames().length > 1) changeFilterExpressionElm.removeClass('hide');
+            else changeFilterExpressionElm.addClass('hide');
+
+            // change checked state of checkbox when click to the div with label
+            $('div[data-object-filter-label]').click(function () {
+                var checkBoxElm = $(this).parent().find('input[data-object-filter]');
+                checkBoxElm.prop('checked', !checkBoxElm.is(':checked'));
+            });
+
+            // show or hide "Change filter expression" button
+            $('li[data-object-filter-li]').click(function () {
+                var filterNames = getCheckedFilterNames();
+                if(filterNames.length) filterTabSwitchElm.addClass('red lighten-4');
+                else filterTabSwitchElm.removeClass('red lighten-4');
+                if(filterNames.length > 1) changeFilterExpressionElm.removeClass('hide');
+                else changeFilterExpressionElm.addClass('hide');
+
+                createObjectFilterExpressionForEditor(filterNames);
+            });
+
+            changeFilterExpressionElm.click(function () {
+                modalChangeObjectsFilterInstance.open();
+            });
         });
+    }
+
+    function createObjectFilterExpressionForEditor(filterNames) {
+
+        if(!filterNames) return filterExpressionEditorElm.empty();
+        var html = filterNames.map(filterName => {
+            return '<div class="chip" data-filter-name data-object-filter-expr-item style="cursor: pointer">' + filterName + '</div>';
+        }).join('<div class="chip" data-filter-operator data-object-filter-expr-item style="cursor: pointer">AND</div>');
+
+        filterExpressionEditorElm.html(html);
+
+        $('div[data-filter-operator]').click(function() {
+            if($(this).text() === 'AND') $(this).text('OR');
+            else $(this).text('AND');
+        });
+
+
     }
 
     // init events
@@ -449,7 +550,9 @@ var initJQueryNamespace = (function($){
             // set first object to @search for correct search request processing in createFilterMenu
             $.post('/mainMenu', {
                 f: 'searchObjects',
-                searchStr: searchStr.replace(/[\r\n]+/g, '|')
+                searchStr: searchStr.replace(/[\r\n]+/g, '|'),
+                filterNames: getCheckedFilterNames().join(','),
+                filterExpression: getFilterExpression(),
             }, function(objects) {
                 // objects: [{name: objectName1, description: objectDescription1, id: objectID1, color: <color>:<shade>, disabled: <1|0>},...]
                 prevCheckedObjectsNames = [];
@@ -741,7 +844,7 @@ var initJQueryNamespace = (function($){
 
     function setActionParametersToBrowserURL(actionParameters) {
         if(!actionParameters || !$.isArray(actionParameters) || !actionParameters.length) return;
-        var actionParameters = actionParameters.filter(function(prm) {
+        actionParameters = actionParameters.filter(function(prm) {
             return ($.isPlainObject(prm) && prm.key && prm.key.toLowerCase() !== 'p' &&
                 prm.key.toLowerCase() !== 'u' && prm.key.toLowerCase() !== 'c' && prm.key.toLowerCase() !== 'a');
         }).map(function(prm) {
@@ -856,7 +959,12 @@ var initJQueryNamespace = (function($){
 
         var objectsNamesStr = upLevelCheckedObjects.join(',');
 
-        $.post('/mainMenu', {f: 'filterObjects', name: objectsNamesStr}, function (objects) {
+        $.post('/mainMenu', {
+            f: 'filterObjectsByInteractions',
+            name: objectsNamesStr,
+            filterNames: getCheckedFilterNames().join(','),
+            filterExpression: getFilterExpression(),
+        }, function (objects) {
             // objects: [{name: objectName1, description: objectDescription1, id: objectID1, color: <color>:<shade>, disabled: <1|0>},...]
             if (!objects || !objects.length) {
                 if(objectsNamesStr) {
@@ -899,7 +1007,12 @@ var initJQueryNamespace = (function($){
         if(checkedObjectsNames && checkedObjectsNames.length) var objectsNamesStr = checkedObjectsNames.join(',');
         else objectsNamesStr = '';
 
-        $.post('/mainMenu', {f: 'filterObjects', name: objectsNamesStr},
+        $.post('/mainMenu', {
+            f: 'filterObjectsByInteractions',
+                name: objectsNamesStr,
+                filterNames: getCheckedFilterNames().join(','),
+                filterExpression: getFilterExpression(),
+            },
             // objects: [{id:.., name:.., description:..}, {..}, ...]
             function(objects) {
 
@@ -932,7 +1045,12 @@ var initJQueryNamespace = (function($){
 
         var objectsNamesStr = objectsNames.join(',');
 
-        $.post('/mainMenu', {f: 'getObjects', name: objectsNamesStr},
+        $.post('/mainMenu', {
+                f: 'getObjectsByName',
+                name: objectsNamesStr,
+                filterNames: getCheckedFilterNames().join(','),
+                filterExpression: getFilterExpression(),
+            },
             // objects: [{id:.., name:.., description:.., color: <color>:<shade>}, {..}, ...]
             function(objects){
 
@@ -1308,6 +1426,8 @@ var initJQueryNamespace = (function($){
     callback(html), where html is a string with HTML page for active action
      */
     function getActionHTMLAndShowActionButtons(reqForUpdate, callback){
+        bodyElm.css("cursor", "wait");
+        $(iframeDOMElm.contentWindow).find('body').css("cursor", "wait");
 
         var activeActionElm = $('li[action_link].active');
         var activeActionLink = activeActionElm.attr('action_link');
@@ -1341,6 +1461,7 @@ var initJQueryNamespace = (function($){
 
         // if not selected any action, return
         if(!activeActionLink){
+            bodyElm.css("cursor", "auto");
             if(typeof callback === 'function') callback();
             return;
         }
@@ -1499,6 +1620,7 @@ var initJQueryNamespace = (function($){
 
         ctrlEnter();
         setTimeout(ctrlEnter, 60000);
+        bodyElm.css("cursor", "auto");
 
         // run task on Ctrl + Enter
         function ctrlEnter() {
@@ -1654,7 +1776,12 @@ var initJQueryNamespace = (function($){
 
         var objectsNamesStr = objectsInObjectsTab.checked.join(',');
 
-        $.post('/mainMenu', {f: 'getObjects', name: objectsNamesStr}, callback);
+        $.post('/mainMenu', {
+            f: 'getObjectsByName',
+            name: objectsNamesStr,
+            filterNames: getCheckedFilterNames().join(','),
+            filterExpression: getFilterExpression(),
+        }, callback);
         // objects: [{id:.., name:.., description:.., color: <color>:<shade>}, {..}, ...]
     }
 
@@ -1852,8 +1979,10 @@ var initJQueryNamespace = (function($){
             // then reload objects list by performing same filter with same objects interaction
             if(prevCheckedObjectsNames.length) {
                 var postParameters = {
-                    f: 'filterObjects',
-                    name: prevCheckedObjectsNames.join(',')
+                    f: 'filterObjectsByInteractions',
+                    name: prevCheckedObjectsNames.join(','),
+                    filterNames: getCheckedFilterNames().join(','),
+                    filterExpression: getFilterExpression(),
                 }
             } else {
                 var objectsIDs = [];
@@ -1862,7 +1991,9 @@ var initJQueryNamespace = (function($){
 
                 postParameters = {
                     f: 'getObjectsByID',
-                    IDs: objectsIDs.join(',')
+                    IDs: objectsIDs.join(','),
+                    filterNames: getCheckedFilterNames().join(','),
+                    filterExpression: getFilterExpression(),
                 }
             }
 
@@ -1922,7 +2053,9 @@ var initJQueryNamespace = (function($){
 
                     $.post('/mainMenu', {
                         f: 'getObjectsByID',
-                        IDs: objectsIDs.join(',')
+                        IDs: objectsIDs.join(','),
+                        filterNames: getCheckedFilterNames().join(','),
+                        filterExpression: getFilterExpression(),
                     }, function (objects) {
                         var newObjectsInObjectsTab = {
                             checked: [],
@@ -2002,7 +2135,7 @@ var initJQueryNamespace = (function($){
             if(!newPass) return false;
         });
 
-        newPass2Elm.keyup(function (e) {
+        newPass2Elm.keyup(function () {
             var newPass = newPass1Elm.val();
             if(newPass !== newPass2Elm.val()) newPass2Elm.addClass('red-text');
             else newPass2Elm.removeClass('red-text');
@@ -2244,7 +2377,7 @@ var initJQueryNamespace = (function($){
 
             retrievingLogRecordsInProgress = 0;
             if(typeof callback === 'function') callback();
-        };
+        }
     }
 
     var logLevels = {S: 0, D: 1, I: 2, W: 3, E: 4};

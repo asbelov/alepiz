@@ -46,12 +46,18 @@ function makeTableOfContents() {
                     obj.subDir + '/' + obj.helpDir + '/' + '">' + obj.title + '</h6></a></li>';
             }).join('');
 
+            var settings = contents.settings.map(function (obj) {
+                return '<li style="padding-left: 2em;"><h6><a href="/settings/' +
+                    obj.helpDir + '/' + obj.file + '">' + obj.title + '</h6></a></li>';
+            }).join('');
+
             var html = '<ul>' + common +
                 '<li><h3>Lessons</h3></li>' + lessons +
                 '<li><h3>Actions</h3></li>' + actions +
                 '<li><h3>Collectors</h3></li>' + collectors +
                 '<li><h3>Launchers</h3></li>' + launchers +
-                '<li><h3>Communication medias</h3></li>' + medias;
+                '<li><h3>Communication medias</h3></li>' + medias +
+                '<li><h3>Settings</h3></li>' + settings;
 
             var elm = document.getElementById('tableOfContents');
             elm.innerHTML = html;

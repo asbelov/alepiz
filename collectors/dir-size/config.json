@@ -4,6 +4,7 @@
     "active": "",
     "separate": "",
     "runCollectorSeparately": "on",
+    "runCollectorAsThread": "on",
     "parameters": {
         "dirNames": {
             "description": "Directory names (comma separated)",

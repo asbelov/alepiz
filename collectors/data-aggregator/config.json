@@ -4,6 +4,7 @@
     "active": "",
     "separate": "",
     "runCollectorSeparately": "on",
+    "runCollectorAsThread": "",
     "parameters": {
         "objectNamesLike": {
             "description": "Object names (comma separated in SQL Like format)",

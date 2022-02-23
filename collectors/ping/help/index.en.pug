@@ -47,16 +47,16 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                             Mast be greater then ping interval (timeout) - the timeout in seconds for the packet to
                     h3 Settings
                     p.
-                        Collector settings are stored in a file config/conf.json in the section collectors.ping
+                        The collector settings are stored in the settings.json file
                     ul.browser-default
                         li.
-                            localAddress - The IP address from which the connection to the collector server is made.
-                            If null or not specified, then the connection will be made from the IP address that the
-                            operating system will select
-                        li.
-                            serverAddress - IP address that the collector listens to and is connected to
-                        li.
-                            port - TCP port that the collector listens on
+                            dontUseExternalPing - Do not use an external ping program to check the operation of the
+                            collector. An external program is run to check that the collector is working correctly
+                            if a packet is lost. In addition, when a packet is lost by the collector, the collector
+                            process is restarted. Packet loss is only detected if the external program confirms
+                            the packet loss. In high loaded systems, the launch of an external program may take a
+                            long time and monitoring will not work correctly. Disabling the use of an external
+                            program allows you to fix all packet losses and disables the restart of the collector.
                     h3 Return value
                     p The packet round trip time in milliseconds (RTT), or 0 if the host did not respond.
 

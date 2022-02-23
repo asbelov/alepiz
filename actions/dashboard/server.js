@@ -3,8 +3,7 @@
  * Created on 2019-6-10 16:59:55
 */
 var log = require('../../lib/log')(module);
-//var events_generator = require('../../collectors/event-generator/collector'); // for select
-var activeCollector = require('../../lib/activeCollector'); // for insert
+var activeCollector = require('../../server/activeCollector'); // for insert
 var communication = require('../../lib/communication');
 var prepareUser = require('../../lib/utils/prepareUser');
 var usersDB = require('../../models_db/usersDB');
@@ -61,7 +60,7 @@ module.exports = function(args, callback) {
 
             log.info('Connect to collector "', collectorName, '" is completed');
 
-            collector.get({
+            collector.getOnce({
                 eventsIDs: eventsIDs,
                 action: action,
                 user: args.username,

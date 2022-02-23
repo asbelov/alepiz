@@ -4,6 +4,7 @@
     "active": "",
     "separate": "",
     "runCollectorSeparately": "",
+    "runCollectorAsThread": "on",
     "parameters": {
         "taskID": {
             "description": "Task ID (you can find this information in \"Task maker\" action)",

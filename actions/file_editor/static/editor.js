@@ -24,7 +24,7 @@ function Editor(initCfg) {
         searchBackground: '#000000',
         searchFontcolor: '#DDDD00',
 
-        fileName: './config/conf.json'
+        fileName: './config/common.json'
     };
 
     var searchStr = '';

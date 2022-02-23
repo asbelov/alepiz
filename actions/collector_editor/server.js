@@ -8,8 +8,7 @@
 var log = require('../../lib/log')(module);
 var collectors = require('../../lib/collectors');
 var help = require('../../lib/help');
-var server = require('../../lib/server');
-server.connect();
+var server = require('../../server/counterProcessor');
 
 module.exports = function(args, callback) {
     log.debug('Starting action server "', args.actionName, '" with parameters', args);
@@ -38,6 +37,7 @@ module.exports = function(args, callback) {
     collector.active = args.activeCollector;
     collector.separate = args.activeCollector ? '' : args.separateCollector;
     collector.runCollectorSeparately = args.runCollectorSeparately;
+    collector.runCollectorAsThread = args.runCollectorAsThread;
 
     var parameters = {};
     for(var inputID in args) {

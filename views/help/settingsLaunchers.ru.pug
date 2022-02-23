@@ -1,0 +1,36 @@
+//
+    Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Настройки лаунчеров для действий launchers.json
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Описание настроек лаунчеров для действий launchers.json
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h3 Описание
+                    p.
+                        Лаунчеры - это модули ALEPIZ, необходимые для запуска действий. Обычно действия запускаются
+                        с помощью nodeModule - лаунчера для встраивания действий в программный код ALEPIZ. В этом случае
+                        действие должно быть написано на JavaScript и будет выполняться в среде nodejs.
+                    p.
+                        Действия можно выполнять и с помощью других лаунчеров. Например, лаунчер
+                        exec позволяет выполнять любые исполняемые файлы ОС. Они могут быть запущены в качестве
+                        действий ALEPIZ. Можно создать собственный лаунчер, например, для запуска
+                        действий на удаленных серверах с помощью технологии Microsoft WMI или SSH. Информация
+                        по созданию лаунчера находится в справке для действия Launcher editor. Информация по каждому
+                        лаунчеру так же можно найти в справке по ALEPIZ
+                    h3 Настройки
+                    ul.browser-default
+                        li dir - каталог в котором находятся лаунчеры. Обычно launchers.
+                        li fileName - имя файла лаунчера. Обычно launcher.js

@@ -42,12 +42,13 @@ houseKeeper.run = function (initParameters) {
                     ' and transaction queue length: ', transQueue.len,
                     ', last transaction started at ', (new Date(transQueue.timestamp)).toLocaleString() +
                     '(' + transQueue.description + ')');
-            } else if(Date.now() - houseKeeperLastCheckTime > parameters.housekeeperWaitTimeout) {
+            } else if(parameters.housekeeperWaitTimeout &&
+                Date.now() - houseKeeperLastCheckTime > parameters.housekeeperWaitTimeout) {
                 log.warn('The housekeeper running at ', (new Date(isHouseKeeperRunning)).toLocaleString(),
                     ' and last checked by watchdog ',
                     Math.ceil((Date.now() - houseKeeperLastCheckTime) / 60000), ' minutes ago. Restarting');
             } else {
-                return log.warn('Prevent starting new housekeeper procedure, because it always running at ',
+                return log.warn('Prevent starting new housekeeper procedure, because it\'s always running at ',
                     (new Date(isHouseKeeperRunning)).toLocaleString());
             }
         }
@@ -100,7 +101,7 @@ houseKeeper.run = function (initParameters) {
                     timestamp: Date.now(),
                 };
 
-                if(watchdogInterval) clearInterval(watchdogInterval);
+                if (watchdogInterval) clearInterval(watchdogInterval);
                 watchdogInterval = setInterval(function () {
                     cache.getTransactionsQueueInfo(function (err, transQueue) {
                         log.info('HouseKeeper started at ', (new Date(isHouseKeeperRunning)).toLocaleString(),
@@ -108,17 +109,17 @@ houseKeeper.run = function (initParameters) {
                             ' objects. There were  ', prevProcessedDataCnt.processedDataCnt, ' objects.',
                             (!prevProcessedDataCnt.processedDataCnt ? '' :
                                 // convert speed from obj/milliseconds to obj/minutes
-                                (' Speed: ' + Math.ceil((processedDataCnt - prevProcessedDataCnt.processedDataCnt) * 60000  /
+                                (' Speed: ' + Math.ceil((processedDataCnt - prevProcessedDataCnt.processedDataCnt) * 60000 /
                                     (Date.now() - prevProcessedDataCnt.timestamp)) + ' objects/min.')),
                             ' Transaction queue length: ', transQueue.len,
                             (transQueue.timestamp ?
                                 ', last transaction started at ' + (new Date(transQueue.timestamp)).toLocaleString() +
-                                    '(' + transQueue.description + ')' :
+                                '(' + transQueue.description + ')' :
                                 ', no transaction in progress')
-                            );
+                        );
 
 
-                        if ((transQueue.len < 2 || transQueue.timestamp === 0) &&
+                        if (parameters.housekeeperWaitTimeout && (transQueue.len < 2 || transQueue.timestamp === 0) &&
                             prevProcessedDataCnt.processedDataCnt === processedDataCnt &&
                             Date.now() - prevProcessedDataCnt.timestamp > parameters.housekeeperWaitTimeout) {
                             isHouseKeeperRunning = houseKeeperLastCheckTime = 0;

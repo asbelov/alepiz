@@ -7,8 +7,9 @@ var rightsDB = require('../models_db/usersRolesRightsDB');
 var log = require('../lib/log')(module);
 var objectsDB = require('../models_db/objectsDB');
 var objectsProperties = require('../models_db/objectsPropertiesDB');
-var conf = require('../lib/conf');
-conf.file('config/conf.json');
+var Conf = require('../lib/conf');
+const conf = new Conf('config/common.json');
+const confActions = new Conf('config/actions.json');
 
 var systemUser = conf.get('systemUser') || 'system';
 
@@ -32,7 +33,7 @@ rightsWrapper.checkActionRights = function (initUser, actionID, executionMode, c
     // user 'system' has all rights for all actions
     if(user === systemUser) return callback(null, {view: 1, run: 1, makeTask: 1});
 
-    var actionsLayout = conf.get('actions:layout');
+    var actionsLayout = confActions.get('layout');
     for (var actionFolder in actionsLayout) {
         if (Object.keys(actionsLayout[actionFolder]).indexOf(actionID) !== -1) break;
     }

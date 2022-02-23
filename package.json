@@ -8,8 +8,9 @@
   },
   "dependencies": {
     "async": "^2.6.3",
+    "better-sqlite3": "^7.4.3",
     "body-parser": "*",
-    "codemirror": "*",
+    "codemirror": "^5.63.1",
     "compression": "*",
     "cookie-parser": "*",
     "express": "*",
@@ -17,14 +18,14 @@
     "jquery": "*",
     "jquery-ui-dist": "*",
     "js-message": "*",
-    "jshint": "*",
+    "jshint": "^2.13.1",
     "material-icons": "^0.7.7",
     "materialize-css": "*",
     "morgan": "*",
+    "nodeaffinity": "^1.1.0",
     "os-service": "*",
     "pug": "*",
     "quill": "*",
-    "serve-favicon": "*",
-    "sqlite3": "^5.0.2"
+    "serve-favicon": "*"
   }
 }

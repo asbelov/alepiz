@@ -3,16 +3,18 @@
 * Created on 2021-4-9 21:01:14
 */
 
-var fs = require('fs');
-var path = require('path');
-var log = require('../../lib/log')(module);
-var sqlite = require('../../lib/sqlite');
-var conf = require('../../lib/conf');
-var prepareUser = require('../../lib/utils/prepareUser');
-var countersGroups = require('../../models_db/countersGroupsDB');
-var countersRightsWrapperDB = require('../../rightsWrappers/countersDB');
-var countersDB = require('../../models_db/countersDB');
-var objectsRightsWrapperDB = require('../../rightsWrappers/objectsDB');
+const fs = require('fs');
+const path = require('path');
+const log = require('../../lib/log')(module);
+const Conf = require('../../lib/conf');
+const confCollectors = new Conf('config/collectors.json');
+const confOptionsEventGenerator = new Conf(confCollectors.get('dir') + '/event-generator/settings.json');
+const prepareUser = require('../../lib/utils/prepareUser');
+const countersGroups = require('../../models_db/countersGroupsDB');
+const countersRightsWrapperDB = require('../../rightsWrappers/countersDB');
+const countersDB = require('../../models_db/countersDB');
+const objectsRightsWrapperDB = require('../../rightsWrappers/objectsDB');
+const Database = require("better-sqlite3");
 
 var db;
 
@@ -53,21 +55,18 @@ function ajax(args, callback) {
 
 function initDB(args, callback) {
     var dbPath = path.join(__dirname, '..', '..',
-        conf.get('collectors:event-generator:dbPath'),
-        conf.get('collectors:event-generator:dbFile'));
+        confOptionsEventGenerator.get('dbPath'),
+        confOptionsEventGenerator.get('dbFile'));
 
-    sqlite.init(dbPath, function (err, _db) {
-        if (err) return callback(new Error('Can\'t initialise event database ' + dbPath + ': ' + err.message));
-
-        _db.exec('PRAGMA journal_mode = WAL', function (err) {
-            if (err) return callback(new Error('Can\'t set journal mode to WAL: ' + err.message));
-
-            db = _db;
-            log.info('Initializing events system database is completed');
-            return ajax(args, callback);
-        });
-    });
+    try {
+        db = new Database(dbPath, {readonly: true, fileMustExist: true});
+    } catch (err) {
+        return callback(new Error('Can\'t initialise event database ' + dbPath + ': ' + err.message));
+    }
+    log.info('Initializing events system database is completed');
+    return ajax(args, callback);
 }
+
 
 function getImportanceAndMontNames(callback) {
     var dashboardConfigFile = path.join(__dirname, '..', 'dashboard', 'config.json');
@@ -121,78 +120,75 @@ function getEvents(user, objectsIDs, callback) {
                     params[param.counterID][param.name] = param.value;
                 });
 
-                db.all('SELECT * FROM hints', function(err, hintsRows) {
-                    if(err) {
-                        return callback(new Error('Can\'t get hints: ' + err.messages));
-                    }
+                try {
+                    var hintsRows = db.prepare('SELECT * FROM hints').all();
+                } catch (err) {
+                    return callback(new Error('Can\'t get hints: ' + err.messages));
+                }
 
-
-                    db.all('SELECT disabledEvents.OCID AS OCID, disabledEvents.disableUntil AS disableUntil, ' +
+                try {
+                    var disabledRows = db.prepare('SELECT disabledEvents.OCID AS OCID, disabledEvents.disableUntil AS disableUntil, ' +
                         'disabledEvents.intervals AS intervals, \n' +
                         'comments.subject AS subject, comments.comment AS comment FROM disabledEvents ' +
-                        'JOIN comments ON disabledEvents.commentID=comments.id',
-                        function (err, disabledRows) {
+                        'JOIN comments ON disabledEvents.commentID=comments.id').all();
+                } catch (err) {
+                    return callback(new Error('Can\'t get disabled events: ' + err.messages));
+                }
 
-                        if(err) {
-                            return callback(new Error('Can\'t get disabled events: ' + err.messages));
-                        }
+                var hints = {};
+                hintsRows.forEach(function (hint) {
+                    var counterID = hint.counterID || (hint.OCID && OCIDs[hint.OCID] ? OCIDs[hint.OCID].counterID : null);
+                    if(!counterID) return;
+                    var objectID = hint.OCID ? OCIDs[hint.OCID].objectID : 0;
 
-                        var hints = {};
-                        hintsRows.forEach(function (hint) {
-                            var counterID = hint.counterID || (hint.OCID && OCIDs[hint.OCID] ? OCIDs[hint.OCID].counterID : null);
-                            if(!counterID) return;
-                            var objectID = hint.OCID ? OCIDs[hint.OCID].objectID : 0;
-
-                            if(!hints[counterID]) hints[counterID] = {};
-                            hints[counterID][objectID] = hint;
-                        });
-
-                        var disabledEvents = {};
-                        if(OCIDsrows) {
-                            disabledRows.forEach(function (disabled) {
-                                var OCID = OCIDs[disabled.OCID];
-                                if (OCID) {
-                                    if(!disabledEvents[OCID.counterID]) disabledEvents[OCID.counterID] = {};
-                                    disabledEvents[OCID.counterID][OCID.objectID] = disabled;
-                                }
-                            });
-                        }
-
-                        var filteredCounters = {};
-                        countersRows.forEach(function (rowCounter) {
-                            var param = params[rowCounter.id];
-                            if(!param) {
-                                log.warn('Undefined collector parameters for ', rowCounter);
-                                return;
-                            }
-                            if(rowCounter.collectorID === 'event-generator' &&
-                                (!OCIDsrows || countersIDs.indexOf(rowCounter.id) !== -1)) {
-
-                                filteredCounters[rowCounter.id] = {
-                                    counterID: rowCounter.id,
-                                    name: rowCounter.name,
-                                    groupID: rowCounter.groupID,
-                                    keepHistory: rowCounter.keepHistory,
-                                    keepTrends: rowCounter.keepTrends,
-                                    counterDescription: rowCounter.description,
-                                    counterDisabled: rowCounter.disabled,
-                                    debug: rowCounter.debug,
-                                    taskCondition: rowCounter.taskCondition,
-                                    importance: param.importance, // can be not an Number
-                                    description: param.eventDescription,
-                                    pronunciation: param.pronunciation,
-                                    duration: param.eventDuration,
-                                    problemTaskID: param.problemTaskID,
-                                    solvedTaskID: param.solvedTaskID,
-                                    hints: hints[rowCounter.id],
-                                    //comments: comments[rowCounter.id],
-                                    disabled: disabledEvents[rowCounter.id],
-                                };
-                            }
-                        });
-                        callback(null, filteredCounters);
-                    });
+                    if(!hints[counterID]) hints[counterID] = {};
+                    hints[counterID][objectID] = hint;
                 });
+
+                var disabledEvents = {};
+                if(OCIDsrows) {
+                    disabledRows.forEach(function (disabled) {
+                        var OCID = OCIDs[disabled.OCID];
+                        if (OCID) {
+                            if(!disabledEvents[OCID.counterID]) disabledEvents[OCID.counterID] = {};
+                            disabledEvents[OCID.counterID][OCID.objectID] = disabled;
+                        }
+                    });
+                }
+
+                var filteredCounters = {};
+                countersRows.forEach(function (rowCounter) {
+                    var param = params[rowCounter.id];
+                    if(!param) {
+                        log.warn('Undefined collector parameters for ', rowCounter);
+                        return;
+                    }
+                    if(rowCounter.collectorID === 'event-generator' &&
+                        (!OCIDsrows || countersIDs.indexOf(rowCounter.id) !== -1)) {
+
+                        filteredCounters[rowCounter.id] = {
+                            counterID: rowCounter.id,
+                            name: rowCounter.name,
+                            groupID: rowCounter.groupID,
+                            keepHistory: rowCounter.keepHistory,
+                            keepTrends: rowCounter.keepTrends,
+                            counterDescription: rowCounter.description,
+                            counterDisabled: rowCounter.disabled,
+                            debug: rowCounter.debug,
+                            taskCondition: rowCounter.taskCondition,
+                            importance: param.importance, // can be not an Number
+                            description: param.eventDescription,
+                            pronunciation: param.pronunciation,
+                            duration: param.eventDuration,
+                            problemTaskID: param.problemTaskID,
+                            solvedTaskID: param.solvedTaskID,
+                            hints: hints[rowCounter.id],
+                            //comments: comments[rowCounter.id],
+                            disabled: disabledEvents[rowCounter.id],
+                        };
+                    }
+                });
+                callback(null, filteredCounters);
             });
         });
     });
@@ -210,47 +206,3 @@ function getOCIDs(user, objectsIDs, callback) {
         return callback(null, rows);
     });
 }
-
-/*
-function getComments(objectsIDs, callback) {
-    if(!Array.isArray(objectsIDs) || !objectsIDs.length) return callback();
-
-    var rows = [];
-
-    // SELECT max (timestamp) AS timestamp... is used to reverse sort events when using GROUP BY events.counterID ORDER BY events.timestamp DESC
-    var stmt = db.prepare('SELECT events.counterID AS counterID, events.objectID AS objectID, ' +
-        'comments.user AS user, comments.timestamp AS timestamp, comments.subject AS subject, comments.comment AS comment ' +
-        'FROM (SELECT max(timestamp) AS timestamp, counterID, objectID, commentID FROM events GROUP BY events.counterID ORDER BY events.timestamp DESC) AS events ' +
-        'JOIN comments ON comments.id=events.commentID ' +
-        'WHERE events.objectID = ?', function (err) {
-        if(err) {
-            return callback(new Error('Can\'t prepare stmt to get comments for ' + objectsIDs.join(',') + ': ' + err.messages));
-        }
-
-        async.eachLimit(objectsIDs, 100, function (objectID, callback) {
-            stmt.all(Number(objectID), function (err, _rows) {
-                if(err) {
-                    return callback(new Error('Can\'t get comments for ' + objectID + '/' + objectsIDs.join(',') + ': ' + err.messages));
-                }
-
-                //_rows.forEach(row => log.warn('Comment size: ', row.comment.length, '; ', new Date(row.timestamp)));
-                rows.push.apply(rows, _rows);
-                callback();
-            });
-        }, function(err) {
-            if(err) return callback(err);
-            stmt.finalize();
-
-            var comments = {};
-            if(commentsRows) {
-                commentsRows.forEach(function (comment) {
-                    if (!comments[comment.counterID]) comments[comment.counterID] = {};
-                    comments[comment.counterID][comment.objectID] = comment;
-                });
-            }
-
-            callback(err, comments);
-        });
-    });
-}
- */

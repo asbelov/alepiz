@@ -3,8 +3,7 @@
  */
 
 var log = require('../../lib/log')(module);
-var server = require('../../lib/server');
-server.connect();
+var server = require('../../server/counterProcessor');
 
 
 module.exports = function(args, callback) {

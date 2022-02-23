@@ -11,7 +11,7 @@ module.exports = function(args, callback) {
         if (!args.IDs) return callback(new Error('Can\'t get shared objects properties: objects IDs are not specified'));
 
         // properties [{name:.., value:.., mode:.., description:..}]
-        return objectsPropertiesDB.getSharedProperties(args.username, args.IDs.split(','), callback);
+        return objectsPropertiesDB.getSharedProperties(args.username, args.IDs.split(','), true, callback);
     } else if(args.func === 'getObjectsForProperty') {
         if (!args.propertyName) return callback(new Error('Can\'t get objects for property: property not specified'));
 

@@ -4,6 +4,7 @@
     "active": "",
     "separate": "on",
     "runCollectorSeparately": "",
+    "runCollectorAsThread": "on",
     "parameters": {
         "objectName": {
             "description": "Object group name or objectID for group",

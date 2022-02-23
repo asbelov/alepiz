@@ -40,52 +40,54 @@ module.exports = function(args, callback) {
 
     if (func === 'getUnits') return units.getUnits(callback);
 
-    if (func === 'getObjectsCountersValues') {
-        if(!args.IDs) return callback(new Error('Can\'t get last values for objects: objectsCounters IDs not specified'));
+    history.connect('actionDataBrowser', function() {
 
-        return history.getLastValues(args.IDs.split(','), function(err, records) {
-            if(!records && err) return callback(err);
-            callback(null, records);
-        });
-    }
+        if (func === 'getObjectsCountersValues') {
+            if (!args.IDs) return callback(new Error('Can\'t get last values for objects: objectsCounters IDs not specified'));
 
-    if (func === 'getObjectsCountersHistoryValues') {
-        if(!args.IDs) return callback(new Error('Can\'t get history values for objects: objectsCounters IDs not specified'));
-
-        // 1477236595310 = 01.01.2000
-        if(!Number(args.to) || Number(args.to)  < 1477236595310) var toDate = (new Date()).getTime();
-        else toDate = Number(args.to);
-
-        // 86400000 = 24 hours or 1 day
-        if(!Number(args.from) || Number(args.from)  >= toDate) var fromDate = (new Date(toDate - 86400000)).getTime();
-        else fromDate = Number(args.from);
-
-        if(Number(args.maxRecordsCnt) === undefined || (Number(args.maxRecordsCnt) > 1 && Number(args.maxRecordsCnt) < 30)) var maxRecordsCnt = 30;
-        else maxRecordsCnt = Number(args.maxRecordsCnt);
-
-
-        var objectsCountersHistoryValues = {}, isDataFromTrends = {};
-        async.each(args.IDs.split(','), function(id, callback){
-            history.getByTime(id, fromDate, toDate, maxRecordsCnt, function(err, result) {
-                if(err){
-                    log.warn(err.message);
-                    return callback();
-                }
-                if(!result[0]){
-                    log.warn('Returned empty history values for object-counter: ', id);
-                    return callback();
-                }
-
-                isDataFromTrends[id] = result[0].isDataFromTrends;
-                objectsCountersHistoryValues[id] = result;
-                callback();
+            return history.getLastValues(args.IDs.split(','), function (err, records) {
+                if (!records && err) return callback(err);
+                callback(null, records);
             });
-        }, function() {
-            callback(null, {
-                history: objectsCountersHistoryValues,
-                isDataFromTrends: isDataFromTrends,
-            });
-        });
-    }
+        }
 
+        if (func === 'getObjectsCountersHistoryValues') {
+            if (!args.IDs) return callback(new Error('Can\'t get history values for objects: objectsCounters IDs not specified'));
+
+            // 1477236595310 = 01.01.2000
+            if (!Number(args.to) || Number(args.to) < 1477236595310) var toDate = (new Date()).getTime();
+            else toDate = Number(args.to);
+
+            // 86400000 = 24 hours or 1 day
+            if (!Number(args.from) || Number(args.from) >= toDate) var fromDate = (new Date(toDate - 86400000)).getTime();
+            else fromDate = Number(args.from);
+
+            if (Number(args.maxRecordsCnt) === undefined || (Number(args.maxRecordsCnt) > 1 && Number(args.maxRecordsCnt) < 30)) var maxRecordsCnt = 30;
+            else maxRecordsCnt = Number(args.maxRecordsCnt);
+
+
+            var objectsCountersHistoryValues = {}, isDataFromTrends = {};
+            async.each(args.IDs.split(','), function (id, callback) {
+                history.getByTime(id, fromDate, toDate, maxRecordsCnt, function (err, result) {
+                    if (err) {
+                        log.warn(err.message);
+                        return callback();
+                    }
+                    if (!result[0]) {
+                        log.warn('Returned empty history values for object-counter: ', id);
+                        return callback();
+                    }
+
+                    isDataFromTrends[id] = result[0].isDataFromTrends;
+                    objectsCountersHistoryValues[id] = result;
+                    callback();
+                });
+            }, function () {
+                callback(null, {
+                    history: objectsCountersHistoryValues,
+                    isDataFromTrends: isDataFromTrends,
+                });
+            });
+        }
+    });
 };

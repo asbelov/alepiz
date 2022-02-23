@@ -197,15 +197,12 @@ var JQueryNamespace = (function ($) {
             var counters = getSharedCounters(objectsIDs.length, allCounters);
             var selectHTML = '<option value="">New counter</option>';
             if(counters && counters.length) {
-                selectHTML += counters.sort(function (a,b) {
-                    var aName = a.name.toLowerCase(), bName = b.name.toLowerCase();
-                    if(aName > bName) return 1;
-                    if(aName < bName) return -1;
-                    if(aName === bName) return 0;
-                }).map(function (counter) {
-                    var selected = initCounterID === counter.id ? ' selected' : '';
-                    return '<option value="' + counter.id + '"' + selected + '>' + escapeHtml(counter.name) + ' (#'+ counter.id + ')</option>';
-                }).join('');
+            selectHTML += counters.sort(function(a, b) {
+                return (new Intl.Collator('us', { numeric: true }).compare(a.name, b.name));
+            }).map(function (counter) {
+                var selected = initCounterID === counter.id ? ' selected' : '';
+                return '<option value="' + counter.id + '"' + selected + '>' + escapeHtml(counter.name) + ' (#'+ counter.id + ')</option>';
+            }).join('');
             }
 
             counterSelectorElm.html(selectHTML);
@@ -485,7 +482,7 @@ var JQueryNamespace = (function ($) {
         });
 
         if(hasUpdateEventsGeneratedByThisObject) {
-            // some times it's a very big array and query will be very slow
+            // sometimes it's a very big array and query will be very slow
             // use selected objects instead
             //var objectsIDsForThisObject = JSON.parse($('#linkedObjectsIDs').val()).map(function (object) {
             //             return object.id;
@@ -733,20 +730,20 @@ var JQueryNamespace = (function ($) {
                 collectorParametersParentElm.empty();
 
                 // set hidden element #activeCollector to value of collector.active for sing is selected collector
-                // is active. It's used for warning, when user try to set update event for active collector
+                // is active. It's used for warning, when user try to set update event for active collector.
                 // Active collector usually updating using internal mechanism.
                 $('#activeCollector').val(collector.active);
 
-                if(counterID) var getCounterParameters = function(callback){
+                if(counterID) var getCounterParameters = function(counterID, callback){
                     // callback(counterParameters); counterParameters: [{name:.., value:..}, ...]
                     $.post(serverURL, {func: 'getCounterParameters', id: counterID}, function(counterParameters){
                         callback(counterParameters)
                     });
                 };
-                else getCounterParameters = function(callback){ callback() };
+                else getCounterParameters = function(counterID, callback){ callback() };
 
 
-                getCounterParameters(function(counterParameters) {
+                getCounterParameters(counterID, function(counterParameters) {
 
                     for (var parameterName in collector.parameters) {
                         if (!collector.parameters.hasOwnProperty(parameterName)) continue;
@@ -1111,7 +1108,7 @@ var JQueryNamespace = (function ($) {
     }
 
     function initVariablesDefinitionsTab() {
-        var instances = M.Collapsible.init(document.querySelectorAll('.collapsible'), {});
+        M.Collapsible.init(document.querySelectorAll('.collapsible'), {});
         $('#addVariable').click(addVariable);
         $('#addVariableExpression').click(addVariableExpression);
         $.post(serverURL, {func: 'getHistoryFunctions'}, function (_historyFunctionsList) {

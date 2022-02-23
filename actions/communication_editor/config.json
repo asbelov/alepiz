@@ -3,7 +3,11 @@
   "description": "Create new or edit existing communication media",
   "homePage": "index",
   "launcher": "nodeModule",
-  "launcherPrms": { "javaScript": "server.js" },
+    "startAjaxAsThread": true,
+    "launcherPrms": {
+        "javaScript": "server.js",
+        "startAsThread": true
+    },
   "ajaxServer": "ajax.js",
   "staticDir": "static",
   "callbackBeforeExec": "callbackBeforeExec",

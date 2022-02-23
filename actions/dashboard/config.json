@@ -2,11 +2,16 @@
     "name": "Dashboard",
     "description": "Events status monitoring",
     "homePage": "index",
-    "ajaxServer": "ajax.js",
     "staticDir": "static",
     "execMethod": "post",
     "launcher": "nodeModule",
-    "launcherPrms": { "javaScript": "server.js" },
+    "ajaxServer": "ajax.js",
+    "startAjaxAsThread": true,
+    "notInQueue": true,
+    "launcherPrms": {
+        "javaScript": "server.js",
+        "startAsThread": true
+    },
     "showWhenNoObjectsSelected": true,
     "onChangeObjectMenuEvent": "callback:onChangeObjects",
     "callbackBeforeExec": "callbackBeforeExec",
@@ -14,23 +19,43 @@
     "timeout": 60,
     "icon": "event",
     "updateInterval": 15,
-    "monthNames": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
-    "actions": [{
-        "ID": "data_browser",
-        "name": "graph"
-    }, {
-        "ID": "sched_viewer",
-        "name": "schedule"
-    }, {
-        "ID": "log_viewer",
-        "name": "log"
-    }, {
-        "ID": "objects_properties",
-        "name": "props"
-    }, {
-        "ID": "counter_settings",
-        "name": "counter"
-    }],
+    "commentsInterval": 3,
+    "monthNames": [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+    ],
+    "actions": [
+        {
+            "ID": "data_browser",
+            "name": "graph"
+        },
+        {
+            "ID": "sched_viewer",
+            "name": "schedule"
+        },
+        {
+            "ID": "log_viewer",
+            "name": "log"
+        },
+        {
+            "ID": "objects_properties",
+            "name": "props"
+        },
+        {
+            "ID": "counter_settings",
+            "name": "counter"
+        }
+    ],
     "importance": {
         "0": {
             "text": "Disaster",
@@ -79,31 +104,59 @@
             "importance": 0,
             "default": true,
             "subject": "[INFO]"
-        }, {
+        },
+        {
             "name": "Task",
             "tip": "Task execution result",
             "subject": "[TASK]",
             "importance": 0
-        }, {
+        },
+        {
             "name": "Mistaken",
             "tip": "Mistake in event",
             "subject": "[MISTAKE]",
             "importance": 0,
             "replyTo": "\"Support\" <support@domain.com>"
-        }, {
+        },
+        {
             "name": "Admins and support",
             "tip": "Send to administrators and support",
-            "recipients": ["\"Admins\" <root@domain.com>", "\"support\" <support@domain.com>"],
-            "subject": "[Problem]"
-        }, {
+            "recipients": [
+                "\"Admins\" <root@domain.com>",
+                "\"support\" <support@domain.com>"
+            ],
+            "subject": "[Problem]",
+            "autoApplyFor": [{
+                "actions": ["addAsComment", "disableEvents", "enableEvents"],
+                "importance": [0,1],
+                "objectNameRE": ["^ALE", "PIZ$"],
+                "counterNameRE": ["Pages reads"],
+                "//startEventTimeLessMin": 5,
+                "//endEventTimeLessMin": 15
+            },{
+                "actions": ["addAsComment", "disableEvents", "enableEvents"],
+                "importance": [0,1],
+                "objectNameRE": ["PAD-ASBEL"],
+                "eventDescriptionRE": ["Free memory is .+Mb"],
+                "//counterNameRE": [],
+                "//startEventTimeLessMin": 5,
+                "//endEventTimeLessMin": 15
+            }]
+        },
+        {
             "name": "Admins",
             "tip": "Send to administrators",
-            "recipients": ["\"Admins\" <root@domain.com>"],
+            "recipients": [
+                "\"Admins\" <root@domain.com>"
+            ],
             "subject": "[Admins]"
-        }, {
+        },
+        {
             "name": "Send to support",
             "tip": "Send to support",
-            "recipients": ["\"Support\" <support@domain.com>"],
+            "recipients": [
+                "\"Support\" <support@domain.com>"
+            ],
             "subject": "[Support]"
         }
     ],
@@ -148,7 +201,9 @@
                 "EVENT_DESCRIPTION": "Description",
                 "EVENT_TIME": "Time"
             },
-            "tables": ["currentEvents"],
+            "tables": [
+                "currentEvents"
+            ],
             "bodyHeader": "<br/><br/><h3><strong style=\"color: rgb(0,138,0);\">Following events was marked as solved:</strong></h3>",
             "eventTemplate": "<p><strong>%:OBJECT_NAME:%:</strong><span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></p>",
             "intervalsDivider": "<p><blockquote>and <span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></blockquote></p>"
@@ -181,7 +236,9 @@
                 "EVENT_DESCRIPTION": "Description",
                 "EVENT_TIME": "Time"
             },
-            "tables": ["disabledEvents"],
+            "tables": [
+                "disabledEvents"
+            ],
             "bodyHeader": "<br/><br/><h3><strong style=\"color: rgb(0,71,178);\">Following events was enabled:</strong></h3>",
             "eventTemplate": "<p>%:ACTION:%: <strong>%:OBJECT_NAME:%:</strong><span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></p>",
             "intervalsDivider": "<p><blockquote>and <span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></blockquote></p>"

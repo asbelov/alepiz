@@ -16,7 +16,8 @@ var unitsDB = require('../../models_db/countersUnitsDB');
 var history = require('../../models_history/history');
 var functions = require('../../lib/calcFunction');
 var calc = require('../../lib/calc');
-var conf = require('../../lib/conf');
+var Conf = require('../../lib/conf');
+const confLog = new Conf('config/log.json');
 var logViewerAjax = require('../log_viewer/ajax');
 
 module.exports = function(args, callback) {
@@ -112,7 +113,7 @@ function getFunctionsDescription() {
 }
 
 function getLogFileList(args, callback) {
-    var logPath = path.join(__dirname, '..', '..', conf.get('log:path'), 'counters');
+    var logPath = path.join(__dirname, '..', '..', confLog.get('dir') || 'logs', 'counters');
 
     fs.readdir(logPath, {withFileTypes: true}, function (err, filesObjArray) {
         if (err) return callback(new Error('Can\'t read dir ' + logPath + ': ' + err.message));

@@ -9,8 +9,9 @@
 * Module dependencies.
 */
 
-var sqlite3 = require('sqlite3'),
-    events = require('events');
+var Database = require('better-sqlite3');
+//const log = require('../lib/log')(module);
+var events = require('events');
 
 /**
 * One day in milliseconds.
@@ -19,7 +20,7 @@ var sqlite3 = require('sqlite3'),
 var oneDay = 86400000;
 
 /**
-* Return the SQLiteStore extending connect's session Store.
+* Return the SQLiteStore extending connects session Store.
 *
 * @param {object} connect
 * @return {Function}
@@ -41,8 +42,7 @@ module.exports = function(connect) {
     */
 
     function dbCleanup(store) {
-        var now = new Date().getTime();
-        store.db.run('DELETE FROM ' + store.table + ' WHERE ? > expired', [now]);
+        store.db.prepare('DELETE FROM ' + store.table + ' WHERE ? > expired').run([Date.now()]);
     }
 
     /**
@@ -66,19 +66,15 @@ module.exports = function(connect) {
             dbPath = (options.dir || '.') + '/' + this.db + '.db';
         }
         
-        this.db = new sqlite3.Database(dbPath, options.mode);
+        this.db = new Database(dbPath);
         this.client = new events.EventEmitter();
         var self = this;
 
-        this.db.exec('CREATE TABLE IF NOT EXISTS ' + this.table + ' (' + 'sid PRIMARY KEY, ' + 'expired, sess)',
-            function(err) {
-                if (err) throw err;
-                self.client.emit('connect');
-
-                dbCleanup(self);
-                setInterval(dbCleanup, oneDay, self).unref();
-            }
-        );
+        this.db.prepare('CREATE TABLE IF NOT EXISTS ' + this.table + ' (' + 'sid PRIMARY KEY, ' + 'expired, sess)').run();
+        self.client.emit('connect');
+        //log.warn('!!!Connect');
+        dbCleanup(self);
+        setInterval(dbCleanup, oneDay, self).unref();
     }
   
     /**
@@ -91,19 +87,20 @@ module.exports = function(connect) {
     * Attempt to fetch session by the given sid.
     *
     * @param {String} sid
-    * @param {Function} fn
+    * @param {Function} callback
     * @api public
     */
 
-    SQLiteStore.prototype.get = function(sid, fn) {
-        var now = new Date().getTime();
-        this.db.get('SELECT sess FROM ' + this.table + ' WHERE sid = ? AND ? <= expired', [sid, now],
-            function(err, row) {
-                if (err) fn(err);
-                if (!row) return fn();
-                fn(null, JSON.parse(row.sess));
-            }
-        );
+    SQLiteStore.prototype.get = function(sid, callback) {
+        var now = Date.now();
+        try {
+            var row = this.db.prepare('SELECT sess FROM ' + this.table + ' WHERE sid = ? AND ? <= expired').get([sid, now]);
+        } catch (err) {
+            return callback(err);
+        }
+        //log.warn('!!!get ', row, ' ', row ? JSON.parse(row.sess) : 0);
+        if (!row) return callback();
+        callback(null, JSON.parse(row.sess));
     };
 
 
@@ -112,69 +109,78 @@ module.exports = function(connect) {
    *
    * @param {String} sid
    * @param {string} sess
-   * @param {Function} fn
+   * @param {Function} callback
    * @api public
    */
 
-  SQLiteStore.prototype.set = function(sid, sess, fn) {
-    try {
-      var maxAge = sess.cookie.maxAge;
-      var now = new Date().getTime();
-      var expired = maxAge ? now + maxAge : now + oneDay;
-      sess = JSON.stringify(sess);
+    SQLiteStore.prototype.set = function(sid, sess, callback) {
+        var maxAge = sess.cookie.maxAge;
+        var now = Date.now();
+        var expired = maxAge ? now + maxAge : now + oneDay;
+        sess = JSON.stringify(sess);
 
-      this.db.all('INSERT OR REPLACE INTO ' + this.table + ' VALUES (?, ?, ?)',
-        [sid, expired, sess],
-        function(err, rows) {
-          if (fn) fn.apply(this, arguments);
+        try {
+          this.db.prepare('INSERT OR REPLACE INTO ' + this.table + ' VALUES (?, ?, ?)').run([sid, expired, sess]);
+        } catch(err) {
+            if (typeof callback === 'function') return callback(err);
         }
-      );
-    } catch (e) {
-      if (fn) fn(e);
-    }
-  };
+        //log.warn('!!!Set ', sid, ' ', sess);
+        if (typeof callback === 'function') callback();
+    };
 
 
     /**
     * Destroy the session associated with the given `sid`.
     *
     * @param {String} sid
-    * @param fn
+    * @param callback
     * @api public
     */
 
-    SQLiteStore.prototype.destroy = function(sid, fn) {
-        this.db.run('DELETE FROM ' + this.table + ' WHERE sid = ?', [sid], fn);
+    SQLiteStore.prototype.destroy = function(sid, callback) {
+        try {
+            this.db.prepare('DELETE FROM ' + this.table + ' WHERE sid = ?').run([sid]);
+        } catch (err) {
+            return callback(err);
+        }
+        //log.warn('!!!destroy');
+        callback();
     };
 
 
     /**
     * Fetch number of sessions.
     *
-    * @param {Function} fn
+    * @param {Function} callback
     * @api public
     */
 
-    SQLiteStore.prototype.length = function(fn) {
-        this.db.all('SELECT COUNT(*) AS count FROM ' + this.table + '', function(err, rows) {
-            if (err) fn(err);
-            fn(null, rows[0].count);
-        });
+    SQLiteStore.prototype.length = function(callback) {
+        try {
+            var rows = this.db.prepare('SELECT COUNT(*) AS count FROM ' + this.table).all();
+        } catch (err) {
+            return callback(err);
+        }
+        //log.warn('!!!Length ', rows, ' ', rows[0].count);
+        callback(null, rows[0].count);
     };
-
 
     /**
     * Clear all sessions.
     *
-    * @param {Function} fn
+    * @param {Function} callback
     * @api public
     */
 
-    SQLiteStore.prototype.clear = function(fn) {
-        this.db.exec('DELETE FROM ' + this.table + '', function(err) {
-            if (err) fn(err);
-            fn(null, true);
-        });
+    SQLiteStore.prototype.clear = function (callback) {
+        try {
+            this.db.prepare('DELETE FROM ' + this.table).run();
+        } catch(err) {
+            return callback(err)
+        }
+
+        //log.warn('!!!Clear');
+        callback(null, true);
     };
     
     
@@ -183,26 +189,21 @@ module.exports = function(connect) {
     *
     * @param {string} sid
     * @param {object} session
-    * @param {function} fn
+    * @param {function} callback
     * @public
     */
-    SQLiteStore.prototype.touch = function(sid, session, fn) {
+    SQLiteStore.prototype.touch = function(sid, session, callback) {
         if (session && session.cookie && session.cookie.expires) {
             var now = new Date().getTime();
             var cookieExpires = new Date(session.cookie.expires).getTime();
-            this.db.run('UPDATE ' + this.table + ' SET expired=? WHERE sid = ? AND ? <= expired',
-                [cookieExpires, sid, now],
-                function(err) {
-                    if (fn) {
-                        if (err) fn(err);
-                        fn(null, true);
-                    }
-                }
-            );
+            try {
+                this.db.prepare('UPDATE ' + this.table + ' SET expired=? WHERE sid = ? AND ? <= expired')
+                    .run([cookieExpires, sid, now]);
+            } catch(err) {
+                if (typeof callback === 'function') return callback(err);
+            }
+            if (typeof callback === 'function') callback(null, true);
         }
     };
-    
-
     return SQLiteStore;
-
 };

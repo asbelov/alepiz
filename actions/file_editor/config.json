@@ -5,7 +5,11 @@
     "ajaxServer": "../log_viewer/ajax.js",
     "execMethod": "post",
     "launcher": "nodeModule",
-    "launcherPrms": { "javaScript": "server.js" },
+    "startAjaxAsThread": true,
+    "launcherPrms": {
+        "javaScript": "server.js",
+        "startAsThread": true
+    },
     "staticDir": "static",
     "callbackBeforeExec": "callbackBeforeExec",
     "onChangeObjectMenuEvent": "fullreload",
@@ -21,7 +25,7 @@
         "replaceElm": true,
         "reloadOnNewFile": true,
         "filterFiles": "(\\.ini$)|(\\.xml$)|(\\.dsc$)|(\\.cmd$)|(\\.bat$)|(\\.cfg$)|(\\.data$)|(\\.tmpl$)|(\\.json$)|(\\.txt$)",
-        "order": "conf.json,config,main",
+        "order": "common.json,config,main",
         "skipDirs": "old_version,sav,certs,!scripts",
         "filePath": "CONFIG_FILES_PATH"
     }

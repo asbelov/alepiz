@@ -5,11 +5,15 @@
     "ajaxServer": "ajax.js",
     "execMethod": "post",
     "launcher": "nodeModule",
-    "launcherPrms": { "javaScript": "server.js" },
+    "startAjaxAsThread": true,
+    "launcherPrms": {
+        "javaScript": "server.js",
+        "startAsThread": true
+    },
     "staticDir": "static",
     "onChangeObjectMenuEvent": "none",
     "callbackBeforeExec": "callbackBeforeExec",
-    "timeout": 60,
+    "timeout": 180,
     "showWhenNoObjectsSelected": true,
     "outputFormat": "text",
     "descriptionTemplate": "%:interactions_description:%. %:deleteOtherInteractions:% ?? Not listed interactions will be deleted :: Not listed interactions will be also saved",

@@ -7,7 +7,7 @@ var objectsDB = require('../../rightsWrappers/objectsDB');
 var counterSaveDB = require('../../rightsWrappers/counterSaveDB');
 var objectsPropertiesDB = require('../../rightsWrappers/objectsPropertiesDB');
 var transactionDB = require('../../models_db/transaction');
-var server = require('../../lib/server');
+var server = require('../../server/counterProcessor');
 
 module.exports = function(args, callback) {
 

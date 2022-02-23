@@ -4,7 +4,7 @@
 var log = require('../../lib/log')(module);
 var objectDB = require('../../rightsWrappers/objectsPropertiesDB');
 var transactionDB = require('../../models_db/transaction');
-var server = require('../../lib/server');
+var server = require('../../server/counterProcessor');
 
 module.exports = function(args, callback) {
     log.debug('Starting action server "', args.actionName, '" with parameters', args);

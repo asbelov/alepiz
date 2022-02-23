@@ -60,17 +60,19 @@ collector.get = function(param, callback) {
                     callback();
                 })
             }, function () {
-                // records: {id1: {err:..., timestamp:..., data:...}, id2: {err:.., timestamp:..., data:..}, ....}
-                history.getLastValues(OCIDs, function (err, records) {
-                    if(err) return callback(new Error('Can\'t get last values for OCIDs ' + OCIDs.join(', ') +
-                        ': ' + err.message + '; ' + JSON.stringify(param)));
+                history.connect('collectorDataAggregator', function() {
+                    // records: {id1: {err:..., timestamp:..., data:...}, id2: {err:.., timestamp:..., data:..}, ....}
+                    history.getLastValues(OCIDs, function (err, records) {
+                        if (err) return callback(new Error('Can\'t get last values for OCIDs ' + OCIDs.join(', ') +
+                            ': ' + err.message + '; ' + JSON.stringify(param)));
 
-                    if(!Object.keys(records).length) {
-                        log.debug('History values are not found for ', param.counterName, ' and ', rowsObjects, '; OCIDs: ', OCIDs);
-                        return callback();
-                    }
+                        if (!Object.keys(records).length) {
+                            log.debug('History values are not found for ', param.counterName, ' and ', rowsObjects, '; OCIDs: ', OCIDs);
+                            return callback();
+                        }
 
-                    callback(null, func[param.func](records));
+                        callback(null, func[param.func](records));
+                    });
                 });
             });
         });

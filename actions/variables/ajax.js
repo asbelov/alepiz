@@ -5,7 +5,7 @@
 var log = require('../../lib/log')(module);
 var rightsWrappersCountersDB = require('../../rightsWrappers/countersDB');
 var groupsDB = require('../../models_db/countersGroupsDB');
-var dynamicLog = require('../../lib/dynamicLog');
+var dynamicLog = require('../../serverDebug/debugCounters');
 
 dynamicLog.connect(function(err) {
     if(err) return log.error(err.message);

@@ -4,15 +4,22 @@
 
 var log = require('../lib/log')(module);
 var async = require('async');
-var db = require('../lib/db');
+var db = require('./db');
 var rightsDB = require('../models_db/usersRolesRightsDB');
 
 var objectsDB = {};
 module.exports = objectsDB;
 
-// Using objectsNames instead of IDs, because in browser URL we use objects names for usability
-// and when we want to create objects list from browser URL, we known only objects names
-objectsDB.filterObjects = function(objectsNames, user, callback) {
+/** Getting a list of objects depending on previously selected objects and their interactions
+ *
+ * @param {Array} objectsNames -an array of object names. Object names are used instead of IDs because the object
+ * names are used in the browser url for convenience and when we want to create a list of objects from the browser url
+ * we only know the object names
+ * @param {string} user - username for check rights for objects
+ * @param {function(Error) | function(null, result: Array)} callback - return Error or an array with objects like
+ * [{name: ..., id: ..., description: ..., sortPosition:...}, {...}, ...]
+ */
+objectsDB.filterObjectsByInteractions = function(objectsNames, user, callback) {
 
     var typesFunc = {
         0: merge,
@@ -130,6 +137,7 @@ function getIncludedObjects(user, objectsNames, callback) {
                 callback();
             });
         }, function (err) {
+            stmt.finalize();
             if(err) return callback(err);
 
             rightsDB.checkObjectsIDs({
@@ -210,6 +218,7 @@ function getInteractions(parentObjectsIDs, callback) {
                 callback();
             });
         }, function (err) {
+            stmt.finalize();
             callback(err, interactions, interactionsArray, types, notInInteractions);
         });
     });
@@ -333,7 +342,7 @@ function merge(rows1, rows2) {
 //
 // searchStr = <searchPattern1><logical operator><searchPattern2><logical operator>,
 //      f.e. %object1%|object2&object3
-// for search perform SQL LIKE. It is case insensitive and you can use symbols "%" and "_":
+// for search perform SQL LIKE. It is case-insensitive, and you can use symbols "%" and "_":
 // '%' - any symbols
 // '_' - any symbol (only one)
 objectsDB.searchObjects = function(searchStr, user, callback){
@@ -358,17 +367,16 @@ objectsDB.searchObjects = function(searchStr, user, callback){
     });
 };
 
-/*
-Get objects information by objects names, using case insensitive compare objects names
-
-objectsNames: array of objects names
-user: user name
-callback(err, objects)
-objects: [{name: ..., id: ..., description: ..., sortPosition:..., color:..., disabled:....}, {...}, ...]
+/** Get full information about objects by object names using case-insensitive comparison of object names
+ *
+ * @param {Array} objectsNames - array of object names
+ * @param {string} user - username for check user rights for objects
+ * @param {function(Error)|function(null, objects: Array)} callback - return Error or array of
+  * objects like [{name: ..., id: ..., description: ..., sortPosition:..., color:..., disabled:....}, {...}, ...]
  */
 objectsDB.getObjectsByNames = function(objectsNames, user, callback) {
 
-    /* when count of objects are greater then 999 (SQLITE_MAX_VARIABLE_NUMBER), sqlite can\'t create a long query.
+    /* when count of objects are greater than 999 (SQLITE_MAX_VARIABLE_NUMBER), sqlite can\'t create a long query.
         separate objects array to small arrays and check objects rights by parts
        https://www.sqlite.org/limits.html
      */

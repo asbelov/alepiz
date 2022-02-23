@@ -4,6 +4,7 @@
     "active": "on",
     "separate": "",
     "runCollectorSeparately": "",
+    "runCollectorAsThread": "on",
     "parameters": {
         "time": {
             "description": "Schedule time (f.e. 13:25)"

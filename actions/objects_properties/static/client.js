@@ -148,7 +148,7 @@ var JQueryNamespace = (function ($) {
     function searchObjectsWithProperties() {
         var propName = $('#propertyName').val();
         if(!propName) return;
-        var searchResultElm = $('#searchResult'), bodyElm = $('body');;
+        var searchResultElm = $('#searchResult'), bodyElm = $('body');
 
         bodyElm.css("cursor", "wait");
         $.post(serverURL, {func: 'getObjectsForProperty', propertyName: propName}, function(rows) {

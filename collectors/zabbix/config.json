@@ -2,8 +2,9 @@
     "name": "Zabbix passive",
     "description": "The server receives data from zabbix agents. Use Zabbix active collector to reduce server load",
     "active": "",
-    "separate": "on",
+    "separate": "",
     "runCollectorSeparately": "",
+    "runCollectorAsThread": "on",
     "parameters": {
         "host": {
             "description": "Zabbix agent IP address",

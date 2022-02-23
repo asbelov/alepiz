@@ -8,7 +8,12 @@ var fs = require('fs');
 var async = require('async');
 var log = require('../lib/log')(module);
 var express = require('express');
-var conf = require('../lib/conf');
+var Conf = require('../lib/conf');
+const confCollectors = new Conf('config/collectors.json');
+const confCommunicationMedia = new Conf('config/communicationMedia.json');
+const confLaunchers = new Conf('config/launchers.json');
+const confActions = new Conf('config/actions.json');
+
 var help = require('../lib/help');
 
 var router = express.Router();
@@ -77,7 +82,7 @@ router.post('/:action', function(req, res) {
 router.get('/actions/:actionDir/help/*', function(req, res) {
     var actionID = req.params.actionDir;
     //console.log('!!!!!', actionID, helpDir, req.params);
-    var actionDir = path.join(__dirname, '..', conf.get('actions:dir'), actionID);
+    var actionDir = path.join(__dirname, '..', confActions.get('dir'), actionID);
 
     renderHelp(actionDir, req, res);
 });
@@ -85,7 +90,7 @@ router.get('/actions/:actionDir/help/*', function(req, res) {
 router.get('/collectors/:collectorDir/help/*', function(req, res) {
     var collectorID = req.params.collectorDir;
     //console.log('!!!!!', collectorID, helpDir, req.params);
-    var collectorDir = path.join(__dirname, '..', conf.get('collectors:dir'), collectorID);
+    var collectorDir = path.join(__dirname, '..', confCollectors.get('dir'), collectorID);
 
     renderHelp(collectorDir, req, res);
 });
@@ -93,7 +98,7 @@ router.get('/collectors/:collectorDir/help/*', function(req, res) {
 router.get('/launchers/:launcherDir/help/*', function(req, res) {
     var launcherID = req.params.launcherDir;
     //console.log('!!!!!', launcherID, helpDir, req.params);
-    var launcherDir = path.join(__dirname, '..', conf.get('launchers:dir'), launcherID);
+    var launcherDir = path.join(__dirname, '..', confLaunchers.get('dir'), launcherID);
 
     renderHelp(launcherDir, req, res);
 });
@@ -101,7 +106,7 @@ router.get('/launchers/:launcherDir/help/*', function(req, res) {
 router.get('/communication/:communicationDir/help/*', function(req, res) {
     var mediaID = req.params.communicationDir;
     //console.log('!!!!!', communicationDir, helpDir, req.params);
-    var communicationDir = path.join(__dirname, '..', conf.get('communicationMedia:dir'), mediaID);
+    var communicationDir = path.join(__dirname, '..', confCommunicationMedia.get('dir'), mediaID);
 
     renderHelp(communicationDir, req, res);
 });
@@ -110,10 +115,10 @@ function getTableOfContents(req, res, callback) {
 
     try {
         var commonDir = path.join(__dirname, '..', 'views');
-        var actionsDir = path.join(__dirname, '..', conf.get('actions:dir'));
-        var collectorsDir = path.join(__dirname, '..', conf.get('collectors:dir'));
-        var launchersDir = path.join(__dirname, '..', conf.get('launchers:dir'));
-        var communicationDir = path.join(__dirname, '..', conf.get('communicationMedia:dir'));
+        var actionsDir = path.join(__dirname, '..', confActions.get('dir'));
+        var collectorsDir = path.join(__dirname, '..', confCollectors.get('dir'));
+        var launchersDir = path.join(__dirname, '..', confLaunchers.get('dir'));
+        var communicationDir = path.join(__dirname, '..', confCommunicationMedia.get('dir'));
     } catch(e) {
         log.error('Can\'t make path to help section: ', e.message);
     }
@@ -130,9 +135,6 @@ function getTableOfContents(req, res, callback) {
                 function(callback) {
                     getContentsFromDir(commonDir, null, req, callback);
                 },
-                function(callback) {
-                    getContentsFromDir(commonDir, 'develop.pug', req, callback);
-                }
             ], callback);
         },
         lessons: function(callback) {
@@ -162,6 +164,55 @@ function getTableOfContents(req, res, callback) {
         },
         medias: function (callback) {
             getHelpTitles(communicationDir, req, callback);
+        },
+        settings: function (callback) {
+            async.series([
+                function(callback) {
+                    getContentsFromDir(commonDir, 'develop.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsCommon.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsSQLite.ru.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settings.dbBackup.ru.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsHistory.ru.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsCollectors.ru.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsServer.ru.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsDebugServer.ru.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsActions.ru.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsLaunchers.ru.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsCommunicationMedia.ru.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsTaskServer.ru.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsWebServer.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsObjectsFilter.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsLog.pug', req, callback);
+                },
+            ], callback);
         }
     }, function (err, result) {
         if(err) {

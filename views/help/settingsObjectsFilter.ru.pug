@@ -1,0 +1,250 @@
+//
+    Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Настройка фильтрации объектов objectFilters.json
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Настройка фильтрации объектов в меню FILTERS
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h2 Описание системы фильтрации
+                    p.
+                        Меню FILTERS позволяет устанавливать фильтры для объектов. При использовании фильтров
+                        объекты, не удовлетворяющие выбранным фильтрам, не будут отображаться в списке объектов.
+
+                        Фильтрация может быть произведена по последним собранным историческим данным, по свойствам
+                        объектов и по свойствам объектов верхнего уровня.
+                        Если для объекта не определено искомое свойство или не подключен требуемый
+                        счетчик для получения исторических данных, фильтрация к объекту не применяется и объект
+                        отображается в списке.
+                    p.
+                        Для настройки фильтрации объектов необходимо описать переменные и составить
+                        логическое выражение, определяющее работу фильтра.
+                        Настройка производится в файле conf/objectFilters.json
+                    h2 Определение переменных
+                    p.
+                        Переменные определяются в объекте variables в виде объектов. Переменная OBJECT_NAME является
+                        предопределенной переменной и принимает значение имени объекта.
+                    ul.collapsible
+                        li
+                            div.collapsible-header #[i.material-icons settings] Пример variables (нажмите для того, чтобы развернуть)
+                            div.collapsible-body
+                                pre.
+                                    "variables": {
+                                        "HOST_TYPE": {
+                                            "source": "property",
+                                            "name": "HOST_TYPE"
+                                        },
+                                        "SERVICE_TYPE": {
+                                            "source": "upLevelProperty",
+                                            "name": "SERVICE_TYPE"
+                                        },
+                                        "SERVICE_STATE": {
+                                            "source": "history",
+                                            "counter": "I: Service state",
+                                            "expiration": "10m",
+                                            "expiredValue": -1
+                                        },
+                                        "FREE_MEMORY": {
+                                            "source": "history",
+                                            "counter": "I: Free memory",
+                                            "expiration": "10m",
+                                            "expiredValue": -1
+                                        },
+                                        "IDLE_DISK_TIME": {
+                                            "source": "history",
+                                            "counter": "I: % Idle Disk Time",
+                                            "expiration": "10m",
+                                            "expiredValue": -1
+                                        }
+                                    },
+                    ul.browser-default
+                        li.
+                            Имя объекта является именем переменной.
+                        li.
+                            source - определяет способ получения данных для установки значения переменной:
+                        ul.browser-default
+                            li history - получать последние данные, собранные счетчиком
+                            li property - получать данные из свойства объекта
+                            li.
+                                upLevelProperty - получать данные из свойства родительского объекта
+                                (объекта верхнего уровня в иерархии объектов, анализируется один уровень вверх).
+                                Фильтрация будет применена к объектам, если хотя бы один объект верхнего уровня содержит
+                                искомое свойство.
+                        li.
+                            name - используется только для source "property" и "upLevelProperty". Указывает имя
+                            свойства для получения значения переменной. Свойство может быть только константой.
+                            Вычисляемые свойства не поддерживаются. Поиск имени свойства осуществляется без учета
+                            регистра символов.
+                        li.
+                            counter - используется для source "history". Устанавливает имя счетчика для получения данных
+                            для переменной. Переменная становится равна последнему значению, полученному от счетчика.
+                        li.
+                            expiration - используется для source "history". Необязательный параметр. Если данные от
+                            счетчика получены позже указанного времени, переменной будет присвоено значение, указанное в
+                            свойстве expiredValue или, если expiredValue не указано, переменная останется неопределенна.
+                            Для указания expiration можно использовать
+                            #[a(href="/help/lessonVariables.pug#bookmark2") предопределенные конверсии].
+                        li.
+                            expiredValue - используется для source "history". Необязательный параметр.
+                            Значение, которое присваивается переменной,
+                            если данные счетчика получены позже времени, указанного в expiration.
+                    h2 Определение фильтров
+                    p.
+                        Фильтры определяются в массиве filters в виде объектов:
+                    ul.collapsible
+                        li
+                            div.collapsible-header #[i.material-icons settings] Пример filters (нажмите для того, чтобы развернуть)
+                            div.collapsible-body
+                                pre.
+                                    "filters": [
+                                        {
+                                            "name": "Production servers",
+                                            "description": "Alepiz servers used for production",
+                                            "expression": "%:HOST_TYPE:% == 'prod' && testRE(%:OBJECT_NAME:%, '\\.alepiz\\.com$', 'i')"
+                                        },
+                                        {
+                                            "name": "Development servers",
+                                            "description": "Servers used for development and testing",
+                                            "expression": "%:HOST_TYPE:% == 'prod'"
+                                        },
+                                        {
+                                            "name": "Test services",
+                                            "description": "Services with a Test property",
+                                            "expression": "testRE(%:SERVICE_TYPE:%, 'T', 'gi')"
+                                        },
+                                        {
+                                            "name": "Reserve services",
+                                            "description": "Services with a Reserve property",
+                                            "expression": "testRE(%:SERVICE_TYPE:%, 'R', 'gi')"
+                                        },
+                                        {
+                                            "name": "Running services",
+                                            "description": "Services with service state = 0",
+                                            "expression": "%:SERVICE_STATE:% == 0 && %:SERVICE_STATE:% <= -1"
+                                        },
+                                        {
+                                            "name": "Stopped services",
+                                            "description": "Services with service state = 6",
+                                            "expression": "%:SERVICE_STATE:% == 6 && %:SERVICE_STATE:% <= -1"
+                                        },
+                                        {
+                                            "name": "Low free memory",
+                                            "description": "All productions servers with low free memory",
+                                            "expression": "%:FREE_MEMORY:% < 1Gb && %:HOST_TYPE:% == 'prod' && %:FREE_MEMORY:% != -1"
+                                        },
+                                        {
+                                            "name": "High disk memory",
+                                            "description": "All productions servers with high disk load",
+                                            "expression": "%:IDLE_DISK_TIME:% < 10 && %:HOST_TYPE:% == 'prod' && %:IDLE_DISK_TIME:% != -1"
+                                        }
+                                    ]
+                    ul.browser-default
+                        li name - имя фильтра, которое отображается в меня FILTERS
+                        li.
+                            description - описание фильтра, которое отображается в качестве подсказки при подведении
+                            указателя к имени фильтра
+                        li.
+                            expression - логическое выражение, которое определяет необходимость фильтрации объекта в
+                            списке объектов. Если значение выражения - true (или может быть приведено к true через
+                            преобразование типов), объект
+                            будет отображаться. Если false (или может быть приведено к false через преобразование типов),
+                            объект будет скрыт. Логическое выражение может использовать переменные, описанные в
+                            variables и предопределенную переменную OBJECT_NAME, значение которой является имя объекта.
+                            Логическое выражение формируется по правилам формирования выражений для счетчиков и
+                            описано в "#[a(href="/help/lessonVariables.pug#bookmark4") Примеры использования вычислений]".
+                    h2 Пример файла настроек conf/objectFilters.json
+                    ul.collapsible
+                        li
+                            div.collapsible-header.
+                                #[i.material-icons settings] Пример файла настроек фильтров conf/objectFilters.json
+                                (нажмите для того, чтобы развернуть)
+                            div.collapsible-body
+                                pre.
+                                    {
+                                        "variables": {
+                                            "HOST_TYPE": {
+                                                "source": "property",
+                                                "name": "HOST_TYPE"
+                                            },
+                                            "SERVICE_TYPE": {
+                                                "source": "upLevelProperty",
+                                                "name": "SERVICE_TYPE"
+                                            },
+                                            "SERVICE_STATE": {
+                                                "source": "history",
+                                                "counter": "I: Service state",
+                                                "expiration": "10m",
+                                                "expiredValue": -1
+                                            },
+                                            "FREE_MEMORY": {
+                                                "source": "history",
+                                                "counter": "I: Free memory",
+                                                "expiration": "10m",
+                                                "expiredValue": -1
+                                            },
+                                            "IDLE_DISK_TIME": {
+                                                "source": "history",
+                                                "counter": "I: % Idle Disk Time",
+                                                "expiration": "10m",
+                                                "expiredValue": -1
+                                            }
+                                        },
+                                        "filters": [
+                                            {
+                                                "name": "Production servers",
+                                                "description": "Alepiz servers used for production",
+                                                "expression": "%:HOST_TYPE:% == 'prod' && testRE(%:OBJECT_NAME:%, '\\.alepiz\\.com$', 'i')"
+                                            },
+                                            {
+                                                "name": "Development servers",
+                                                "description": "Servers used for development and testing",
+                                                "expression": "%:HOST_TYPE:% == 'prod'"
+                                            },
+                                            {
+                                                "name": "Test services",
+                                                "description": "Services with a Test property",
+                                                "expression": "testRE(%:SERVICE_TYPE:%, 'T', 'gi')"
+                                            },
+                                            {
+                                                "name": "Reserve services",
+                                                "description": "Services with a Reserve property",
+                                                "expression": "testRE(%:SERVICE_TYPE:%, 'R', 'gi')"
+                                            },
+                                            {
+                                                "name": "Running services",
+                                                "description": "Services with service state = 0",
+                                                "expression": "%:SERVICE_STATE:% == 0"
+                                            },
+                                            {
+                                                "name": "Stopped services",
+                                                "description": "Services with service state = 6",
+                                                "expression": "%:SERVICE_STATE:% == 6"
+                                            },
+                                            {
+                                                "name": "Low free memory",
+                                                "description": "All productions servers with low free memory",
+                                                "expression": "%:FREE_MEMORY:% < 1Gb && %:HOST_TYPE:% == 'prod'"
+                                            },
+                                            {
+                                                "name": "High disk memory",
+                                                "description": "All productions servers with high disk load",
+                                                "expression": "%:IDLE_DISK_TIME:% < 10 && %:HOST_TYPE:% == 'prod'"
+                                            }
+                                        ]
+                                    }
+
+
+
+

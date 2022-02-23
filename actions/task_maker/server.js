@@ -9,7 +9,7 @@ var log = require('../../lib/log')(module);
 var transactionsDB = require('../../models_db/transaction');
 var tasksDB = require('../../rightsWrappers/tasksDB');
 var tasks = require('../../lib/tasks');
-var taskServer = require('../../lib/taskServer');
+var taskServer = require('../../serverTask/taskServerClient');
 var async = require('async');
 
 
@@ -361,7 +361,7 @@ function sendMessage(username, taskID, workflows, action, err, callback) {
 
     if(action.indexOf(',') !== -1) action = 'Move from ' + action.split(/ *, */).join(' to ');
     action = action.toLowerCase();
-    async.each(workflows, function (workflow, callback) {
+    async.eachSeries(workflows, function (workflow, callback) {
         if(typeof workflow.action !== 'string') return callback();
         if(workflow.action.indexOf(',') !== -1) workflow.action = 'Move from ' + workflow.action.split(/ *, */).join(' to ');
         if(workflow.action.toLowerCase() === action) {

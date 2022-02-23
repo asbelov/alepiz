@@ -29,8 +29,18 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
             var domain = parameters.action.domain || location.hostname.replace(/^[^.]+/, '');
             var prefix = parameters.action.prefix || '';
             var suffix = parameters.action.suffix || '';
+            var regExp = parameters.action.regExp;
+            var regExpReplace = parameters.action.regExpReplace;
             var port = parameters.action.port || (protocol === 'https' ? 443 : 80);
             var hostname = parameters.objects[0].name.toLowerCase()
+            try {
+                var hostnameRE = regExp ? new RegExp(regExp, 'gi') : '';
+            } catch (err) {
+                console.log('regExp error:', err.message);
+            }
+            hostname = hostnameRE.test(hostname) ? hostname.replace(hostnameRE, regExpReplace) : hostname;
+            //console.log('hostname:', hostname);
+
             var url = protocol + '://' + prefix + hostname + suffix + domain + (port ? ':' + port : '');
 
             var link = document.createElement('a');

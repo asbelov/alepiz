@@ -64,10 +64,14 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                         div.input-field.col.s12.m6.l4
                             input(type='text' data-tooltip='Short name of collector for any drop down selectors')#name.tooltipped
                             label(for='name') Collector name
+                        p(data-tooltip='Start the collector as a thread (for active and separate collectors)').col.s12.m2.l2.tooltipped
+                            label
+                                input(type='checkbox' disabled)#runCollectorAsThread
+                                span Start the collector as a separate thread
                         p(data-tooltip='Prevent running multiple collectors for defined object and counter at one time').col.s12.m2.l2.tooltipped
                             label
                                 input(type='checkbox')#runCollectorSeparately
-                                span Run collector separately
+                                span Start collector separately
                         p(data-tooltip='Collector will be return data without requests. It will be running in separate process').col.s12.m2.l2.tooltipped
                             label
                                 input(type='checkbox')#activeCollector

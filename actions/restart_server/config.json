@@ -4,7 +4,11 @@
   "homePage": "index",
   "execMethod": "post",
   "launcher": "nodeModule",
-  "launcherPrms": { "javaScript": "server.js" },
+    "startAjaxAsThread": true,
+    "launcherPrms": {
+        "javaScript": "server.js",
+        "startAsThread": true
+    },
   "staticDir": "static",
   "timeout": 60,
   "showWhenNoObjectsSelected": true,

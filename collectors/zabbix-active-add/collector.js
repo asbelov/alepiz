@@ -3,7 +3,7 @@
  */
 
 
-var collector = require('../zabbix-active/collector');
+const collector = require('../zabbix-active/lib/zabbixAgentActive');
 
 collector.init(10056);
 

@@ -3,6 +3,7 @@
   "description": "View log files",
   "homePage": "index",
   "ajaxServer": "ajax.js",
+    "startAjaxAsThread": true,
   "staticDir": "static",
   "onChangeObjectMenuEvent": "fullreload",
   "timeout": 60,

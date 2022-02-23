@@ -4,7 +4,7 @@
 
 var async = require('async');
 var log = require('../lib/log')(module);
-var db = require('../lib/db');
+var db = require('./db');
 
 var objectsDB = {};
 module.exports = objectsDB;
@@ -69,7 +69,7 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled, c
 
     // Prepare statement for inserting new objects into a database
     var stmt = db.prepare('INSERT INTO objects (name, description, sortPosition, disabled, created) VALUES ' +
-        '($name,$description,$sortPosition, $disabled, $created)', function(err){
+        '($name,$description,$sortPosition, $disabled, $created)', function(err) {
         if(err) return callback(err);
 
         // array with IDs of a new objects, which inserting
@@ -82,10 +82,10 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled, c
                 $sortPosition: order,
                 $disabled: disabled,
                 $created: Date.now(),
-            }, function(err){
+            }, function (err, info) {
                 if(err) return callback(err);
                 // push new object ID into array
-                newObjectsIDs.push(this.lastID);
+                newObjectsIDs.push(this.lastID === undefined ? info.lastInsertRowid : this.lastID);
                 callback();
             });
         }, function(err){
@@ -159,7 +159,7 @@ objectsDB.insertInteractions = function(interactions, callback){
 objectsDB.deleteInteractions = function(interactions, callback){
     if(!interactions.length) return callback();
 
-    var stmt = db.prepare('DELETE FROM interactions WHERE objectID1=? AND objectID2=? AND type=?', function(err){
+    var stmt = db.prepare('DELETE FROM interactions WHERE objectID1=? AND objectID2=? AND type=?', function(err) {
         if(err) return callback(err);
 
         // eachSeries used for possible transaction rollback if error occurred
@@ -192,7 +192,7 @@ objectsDB.getObjectsByIDs = function(IDs, callback) {
     getObjectsByX(IDs, 'id=', callback);
 };
 
-    objectsDB.getObjectsByNames = function(names, callback) {
+objectsDB.getObjectsByNames = function(names, callback) {
     // SELECT * FROM objects WHERE name=?
     getObjectsByX(names, 'name=', callback);
 };
@@ -206,7 +206,6 @@ function getObjectsByX(IDs, condition, callback) {
     var rows = [];
     var stmt = db.prepare('SELECT * FROM objects WHERE ' + condition + '? ORDER BY name', function(err) {
         if(err) return callback(err);
-
         async.each(IDs, function(ID, callback) {
             stmt.all(ID, function(err, subRows) {
                 if(err) return callback(err);
@@ -221,18 +220,21 @@ function getObjectsByX(IDs, condition, callback) {
     })
 }
 
-// get interactions for specified objects IDs
-// Check user rights before using it functions
-// IDs - array of objects IDs
-// callback(err, interactions), where
-// interactions - [{
-//                  name1: <objName1>, description1: <objDescription1>, id1: <id1>,
-//                  name2: <objName2>, description2: <objDescription2>, id2: <id2>,
-//                  type: <interactionType1>},
-//                  {...},...]
-// interaction types: 0 - include; 1 - intersect, 2 - exclude
-// function can used for less then 999 objects, according  SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999
-// https://www.sqlite.org/limits.html
+/** Get interactions for specified objects IDs. Check user rights before using it functions
+ * @param {Array} IDs - array of objects IDs
+ * @param {function(Error)|function(null, Array)} callback - callback(err, interactions)
+ *
+ * @example
+ * // interactions returned by callback(err, interactions)
+ * interactions - [{
+ *      name1: <objName1>, description1: <objDescription1>, id1: <id1>,
+ *      name2: <objName2>, description2: <objDescription2>, id2: <id2>,
+ *      type: <interactionType1>},
+ *      {...},...]
+ * interaction types: 0 - include; 1 - intersect, 2 - exclude
+ * function can be used for less than 999 objects, according  SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999
+ * https://www.sqlite.org/limits.html
+ */
 objectsDB.getInteractions = function(IDs, callback){
     var questionStr = IDs.map(function(){return '?'}).join(',');
 

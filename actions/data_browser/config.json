@@ -3,6 +3,7 @@
   "description": "Browse data and draw graph from history and trend",
   "homePage": "index",
   "ajaxServer": "ajax.js",
+  "startAjaxAsThread": true,
   "staticDir": "static",
   "showWhenNoObjectsSelected": true,
   "onChangeObjectMenuEvent": "fullreload",

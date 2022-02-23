@@ -2,11 +2,11 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
+var log = require('../lib/log')(module);
 var objectsDB = require('../models_db/objectsDB');
 var rightsDB = require('../models_db/usersRolesRightsDB');
 var prepareUser = require('../lib/utils/prepareUser');
 var checkIDs = require('../lib/utils/checkIDs');
-var log = require('../lib/log')(module);
 
 var rightsWrapper = {};
 module.exports = rightsWrapper;
@@ -78,7 +78,7 @@ rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOr
             var existingObjectsNames = row.map(function (obj) {
                 return obj.name
             }).join(',');
-            return callback(new Error('Some objects names already exists in database: ' + existingObjectsNames));
+            return callback(new Error('Some object names already exists in database: ' + existingObjectsNames));
         }
 
         // add a new objects, its description and order
@@ -205,12 +205,11 @@ rightsWrapper.deleteInteractions = function(user, interactionsForDeleting, callb
     });
 };
 
-/*
- get objects information by object ID
- user - user name
- IDs - array of objects IDs
- callback(err, objects)
- objects = [{id: <id>, name: <objectName>, description: <objectDescription>, sortPosition: <objectOrder>, color:.., disabled:..., color:...}, {...},...]
+/** Get objects information by object ID
+ * @param {string} user - username for check rights to objects
+ * @param {Array|string|number} initIDs - array of objects IDs or comma separated string with IDs or single ID
+ * @param {function(Error)|function(null, Array)} callback - callback(err, objects) return array of rows with result of SELECT * FROM objects WHERE id=?
+ * like [{id: <id>, name: <objectName>, description: <objectDescription>, sortPosition: <objectOrder>, color:..., disabled:..., color:...}, {...},...]
  */
 rightsWrapper.getObjectsByIDs = function(user, initIDs, callback) {
 

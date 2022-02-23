@@ -1,7 +1,7 @@
-#define   Version    "0.0.11"
+#define   Version    "0.0.12"
 #define   AppName    "ALEPIZ"
 #define   AppId     "{EABD44EE-0DAD-4337-ADC6-A37A930BADC7}"
-#define   AppCopyright  "Copyright (c) 2020 Alexander Belov <asbel@alepiz.com>"
+#define   AppCopyright  "Copyright (c) 2022 Alexander Belov <asbel@alepiz.com>"
 #define	  InstallerVersion	"1.0"
 
 [Setup]
@@ -25,7 +25,7 @@ SolidCompression=yes
 PrivilegesRequired=admin
 
 [Files]
-Source: "C:\Users\asbel\WebstormProjects\alepiz\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: ".*, config\*, logs\*, DB\*, private\*, tests, *.zip, *.7z, mk7z*.bat, alepizSetup*.exe, *.iss, *.~is, bin\install_build_tools.cmd, actions\qmonitor, actions\procdump, actions\ARQA*, collectors\qmz"
+Source: "C:\Users\asbel\WebstormProjects\alepiz\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: ".*, config\*, logs\*, DB\*, private\*, tests, *.zip, *.7z, copyLog.cmd, mk7z*.bat, alepizSetup*.exe, *.iss, *.~is, bin\install_build_tools.cmd, actions\qmonitor, actions\procdump, actions\ARQA*, collectors\qmz"
 Source: "C:\Users\asbel\WebstormProjects\alepiz\.distr\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 

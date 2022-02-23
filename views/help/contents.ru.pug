@@ -38,3 +38,6 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         li: h3 Средства связи (Communication medias)
                         each item in medias
                             li(style="padding-left: 2em;"): h6: a(href='/communication/' + item.subDir + '/' + item.helpDir + '/' + item.file)= item.title
+                        li: h3 Описание архитектуры и настройки
+                        each item in settings
+                            li(style="padding-left: 2em;"): h6: a(href='/' + item.helpDir + '/' + item.file)= item.title

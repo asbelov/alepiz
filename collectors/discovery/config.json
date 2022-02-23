@@ -4,6 +4,7 @@
     "active": "on",
     "separate": "",
     "runCollectorSeparately": "on",
+    "runCollectorAsThread": "on",
     "parameters": {
         "ranges": {
             "description": "IP addresses ranges, separated by comma",

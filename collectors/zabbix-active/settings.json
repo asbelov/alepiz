@@ -1,0 +1,4 @@
+{
+    "logZabbixAgentErrors": true,
+    "logZabbixAgentErrorObtainPerformanceInformation": false
+}

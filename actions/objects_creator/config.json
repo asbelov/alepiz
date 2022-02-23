@@ -4,12 +4,14 @@
     "homePage": "index",
     "execMethod": "post",
     "launcher": "nodeModule",
+    "startAjaxAsThread": true,
     "launcherPrms": {
-        "javaScript": "server.js"
+        "javaScript": "server.js",
+        "startAsThread": true
     },
     "staticDir": "static",
     "onChangeObjectMenuEvent": "callback:onChangeObjects",
-    "timeout": 60,
+    "timeout": 180,
     "showWhenNoObjectsSelected": true,
     "outputFormat": "text",
     "icon": "library_add",

@@ -92,10 +92,14 @@ var JQueryNamespace = (function ($) {
 
     $('#activeCollector').click(function () {
         $('#separateCollector').prop("checked", false);
+        if($(this).is(':checked')) $('#runCollectorAsThread').prop("disabled", false).prop("checked", true);
+        else $('#runCollectorAsThread').prop("disabled", true).prop("checked", false);
     });
 
       $('#separateCollector').click(function () {
           $('#activeCollector').prop("checked", false);
+          if($(this).is(':checked')) $('#runCollectorAsThread').prop("disabled", false).prop("checked", true);
+          else $('#runCollectorAsThread').prop("disabled", true).prop("checked", false);
       });
 
       M.FormSelect.init(document.querySelectorAll('select'), {});
@@ -222,11 +226,20 @@ var JQueryNamespace = (function ($) {
               nameElm.val(collector.name);
               descriptionElm.val(collector.description);
 
-              if(collector.active) $('#activeCollector').prop("checked", true);
+              if(collector.active) {
+                  $('#activeCollector').prop("checked", true);
+                  $('#runCollectorAsThread').prop("disabled", false);
+              }
               else $('#activeCollector').prop("checked", false);
 
-              if(collector.separate) $('#separateCollector').prop("checked", true);
+              if(collector.separate) {
+                  $('#separateCollector').prop("checked", true);
+                  $('#runCollectorAsThread').prop("disabled", false);
+              }
               else $('#separateCollector').prop("checked", false);
+
+              if(collector.runCollectorAsThread) $('#runCollectorAsThread').prop("checked", true).prop("disabled", false);
+              else $('#runCollectorAsThread').prop("checked", false);
 
               if(collector.runCollectorSeparately) $('#runCollectorSeparately').prop("checked", true);
               else $('#runCollectorSeparately').prop("checked", false);

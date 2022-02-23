@@ -10,7 +10,7 @@ var async = require('async');
 var rightsWrapper = require('../../rightsWrappers/objectsDB');
 var objectsDB = require('../../models_db/objectsDB');
 var log = require('../../lib/log')(module);
-var server = require('../../lib/server');
+var server = require('../../server/counterProcessor');
 var history = require('../../models_history/history');
 var ajax = require('./ajax');
 
@@ -20,7 +20,7 @@ module.exports = function(args, callback) {
     if(!args.o) return callback(new Error('Objects are not selected'));
 
     if(args.deleteWithChildren) {
-        var getObjectsForRemoving = function(callback) {
+        var getObjectsForRemoving = function(args, callback) {
             ajax({
                 func: 'getChildObjects',
                 objects: args.o, // send stringified object
@@ -29,7 +29,7 @@ module.exports = function(args, callback) {
             }, callback);
         }
     } else {
-        getObjectsForRemoving = function(callback) {
+        getObjectsForRemoving = function(args, callback) {
             try {
                 var objects = JSON.parse(args.o);
             } catch(err) {
@@ -39,7 +39,7 @@ module.exports = function(args, callback) {
         };
     }
 
-    getObjectsForRemoving(function(err, objects) {
+    getObjectsForRemoving(args, function(err, objects) {
         if(err) return callback(err);
 
         log.info('Objects for removing: ', objects);
@@ -70,23 +70,26 @@ module.exports = function(args, callback) {
                 description: 'Objects IDs ' + objectsIDs.join(',') + ' was removed from database by user ' + args.username
             });
 
-            // remove objects without checking rights for speed up. We do it above at rightsWrapper.getObjectsCountersIDs()
-            async.parallel([function(callback) {
-                log.info('Sending message to history for removing OCIDs: ', OCIDs);
-                history.del(OCIDs, function(err) {
-                    if(err) log.error(err.message);
-                });
+            history.connect('actionObjectRemover', function() {
 
-                // Don't wait for the records to be removed from history.
-                // This can last a long time when the housekeeper is working.
-                callback();
-            }, function(callback) {
-                log.info('Removing objects from database: ', objectsIDs);
-                objectsDB.deleteObjects(objectsIDs, function(err) {
-                    if(err) log.error(err.message);
+                // remove objects without checking rights for speed up. We do it above at rightsWrapper.getObjectsCountersIDs()
+                async.parallel([function (callback) {
+                    log.info('Sending message to history for removing OCIDs: ', OCIDs);
+                    history.del(OCIDs, function (err) {
+                        if (err) log.error(err.message);
+                    });
+
+                    // Don't wait for the records to be removed from history.
+                    // This can last a long time when the housekeeper is working.
                     callback();
-                });
-            }], callback);
+                }, function (callback) {
+                    log.info('Removing objects from database: ', objectsIDs);
+                    objectsDB.deleteObjects(objectsIDs, function (err) {
+                        if (err) log.error(err.message);
+                        callback();
+                    });
+                }], callback);
+            });
         })
     });
 };

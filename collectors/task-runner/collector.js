@@ -1,8 +1,8 @@
 //var log = require('../../lib/log')(module);
 var tasks = require('../../lib/tasks');
 
-var conf = require('../../lib/conf');
-conf.file('config/conf.json');
+var Conf = require('../../lib/conf');
+const conf = new Conf('config/common.json');
 var systemUser = conf.get('systemUser') || 'system';
 
 var collector = {};

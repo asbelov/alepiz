@@ -266,6 +266,9 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                 action: {
                                     actionID: "action_editor",
                                     ajaxServer: "ajax.js",
+                                    runActionInline: false,
+                                    startAjaxAsThread: true,
+                                    notInQueue: false,
                                     onChangeObjectMenuEvent: "callback:onChangeObjects",
                                     callbackBeforeExec: "callbackBeforeExec",
                                     callbackAfterExec: "callbackAfterExec",
@@ -275,7 +278,8 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                     icon: "directions_run",
                                     launcher: "nodeModule",
                                     launcherPrms: {
-                                            javaScript: "server.js"
+                                            javaScript: "server.js",
+                                            startAsThread: true
                                         },
                                     link: "/actions/action_editor_158947905273636",
                                     name: "Action editor",
@@ -483,6 +487,23 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         li.
                             ajaxServer - файл, в котором находится код серверной части действия, отвечающего за
                             формирование пользовательского интерфейса.
+                        li.
+                            runActionInline - (true|false) запустить действие как часть кода action server или
+                            в отдельном потоке обработчика действий (runAction).
+                            Используется, если действие не может быть запущено в потоке из-за ограничений используемых
+                            в нем модулей. По умолчанию false.
+                        li.
+                            startAjaxAsThread - (true|false) - запустить код ajaxServer в выделенном потоке или внутри
+                            потока обработчика действий (runAction). По умолчанию false.
+                        li.
+                            notInQueue - (true|false) - запускать действие вне очереди. Все действия запускаются в
+                            порядке очереди для того, чтобы не нарушить логику задач, которые состоят из нескольких
+                            действий и подразумевают их последовательного выполнения. Например, сначала необходимо
+                            создать объект, а потом добавить ему определенные свойства. Если для действия
+                            этот параметр установлен в true& действие не будет ждать выполнения пердыдущих действий и
+                            будет запускаться немедленно. Это позволит увеличить скорость работы интерфейса для
+                            действия. Например, это может иметь смысл для отправки событий из dashboard.
+                            По умолчанию false.
                         li.
                             staticDir - каталог, в котором расположены статические файлы, используемые действием.
                             Обычно это скрипт для формирования пользовательского интерфейса, который запускается

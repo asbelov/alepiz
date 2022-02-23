@@ -5,15 +5,16 @@
 var log = require('../../lib/log')(module);
 var path = require('path');
 var async = require('async');
-var eventDisabled = require('../../collectors/event-generator/collector').isEventDisabled; // only for isEventsDisabled()
 var objectsPropertiesDB = require('../../rightsWrappers/objectsPropertiesDB');
 var countersDB = require('../../models_db/countersDB');
 var prepareUser = require('../../lib/utils/prepareUser');
 var usersDB = require('../../models_db/usersDB');
 var actionsRights = require('../../rightsWrappers/actions');
-var sqlite = require('../../lib/sqlite');
-var conf = require('../../lib/conf');
-conf.file('config/conf.json');
+var Database = require('better-sqlite3');
+const Conf = require('../../lib/conf');
+const confCollectors = new Conf('config/collectors.json');
+const confOptionsEventGenerator = new Conf(confCollectors.get('dir') + '/event-generator/settings.json');
+var eventDisabled = require('../../' + confCollectors.get('dir') + '/event-generator/lib/eventGenerator').isEventDisabled; // only for isEventsDisabled()
 var checkIDs = require('../../lib/utils/checkIDs');
 
 var db;
@@ -104,20 +105,16 @@ function ajax(args, callback) {
 
 function initDB(args, callback) {
     var dbPath = path.join(__dirname, '..', '..',
-        conf.get('collectors:event-generator:dbPath'),
-        conf.get('collectors:event-generator:dbFile'));
+        confOptionsEventGenerator.get('dbPath'),
+        confOptionsEventGenerator.get('dbFile'));
 
-    sqlite.init(dbPath, function (err, _db) {
-        if (err) return callback(new Error('Can\'t initialise event database ' + dbPath + ': ' + err.message));
-
-        _db.exec('PRAGMA journal_mode = WAL', function (err) {
-            if (err) return callback(new Error('Can\'t set journal mode to WAL: ' + err.message));
-
-            db = _db;
-            log.info('Initializing events system database is completed');
-            return ajax(args, callback);
-        });
-    });
+    try {
+        db = new Database(dbPath, {readonly: true, fileMustExist: true});
+    } catch (err) {
+        return callback(new Error('Can\'t initialise event database ' + dbPath + ': ' + err.message));
+    }
+    log.info('Initializing events system database is completed');
+    return ajax(args, callback);
 }
 
 function checkActionsRights(user, actions, callback) {
@@ -146,7 +143,8 @@ function getEvents (args, maxImportance, callback) {
         var queryParameters = [maxImportance];
         Array.prototype.push.apply(queryParameters, objectsIDs);
 
-        db.all('\
+        try {
+            var events = db.prepare('\
 SELECT events.id AS id, events.OCID AS OCID, events.parentOCID AS parentOCID, events.objectName AS objectName, \
 events.counterID AS counterID, events.counterName AS counterName, events.data AS eventDescription, \
 events.timestamp AS timestamp, events.importance AS importance, events.commentID AS commentID, \
@@ -155,56 +153,59 @@ disabledEvents.disableUntil AS disableUntil, disabledEvents.intervals AS disable
 FROM events \
 LEFT JOIN disabledEvents ON disabledEvents.eventID=events.id \
 WHERE (' + condition.join(' OR ') + ') AND events.importance <= ? ' +
-            (objectsIDs.length ? 'AND events.objectID IN (' + (new Array(objectsIDs.length)).fill('?').join(',') + ')' : '') + ' \
-ORDER BY disabledEvents.eventID DESC, events.startTime DESC', queryParameters, function (err, events) {
-            if (err) return callback(new Error('Can\'t get data from events: ' + err.message));
+(objectsIDs.length ? 'AND events.objectID IN (' + (new Array(objectsIDs.length)).fill('?').join(',') + ')' : '') + ' \
+ORDER BY disabledEvents.eventID DESC, events.startTime DESC').all(queryParameters);
+        } catch (err) {
+            return callback(new Error('Can\'t get data from events: ' + err.message));
+        }
 
-            db.all('SELECT id, OCID, counterID FROM hints', function (err, rows) {
-                if (err) return callback(new Error('Can\'t get hints: ' + err.message));
+        try {
+            var rows = db.prepare('SELECT id, OCID, counterID FROM hints').all();
+        } catch (err) {
+            return callback(new Error('Can\'t get hints: ' + err.message));
+        }
 
-                var hintsOCID = {}, hintsCounterID = {};
-                rows.forEach(function (row) {
-                    if (row.OCID) hintsOCID[row.OCID] = row;
-                    if (row.counterID) hintsCounterID[row.counterID] = row;
-                });
+        var hintsOCID = {}, hintsCounterID = {};
+        rows.forEach(function (row) {
+            if (row.OCID) hintsOCID[row.OCID] = row;
+            if (row.counterID) hintsCounterID[row.counterID] = row;
+        });
 
-                var disabledOCID = {}, history = [], current = [], now = Date.now();
+        var disabledOCID = {}, history = [], current = [], now = Date.now();
 
-                //log.info('Events list:');
-                events.forEach(function (event) {
-                    // add hintID to events
-                    if (hintsOCID[event.OCID]) event.hintID = hintsOCID[event.OCID].id;
-                    else if (hintsCounterID[event.counterID]) event.hintID = hintsCounterID[event.counterID].id;
+        //log.info('Events list:');
+        events.forEach(function (event) {
+            // add hintID to events
+            if (hintsOCID[event.OCID]) event.hintID = hintsOCID[event.OCID].id;
+            else if (hintsCounterID[event.counterID]) event.hintID = hintsCounterID[event.counterID].id;
 
-                    // make list of disabled events
-                    // events are sorted by disabledEvents.eventID and at first of the events list we have a disabled events
-                    if (event.disableUntil) disabledOCID[event.OCID] = event;
+            // make list of disabled events
+            // events are sorted by disabledEvents.eventID and at first of the events list we have a disabled events
+            if (event.disableUntil) disabledOCID[event.OCID] = event;
 
-                    // add disabled event information
-                    if (disabledOCID[event.OCID]) {
-                        event.disableUntil = disabledOCID[event.OCID].disableUntil;
-                        event.disableIntervals = disabledOCID[event.OCID].disableIntervals;
-                        event.disableUser = disabledOCID[event.OCID].disableUser;
-                    }
+            // add disabled event information
+            if (disabledOCID[event.OCID]) {
+                event.disableUntil = disabledOCID[event.OCID].disableUntil;
+                event.disableIntervals = disabledOCID[event.OCID].disableIntervals;
+                event.disableUser = disabledOCID[event.OCID].disableUser;
+            }
 
-                    //log.info('event all: ', event.objectName, ':', event.counterName, ':', event);
-                    // sort events
-                    if (!event.disableUntil ||
-                        event.disableUntil < now ||
-                        !eventDisabled(event.disableIntervals, event.startTime, event.endTime)) {
+            //log.info('event all: ', event.objectName, ':', event.counterName, ':', event);
+            // sort events
+            if (!event.disableUntil ||
+                event.disableUntil < now ||
+                !eventDisabled(event.disableIntervals, event.startTime, event.endTime)) {
 
-                        //log.info('event prn: ', event.objectName, ':', event.counterName, ':', event);
-                        if (args.getDataForCurrentEvents && event.endTime === null ) current.push(event);
-                        if (args.getDataForHistoryEvents && !event.commentID) history.push(event);
-                    }
-                });
+                //log.info('event prn: ', event.objectName, ':', event.counterName, ':', event);
+                if (args.getDataForCurrentEvents && event.endTime === null ) current.push(event);
+                if (args.getDataForHistoryEvents && !event.commentID) history.push(event);
+            }
+        });
 
-                callback(null, {
-                    disabled: args.getDataForDisabledEvents ? Object.values(disabledOCID).reverse() : [],
-                    current: current,
-                    history: history
-                });
-            });
+        callback(null, {
+            disabled: args.getDataForDisabledEvents ? Object.values(disabledOCID).reverse() : [],
+            current: current,
+            history: history
         });
     });
 }
@@ -214,7 +215,8 @@ function getHistoryForOCID (args, maxImportance, callback) {
         if (!args.OCID || !OCID || !OCID.length) return callback(new Error('OCID is not set for getting history'));
         else if (err) return callback(err);
 
-        db.all('\
+        try {
+            var events = db.prepare('\
 SELECT events.id AS id, events.OCID AS OCID, events.parentOCID AS parentOCID, events.objectName AS objectName, \
 events.counterID AS counterID, events.counterName AS counterName, events.data AS eventDescription, \
 events.timestamp AS timestamp, events.importance AS importance, events.commentID AS commentID, \
@@ -223,11 +225,12 @@ disabledEvents.disableUntil AS disableUntil, disabledEvents.intervals AS disable
 FROM events \
 LEFT JOIN disabledEvents ON disabledEvents.eventID=events.id \
 WHERE events.OCID = ? AND events.importance <= ? \
-ORDER BY disabledEvents.eventID DESC, events.startTime DESC LIMIT 100', [OCID[0], maxImportance], function (err, events) {
-            if (err) return callback(new Error('Can\'t get history data for OCID ' + OCID[0] + ' and importance ' +
+ORDER BY disabledEvents.eventID DESC, events.startTime DESC LIMIT 100').all([OCID[0], maxImportance]);
+        } catch (err) {
+            return callback(new Error('Can\'t get history data for OCID ' + OCID[0] + ' and importance ' +
                 maxImportance + ' from events: ' + err.message));
-            callback(null, events);
-        });
+        }
+        callback(null, events);
     });
 }
 
@@ -252,18 +255,19 @@ function getDashboardDataForHistoryCommentedEvents (args, maxImportance, callbac
         if (objectsIDs && objectsIDs.length) Array.prototype.push.apply(queryParameters, objectsIDs);
         else objectsIDs = null;
 
-        db.all('\
+        try {
+            var rows = db.prepare('\
 SELECT comments.id AS id, comments.timestamp AS timestamp, comments.user AS user, comments.recipients AS recipients, \
 comments.subject AS subject, comments.comment AS comment, count(events.id) AS eventsCount, min(events.importance) AS importance \
 FROM comments \
 JOIN events ON comments.id=events.commentID \
 WHERE comments.timestamp BETWEEN ? AND ? AND events.importance <= ? '
-            + (objectsIDs ? ' AND events.objectID IN (' + (new Array(objectsIDs.length)).fill('?').join(',') + ') ' : '') +
-            'GROUP by events.commentID ORDER BY comments.timestamp DESC', queryParameters, function (err, rows) {
-            if (err) return callback(new Error('Can\'t get data for dashboard commented history events: ' + err.message));
-
-            callback(null, rows);
-        });
++ (objectsIDs ? ' AND events.objectID IN (' + (new Array(objectsIDs.length)).fill('?').join(',') + ') ' : '') +
+'GROUP by events.commentID ORDER BY comments.timestamp DESC').all(queryParameters);
+        } catch (err) {
+            return callback(new Error('Can\'t get data for dashboard commented history events: ' + err.message));
+        }
+        callback(null, rows);
     });
 }
 
@@ -280,7 +284,8 @@ function getDashboardDataForCommentedEventsList (initObjectsIDs, commentID, maxI
             if(objectsIDs && objectsIDs.length) Array.prototype.push.apply(queryParameters, objectsIDs);
             else objectsIDs = null;
 
-            db.all('\
+            try {
+                var rows = db.prepare('\
 SELECT events.id AS id, events.OCID AS OCID, events.parentOCID AS parentOCID, events.objectName AS objectName, \
 events.counterID AS counterID, events.counterName AS counterName, events.data AS eventDescription, events.timestamp AS timestamp, \
 events.importance AS importance, events.startTime AS startTime, events.endTime AS endTime, \
@@ -291,13 +296,13 @@ LEFT JOIN hints ON hints.id = (SELECT id FROM hints \
     ((SELECT id FROM hints WHERE OCID IS NOT NULL AND events.OCID=OCID) IS NULL AND \
     counterID IS NOT NULL AND events.counterID=counterID) ORDER BY timestamp DESC LIMIT 1) \
 WHERE events.commentID = ? AND events.importance <= ? ' +
-                /*'AND events.startTime > ?' + */
-                (objectsIDs ? 'AND events.objectID IN (' + (new Array(objectsIDs.length)).fill('?').join(',') + ') ' : '') +
-                'ORDER BY events.startTime DESC LIMIT 1000', queryParameters, function(err, rows) {
-
-                if(err) return callback(new Error('Can\'t get data for commented events list: ' + err.message));
-                callback(null, rows);
-            });
+/*'AND events.startTime > ?' + */
+(objectsIDs ? 'AND events.objectID IN (' + (new Array(objectsIDs.length)).fill('?').join(',') + ') ' : '') +
+'ORDER BY events.startTime DESC LIMIT 1000').all(queryParameters);
+            } catch(err) {
+                return callback(new Error('Can\'t get data for commented events list: ' + err.message));
+            }
+            callback(null, rows);
         });
     });
 }
@@ -310,22 +315,26 @@ function getCommentForEvent(IDs, callback) {
         var OCID = IDs[1];
         if(!commentID) return callback();
 
-        db.get('SELECT * FROM comments WHERE id=?', commentID, function(err, comment) {
-            if(err) return callback(new Error('Can\'t get comment with ID ' + commentID + ': ' + err.message));
+        try {
+            var comment = db.prepare('SELECT * FROM comments WHERE id=?').get(commentID);
+        } catch(err) {
+            return callback(new Error('Can\'t get comment with ID ' + commentID + ': ' + err.message));
+        }
+        if(!OCID || !comment) return callback(null, comment);
 
-            if(!OCID) return callback(null, comment);
+        try {
+            var disabled = db.prepare('SELECT * FROM disabledEvents WHERE OCID=?').get(OCID);
+        } catch(err) {
+            return callback(new Error('Can\'t get disabled event with OCID ' + OCID + ': ' + err.message));
+        }
+        if(!disabled) return callback(null, comment);
 
-            db.get('SELECT * FROM disabledEvents WHERE OCID=?', OCID, function(err, disabled) {
-                if(err) return callback(new Error('Can\'t get disabled event with OCID ' + OCID + ': ' + err.message));
-
-                for(var key in disabled) {
-                    if(comment[key] && comment[key] !== disabled[key] && key !== 'timestamp') {
-                        comment[key] = 'comment: ' + comment[key] + ', disabled: ' + disabled[key];
-                    } else comment[key] = disabled[key];
-                }
-                callback(null, comment);
-            });
-        });
+        for(var key in disabled) {
+            if(comment[key] && comment[key] !== disabled[key] && key !== 'timestamp') {
+                comment[key] = 'comment: ' + comment[key] + ', disabled: ' + disabled[key];
+            } else comment[key] = disabled[key];
+        }
+        callback(null, comment);
     });
 }
 
@@ -337,9 +346,11 @@ function getHintForEvent(ID, callback) {
         if(!hintID) return callback();
 
         // get last hint
-        db.get('SELECT * FROM hints WHERE id=? ORDER BY timestamp DESC LIMIT 1', hintID, function(err, row) {
-            if(err) return callback(new Error('Can\'t get hint with ID ' + hintID + ': ' + err.message));
-            callback(null, row)
-        });
+        try {
+            var row = db.prepare('SELECT * FROM hints WHERE id=? ORDER BY timestamp DESC LIMIT 1').get(hintID);
+        } catch(err) {
+            return callback(new Error('Can\'t get hint with ID ' + hintID + ': ' + err.message));
+        }
+        callback(null, row);
     });
 }

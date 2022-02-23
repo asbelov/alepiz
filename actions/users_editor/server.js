@@ -104,7 +104,7 @@ function addOrUpdateUser(args, callback) {
                             addCommunicationMedia(userID, medias, function (err) {
                                 if (err) {
                                     return callback(new Error('Can\'t add communication medias "' + JSON.stringify(medias) +
-                                        '" for a new user ' + args.userName + ', user ID: '+ newUserID +' : ' + err.message));
+                                        '" for a new user ' + args.userName + ', user ID: '+ userID +' : ' + err.message));
                                 }
 
                                 log.info('Updated user ', args.userName, ', full name: ', args.fullUserName,', user ID: ',

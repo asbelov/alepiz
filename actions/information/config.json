@@ -3,6 +3,7 @@
     "description": "Show objects properties and history values",
     "homePage": "index",
     "ajaxServer": "ajax.js",
+    "startAjaxAsThread": true,
     "staticDir": "static",
     "showWhenNoObjectsSelected": true,
     "onChangeObjectMenuEvent": "callback:onChangeObjects",

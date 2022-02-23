@@ -1,0 +1,56 @@
+//
+    Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Настройки Web сервера webServer.json
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Описание настроек для Веб-сервера webServer.json
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    ul.browser-default
+                        li httpPort или port - TCP порт для работы HTTP сервера. По умолчанию 80
+                        li.
+                            httpsPort - TCP порт для работы HTTPS сервера. По умолчанию 443.
+                            Порт может быть задан переменными окружения app_port или PORT. Переменные окружения
+                            Имеют приоритет перед настройкой.
+                        li.
+                            downloadWebServerMaxSize - Максимальный объем данных, который можно получить с Веб-сервера.
+                            К параметру можно добавлять единицы измерения (Kb, Mb, Gb). По умолчанию "100gb".
+                        li.
+                            sessionMaxAgeInDays - время жизни сессии для пользователя в днях, после которого пользователю
+                            будет предложено повторно ввести свои учетные данные. По умолчанию 7.
+                        li.
+                            parameterLimit - максимальное число параметров, которое можно передать серверу
+                            при выполнении HTTP запроса. По умолчанию 100000,
+                        li.
+                            privatePath - каталог с SSL ключами для сервера HTTPS и файлом для шифрования cookies.
+                            По умолчанию private. Если не существует, будет создан при старте сервиса
+                        li.
+                            webSecretFile файл JSON, содержащий ключ для шифрования cookies в формате
+                            {"cookieSecret":"<ключ>"}. По умолчанию webSecret.json.
+                            Файл находится в каталоге, установленном в настройке privatePath. Если при старте сервиса файл
+                            отсутствует, он будет создан автоматически.
+                        li.
+                            httpsKeyFile - SSL ключ для шифрования пользовательских подключений к HTTPS серверу.
+                            По умолчанию key.pem. Файл находится в каталоге, установленном в настройке privatePath.
+                        li.
+                            httpsCertFile - SSL сертификат для шифрования пользовательских подключений к HTTPS серверу.
+                            По умолчанию cert.pem. Файл находится в каталоге, установленном в настройке privatePath.
+                        li.
+                            sessionDB - относительный путь и файл базы банных SQLite, в которой хранятся пользовательские сессии.
+                            По умолчанию db/session.db. Расширение .db обязательно.
+                        li.
+                            sessionTableName - имя таблицы в базе данных sessionDB, в которой хранятся пользовательские
+                            сессии. По умолчанию session.
+

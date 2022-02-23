@@ -3,11 +3,10 @@
  * Created on 2021-3-22 12:48:02
  */
 
-var fs = require('fs');
-var path = require('path');
-var async = require('async');
-const e = require('express');
-var log = require('../../lib/log')(module);
+const log = require('../../lib/log')(module);
+const fs = require('fs');
+const path = require('path');
+const async = require('async');
 
 var collector = {};
 module.exports = collector;
@@ -40,42 +39,51 @@ collector.get = function(param, callback) {
         }
     });
 
-    var size = 0;
+    var size = 0, allObjectsNum = 0, allFilesNum = 0;
     async.eachSeries(dirNames, function(dirName, callback) {
-            fs.stat(dirName, function(err, dirStats) {
-                if (err) {
-                    if (!param.dontLogErrors) log.warn('Can\'t get file info ' + dirName + ': ' + err.message + ' for ' + JSON.stringify(param));
-                    return callback();
-                }
-                if (dirStats.isDirectory()) {
-                    getDirSize(dirName, excluded, param.sleepTime, JSON.stringify(param), param.dontLogErrors, function(err, childSize) {
-                        if (err) {
-                            if (!param.dontLogErrors) log.warn(err.message);
-                            return callback();
-                        }
-                        if (!isNaN(childSize)) size += childSize;
-                        callback();
-                    });
-                } else if (dirStats.isFile()) {
-                    var fileSize = Number(dirStats.size);
-                    if (!isNaN(fileSize)) size += fileSize;
-                    setTimeout(callback, param.sleepTime);
-                }
-            });
-        },
-        function() {
-            if (Date.now() - startTime > param.warnTimeDirSizeCalculation) {
-                log.warn('Size calculation time for ', param, ' too long: ', (Math.round(Date.now() - startTime) / 60000), 'min');
+        fs.stat(dirName, function(err, dirStats) {
+            if (err) {
+                if (!param.dontLogErrors) log.warn('Can\'t get file info ' + dirName + ': ' + err.message + ' for ' + JSON.stringify(param));
+                return callback();
             }
-            callback(null, size);
+            if (dirStats.isDirectory()) {
+                getDirSize(dirName, excluded, param.sleepTime, JSON.stringify(param), param.dontLogErrors,
+                    function(err, childSize, objectsNum, filesNum) {
+                    if (err) {
+                        if (!param.dontLogErrors) log.warn(err.message);
+                        return callback();
+                    }
+                    if (!isNaN(filesNum)) allFilesNum += filesNum;
+                    if (!isNaN(objectsNum)) allObjectsNum += objectsNum;
+                    if (!isNaN(childSize)) size += childSize;
+                    callback();
+                });
+            } else if (dirStats.isFile()) {
+                var fileSize = Number(dirStats.size);
+                ++allFilesNum;
+                ++allFilesNum;
+                if (!isNaN(fileSize)) size += fileSize;
+                setTimeout(callback, param.sleepTime);
+            }
         });
+    },
+    function() {
+        if (Date.now() - startTime > param.warnTimeDirSizeCalculation) {
+            log.info('Size calculation time too long: ', Math.round((Date.now() - startTime) / 60000),
+                '/', Math.round(param.warnTimeDirSizeCalculation / 60000), 'min. Objects checked: ', allObjectsNum,
+                ', files: ', allFilesNum, ', sleep time: ', param.sleepTime, 'ms, dir: ',  param.dirNames,
+                '; param: ', param);
+        }
+        callback(null, size);
+    });
 };
 
 function getDirSize(dirName, excluded, sleepTime, paramStr, dontLogErrors, callback) {
-    var size = 0;
+    var size = 0, allObjectsNum = 0, filesNum = 0;
     fs.readdir(dirName, { withFileTypes: true }, function(err, dirEntObjects) {
         if (err) return callback(new Error('Can\'t read directory ' + dirName + ': ' + err.message + ' for ' + paramStr));
 
+        allObjectsNum = dirEntObjects.length;
         async.eachSeries(dirEntObjects, function(dirEntObj, callback) {
             for (var i = 0; i < excluded.length; i++) {
                 if (!excluded[i]) continue;
@@ -111,12 +119,15 @@ function getDirSize(dirName, excluded, sleepTime, paramStr, dontLogErrors, callb
                         return callback();
                     }
                     var fileSize = Number(statStruct.size);
-                    if (!isNaN(fileSize)) size += fileSize;
+                    if (!isNaN(fileSize)) {
+                        size += fileSize;
+                        ++filesNum;
+                    }
                     setTimeout(callback, sleepTime);
                 });
             }
         }, function() {
-            callback(null, size);
+            callback(null, size. allObjectsNum, filesNum);
         });
     });
 }

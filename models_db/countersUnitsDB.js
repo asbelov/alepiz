@@ -6,7 +6,7 @@
  * Created by Alexander Belov on 30.08.2015.
  */
 var log = require('../lib/log')(module);
-var db = require('../lib/db');
+var db = require('./db');
 
 var unitsDB = {};
 module.exports = unitsDB;

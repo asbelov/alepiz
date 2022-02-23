@@ -7,8 +7,8 @@ var path = require('path');
 var log = require('../../lib/log')(module);
 var help = require('../../lib/help');
 var rmTree = require('../../lib/utils/rmTree');
-var conf = require('../../lib/conf');
-conf.file('config/conf.json');
+var Conf = require('../../lib/conf');
+const confCommunicationMedia = new Conf('config/communicationMedia.json');
 
 
 module.exports = function(args, callback) {
@@ -22,7 +22,7 @@ module.exports = function(args, callback) {
 
     if(!args.mediaEditor) return callback(new Error('Media ' + mediaID + ' content is empty'));
     
-    var mediaDir = path.join(__dirname, '..', '..', conf.get('communicationMedia:dir'), mediaID);
+    var mediaDir = path.join(__dirname, '..', '..', confCommunicationMedia.get('dir'), mediaID);
     if(!args.ID) {
         try {
             fs.mkdirSync(mediaDir);
@@ -51,7 +51,7 @@ module.exports = function(args, callback) {
         if(args.ID !== mediaID) {
             log.warn('Rename media from ', args.ID, ' to ', mediaID);
 
-            var oldMediaDir = path.join(__dirname, '..', '..', conf.get('communicationMedia:dir'), args.ID);
+            var oldMediaDir = path.join(__dirname, '..', '..', confCommunicationMedia.get('dir'), args.ID);
             if(fs.existsSync(mediaDir)) {
                 log.error('Can\'t rename ', oldMediaDir, ' to ', mediaDir, ': ', mediaDir , ' already exist');
                 mediaID = args.ID;
@@ -70,8 +70,8 @@ module.exports = function(args, callback) {
         }
     }
 
-    var mediaFile = path.join(mediaDir, conf.get('communicationMedia:server'));
-    var confFile = path.join(mediaDir, conf.get('communicationMedia:configuration'));
+    var mediaFile = path.join(mediaDir, confCommunicationMedia.get('server'));
+    var confFile = path.join(mediaDir, confCommunicationMedia.get('configuration'));
     
     fs.writeFile(mediaFile, args.mediaEditor, 'utf8', function (err) {
         if(err) log.error('Can\'t write file ', mediaFile, ': ', err.message);

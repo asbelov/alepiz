@@ -13,7 +13,7 @@ var userRolesRights = require('../../models_db/usersRolesRightsDB');
 var transactions = require('../../models_db/transaction');
 var counterDB = require('../../models_db/countersDB');
 var counterSaveDB = require('../../models_db/counterSaveDB');
-var activeCollector = require('../../lib/activeCollector');
+var activeCollector = require('../../server/activeCollector');
 
 
 var collectorName = 'event-generator';
@@ -23,8 +23,13 @@ module.exports = function(args, callback) {
         ', disabled: ' + (args.switchOnDisable || 'off') +', settings: ' + (args.switchOnSettings || 'off') +
         ';  parameters', args);
 
-    if((!args.switchOnDisable || args.o === '[]') && !args.switchOnSettings && !args.switchOnHint) {
+    if(!args.switchOnDisable && !args.switchOnSettings && !args.switchOnHint) {
         log.info('All tabs are disabled. Nothing to save. Exiting');
+        return callback();
+    }
+
+    if(args.switchOnDisable && args.o === '[]') {
+        log.info('Objects were not selected for disable counters. Exiting');
         return callback();
     }
 

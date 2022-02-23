@@ -1,23 +1,27 @@
 {
-  "name": "Simple test",
-  "description": "Generate error for testing task actions",
-  "homePage": "index",
-  "execMethod": "post",
-  "launcher": "nodeModule",
-  "launcherPrms": { "javaScript": "server.js" },
-  "staticDir": "static",
-  "timeout": 60,
-  "showWhenNoObjectsSelected": true,
-  "descriptionTemplate": "{{%:error:% ?? !!! Action will be executed with error: '%:error:%'.:: Action will be executed without error.}} {{%:returnValue:% ?? Action will be return: '%:returnValue:%'.:: Action doesn't return any value.}}",
-  "parameters": {
-    "o": {
-      "description": "Objects"
+    "name": "Simple test",
+    "description": "Generate error for testing task actions",
+    "homePage": "index",
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "startAjaxAsThread": true,
+    "launcherPrms": {
+        "javaScript": "server.js",
+        "startAsThread": true
     },
-    "error": {
-      "description": "If set, then executed action with this error"
-    },
-    "returnValue": {
-      "description": "If set, then action will return this value"
+    "staticDir": "static",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": true,
+    "descriptionTemplate": "{{%:error:% ?? !!! Action will be executed with error: '%:error:%'.:: Action will be executed without error.}} {{%:returnValue:% ?? Action will be return: '%:returnValue:%'.:: Action doesn't return any value.}}",
+    "parameters": {
+        "o": {
+            "description": "Objects"
+        },
+        "error": {
+            "description": "If set, then executed action with this error"
+        },
+        "returnValue": {
+            "description": "If set, then action will return this value"
+        }
     }
-  }
 }

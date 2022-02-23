@@ -2,7 +2,7 @@
     "name": "MSSQL",
     "description": "To execute MSSQL queries",
     "active": "",
-    "separate": "",
+    "separate": "on",
     "runCollectorSeparately": "",
     "parameters": {
         "driver": {

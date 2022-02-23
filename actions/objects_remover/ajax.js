@@ -64,7 +64,7 @@ function getObjectsTree(user, objects, depth, maxObjectsCnt, callback) {
 
         if(maxObjectsCnt && objects.length >= maxObjectsCnt) return callback();
 
-        objectsFilterDB.filterObjects([object.name], user, function(err, rows) {
+        objectsFilterDB.filterObjectsByInteractions([object.name], user, function(err, rows) {
             if(err) return callback(err);
             if(!rows.length) return callback();
 

@@ -2,7 +2,7 @@
  * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var db = require('../lib/db');
+var db = require('./db');
 var log = require('../lib/log')(module);
 
 var transaction = {};
@@ -61,6 +61,8 @@ function runDelayedTransaction(callback) {
 
     var delayedCallback = delayedCallbacks.shift();
     transactionInProgress = false;
-    transaction.begin(delayedCallback);
+    // trying to fix bug with RangeError: Maximum call stack size exceeded
+    // transaction.begin(delayedCallback);
+    setTimeout(transaction.begin, 0, delayedCallback);
     callback();
 }

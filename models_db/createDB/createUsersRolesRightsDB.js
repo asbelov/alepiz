@@ -3,20 +3,20 @@
  */
 
 var log = require('../../lib/log')(module);
-var db = require('../../lib/db');
+var db = require('../db');
 var async = require('async');
 var encrypt = require('../../lib/encrypt');
 
 module.exports = function(callback){
     log.debug('Creating users and roles tables in database');
 
-    async.parallel({
+    async.series({
         users: createUsersTable,
         roles: createRolesTable
     }, function(err, fillTables){
         if(err) return callback(err);
 
-        async.parallel([
+        async.series([
             function(callback){
                 createUsersRolesTable((fillTables.users && fillTables.roles), callback);
             },

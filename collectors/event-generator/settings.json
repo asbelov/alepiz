@@ -1,0 +1,19 @@
+{
+    "db": [
+        {
+            "path": "db",
+            "file": "events.db",
+            "relative": true
+        },
+        {
+            "path": "db",
+            "file": "events_clone.db",
+            "relative": true
+        }
+    ],
+    "dbPath": "db",
+    "dbFile": "events.db",
+    "saveRepeatEventsCacheInterval": 15,
+    "runTaskOnProblem": true,
+    "runTaskOnSolve": true
+}

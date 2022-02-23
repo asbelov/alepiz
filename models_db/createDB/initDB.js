@@ -3,7 +3,7 @@
  */
 
 var log = require('../../lib/log')(module);
-var db = require('../../lib/db');
+var db = require('../db');
 
 module.exports = function (callback) {
     log.info('Truncate WAL journal file');
@@ -13,7 +13,6 @@ module.exports = function (callback) {
         db.exec('PRAGMA optimize', function (err) {
             if (err) return callback(new Error('Can\'t optimize database: ' + err.message));
         });
-
         callback();
     });
 };

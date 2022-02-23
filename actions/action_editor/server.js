@@ -8,14 +8,14 @@ var async = require('async');
 var log = require('../../lib/log')(module);
 var help = require('../../lib/help');
 var rmTree = require('../../lib/utils/rmTree');
-var conf = require('../../lib/conf');
-conf.file('config/conf.json');
+var Conf = require('../../lib/conf');
+const confActions = new Conf('config/actions.json');
 
 
 module.exports = function(args, callback) {
     log.debug('Starting action server "', args.actionName, '" with parameters', args);
 
-    conf.reload();
+    confActions.reload();
 
     var ID = args.newActionID;
     if(!ID) {
@@ -23,7 +23,7 @@ module.exports = function(args, callback) {
         else ID = args.ID;
     }
 
-    var actionDir = path.join(__dirname, '..', '..', conf.get('actions:dir'), ID);
+    var actionDir = path.join(__dirname, '..', '..', confActions.get('dir'), ID);
     if(!args.ID) {
         try {
             fs.mkdirSync(actionDir);
@@ -46,7 +46,7 @@ module.exports = function(args, callback) {
         if(args.ID !== ID) {
             log.warn('Rename action from ', args.ID, ' to ', ID);
 
-            var oldActionDir = path.join(__dirname, '..', '..', conf.get('actions:dir'), args.ID);
+            var oldActionDir = path.join(__dirname, '..', '..', confActions.get('dir'), args.ID);
             if(fs.existsSync(actionDir)) {
                 log.error('Can\'t rename ', oldActionDir, ' to ', actionDir, ': ', actionDir , ' already exist');
                 ID = args.ID;
@@ -129,7 +129,7 @@ module.exports = function(args, callback) {
 };
 
 function saveConf(ID, newGroup, oldID) {
-    var cfg = conf.get();
+    var cfg = confActions.get();
     var actionsLayout = cfg.actions.layout;
     if(ID && actionsLayout[newGroup] && actionsLayout[newGroup][ID]) return;
 
@@ -154,6 +154,6 @@ function saveConf(ID, newGroup, oldID) {
 
     cfg.actions.layout = actionsLayout;
 
-    var errMessage = conf.save(cfg);
+    var errMessage = confActions.save(cfg);
     if(errMessage) log.error(errMessage);
 }

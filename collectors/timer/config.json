@@ -4,6 +4,7 @@
     "active": "on",
     "separate": "",
     "runCollectorSeparately": "",
+    "runCollectorAsThread": "on",
     "parameters": {
         "wakeupInterval": {
             "description": "Events will be generated at this time interval",

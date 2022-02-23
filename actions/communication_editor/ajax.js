@@ -5,13 +5,13 @@
 var fs = require('fs');
 var path = require('path');
 var log = require('../../lib/log')(module);
-var conf = require('../../lib/conf');
-conf.file('config/conf.json');
+var Conf = require('../../lib/conf');
+const confCommunicationMedia = new Conf('config/communicationMedia.json');
 var help = require('../../lib/help');
 
-var dir = path.join(__dirname, '..', '..', conf.get('communicationMedia:dir'));
-var server = conf.get('communicationMedia:server');
-var config = conf.get('communicationMedia:configuration');
+var dir = path.join(__dirname, '..', '..', confCommunicationMedia.get('dir'));
+var server = confCommunicationMedia.get('server');
+var config = confCommunicationMedia.get('configuration');
 
 module.exports = function(args, callback) {
     log.debug('Starting ajax '+__filename+' with parameters', args);

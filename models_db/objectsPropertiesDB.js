@@ -5,11 +5,20 @@
 
 var async = require('async');
 var log = require('../lib/log')(module);
-var db = require('../lib/db');
+var db = require('./db');
 
 var objectsPropertiesDB = {};
 module.exports = objectsPropertiesDB;
 
+/** Get objects properties for specified object IDs
+ *
+ * @param {Array[number]} objectsIDs - array of object IDs
+ * @param {function(Error)|function(null, Array): void} callback - return Error or array with objects properties for
+ * SQL query "SELECT * FROM objectsProperties WHERE objectID = ?" like
+ * [{id:..., objectID:..., name:..., value:..., description:..., mode:...}, ...], where mode:
+ * 0 - not calculated text; 1 - checkbox, 2 - not calculated text area, 3 - calculated expression
+ * @returns {*|void}
+ */
 objectsPropertiesDB.getProperties = function (objectsIDs, callback) {
     log.debug('Getting all properties for objects IDs: ', objectsIDs);
 
@@ -50,14 +59,15 @@ objectsPropertiesDB.updateProperties = function(objectID, properties, callback) 
             stmt.run( {
                 $objectID: objectID,
                 $name: property.name,
-                $value: property.value,
+                $value: String(property.value), // for convert integer to TEXT correctly
                 $mode: property.mode,
                 $description: property.description
-            }, function(err) {
+            }, function(err, info) {
                 if(err) return callback(err);
 
                 // count of changes
-                if(this.changes !== 1) notUpdatedProperties.push(property);
+                var changes = info && info.changes !== undefined ? info.changes : this.changes;
+                if(changes !== 1)  notUpdatedProperties.push(property);
                 callback();
             });
         }, function(err) {
@@ -80,7 +90,7 @@ objectsPropertiesDB.insertProperties = function(objectID, properties, callback) 
             stmt.run( {
                 $objectID: objectID,
                 $name: property.name,
-                $value: property.value,
+                $value: String(property.value), // for convert integer to TEXT correctly
                 $mode: property.mode,
                 $description: property.description
             }, callback);
@@ -110,6 +120,12 @@ objectsPropertiesDB.deleteProperties = function(objectID, propertiesNames, callb
     });
 };
 
+/** Get object property by property name (SQL LIKE sintaxis)
+ *
+ * @param {string} propertyName - SQL Like property name (wildcards: "%" any simbols, "_" one simbol, "\\";"\%";"\_" - for escape)
+ * @param {function(Error)|function(null, Array)} callback - return error or an Array with object properties
+ * [{objectName:..., objectID:..., propName:..., propVal:..., propMode:... propDescription:...}, ....]
+ */
 objectsPropertiesDB.getObjectsForProperty = function (propertyName, callback) {
     log.debug('Getting objects for property: ', propertyName);
 

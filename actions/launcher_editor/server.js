@@ -7,8 +7,8 @@ var path = require('path');
 var log = require('../../lib/log')(module);
 var help = require('../../lib/help');
 var rmTree = require('../../lib/utils/rmTree');
-var conf = require('../../lib/conf');
-conf.file('config/conf.json');
+var Conf = require('../../lib/conf');
+const confLaunchers = new Conf('config/launchers.json');
 
 
 module.exports = function(args, callback) {
@@ -22,7 +22,7 @@ module.exports = function(args, callback) {
 
     if(!args.launcherEditor) return callback(new Error('Launcher ' + ID + ' content is empty'));
     
-    var launcherDir = path.join(__dirname, '..', '..', conf.get('launchers:dir'), ID);
+    var launcherDir = path.join(__dirname, '..', '..', confLaunchers.get('dir'), ID);
     if(!args.ID) {
         try {
             fs.mkdirSync(launcherDir);
@@ -44,7 +44,7 @@ module.exports = function(args, callback) {
         if(args.ID !== ID) {
             log.warn('Rename launcher from ', args.ID, ' to ', ID);
 
-            var oldLauncherDir = path.join(__dirname, '..', '..', conf.get('launchers:dir'), args.ID);
+            var oldLauncherDir = path.join(__dirname, '..', '..', confLaunchers.get('dir'), args.ID);
             if(fs.existsSync(launcherDir)) {
                 log.error('Can\'t rename ', oldLauncherDir, ' to ', launcherDir, ': ', launcherDir , ' already exist');
                 ID = args.ID;
@@ -63,7 +63,7 @@ module.exports = function(args, callback) {
         }
     }
 
-    var launcherFile = path.join(launcherDir, conf.get('launchers:fileName'));
+    var launcherFile = path.join(launcherDir, confLaunchers.get('fileName'));
     
     fs.writeFile(launcherFile, args.launcherEditor, 'utf8', function (err) {
         if(err) log.error('Can\'t write file ', launcherFile, ': ', err.message);
