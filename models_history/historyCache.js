@@ -10,16 +10,19 @@
     Code was reviewed at 07/02/2018
 
  */
-var fs = require('fs');
-var async = require('async');
-var path = require('path');
+const fs = require('fs');
+const async = require('async');
+const path = require('path');
 
-var parameters = require('../models_history/historyParameters');
-var log = require('../lib/log')(module);
-var storage = require('../models_history/historyStorage');
-var countersDB = require('../models_db/countersDB'); // for init housekeeper
+const parameters = require('../models_history/historyParameters');
+const log = require('../lib/log')(module);
+const storage = require('../models_history/historyStorage');
+const countersDB = require('../models_db/countersDB'); // for init housekeeper
 
-var historyCache = {};
+var historyCache = {
+    storageRetrievingDataIncomplete: storageRetrievingDataIncomplete,
+    storageRetrievingDataComplete: storageRetrievingDataComplete,
+};
 module.exports = historyCache;
 
 var cache = new Map(), functions = new Map();
@@ -44,7 +47,7 @@ load unsaved data from dump files
 load records to cache from storage
 starting cache service for save data to storage
  */
-historyCache.init = function (initParameters, callback){
+historyCache.init = function (initParameters, callback) {
 
     parameters.init(initParameters);
     terminateCacheService = 0;
@@ -353,137 +356,10 @@ historyCache.getByValue = function(id, value, callback) {
         }
     }
 
+    if(parameters.directAccessToDBFile) return callback(null, null);
     storage.getLastRecordTimestampForValue(id, value, callback);
 };
 
-/*
-    get requested records by position or by time, depend on format of the 'shift' parameter
-
-    id: object ID
-
-    if format of 'num' parameter is a #<num> and\or 'shift' is #<shift>, then get records by position.
-    shift: it's a last record position from the end of the storage. 0 - last element
-    num: count of the requirement records from the last position. 0 - only one element with a 'last' position
-
-    or
-
-    if format of 'num' parameter is a <num>, then get records by time
-     'shift' and 'num' parameters:
-     1. if 'shift' is a timestamp (from 1970 in ms) - it interpretable as "time from". 'num' must be a timestamp too, and it is interpretable as "time to"
-     2. if 'shift' is ms from last record. 'num' - time interval in ms from 'shift'
-     you can add suffix 's', 'm', 'h' or 'd' to the end of time parameters 'shift' or 'num'.
-     It means seconds for 's', minutes for 'm', hours for 'h' and days for 'd'
-
-    callback(err, records), where records: [{data:.., timestamp:..}, ....]
-
- */
-historyCache.get = function (id, shift, num, recordsType, callback) {
-
-    var isRequiredAllRecords = false;
-    if(String(num).charAt(0) === '!') {
-        num = num.slice(1);
-        isRequiredAllRecords = true;
-    }
-
-    if(String(num).charAt(0) === '#') {
-        var getFromHistory = historyCache.getByIdx;
-        num = num.slice(1);
-        var isTime = false;
-    }
-
-    if(String(shift).charAt(0) === '#') {
-        getFromHistory = historyCache.getByIdx;
-        shift = shift.slice(1);
-        isTime = false;
-    }
-
-    if(getFromHistory === undefined) {
-        getFromHistory = historyCache.getByTime;
-        isTime = true;
-    }
-
-    if(String(num).charAt(0) === '!') {
-        num = num.slice(1);
-        isRequiredAllRecords = true;
-    }
-
-    getFromHistory(id, shift, num, 0, recordsType, function (err, rawRecords, isGotAllRecords) {
-        //if(id === 155103) log.info(id, ': shift: ', shift, '; num: ', num, '; isRequiredAllRecords: ', isRequiredAllRecords, '; rawRecords: ', rawRecords, '; isGotAllRecords: ', isGotAllRecords);
-        if(err) {
-            ++storageRetrievingDataIncomplete;
-            Array.isArray(rawRecords) ? rawRecords.push(err.message) : rawRecords = err.message;
-            return callback(err, null, rawRecords);
-        }
-
-        // convert numeric to Number
-        if(recordsType < 2) {
-            var records = rawRecords.map(function (record) {
-                if (!isNaN(parseFloat(record.data)) && isFinite(record.data)) {
-                    return {
-                        timestamp: record.timestamp,
-                        data: Number(record.data),
-                    }
-                } else return record;
-            });
-        } else records = rawRecords;
-
-        // when recordsType is null, return received records in any cases
-        if(recordsType === null || !isRequiredAllRecords) {
-            ++storageRetrievingDataComplete;
-            return callback(null, records, records);
-        }
-
-        // used in a history functions, if not got all required records, return nothing
-        if(!isGotAllRecords) {
-            ++storageRetrievingDataIncomplete;
-            rawRecords.push('No data from the database');
-            return callback(null, null, rawRecords);
-        }
-
-        if(!isTime) {
-            // return less the 90% of requirement records
-            if(!num || records.length / num < 0.9) {
-                ++storageRetrievingDataIncomplete;
-                rawRecords.push('records: ' + records.length + '; num: ', num);
-                return callback(null, null, rawRecords);
-            }
-            ++storageRetrievingDataComplete;
-            return callback(null, records, records);
-        } else {
-            if(records.length < 2) {
-                ++storageRetrievingDataIncomplete;
-                rawRecords.push('Returned ' + records.length + ' records');
-                return callback(null, null, rawRecords);
-            }
-/*
-            if(records.length === 1) {
-                ++storageRetrievingDataComplete;
-                return callback(null, records, records);
-            }
-*/
-
-            // calculating an avg time interval between the record timestamps
-            for(var i = 2, avgTimeInterval = records[1].timestamp - records[0].timestamp; i < records.length; i++) {
-                avgTimeInterval = (avgTimeInterval + records[i].timestamp - records[i-1].timestamp) / 2;
-            }
-
-            // checking for the 1477236595310 = 01/01/2000. shift is a timeFrom or timeShift; num is a timeTo or
-            // timeInterval
-            var timeFrom = shift > 1477236595310 ? shift : Date.now() - shift - num;
-
-            // checking for the last record timestamp is near the timeFrom timestamp
-            // r.timestamp = 14:05:00, avgInterval = 30, timeFrom = 14:04:25
-            if(records[0].timestamp - avgTimeInterval * 1.2 > timeFrom) {
-                ++storageRetrievingDataIncomplete;
-                rawRecords.push('avgInterval + 20%: ' + Math.round(avgTimeInterval * 1.2 / 1000) +
-                    '; timestamp - timeFrom: ' + Math.round((records[0].timestamp - timeFrom) / 1000));
-                return callback(null, null, rawRecords);
-            }
-            ++storageRetrievingDataComplete;
-            return callback(null, records, records);
-        }
-    });
-};
 
 /*
     get last values for IDs. Will continue getting last values even if error occurred
@@ -503,7 +379,7 @@ historyCache.getLastValues = function(IDs, callback) {
         if(records[id]) return callback();
 
         records[id] = {};
-        historyCache.getLastValue(id,function (err, record) {
+        historyCache.getLastValue(id,function (err, record/*, isGotAllRequiredRecords, param*/) {
             if(err) {
                 if(!historyCache.terminateHousekeeper) {
                     log.warn('Can\'t get last value for ', id, ': ', err.message);
@@ -517,6 +393,7 @@ historyCache.getLastValues = function(IDs, callback) {
             if(record && record.length) {
                 records[id].timestamp = record[0].timestamp;
                 records[id].data = record[0].data;
+                //if(param) records[id].param = param;
             }
             callback();
         });
@@ -605,6 +482,15 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
             storageTimestamp = null;
             storageOffset = offset;
         }
+    }
+
+    if(parameters.directAccessToDBFile) {
+        return callback(null, recordsFromCache, false, {
+            id: id,
+            storageOffset: storageOffset,
+            storageCnt: storageCnt,
+            storageTimestamp: storageTimestamp,
+        });
     }
 
     storage.getRecordsFromStorageByIdx(id, storageOffset, storageCnt, storageTimestamp, maxRecordsCnt, recordsType,
@@ -718,6 +604,14 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
     Use recordsFromCache[0].timestamp - 1 because the SQL BETWEEN operator is inclusive
     */
     var storageTimeTo = recordsFromCache.length ? recordsFromCache[0].timestamp - 1 : timeTo;
+
+    if(parameters.directAccessToDBFile) {
+        return callback(null, recordsFromCache, false, {
+            timeFrom: timeFrom,
+            storageTimeTo: storageTimeTo,
+        });
+    }
+
     storage.getRecordsFromStorageByTime(id, timeFrom, storageTimeTo, maxRecordsCnt, recordsType,
         function(err, recordsFromStorage) {
 //            log.debug(id, ': !!! records form storage err: ', err, '; time: ', (new Date(timeFrom)).toLocaleString(), '-', (new Date(storageTimeTo)).toLocaleString(), ';', timeFrom,'-', storageTimeTo, ': ', recordsFromStorage);
@@ -835,13 +729,24 @@ function addDataToCache(cacheObj, recordsFromStorage) {
 }
 
 function calculateCacheSize(cacheObj, recordsFromStorage, recordsFromCache) {
-    // if required records from storage, set cache size to all required records
-    if(recordsFromStorage && recordsFromStorage.length) return cacheObj.cachedRecords + recordsFromStorage.length;
+    if(parameters.directAccessToDBFile) {
+        cacheObj.cachedRecords =  parameters.initCachedRecords;
+        return cacheObj.cachedRecords;
+    }
+
+    // if it was necessary to get records from the storage, add the number of received records from the storage to the cache size
+    if(recordsFromStorage && recordsFromStorage.lengths) {
+        cacheObj.cachedRecords += recordsFromStorage.length;
+        return cacheObj.cachedRecords;
+    }
 
     // TODO: change this algorithm
-    // if all required records was returned from cache, reduce cache size to 10% of extra records
-    if(recordsFromCache && recordsFromCache.length && recordsFromCache.length < cacheObj.cachedRecords)
-        return cacheObj.cachedRecords - Math.round((cacheObj.cachedRecords - recordsFromCache.length) / 10 );
+    // if all the necessary records were obtained from the cache, reduce the cache size by 10% of the number of unnecessary records
+    if(recordsFromCache && recordsFromCache.length && recordsFromCache.length < cacheObj.cachedRecords) {
+        cacheObj.cachedRecords -= Math.round((cacheObj.cachedRecords - recordsFromCache.length) / 10);
+        if(cacheObj.cachedRecords < parameters.initCachedRecords) cacheObj.cachedRecords = parameters.initCachedRecords;
+        return cacheObj.cachedRecords;
+    }
 
     return cacheObj.cachedRecords;
 }
@@ -991,7 +896,7 @@ function cacheService(callback) {
                         }
 
                         /*
-                            !!! BE ATANTION !!!
+                            !!! BE ATTENTION !!!
                             savedData for 2 running storage servers can be:
                             savedData: [
                               {

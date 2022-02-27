@@ -90,62 +90,63 @@ function initServerCommunication() {
     /*
         get data and return it to server
 
-        prms - object with collector parameters {<parameter1>: <value>, <parameter2>: <value>}
+        param - object with collector parameters {<parameter1>: <value>, <parameter2>: <value>}
         callback(err, result)
         result - object {timestamp: <timestamp>, value: <value>} or simple value
     */
 
-    collector.get = function(prms, callback) {
+    collector.get = function(param, callback) {
 
         // checking for correct values
         if(typeof callback !== 'function') return log.error('Ping: callback is not a function');
 
-        if(!prms || !prms.host) return callback(new Error('Ping: parameter host not defined'));
+        if(!param || !param.host) return callback(new Error('Ping: parameter host not defined'));
 
-        if(!prms.pingInterval || Number(prms.pingInterval) < 1) prms.pingInterval = 1000;
-        else prms.pingInterval = Number(prms.pingInterval) * 1000; // convert seconds to milliseconds
+        if(!param.pingInterval || Number(param.pingInterval) < 1) param.pingInterval = 1000;
+        else param.pingInterval = Number(param.pingInterval) * 1000; // convert seconds to milliseconds
 
-        if(!prms.packetsCnt || Number(prms.packetsCnt) < 0) prms.packetsCnt = 0;
-        else prms.packetsCnt = Number(prms.packetsCnt);
+        if(!param.packetsCnt || Number(param.packetsCnt) < 0) param.packetsCnt = 0;
+        else param.packetsCnt = Number(param.packetsCnt);
 
-        if(!prms.timeout || Number(prms.timeout) < 2) prms.timeout = 3000;
-        else prms.timeout = Number(prms.timeout) * 1000; // convert seconds to milliseconds;
-        if(prms.timeout < prms.pingInterval){
-            log.warn('Ping: ', prms.host, '(', prms.address || '', ') ping interval ', prms.pingInterval/1000, ' more then ping timeout ', prms.timeout/1000, '. Set timeout to ', (prms.pingInterval + 3000)/1000);
-            prms.timeout = prms.pingInterval + 3000;
+        if(!param.timeout || Number(param.timeout) < 2) param.timeout = 3000;
+        else param.timeout = Number(param.timeout) * 1000; // convert seconds to milliseconds;
+        if(param.timeout < param.pingInterval){
+            log.warn('Ping: ', param.host, '(', param.address || '', ') ping interval ', param.pingInterval/1000,
+                ' more than ping timeout ', param.timeout/1000, '. Set timeout to ', (param.pingInterval + 3000)/1000);
+            param.timeout = param.pingInterval + 3000;
         }
 
-        if(!prms.packetSize) prms.packetSize = 64;
+        if(!param.packetSize) param.packetSize = 64;
         else {
-            prms.packetSize = Number(prms.packetSize);
-            if(!prms.packetSize) prms.packetSize = 64;
+            param.packetSize = Number(param.packetSize);
+            if(!param.packetSize) param.packetSize = 64;
             // 20 bytes IP headers + 28 bytes ICMP packet, contain 64 bit ICMP header, two 64 bit timestamp fields
             // and field with 32 bit sequence number
-            else if(prms.packetSize < 48) prms.packetSize = 48;
-            else if(prms.packetSize > 4096) prms.packetSize = 4096; // maximum size of ICMP package
+            else if(param.packetSize < 48) param.packetSize = 48;
+            else if(param.packetSize > 4096) param.packetSize = 4096; // maximum size of ICMP package
         }
 
-        prms.packetSize -= 20; // subtract 20 bytes of IP header from packet size
+        param.packetSize -= 20; // subtract 20 bytes of IP header from packet size
 
-        prms.host = prms.host.toLowerCase();
+        param.host = param.host.toLowerCase();
 
         // checking for Internet domain name
             // checking for IPv4 address family
-        if(/^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/.test(prms.host)) { // IPv4
+        if(/^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/.test(param.host)) { // IPv4
             var addressPrepare = function(IPv4, callback) { callback(null, IPv4, 4);};
             // checking for IPv6 address family
-        } else if(/^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/.test(prms.host)) { // IPv6
+        } else if(/^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/.test(param.host)) { // IPv6
             addressPrepare = function(IPv6, callback) { callback(null, IPv6, 6);};
         } else { // lookup IP by dns
-            addressPrepare = dns.lookup; // dns.lookup(prms.host, function (err, IP, family) {}) // address: 192.168.0.1; family: 4|6
+            addressPrepare = dns.lookup; // dns.lookup(param.host, function (err, IP, family) {}) // address: 192.168.0.1; family: 4|6
         }
 
         // resolving IP address for internet domain name target
-        addressPrepare(prms.host, function(err, address, family) {
+        addressPrepare(param.host, function(err, address, family) {
             if(err) {
                 // don't run callback(err) for retrying resolve host in the next time
-                log.error('Can\'t resolve IP address for Internet domain host name ', prms.host, ': ', err.message, ' Retry after 9 minutes');
-                setTimeout(collector.get, 540000, prms, callback);
+                log.error('Can\'t resolve IP address for Internet domain host name ', param.host, ': ', err.message, ' Retry after 9 minutes');
+                setTimeout(collector.get, 540000, param, callback);
                 return;
             }
 
@@ -153,14 +154,14 @@ function initServerCommunication() {
             var sequenceNumber = targets[address] && targets[address].sequenceNumber ? targets[address].sequenceNumber : 0;
 
             targets[address] = {
-                OCID: prms.$id,
-                host: prms.host,
+                OCID: param.$id,
+                host: param.host,
                 address: address,
-                interval: prms.pingInterval,
-                packetSize: prms.packetSize,
-                packetsCnt: prms.packetsCnt,
+                interval: param.pingInterval,
+                packetSize: param.packetSize,
+                packetsCnt: param.packetsCnt,
                 sequenceNumber: sequenceNumber,
-                timeout: prms.timeout,
+                timeout: param.timeout,
                 family: family,
                 callback: callback
             };
@@ -345,7 +346,7 @@ function initServerCommunication() {
             // restart server and try to ping target using internal server
             if(!serverProcess || !targets[address]) return;
 
-            // don't restart ping server if last restart time was smaller then 60 sec ago
+            // don't restart ping server if last restart time was smaller than 60 sec ago
             // only starting ping for target
             if(Date.now() - pingServerRestartTime < 60000) return sendMessageToPing(targets[address]);
 
@@ -383,7 +384,7 @@ function initServerCommunication() {
 
             // decode received buffer to UTF-8
             var stdout = recode.decode(data, 'cp866');
-            // extracted RTT from received data. If fail, result will be equal to NaN
+            // extracted RTT from received data. If failed, result will be equal to NaN
             var result = Number(stdout.replace(regExpForExtractRTT, "$1"));
 
             // console.log(result, ': ', stdout);
@@ -407,7 +408,7 @@ function initServerCommunication() {
                     child.kill('SIGINT');
                 }
             } else { // packet loss or stdout did not contain data about RTT
-                // return packet loss only if last packet was sending more then <timeout> time ago
+                // return packet loss only if last packet was sending more than <timeout> time ago
                 if(Date.now() - lastPacketSentTime <= target.timeout) return;
 
                 log.info('Packet LOSS for ',target.host,'(', target.address,'); sequence ',target.sequenceNumber,', received from external ping program');
@@ -428,7 +429,7 @@ function initServerCommunication() {
                 }
             });
 
-            // stopping ping object when sequenceNumber more then requested packets count
+            // stopping ping object when sequenceNumber more than requested packets count
             if(++target.sequenceNumber > target.packetsCnt && target.packetsCnt) {
                 externalPingProcesses[target.address].kill('SIGINT');
                 delete targets[target.address];
@@ -472,23 +473,6 @@ function runServerProcess() {
 
         process.on('message', function (message) {
 
-            if (message.type === 'init') {
-                if (!isSocketsInitialising) {
-                    isSocketsInitialising = true;
-                    log.info('Ping: initializing sockets for IPv4, IPv6');
-                    initSocket(4);
-                    initSocket(6);
-                    setInterval(watchdog, 1000);
-                    setInterval(function() {
-                        log.info('Ping hosts: ', Object.keys(targets).join(', '));
-                    }, 360000);
-                    setTimeout(function () {
-                        process.send({type: 'initCompleted'});
-                    }, 200);
-                }
-                return;
-            }
-
             if (message.type === 'echoRequest') {
 
                 var target = message.data;
@@ -500,8 +484,8 @@ function runServerProcess() {
                 hostID.push(address);
 
                 var packetTemplate = Buffer.alloc(target.packetSize);
-                if (target.family === 4) packetTemplate.writeUInt8(0x08, 0); // ICMP type for IPv4
-                else packetTemplate.writeUInt8(0x80, 0); // ICMP type for IPv6
+                if (target.family === 4) packetTemplate.writeUInt8(0x08, 0); // ICMP types for IPv4
+                else packetTemplate.writeUInt8(0x80, 0); // ICMP types for IPv6
 
                 // write host ID into two ICMP Echo replay fields: Identifier and sequence number
                 // I don't know why, but if I write sequence number and change it after every packet for IPv6 ping
@@ -534,6 +518,24 @@ function runServerProcess() {
                     ' sequence number: ', sequenceNumber);
 
                 sendICMPMessage(targets[address]);
+                return;
+            }
+
+            if (message.type === 'init') {
+                if (!isSocketsInitialising) {
+                    isSocketsInitialising = true;
+                    log.info('Ping: initializing sockets for IPv4, IPv6');
+                    initSocket(4);
+                    initSocket(6);
+                    // 1123 to prevent receiving a packet loss and a subsequent reply packet at the same time
+                    setInterval(watchdog, 1123);
+                    setInterval(function() {
+                        log.info('Ping hosts: ', Object.keys(targets).join(', '));
+                    }, 360000);
+                    setTimeout(function () {
+                        process.send({type: 'initCompleted'});
+                    }, 200);
+                }
                 return;
             }
 
@@ -784,7 +786,7 @@ function runServerProcess() {
      */
     function watchdog() {
 
-        // watchdog will be check for sending packets to all targets not often then 1 second
+        // watchdog will be checked for sending packets to all targets not often then 1 second
         var now = Date.now();
         for (var address in targets) {
             if(!targets.hasOwnProperty(address)) continue;
@@ -821,7 +823,7 @@ function runServerProcess() {
 
             if (now - target.lastPacketTime > target.timeout + 1000) {
                 log.warn('Ping: last packet for ', target.host, '(', target.address, ') was sending ', now - target.lastPacketTime,
-                    ' seconds ago. It more then timeout+1000 (', target.timeout + 1000, '). Restarting ping for this host');
+                    ' seconds ago. It is more than timeout+1000 (', target.timeout + 1000, '). Restarting ping for this host');
                 sendICMPMessage(target);
             }
         }

@@ -52,20 +52,23 @@ function processMessage(message, socket, callback) {
 
     if(message.msg === 'getByIdx') {
         return cache.getByIdx (message.id, message.last, message.cnt, message.maxRecordsCnt, message.recordsType,
-            function(err, records) {
-                callback(err, thinOutRecords(records, message.maxRecordsCnt))
+            function(err, records, isGotAllRequiredRecords, param) {
+                callback(err, {
+                    records: thinOutRecords(records, message.maxRecordsCnt),
+                    all: isGotAllRequiredRecords,
+                    param: param,
+                });
             });
     }
 
     if(message.msg === 'getByTime') {
         return cache.getByTime (message.id, message.time, message.interval, message.maxRecordsCnt,
-            message.recordsType, function(err, records) {
-                //var isDataFromTrends = records && records.length ? records[0].isDataFromTrends : false;
-                var trimmedRecords = thinOutRecords(records, message.maxRecordsCnt);
-                //if(trimmedRecords.length) {
-                //trimmedRecords[0].isDataFromTrends = trimmedRecords.length !== records.length || isDataFromTrends;
-                //}
-                callback(err, trimmedRecords);
+            message.recordsType, function(err, records, isGotAllRequiredRecords, param) {
+                callback(err, {
+                    records: thinOutRecords(records, message.maxRecordsCnt),
+                    all: isGotAllRequiredRecords,
+                    param: param,
+                });
             });
     }
 

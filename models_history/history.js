@@ -1,24 +1,30 @@
 /*
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
-/*
- * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
- */
-
 /**
  * Created by Alexander Belov on 16.10.2016.
  */
 
 const path = require('path');
-var log = require('../lib/log')(module);
-var IPC = require('../lib/IPC');
-var proc = require('../lib/proc');
-var parameters = require('../models_history/historyParameters');
-var cache = require('../models_history/historyCache');
-var functions = require('../models_history/historyFunctions');
-var countersDB = require('../models_db/countersDB');
+const log = require('../lib/log')(module);
+const IPC = require('../lib/IPC');
+const proc = require('../lib/proc');
+const parameters = require('../models_history/historyParameters');
+const cache = require('../models_history/historyCache');
+const functions = require('../models_history/historyFunctions');
+const historyGet = require('../models_history/historyFunctionsGet');
+const historyStorageServer = require("../models_history/historyStorageServer");
+const countersDB = require('../models_db/countersDB');
+const Conf = require('../lib/conf');
+const confHistory = new Conf('config/history.json');
+parameters.init(confHistory.get());
 
-var history = {};
+if(parameters.directAccessToDBFile) historyGet.initFunctions(getByIdx, getByTime);
+
+var history = {
+    getByIdx: getByIdx,
+    getByTime: getByTime,
+};
 module.exports = history;
 
 var clientIPC, truncateWatchDogInterval, restartInProgress = false, usedToSaveDataToHistory = false;
@@ -100,67 +106,18 @@ for(var funcName in functions) {
                 return callback(new Error('Try to run function ' + tmp_funcName + '(' + args.join(', ') +
                     ') for object in history with not integer objectCounterID: ' + id));
 
-            clientIPC.sendAndReceive( {
-                msg: 'func',
-                id: Number(id),
-                funcName: tmp_funcName,
-                parameters: args
-            }, callback);
+            if(parameters.directAccessToDBFile) functions[tmp_funcName](Number(id), args, callback);
+            else {
+                clientIPC.sendAndReceive({
+                    msg: 'func',
+                    id: Number(id),
+                    funcName: tmp_funcName,
+                    parameters: args
+                }, callback);
+            }
         }
     })(funcName);
 }
-
-/*
-function truncateWalWatchdog(initParameters, callback) {
-
-    cache.getDBPath().forEach(function(dbPath) {
-        var walPath = dbPath.replace(/\.db$/i, '.wal');
-        // truncate watchdog
-        var truncateCounter = 0, truncateCheckInterval = 30000;
-        truncateWatchDogInterval = setInterval(function () {
-            fs.stat(walPath, function (err, stat) {
-                if(err) return log.warn('Can\'t stat file ', walPath, ': ', err.message);
-                if(!stat.size) {
-                    if(truncateWatchDogInterval) clearInterval(truncateWatchDogInterval);
-                    log.warn('WAL file was truncated, waiting for continue execution...');
-                    setTimeout(function () {
-                        fs.stat(walPath, function (err, stat) {
-                            if (err) log.warn('Can\'t stat file ', walPath, ': ', err.message);
-                            if((!stat || !stat.size) && truncateWatchDogInterval) {
-                                log.error('WAL file was truncated, but history is halted. Restart history...');
-                                restartHistory(callback);
-                            }
-                        });
-                    }, 10000)
-                }
-
-                if(truncateCounter * truncateCheckInterval > 600000) {
-                    log.error('The WAL file was not truncated, but the possible history process halt. Restart history process...');
-                    restartHistory(callback);
-                    if(truncateWatchDogInterval) clearInterval(truncateWatchDogInterval);
-                    return;
-                }
-
-                for(var i = 0, size = stat.size; i < 3 && size > 1024; i++) {
-                    size = Math.round(size / 1024);
-                }
-                log.info('Waiting for truncation of WAL file (',
-                    Math.ceil((++truncateCounter * truncateCheckInterval) / 60000) ,'min), size: ', size, ['B', 'KB', 'MB', 'GB'][i],
-                    ' path: ', walPath);
-            });
-        }, truncateCheckInterval);
-    });
-
-    function restartHistory(callback) {
-        clientIPC.kill(function() {
-            setTimeout( function() {
-                history.start(initParameters, callback);
-            }, 5000);
-        });
-    }
-}
-*/
-
 
 /** Returning list of all history functions
  * @returns {array} - return array of objects [{name: ..., description:...}, {}, ...]
@@ -323,8 +280,8 @@ history.del = function(IDs, callback){
 /** Get last value for specified history IDs (OCIDs)
  *
  * @param {array} IDs - array of history IDs (OCIDs)
- * @param {function(null, object)|function(Error): void} callback - called when done. Return Error or records wit last values for IDs
- * like {id1: {err:..., timestamp:..., data:...}, id2: {err:..., timestamp:..., data:...}, ....}
+ * @param {function(null, object)|function(Error): void} callback - called when done. Return Error or records with last values for IDs
+ * like {id1: {timestamp:..., data:..., param:...}, id2: {timestamp:..., data:..., param:...}, ....}
  */
 history.getLastValues = function(IDs, callback) {
     if(typeof callback !== 'function') {
@@ -352,7 +309,7 @@ history.getLastValues = function(IDs, callback) {
  * @param {function(null, array)|function(Error): void } [callback] - called when done. Return Error or an array of records like
  * [{timestamp:..., data:...}, {timestamp:..., data:...}, ...]
  */
-history.getByIdx = function(id, offset, cnt, maxRecordsCnt, callback){
+function getByIdx (id, offset, cnt, maxRecordsCnt, callback) {
 
     if(typeof callback !== 'function') {
         return log.error('Error getting value for object ',id,' by index from history: callback is not a function');
@@ -377,8 +334,29 @@ history.getByIdx = function(id, offset, cnt, maxRecordsCnt, callback){
         cnt: Number(cnt),
         maxRecordsCnt: Number(maxRecordsCnt),
         recordsType: 0,
-    }, callback);
-};
+    }, function(err, result) {
+        var recordsFromCache = result.records;
+        var param = result.param;
+        var isGotAllRequiredRecords = result.all;
+
+        if(typeof param !== 'object') return callback(err, recordsFromCache, isGotAllRequiredRecords);
+
+        historyStorageServer.getRecordsFromStorageByIdx(Number(id), param.storageOffset, param.storageCnt, param.storageTimestamp,
+            Number(maxRecordsCnt), 0, function(err, recordsFromStorage) {
+
+            if (err) return callback(err);
+            if(!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
+                return callback(err, recordsFromCache, false);
+            }
+
+            Array.prototype.push.apply(recordsFromStorage, recordsFromCache);
+            if(recordsFromStorage.length) {
+                recordsFromStorage[0].recordsFromCache = recordsFromCache.length;
+            }
+            callback(null, recordsFromStorage, true);
+        });
+    });
+}
 
 /** Get data from history for a specified time for a specified history identifier (OCID)
  *
@@ -393,7 +371,7 @@ history.getByIdx = function(id, offset, cnt, maxRecordsCnt, callback){
  * @param {function(null, array)|function(Error): void } callback - called when done. Return Error or an array of records like
  * [{timestamp:..., data:...}, {timestamp:..., data:...}, ...]
  */
-history.getByTime = function(id, time, interval, maxRecordsCnt, callback){
+function getByTime (id, time, interval, maxRecordsCnt, callback) {
 
     if(Number(maxRecordsCnt) !== parseInt(String(maxRecordsCnt), 10)) {
         return callback(new Error('Try to get data by function "getByTime" for object from history with not ' +
@@ -422,8 +400,43 @@ history.getByTime = function(id, time, interval, maxRecordsCnt, callback){
         interval: Number(interval),
         maxRecordsCnt: Number(maxRecordsCnt),
         recordsType: 0,
-    }, callback);
-};
+    }, function(err, result) {
+        var recordsFromCache = result.records;
+        var param = result.param;
+        var isGotAllRequiredRecords = result.all;
+
+        if(typeof param !== 'object') return callback(err, recordsFromCache, isGotAllRequiredRecords);
+
+        historyStorageServer.getRecordsFromStorageByTime(Number(id), param.timeFrom, param.storageTimeTo,
+            Number(maxRecordsCnt), 0,function(err, recordsFromStorage) {
+//          log.debug(id, ': !!! records form storage err: ', err, '; time: ', (new Date(timeFrom)).toLocaleString(), '-', (new Date(storageTimeTo)).toLocaleString(), ';', timeFrom,'-', storageTimeTo, ': ', recordsFromStorage);
+
+            if (err) return callback(err);
+            if(!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
+                return callback(err, recordsFromCache, false);
+            }
+
+            var isDataFromTrends = recordsFromStorage.length ? recordsFromStorage[0].isDataFromTrends : false;
+            if(recordsFromCache.length &&
+                recordsFromStorage[recordsFromStorage.length-1].timestamp >= recordsFromCache[0].timestamp) {
+                log.warn('Timestamp in last record from storage: ', recordsFromStorage[recordsFromStorage.length-1],
+                    ' more than timestamp in first record from cache: ', recordsFromCache[0], '; storage: ...',
+                    recordsFromStorage.slice(-5), '; cache: ', recordsFromCache.slice(0, 5), '...');
+
+                var lastRecord = recordsFromStorage.pop(), firstCachedRecordTimestamp = recordsFromCache[0].timestamp;
+                while(lastRecord && lastRecord.timestamp >= firstCachedRecordTimestamp) {
+                    lastRecord = recordsFromStorage.pop();
+                }
+            }
+            Array.prototype.push.apply(recordsFromStorage, recordsFromCache);
+            if(recordsFromStorage.length) {
+                recordsFromStorage[0].isDataFromTrends = isDataFromTrends;
+                recordsFromStorage[0].recordsFromCache = recordsFromCache.length;
+            }
+            callback(null, recordsFromStorage, true);
+        });
+    });
+}
 
 /** Tries to find the closest specified value in the history data for a specific history identifier (OCID) and return
  * the timestamp of the desired value
@@ -450,5 +463,9 @@ history.getByValue = function(id, value, callback){
         msg: 'getByValue',
         id: Number(id),
         value: value
-    }, callback);
+    }, function(err, records) {
+        if(err !== null || records !== null) return callback(err, records);
+
+        historyStorageServer.getLastRecordTimestampForValue(Number(id), value, callback);
+    });
 };

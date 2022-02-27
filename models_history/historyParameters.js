@@ -12,6 +12,7 @@ var parameters = {
     serverAddress: "127.0.0.1",
     maxSocketErrorsCnt: 500, // for IPC system
     serverPort: 10163,
+    directAccessToDBFile: true, // direct read data from history.db without history server
     cacheServiceInterval: 300, //sec
     restartHistoryInterval: 0, // sec = 1 hour 30 minutes
     restartStorageModifier: false,

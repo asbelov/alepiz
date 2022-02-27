@@ -3,22 +3,20 @@
  */
 
 var log = require('../lib/log')(module);
-const proc = require("../lib/threads");
-const Database = require("better-sqlite3");
+const threads = require('../lib/threads');
+const Database = require('better-sqlite3');
 const fs = require("fs");
 const exitHandler = require("../lib/exitHandler");
 const countersDB = require("../models_db/countersDB");
-const historyStorage = require('./historyStorage');
+const historyStorage = require('../models_history/historyStorage');
+var parameters = require('../models_history/historyParameters');
+const Conf = require("../lib/conf");
 
 // array of minutes for trends. long time (keepTrends time) keeps only trends with time interval 60
 // trends less the 60 will keep as history data (keepHistory time)
 var trendsTimeIntervals = historyStorage.trendsTimeIntervals;
 var transProcessArgID = historyStorage.transProcessArgID;
 var getDbPaths = historyStorage.getDbPaths;
-var parameters = {};
-
-var isTransactionProcess = proc.workerData && proc.workerData[0];
-var dbPath = proc.workerData && proc.workerData[1];
 
 var db;
 var functions = {};
@@ -36,28 +34,57 @@ var slowRecords = {
     recordsNum: 0,
 };
 
-new proc.child({
-    module: 'historyStorage',
-    cleanUpCallbacksPeriod: 86400000,
-    onMessage: onMessage,
-    onStop: onStop,
-    onDestroy: function () {
-        if(db && typeof db.close === 'function') {
-            try {
-                db.close();
-                log.exit('Storage DB closed successfully');
-            } catch (err) {
-                log.exit('Error while close storage DB: ' + err.message);
+// if(module.parent) {} === if(require.main !== module) {}
+if(require.main !== module) {
+    const Conf = require('../lib/conf');
+    const confHistory = new Conf('config/history.json');
+    parameters.init(confHistory.get());
+
+    var isTransactionProcess = false;
+    var dbPath = getDbPaths(parameters)[0];
+    dbOpen();
+    module.exports = functions;
+} else {
+    isTransactionProcess = threads.workerData && threads.workerData[0];
+    dbPath = threads.workerData && threads.workerData[1];
+
+    new threads.child({
+        module: 'historyStorage',
+        cleanUpCallbacksPeriod: 86400000,
+        onMessage: onMessage,
+        onStop: onStop,
+        onDestroy: function () {
+            if(db && typeof db.close === 'function') {
+                try {
+                    db.close();
+                    log.exit('Storage DB closed successfully');
+                } catch (err) {
+                    log.exit('Error while close storage DB: ' + err.message);
+                }
             }
-        }
-    },
-    onDisconnect: function () {  // exit on disconnect from parent (then server will be restarted)
-        log.exit('History storage process ' + process.pid + ' was disconnected from server unexpectedly. Exiting');
-        onStop(function () {
-            log.disconnect(function () { process.exit(2) });
-        });
-    },
-});
+        },
+        onDisconnect: function () {  // exit on disconnect from parent (then server will be restarted)
+            log.exit('History storage process ' + process.pid + ' was disconnected from server unexpectedly. Exiting');
+            onStop(function () {
+                log.disconnect(function () { process.exit(2) });
+            });
+        },
+    });
+}
+
+function dbOpen() {
+    log.info('Open storage file ', dbPath, ' for ', (isTransactionProcess ? 'transactions' : 'queries'),' operations...');
+    try {
+        db = new Database(dbPath, {readonly: !isTransactionProcess});
+        db.pragma('synchronous = "OFF"');
+        db.pragma('foreign_keys = "ON"');
+        db.pragma('encoding = "UTF-8"');
+        db.pragma('journal_mode = "WAL"');
+    } catch (err) {
+        return log.throw('Can\'t open DB ', dbPath, ' or set some required pragma modes: ', err.message);
+    }
+}
+
 
 // starting after receiving message with parameters from parent
 function init(callback) {
@@ -76,16 +103,7 @@ function init(callback) {
     }, 60000);
 
 
-    log.info('Open storage file ', dbPath, ' for ', (isTransactionProcess ? 'transactions' : 'queries'),' operations...');
-    try {
-        db = new Database(dbPath);
-        db.pragma('synchronous = "OFF"');
-        db.pragma('foreign_keys = "ON"');
-        db.pragma('encoding = "UTF-8"');
-        db.pragma('journal_mode = "WAL"');
-    } catch (err) {
-        return log.throw('Can\'t open DB ', dbPath, ' or set some required pragma modes: ', err.message);
-    }
+    dbOpen();
 
     if(isTransactionProcess) {
         log.info('Loading object parameters...');
