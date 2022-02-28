@@ -353,7 +353,7 @@ function getByIdx (id, offset, cnt, maxRecordsCnt, callback) {
             if(recordsFromStorage.length) {
                 recordsFromStorage[0].recordsFromCache = recordsFromCache.length;
             }
-            callback(null, recordsFromStorage, true);
+            callback(null, cache.thinOutRecords(recordsFromStorage, Number(maxRecordsCnt)), true);
         });
     });
 }
@@ -433,7 +433,7 @@ function getByTime (id, time, interval, maxRecordsCnt, callback) {
                 recordsFromStorage[0].isDataFromTrends = isDataFromTrends;
                 recordsFromStorage[0].recordsFromCache = recordsFromCache.length;
             }
-            callback(null, recordsFromStorage, true);
+            callback(null, cache.thinOutRecords(recordsFromStorage, Number(maxRecordsCnt)), true);
         });
     });
 }

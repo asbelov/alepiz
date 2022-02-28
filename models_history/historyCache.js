@@ -1055,3 +1055,67 @@ historyCache.getTransactionsQueueInfo = function(callback) {
         return callback(null, transQueue);
     });
 };
+
+/** Thin out records: decrease count of returned records to maxRecordsNum records
+ * @param {Array} allRecords: array of records [{timestamp:..., data:...}, ...]
+ * @param {uint} maxRecordsNum: required maximum number of records
+ * @return thin out array of records [{timestamp:..., data:...}, ...]
+ */
+historyCache.thinOutRecords = function (allRecords, maxRecordsNum) {
+
+    if(!allRecords || !allRecords.length) return [];
+    var recordsCnt = allRecords.length;
+
+    maxRecordsNum = parseInt(String(maxRecordsNum), 10);
+
+    var stepTimestamp = (Number(allRecords[recordsCnt - 1].timestamp) - Number(allRecords[0].timestamp)) / (maxRecordsNum - 1);
+    if(!maxRecordsNum || maxRecordsNum === 1 || stepTimestamp < 1 || recordsCnt <= maxRecordsNum) return allRecords;
+
+    var nextTimestamp = Number(allRecords[0].timestamp); // also adding first record to returned array
+    var avgRecords = [], avgData = null, avgTimestamp = null;
+
+    allRecords.forEach(function (record) {
+        // if record.data is number
+        if(!isNaN(parseFloat(record.data)) && isFinite(record.data)) {
+            if(avgData === null) {
+                avgData = Number(record.data);
+                avgTimestamp = Number(record.timestamp);
+            } else {
+                avgData = (avgData + Number(record.data)) / 2;
+                avgTimestamp = Math.round((avgTimestamp + Number(record.timestamp)) / 2);
+            }
+
+            if(Number(record.timestamp) >= nextTimestamp) {
+                avgRecords.push({
+                    data: avgData,
+                    timestamp: avgTimestamp
+                });
+                nextTimestamp += stepTimestamp;
+                avgData = null; avgTimestamp = null;
+            }
+        } else { // if record.data not a number
+            if(avgData !== null) avgRecords.push({ // add previous numbers to array
+                data: avgData,
+                timestamp: avgTimestamp
+            });
+            avgRecords.push(record); // add record to array
+            nextTimestamp += stepTimestamp;
+            avgData = null; avgTimestamp = null;
+        }
+    });
+
+    if(avgData !== null) avgRecords.push({ // add last record to array
+        data: avgData,
+        timestamp: avgTimestamp
+    });
+
+    // add isDataFromTrends and recordsFromCache information
+    if(typeof avgRecords[0] === 'object') {
+        for(var key in allRecords[0]) {
+            if(key !== 'data' && key !== 'timestamp') avgRecords[0][key] = allRecords[0][key];
+        }
+        avgRecords[0].notTrimmedRecordsNum = allRecords.length;
+    }
+
+    return avgRecords;
+}

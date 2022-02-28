@@ -2,9 +2,9 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var recode = require('../../lib/recode');
+const recode = require('../../lib/recode');
 const Conf = require("../../lib/conf");
-var log = require('../../lib/log')(module);
+const log = require('../../lib/log')(module);
 const confCollectors = new Conf('config/collectors.json');
 const confSettings = new Conf(confCollectors.get('dir') + '/ping/settings.json');
 
@@ -21,7 +21,8 @@ Collector ping targets using raw-socket module.
  */
 
 
-if(module.parent) initServerCommunication();
+// if(module.parent) {} === if(require.main !== module) {}
+if(require.main !== module) initServerCommunication();
 else runServerProcess(); //standalone server process
 
 
@@ -37,7 +38,6 @@ function initServerCommunication() {
         serverProcess,
         restartInProgress = 0,
         isServerInitialising = false,
-        packetLossCnt = {},
         externalPingProcesses = {},
         pingServerRestartTime = Date.now();
 
@@ -53,7 +53,9 @@ function initServerCommunication() {
             if(!externalPingProcesses.hasOwnProperty(address)) continue;
 
             log.info('Killing external ping program for ', targets[address] ? targets[address].host : 'UNKNOWN', '(', address, ')');
-            if(externalPingProcesses[address] && typeof externalPingProcesses[address].kill === 'function') externalPingProcesses[address].kill('SIGINT');
+            if(externalPingProcesses[address] && typeof externalPingProcesses[address].kill === 'function') {
+                externalPingProcesses[address].kill('SIGINT');
+            }
         }
 
         if(serverProcess) {
@@ -63,7 +65,6 @@ function initServerCommunication() {
         isServerInitialising = false;
         targets = {};
         externalPingProcesses = {};
-        packetLossCnt = {};
 
         if(typeof callback === 'function') return callback();
     };
@@ -179,7 +180,22 @@ function initServerCommunication() {
     };
 
 
-    // sending message for ping server to starting ping for specific host
+    /** sending message to the ping server to starting ping for specific host
+     * @param {Object} target - target object
+     * @example
+     * targets = {
+     *      OCID: param.$id,
+     *      host: param.host,
+     *      address: address,
+     *      interval: param.pingInterval,
+     *      packetSize: param.packetSize,
+     *      packetsCnt: param.packetsCnt,
+     *      sequenceNumber: sequenceNumber,
+     *      timeout: param.timeout,
+     *      family: family,
+     *      callback: callback
+     * };
+     */
     function sendMessageToPing(target) {
         if(serverProcess) {
             serverProcess.send({
@@ -268,12 +284,7 @@ function initServerCommunication() {
                     pingServerRestartTime = Date.now();
                     restartInProgress = 0;
 
-                    for (var address in packetLossCnt) {
-                        if(!packetLossCnt.hasOwnProperty(address)) continue;
-                        delete packetLossCnt[address];
-                    }
-
-                    for (address in targets) {
+                    for (var address in targets) {
                         if(!targets.hasOwnProperty(address)) continue;
                         sendMessageToPing(targets[address]);
                     }
@@ -332,7 +343,8 @@ function initServerCommunication() {
                 externalPingProcesses[address].pid, '. Stopping internal ping for target');
         }
 
-        log.info('Switch target ', targets[address].host, '(', address, ') from internal ping server to ping using external program');
+        log.info('Switch target ', targets[address].host, '(', address,
+            ') from internal ping server to ping using external program');
 
         // getting sequence number for target for syncing with ping server.
         // It will be set when receiving message reply to target object
@@ -390,7 +402,8 @@ function initServerCommunication() {
             // console.log(result, ': ', stdout);
 
             if(!target.address || !targets[target.address]) {
-                log.info('Received echo replay packets from unknown target "', target.address, '" by external ping. Kill it');
+                log.info('Received echo replay packets from unknown target "', target.address,
+                    '" by external ping. Kill it');
                 child.kill('SIGINT');
                 return;
             }
@@ -404,14 +417,16 @@ function initServerCommunication() {
                 // killing external ping for it and running callback at child.on('exit'...) for
                 // switch to internal ping
                 if(legalRTTCnt > 60) {
-                    log.info('Received ', legalRTTCnt, ' echo replay packets from ', target.host, '(', target.address, ') using external ping. Try to switch to internal ping server');
+                    log.info('Received ', legalRTTCnt, ' echo replay packets from ', target.host, '(', target.address,
+                        ') using external ping. Try to switch to internal ping server');
                     child.kill('SIGINT');
                 }
             } else { // packet loss or stdout did not contain data about RTT
                 // return packet loss only if last packet was sending more than <timeout> time ago
                 if(Date.now() - lastPacketSentTime <= target.timeout) return;
 
-                log.info('Packet LOSS for ',target.host,'(', target.address,'); sequence ',target.sequenceNumber,', received from external ping program');
+                log.info('Packet LOSS for ', target.host, '(', target.address, '); sequence ', target.sequenceNumber,
+                    ', received from external ping program');
                 legalRTTCnt = 0;
                 result = 0;
             }
@@ -480,7 +495,10 @@ function runServerProcess() {
                 var address = target.address;
 
                 var ID = targets[address] && targets[address].ID !== undefined ? targets[address].ID : hostID.length;
-                if (ID > 4294967295) return log.error('Can\'t add host ' + target.host + '(' + address + ') to ping server: host ID has reached maximum value (4294967295)');
+                if (ID > 4294967295) {
+                    return log.error('Can\'t add host ' + target.host + '(' + address +
+                        ') to ping server: host ID has reached maximum value (4294967295)');
+                }
                 hostID.push(address);
 
                 var packetTemplate = Buffer.alloc(target.packetSize);
@@ -517,6 +535,7 @@ function runServerProcess() {
                     ' packet size: ', target.packetSize, ' packet count: ', target.packetsCnt,
                     ' sequence number: ', sequenceNumber);
 
+                if(target.timeID) clearInterval(target.timeID);
                 sendICMPMessage(targets[address]);
                 return;
             }
@@ -530,7 +549,7 @@ function runServerProcess() {
                     // 1123 to prevent receiving a packet loss and a subsequent reply packet at the same time
                     setInterval(watchdog, 1123);
                     setInterval(function() {
-                        log.info('Ping hosts: ', Object.keys(targets).join(', '));
+                        log.info('Ping ', Object.keys(targets).length, ' hosts: ', Object.keys(targets).sort().join(', '));
                     }, 360000);
                     setTimeout(function () {
                         process.send({type: 'initCompleted'});
@@ -540,8 +559,10 @@ function runServerProcess() {
             }
 
             if (message.type === 'destroyTarget') {
-                if(!message.data || targets[message.data] === undefined)
-                    return log.warn('Ping: Can\'t destroying target with IP "', message.data, '": address not found in a targets object');
+                if(!message.data || targets[message.data] === undefined) {
+                    return log.warn('Ping: Can\'t destroying target with IP "', message.data,
+                        '": address not found in a targets object');
+                }
                 return destroyTarget(targets[message.data]);
             }
 
@@ -557,14 +578,14 @@ function runServerProcess() {
                 log.warn('Ping: server received exit message, exiting');
 
                 // sending sequences numbers to parent before exit for save it
-                for(var addr in targets) {
-                    if(!targets.hasOwnProperty(addr)) continue;
+                for(var _address in targets) {
+                    if(!targets.hasOwnProperty(_address)) continue;
 
                     process.send({
                         type: 'sequenceNumber',
                         data: {
-                            sequenceNumber: targets[addr].sequenceNumber,
-                            address: addr
+                            sequenceNumber: targets[_address].sequenceNumber,
+                            address: _address
                         }
                     });
                 }
@@ -637,7 +658,8 @@ function runServerProcess() {
         buffer.writeUInt32LE(socketOption.val, 0);
         socket.setOption(raw.SocketLevel[socketOption.level], raw.SocketOption[socketOption.name], buffer, buffer.length);
         socket.getOption(raw.SocketLevel[socketOption.level], raw.SocketOption[socketOption.name], buffer, buffer.length);
-        log.info('Init socket IPv', family,' option "', socketOption.name, '" was ', currentValue, ', now set to ', buffer.readUInt32LE(0));
+        log.info('Init socket IPv', family,' option "', socketOption.name, '" was ', currentValue, ', now set to ',
+            buffer.readUInt32LE(0));
 
         socket.on("close", function () {
             log.info('Socket IPv', family, ' is closed');
@@ -738,6 +760,13 @@ function runServerProcess() {
     */
     function sendICMPMessage(target) {
 
+        if(target.lastPacketTime + target.interval > Date.now()) {
+            log.info('Preventing an attempt to send a packet more often than the time interval ', target.interval / 1000
+                ,'sec for ', target.host, '(', target.address, '). Last packet send ',
+                Math.round((Date.now() - target.lastPacketTime) / 1000), 'sec ago');
+            return;
+        }
+
         // stop sending packet if sequenceNumber > required packetCnt
         if (target.packetsCnt && target.sequenceNumber > target.packetsCnt) {
             process.send({
@@ -768,7 +797,8 @@ function runServerProcess() {
         socket.send(buffer, 0, buffer.length, target.address, function (err/*, bytes*/) {
             if (err) {
                 log.error('Ping IPv', target.family, ' for ', target.host, '(', target.address,
-                    ') error sending packet: ', recode.decode(Buffer.from(err.message), 'cp866'), '; raw error: ', err);
+                    ') error sending packet: ', recode.decode(Buffer.from(err.message), 'cp866'),
+                    '; raw error: ', err);
             }
 
             target.processedSequences[target.sequenceNumber] = target.lastPacketTime = Date.now();
@@ -777,7 +807,6 @@ function runServerProcess() {
             //console.log ('sent ' + (bytes+20) + ' bytes to ' + target.address + ' (IPv' + target.family+ ', hostID: ', buffer.readUInt32BE(4) ,'), seqNum ' + (target.sequenceNumber) + ' seconds: ' +timestamp[0] + ' nanoseconds: ' + timestamp[1]);
             //console.log ("data: " + buffer.toString ("hex").match(/.{1,4}/g).join(' '));
         });
-
     }
 
     /*
@@ -802,8 +831,9 @@ function runServerProcess() {
                 if(now - target.processedSequences[sequenceNumber] > target.timeout) {
 
                     log.info('Packet LOSS for ', target.host, '(', target.address, '); delay: ',
-                        now - target.processedSequences[sequenceNumber], 'ms / ', target.timeout, 'ms; sequence ',
-                        sequenceNumber, ', waiting replies from sequences: ', Object.keys(target.processedSequences).join(','));
+                        now - target.processedSequences[sequenceNumber], '/', target.timeout, 'ms; sequence ',
+                        sequenceNumber, ', waiting replies from sequences: ',
+                        Object.keys(target.processedSequences).join(','));
 
                     process.send({
                         type: 'echoReply',
@@ -822,8 +852,9 @@ function runServerProcess() {
             }
 
             if (now - target.lastPacketTime > target.timeout + 1000) {
-                log.warn('Ping: last packet for ', target.host, '(', target.address, ') was sending ', now - target.lastPacketTime,
-                    ' seconds ago. It is more than timeout+1000 (', target.timeout + 1000, '). Restarting ping for this host');
+                log.warn('Ping: last packet for ', target.host, '(', target.address, ') was sending ',
+                    now - target.lastPacketTime, 'ms ago. It is more than timeout ', target.timeout,
+                    'ms. Restarting ping for this host');
                 sendICMPMessage(target);
             }
         }

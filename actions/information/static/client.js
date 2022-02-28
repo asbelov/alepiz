@@ -92,7 +92,7 @@ var JQueryNamespace = (function ($) {
             var link = !leftOCIDs.length && !rightsOCIDs.length ? ('<b>' + escapeHtml(objectsNames[i]) + '</b>') :
                 ('<a href="' + makeURLForDataBrowser(objectsNames[i], leftOCIDs, rightsOCIDs) + '" target="_blank">' +
                     escapeHtml(objectsNames[i]) + '</a>');
-            html += '<tr><td><b>' + (++num) + '</b></td><td>' + link + '</td><td>' +
+            html += '<tr><td><b>' + (num++) + '</b></td><td>' + link + '</td><td>' +
                 results.join('</td><td>') + '</td></tr>';
 
             CSVData += CSVRow.join(div) + '\n';

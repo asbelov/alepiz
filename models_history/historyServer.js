@@ -54,7 +54,7 @@ function processMessage(message, socket, callback) {
         return cache.getByIdx (message.id, message.last, message.cnt, message.maxRecordsCnt, message.recordsType,
             function(err, records, isGotAllRequiredRecords, param) {
                 callback(err, {
-                    records: thinOutRecords(records, message.maxRecordsCnt),
+                    records: cache.thinOutRecords(records, message.maxRecordsCnt),
                     all: isGotAllRequiredRecords,
                     param: param,
                 });
@@ -65,7 +65,7 @@ function processMessage(message, socket, callback) {
         return cache.getByTime (message.id, message.time, message.interval, message.maxRecordsCnt,
             message.recordsType, function(err, records, isGotAllRequiredRecords, param) {
                 callback(err, {
-                    records: thinOutRecords(records, message.maxRecordsCnt),
+                    records: cache.thinOutRecords(records, message.maxRecordsCnt),
                     all: isGotAllRequiredRecords,
                     param: param,
                 });
@@ -257,70 +257,4 @@ function initScheduledRestart() {
             }
         }, Math.round(parameters.restartHistoryInterval - parameters.restartHistoryInterval / 5));
     }
-}
-
-/*
-    thin out records: decrease count of returned records to maxRecordsCnt records
-
-    allRecords: array of records
-    maxRecordsCnt: required maximum count of records
-    return thin out array of records
- */
-function thinOutRecords(allRecords, maxRecordsCnt) {
-
-    if(!allRecords || !allRecords.length) return [];
-    var recordsCnt = allRecords.length;
-
-    maxRecordsCnt = parseInt(String(maxRecordsCnt), 10);
-
-    var stepTimestamp = (Number(allRecords[recordsCnt - 1].timestamp) - Number(allRecords[0].timestamp)) / (maxRecordsCnt - 1);
-    if(!maxRecordsCnt || maxRecordsCnt === 1 || stepTimestamp < 1 || recordsCnt <= maxRecordsCnt) return allRecords;
-
-    var nextTimestamp = Number(allRecords[0].timestamp); // also adding first record to returned array
-    var avgRecords = [], avgData = null, avgTimestamp = null;
-
-    allRecords.forEach(function (record) {
-        // if record.data is number
-        if(!isNaN(parseFloat(record.data)) && isFinite(record.data)) {
-            if(avgData === null) {
-                avgData = Number(record.data);
-                avgTimestamp = Number(record.timestamp);
-            } else {
-                avgData = (avgData + Number(record.data)) / 2;
-                avgTimestamp = Math.round((avgTimestamp + Number(record.timestamp)) / 2);
-            }
-
-            if(Number(record.timestamp) >= nextTimestamp) {
-                avgRecords.push({
-                    data: avgData,
-                    timestamp: avgTimestamp
-                });
-                nextTimestamp += stepTimestamp;
-                avgData = null; avgTimestamp = null;
-            }
-        } else { // if record.data not a number
-            if(avgData !== null) avgRecords.push({ // add previous numbers to array
-                data: avgData,
-                timestamp: avgTimestamp
-            });
-            avgRecords.push(record); // add record to array
-            nextTimestamp += stepTimestamp;
-            avgData = null; avgTimestamp = null;
-        }
-    });
-
-    if(avgData !== null) avgRecords.push({ // add last record to array
-        data: avgData,
-        timestamp: avgTimestamp
-    });
-
-    // add isDataFromTrends and recordsFromCache information
-    if(typeof avgRecords[0] === 'object') {
-        for(var key in allRecords[0]) {
-            if(key !== 'data' && key !== 'timestamp') avgRecords[0][key] = allRecords[0][key];
-        }
-        avgRecords[0].notTrimmedRecordsNum = allRecords.length;
-    }
-
-    return avgRecords;
 }
