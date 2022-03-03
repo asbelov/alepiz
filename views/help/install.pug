@@ -1,0 +1,172 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-5-8 22:48:12
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Installation, system requirements, and connecting to ALEPIZ.
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 ALEPIZ installation
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h2 System requirements
+                    p.
+                        ALEPIZ requires an Intel x64 architecture processor with installed Microsoft Windows OS version
+                        not lower than Windows Server 2012 or Windows 10. After installation, ALEPIZ uses 200Mb of disk
+                        space. RAM utilisation on a server with 12 CPU cores, when servicing 10 monitoring
+                        objects, is about 1Gb. Disk space utilisation falls on the storage of historical data.
+                    p.
+                        With an increase in the number of objects, the growth in the RAM utilisation and other
+                        resources occurs non-linearly and depends on the size of the infrastructure and system settings.
+                        For example, to process data from 10,000 monitoring objects, 25 metrics and events per object,
+                        you need a server with 2 processors, 16 cores per processor and 100GB of RAM.
+                        Under the condition of storing historical data for 3 months and using the data throttling
+                        algorithm, about 300Gb of disk space is required. It is recommended to use disk drives such as
+                        SSD and a RAID controller with memory for data caching
+                    blockquote.
+                        ALEPIZ includes all the necessary components for operation. No additional software is required
+                        for the operation of the server part of the system.
+                    p.
+                        Interaction with ALEPIZ is carried out through the Web interface. To control ALEPIZ, you will
+                        need a computer, tablet, or smartphone with an installed browser.
+                    h2 Download ALEPIZ
+                    p.
+                        The latest stable version of ALEPIZ can be obtained from the page
+                        #[a(href="https://alepiz.com/help/download.pug") https://alepiz.com/help/download.pug].
+                    h2 Installing ALEPIZ using the installation package
+                    blockquote.
+                        To study ALEPIZ, it can be installed on a personal computer or laptop.
+                    p.
+                        After downloading the installation package, you need to run it. You will need system
+                        administrator privileges to install correctly. During the installation process, you must accept
+                        the license agreement and indicate where you are going to install ALEPIZ. In the screenshot
+                        example, the default path C:\Program Files\ALEPIZ has been changed to D:\ALEPIZ.
+                    div.row
+                        div.col.m6.s12
+                            img(src="./images/help.installSetupLicense.png" width="500px").materialboxed.card-panel.hoverable
+                        div.col.m6.s12
+                            img(src="./images/help.installSetupPath.png" width="500px").materialboxed.card-panel.hoverable
+                    p.
+                        Next, the process of unpacking the files will be performed. After that, you need to answer three questions:
+                    ol
+                        li Install as service
+                        li Launch ALEPIZ
+                        li Launch a browser and connect to ALEPIZ (http://localhost)
+                    div.row
+                        div.col.m6.s12
+                            img(src="./images/help.installSetupExtract.png" width="500px").materialboxed.card-panel.hoverable
+                        div.col.m6.s12
+                            img(src="./images/help.installSetupOptions.png" width="500px").materialboxed.card-panel.hoverable
+                    p.
+                        In the example in the screenshot, all three questions are answered yes, so next the browser
+                        will be launched and display the ALEPIZ interface.
+
+                    h5 ALEPIZ installed and ready to use
+
+                    img(src="./images/help.installBrowser.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h3 Installing ALEPIZ from the archive
+                    p.
+                        ALEPIZ can be installed from the archive. To do this, follow these steps:
+                    ol
+                        li.
+                            Download and extract the archive to the directory where you plan to use ALEPIZ.
+                        li.
+                            Log in as an Administrator user or run cmd as an Administrator user. To launch cmd,
+                            you need to press Win+Q, type "cmd" in the search box, right-click on the "Command prompt"
+                            item that appears and select "Run as administrator".
+                        li.
+                            Change to the ALEPIZ installation directory, then to the "bin\" directory and run
+                            install.cmd. The script will register ALEPIZ as a Windows service. From the "bin\"
+                            directory, run start.cmd. The script will start the ALEPIZ service.
+                        li.
+                            ALEPIZ is waiting for an HTTP connection on port 80. Connect your browser to ALEPIZ.
+
+                    h2 Login and change passwords
+                    p.
+                        After successfully connecting to ALEPIZ, you need to log in. To do this, you need to click on
+                        the #[i.material-icons account_box] icon in the upper right corner and log in with the user
+                        "admin" and password "admin".
+                    img(src="./images/help.startAuth.png" width="1024").materialboxed.card-panel.hoverable
+                    p.
+                        After that, for security purposes, you need to change the passwords of three users:
+                        admin, business and watcher. The admin user has the admin password, the business user has the
+                        business password, and the watcher user has the watcher password. Other users do not have
+                        passwords and it is impossible to log in using them.
+                    p.
+                        To change passwords, in the Actions system menu on the left, select the
+                        Administration\Users editor action. Next, select the desired user from the list, enter a new
+                        password for him and save the changes by launching the action.
+                    img(src="./images/help.startChangePass.png" width="1024").materialboxed.card-panel.hoverable
+                    blockquote.
+                        Launch action button appears when hovering over an element
+                        #[a.btn-floating.btn-small.waves-effect.waves-light.orange.darken-1: i.material-icons.large more_horiz],
+                        which is in the lower right corner. To run an action, click on
+                        #[a.btn-floating.btn-small.waves-effect.waves-light.red: i.material-icons play_arrow].
+                        After that, a window with information about the execution of the action will appear on the
+                        screen below. As long as the action is not running, the changes entered will not be applied.
+                    img(src="./images/help.startChangePassRun.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h3 Additional Information
+                    blockquote.
+                        If you click on the icon #[i.material-icons help_outline] in the upper right corner of the
+                        screen, help will appear for the action that is currently displayed in the main ALEPIZ window.
+                    blockquote.
+                        You can get acquainted with the interface of the ALEPIZ system on the help page
+                        #[a(href="/help/") Interface of ALEPIZ].
+                    blockquote.
+                        The system log files are located in the "logs\" directory. Once installed, ALEPIZ runs on
+                        port 80. You can connect to it via the HTTP protocol, for this you just need to type in the
+                        address bar of your browser
+                        http://&lt;alepiz.server&gt;, где &lt;alepiz.server&gt; - IP address or name of the server
+                        where ALEPIZ is installed. You can change the TCP port in the ALEPIZ configuration file -
+                        config\webServer.json by changing the port: 80 parameter.
+                    h3 Launching ALEPIZ with extended rights
+                    p.
+                        After installation, the ALEPIZ service runs under the system user who does not have access to
+                        external network resources. If you plan to use ALEPIZ not only for monitoring, but also for
+                        infrastructure management, you may need to give the system access to other servers on the
+                        network. To do this, you need to run the ALEPIZ service under a user who has the appropriate
+                        rights. This can be a domain administrator or a specially created user with advanced rights.
+                    p.
+                        To start the ALEPIZ service under a different user, you must press Win+Q, type "services" in
+                        the search form that appears, select "Services".
+                    p.
+                        The application for managing Windows services will launch. In the list of services, move the
+                        cursor to "ALEPIZ" and double-click the left mouse button.
+                    div.row
+                        div.col.s12.m4
+                            img(src="./images/help.installRunServices.png" width="300px").materialboxed.card-panel.hoverable
+                        div.col.s12.m8
+                            img(src="./images/help.installServicesControl.png" width="700px").materialboxed.card-panel.hoverable
+                    p.
+                        The service management window will appear. It is necessary to stop the service by clicking on
+                        the "Stop" button and wait until the end of the stop.
+                    p.
+                        Next, go to the "Log ON" tab. Select "This account" and enter the domain name and domain
+                        user under which ALEPIZ will run, for example, "MY_DOMAIN\Administrator". Enter the user
+                        password below and save the changes.
+                    p.
+                        Then you need to return to the General tab and start the ALEPIZ service by clicking on the
+                        "Start" button.
+                    div.row
+                        div.col.s12.m7
+                            img(src="./images/help.installServiceStopInProgress.png" width="600px").materialboxed.card-panel.hoverable
+                        div.col.s12.m5
+                            img(src="./images/help.installServicesChangeUser.png" width="400px").materialboxed.card-panel.hoverable
+                    h3 Security
+                    p.
+                        Despite the fact that ALEPIZ has a built-in user authorization system and a system for
+                        distributing access rights to objects, actions, and tasks, we recommend that, as additional
+                        security measures, restrict access to the system with network filters and configure Web browser
+                        connections to ALEPIZ using the secure HTTPS protocol.

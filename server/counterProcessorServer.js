@@ -380,7 +380,7 @@ function printChildrenMemUsage() {
         if(serverMemoryUsage > cfg.maxMemUsage) {
             if (!startMemUsageTime) startMemUsageTime = Date.now();
             else if (Date.now() - startMemUsageTime > memUsageMaxTime) {
-                log.exit('Memory usage too high ', serverMemoryUsage, 'Mb/', cfg.maxMemUsage,
+                log.exit('Memory usage too high ', serverMemoryUsage, '/', cfg.maxMemUsage,
                     'Mb from ', (new Date(startMemUsageTime).toLocaleString()), ', restarting counter server process');
 
                 // stopServer() included in exitHandler.exit() function
@@ -391,7 +391,7 @@ function printChildrenMemUsage() {
 
     log.info(serverName,' DB queries: ', serverCache.recordsFromDBCnt,
         '. Rcv from children: ', receivingValues,
-        '. Mem usage: ', serverMemoryUsage,'Mb', (cfg.maxMemUsage ? '/' + cfg.maxMemUsage + 'Mb' : ''),
+        '. Mem usage: ', serverMemoryUsage, (cfg.maxMemUsage ? '/' + cfg.maxMemUsage : ''), 'Mb',
         (startMemUsageTime ?
             '. High mem usage lasts ' + Math.round((Date.now() - startMemUsageTime) / 1000) + '/' +
             memUsageMaxTime / 1000 + 'sec' : ''),
@@ -454,10 +454,10 @@ function processServerMessage(message) {
 function processChildMessage(message) {
     if(!message) return;
 
-    if(message.updateEventKey) {
-        updateEventsStatus.set(message.updateEventKey, message.updateEventState);
-        return;
-    }
+    //if(message.updateEventKey) {
+    //    updateEventsStatus.set(message.updateEventKey, message.updateEventState);
+    //    return;
+    //}
 
     if(message.messagesQueue && message.tid) {
         // save queue data for child
@@ -517,6 +517,10 @@ function processChildMessage(message) {
     }
 
 
+    if(message.variables.UPDATE_EVENT_STATE !== undefined) {
+        var updateEventKey = message.parentOCID + '-' + message.objectCounterID;
+        updateEventsStatus.set(updateEventKey, message.variables.UPDATE_EVENT_STATE);
+    }
 
     /*
     var values = Array.isArray(message.value) ? message.value : [message.value];

@@ -1,0 +1,229 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-5-8 22:48:12
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Overview of ALEPIZ
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 ALEPIZ
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    h2 Overview of ALEPIZ
+                    p.
+                        ALEPIZ is designed to organize monitoring and automation of infrastructure processes.
+                        Due to the fact that ALEPIZ combines monitoring and automation, it is possible to set up a
+                        system where all processes will be logically interconnected based on monitoring data.
+                        This approach implies that automation processes will be launched depending on the current state
+                        of the infrastructure.
+                    p.
+                        For example, packing of log files will be automatically started after a complete shutdown of
+                        the service according to a schedule based on information received from the monitoring system.
+                        The service files will be backed up after the log files packing operation is completed.
+                        Automatic update of the service to the new version will be performed immediately after
+                        receiving information about the end of the backup process. Until the service update process is
+                        completed, the automatic start of the service will not be performed.
+                    img(src="./images/help.mainInterface.png" width="1024x").materialboxed.card-panel.hoverable
+                    div.row
+                        div.col.s12.m6
+                            h3 Key Features
+                            blockquote.
+                                After installation, ALEPIZ is immediately ready for use. It includes all necessary
+                                components, including a Web server and a database server. For its functioning,
+                                the system does not require the installation of additional software.
+                            blockquote.
+                                ALEPIZ can be quickly prepared for use in a small infrastructure by manually creating
+                                static monitoring objects without having to deeply study the system and develop
+                                your own components.
+                            blockquote.
+                                With ALEPIZ, you can customize the maintenance of an extensive infrastructure by
+                                combining all its parts into a single whole, automating various processes and
+                                developing new components for its maintenance.
+                            blockquote.
+                                ALEPIZ allows you to achieve high performance and serve a large number of processes
+                                through the use of parallel computing, an asynchronous system core and components,
+                                a productive database, and the use of smart caching.
+                            blockquote.
+                                ALEPIZ's smart algorithm for skipping similar data allows you to reduce storage
+                                requirements by five or more times without sacrificing information content.
+                                Due to the fact that some of the similar data is not processed, the load on the
+                                computing core of the system is reduced, allowing the use of fewer server resources.
+                            blockquote.
+                                Access to ALEPIZ, all settings and system management is carried out through the
+                                Web interface. The interface automatically adapts to work on desktop PCs, tablets or
+                                smartphones, depending on the screen size, resolution and input method
+                        div.col.s12.m6
+                            img(src="./images/help.mainPad1.png" width="400px").materialboxed.card-panel.hoverable
+                            //img(src="./images/help.installSetupOptions.png" width="400px").materialboxed.card-panel.hoverable
+                    h3 Maintenance of non-standard infrastructure
+                    p.
+                        If the infrastructure being served cannot be managed by standard means, ALEPIZ provides the
+                        opportunity to develop new components. Component development tools and documentation for their
+                        creation are built into ALEPIZ. Open source existing components can serve as an example.
+                    img(src="./images/help.overViewDev.png" width="1024px").materialboxed.card-panel.hoverable
+                    h2 Features of the monitoring system
+                    p.
+                        ALEPIZ has a built-in monitoring system that allows you to collect and store historical data
+                        supporting various information collection protocols. Setting up a monitoring system is based on
+                        creating dependencies between meters that collect data. For example, it does not
+                        collect the application data of a service if it is stopped. Therefore, the counters that
+                        collect application information about the service must depend on the counter that collects
+                        information about the status of the service. If the status of the service indicates that the
+                        service is stopped, the start condition for child application data collection counters will
+                        not be met and they will not start. Even data collection, standard for monitoring systems,
+                        at time intervals is configured as a dependence on a counter that generates signals at certain
+                        time intervals.
+                    p.
+                        Dependencies between counters are also used to generate events. They can, for example, be
+                        configured in such a way that the counter that generates the event is triggered after the
+                        received values from the parent counter have exceeded the set threshold. For example, you can
+                        set up a dependency so that when the amount of free memory on the server drops to 1Gb, a
+                        counter will be launched that generates the corresponding event. A warning will appear on the
+                        Dashboard, which, if necessary, will be duplicated by voice. Administrators will be notified by
+                        e-mail and/or other means.
+                    p.
+                        All collected historical data is available for further viewing and analysis. To prevent the
+                        database from growing indefinitely, a system for cleaning old historical data is provided.
+                        For quick access to a large amount of data, a trend system is used that stores only the
+                        arithmetic average of historical data values for certain time intervals.
+                    p.
+                        System maintenance tasks can be launched based on the analysis of the system state according to
+                        the received historical data collected by the built-in monitoring system.
+                    p.
+                        In the absence of means for collecting data, for example, if the application system returns
+                        them in a non-standard way, ALEPIZ allows you to develop and connect a new collector adapted
+                        to the application system.
+                    h3 Data throttling algorithm
+                    p.
+                        To reduce the load on the computing core and disk subsystem, ALEPIZ uses an intelligent
+                        algorithm to data throttling. When a new value is received, the collected data is automatically
+                        analyzed and if the new value does not differ significantly from the data that was received
+                        before, it will not be processed by the ALEPIZ computing core and will not be written to the
+                        database. For example, the amount of RAM on the server is collected every 30 seconds and
+                        usually changes slightly. ALEPIZ will analyze the changes and skip up to six similar values
+                        received from the counter. This allows you not to occupy disk space with the same data, while
+                        having a complete picture of historical values. If necessary, throttling settings can be reconfigured
+                        or disabled for any collector that supports it.
+
+                    h2 ALEPIZ components
+                    p.
+                        The modular architecture of ALEPIZ consists of a core to which various components are connected.
+                        Below is a description of the types of components that can be connected to ALEPIZ. If necessary,
+                        you can develop your own components of any type.
+                    div.row
+                        div.col.s12.m6
+                            h4 Collectors
+                            p.
+                                ALEPIZ allows you to collect and save data from various systems. A collector is used
+                                to collect each type of data. For example, ALEPIZ can collect data about hardware
+                                operation via SNMP protocol or operation system data and software operation from
+                                #[a(href="https://www.zabbix.com" target="__blank") Zabbix agents], check availability
+                                and response time of services on the network by connecting to a remote service port
+                                via TCP/IP or analyze the response time of hosts using the built-in Ping collector.
+                                It is also possible to find new hosts on the network using the Objects discovery
+                                collector, automatically generating infrastructure monitoring. You can report events
+                                based on collected data threshold violations or, for example, run tasks when certain
+                                conditions are met.
+                            p.
+                                If necessary, you can develop your own collector, which will take into account the
+                                architecture of the used system and collect the necessary data from it or generate
+                                your own.
+                        div.col.s12.m6
+                            img(src="./images/help.startCounter1.png" width="500px").materialboxed.card-panel.hoverable
+                    div.row
+                        div.col.s12.m8
+                            h4 Actions
+                            p.
+                                ALEPIZ allows you to perform certain actions. You can perform an internal action, such
+                                as creating a new monitoring object in ALEPIZ, or an external one, such as starting a
+                                service, or packing log files, or updating a service. In addition, the action can be
+                                used to view information, for example, you can view a log file or data collected by
+                                the built-in monitoring system. Using the action, you can connect to a remote server
+                                using the RDP or ILO protocol.
+                            p.
+                                You can develop your own actions that will be used in the maintenance of any
+                                non-standard infrastructure.
+                        div.col.s12.m4
+                            img(src="./images/help.mainActionSearch.png" width="300px").materialboxed.card-panel.hoverable
+                    div.row
+                        div.col.s12.m8
+                            h4 Launchers
+                            p.
+                                To run actions, are used components that allow them to be launched, depending on the
+                                architecture chosen for the action. Such components are called launchers.
+                                An example of a launcher is a module for connecting and launching a JavaScript file
+                                written in nodejs, or launching an external program that will be passed the necessary
+                                command line parameters, or executing the program on a remote server via the SSH or
+                                WMI protocol.
+                            p.
+                                If the existing launchers in ALEPIZ are not enough, you can develop a new one yourself.
+                            h4 Communication medias
+                            p.
+                                Communication medias are used to communicate with users. The means of communication can
+                                be email, SMS, voice notification, and so on. Actions and collectors can use
+                                communication medias to transfer various information to users of the system.
+                                For example, it can be events that have occurred in the operation system or a
+                                change in the status of a task.
+                            p.
+                                If the communication medias existing in ALEPIZ is not enough, you can independently
+                                develop a new one.
+                        div.col.s12.m4
+                            img(src="./images/help.userEditor.png" width="300px").materialboxed.card-panel.hoverable
+                    h2 Entities of ALEPIZ
+                    div.row
+                        div.col.s12.m9
+                            p.
+                                The ALEPIZ architecture is as simple as possible to understand. It has three built-in
+                                entities that perform infrastructure maintenance. These are objects, counters and tasks.
+                            h4 Objects
+                            p.
+                                Objects are any entity that can have a name. An example of an object could be the name
+                                of a server from which monitoring data is collected, or a group that contains other
+                                objects (for example, object Servers that contains servers of an organization),
+                                or a template that stores standard properties for quickly creating new objects.
+                            h4 Counters
+                            p.
+                                Counters are entities that are used to collect or generate data using collectors with
+                                certain parameters. For example, the Ping collector needs to pass a hostname as a
+                                parameter. For each counter, a collector is selected and the required parameters for
+                                data collection are configured. The counter is always connected to one or more objects.
+                                For example, a counter that collects the amount of available RAM can be connected to
+                                objects responsible for monitoring the organization's servers. Counters can depend on
+                                each other. Data is collected only when the necessary conditions are met. For example,
+                                it doesn't make sense to collect data about a process's memory consumption until the
+                                process is not running. The generation of various monitoring events is also based on
+                                counter dependencies.
+                            h4 Tasks
+                            p.
+                                Tasks are actions grouped into a sequence. For example, it can be the creation of a new
+                                ALEPIZ object and the connection of counters to it to collect the necessary information.
+                                Or update the service files and run the SQL script to modify the database structure.
+                                Tasks can be launched in various ways, for example, manually or by some condition, or
+                                by creating a special counter for this.
+
+                        div.col.s12.m3
+                            img(src="./images/help.mainPhone2.png" width="300px").materialboxed.card-panel.hoverable
+                    h2 Integrated data processing system
+                    p.
+                        In addition to collecting data, you can perform data processing. ALEPIZ contains functions for
+                        processing historical data and for creating expressions that process data. If necessary,
+                        JavaScript code fragments can be included in the data processing process. The resulting values
+                        can be used in both parent and all dependent counters. Collectors and tasks can also receive
+                        parameters that are generated dynamically.
+                    img(src="./images/help.var1ShortHostName.png" width="1024x").materialboxed.card-panel.hoverable
+
+
+
+
+
+

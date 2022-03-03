@@ -130,7 +130,7 @@ module.exports = function(args, callback) {
 
 function saveConf(ID, newGroup, oldID) {
     var cfg = confActions.get();
-    var actionsLayout = cfg.actions.layout;
+    var actionsLayout = cfg.layout;
     if(ID && actionsLayout[newGroup] && actionsLayout[newGroup][ID]) return;
 
     // remove actionID from old group
@@ -152,7 +152,7 @@ function saveConf(ID, newGroup, oldID) {
 
     //console.log('Param:', ID, newGroup, oldID, '!!!New layout:', actionsLayout);
 
-    cfg.actions.layout = actionsLayout;
+    cfg.layout = actionsLayout;
 
     var errMessage = confActions.save(cfg);
     if(errMessage) log.error(errMessage);

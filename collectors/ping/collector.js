@@ -546,8 +546,8 @@ function runServerProcess() {
                     log.info('Ping: initializing sockets for IPv4, IPv6');
                     initSocket(4);
                     initSocket(6);
-                    // 1123 to prevent receiving a packet loss and a subsequent reply packet at the same time
-                    setInterval(watchdog, 1123);
+                    // 350 to prevent receiving a packet loss and a subsequent reply packet at the same time
+                    setInterval(watchdog, 350);
                     setInterval(function() {
                         log.info('Ping ', Object.keys(targets).length, ' hosts: ', Object.keys(targets).sort().join(', '));
                     }, 360000);
@@ -811,7 +811,7 @@ function runServerProcess() {
 
     /*
     Checking for packet loss and for sending packets termination
-    watchdog running every 1 seconds
+    watchdog running every 350 seconds
      */
     function watchdog() {
 

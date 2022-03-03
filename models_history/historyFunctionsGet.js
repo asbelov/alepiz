@@ -2,12 +2,12 @@
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
+var log = require('../lib/log')(module);
 const parameters = require("./historyParameters");
 const historyCache = require('./historyCache');
 
 var getByIdx = function () {};
 var getByTime = function () {};
-var getLastValue = function () {};
 
 function initFunctions(_getByIdx, _getByTime) {
     getByIdx = function (id, offset, cnt, maxRecordsCnt, recordsType, callback) {
@@ -23,18 +23,30 @@ function initFunctions(_getByIdx, _getByTime) {
     }
 
     getLastValue = function (id, callback)  {
-        if(parameters.directAccessToDBFile) _getByIdx(id, 0, 1, 0, 0, callback);
+        if(parameters.directAccessToDBFile) {
+            log.info('get nodata: ', id)
+            _getByIdx(id, 0, 1, 0, function(err, records) {
+                log.info('get nodata: ', id, '; err: ', err, ': res: ', records)
+                callback(err, records);
+            });
+        }
         else historyCache.getLastValue(id, callback);
     }
 }
 
 var historyGet = {
     initFunctions: initFunctions,
-    getLastValue:getLastValue,
+    getLastValue: getLastValue,
     get: getFromHistory,
 };
 
 module.exports = historyGet;
+
+
+function getLastValue (id, callback) {
+    if(parameters.directAccessToDBFile) getByIdx(id, 0, 1, 0, 0, callback);
+    else historyCache.getLastValue(id, callback);
+}
 
 
 /*

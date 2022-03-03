@@ -20,6 +20,7 @@ const taskServer = require('../serverTask/taskServerClient');
 
 var thread = require('../lib/threads');
 const runInThread = require("../lib/runInThread");
+
 var serverName = thread.workerData[0];
 var childID = thread.workerData[1];
 var isConnectingToCollectors = 0;
@@ -1197,6 +1198,7 @@ function startMessageListener() {
                 variablesDebugInfo.UPDATE_EVENT_STATE.name = 'Update event. Mode: ' + updateEventsMode[property.mode]
             }
 
+            /*
             if(property.parentOCID && property.expression) {
                 if (variables.UPDATE_EVENT_STATE === undefined) return callback(null, updateEventNewState, variables, variablesDebugInfo);
                 else {
@@ -1208,6 +1210,7 @@ function startMessageListener() {
                     return;
                 }
             }
+            */
             callback(null, updateEventNewState, variables, variablesDebugInfo);
         });
     }
