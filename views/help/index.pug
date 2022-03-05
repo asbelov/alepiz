@@ -1,0 +1,325 @@
+//
+    Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 2020-4-28 11:29:12
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title ALEPIZ Interface
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 ALEPIZ Interface
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+
+                    h2 Description of the ALEPIZ interface
+                    p.
+                        Access to the ALEPIZ system is provided through the Web interface. The ALEPIZ interface is
+                        designed to be used on devices with different screen resolutions and orientations. These can
+                        be smartphones, tablets, laptops and desktops. Interface adaptation occurs automatically.
+                    h5 Interface, for smartphone screen
+                    div.row
+                        div.col.s6
+                            img(src="./images/help.mainPhone1.png").materialboxed.card-panel.hoverable
+                        div.col.s6
+                            img(src="./images/help.mainPhone2.png").materialboxed.card-panel.hoverable
+
+                    h5 Interface, for tablet screen
+                    img(src="./images/help.mainPad1.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h5 Interface, for laptop or personal computer screen
+                    img(src="./images/help.mainInterface.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h3 Actions, Objects and Filters system menu
+                    p.
+                        The Actions, Objects and Filters system menu is on the left. If it is hidden, it is called by
+                        clicking on the #[i.material-icons menu] icon in the upper left corner of the screen.
+                        The menu is used to select objects, filter objects, select an action, as well as to search for
+                        actions and objects.
+                    h3 Actions
+                    p.
+                        These components allow you to perform actions or provide some information. An example of
+                        actions can be creating an object in ALEPIZ, administering users, viewing log files,
+                        viewing a graph with historical information collected by the built-in monitoring system
+                        (in the screenshot above), restarting a service on a remote server, editing a configuration
+                        file, creating tasks that combine other actions for automation etc.
+                    p.
+                        You can develop your own actions to automate processes.
+                    p.
+                        Actions can be performed by starting them manually or as part of a task in automatic mode,
+                        depending on the events that have occurred. An action can also be performed as part of a task
+                        according to a specified schedule.
+                    p.
+                        The Actions tab (located on the left in the screenshot above) contains actions grouped into
+                        groups. When you click on the selected action, it will be shown in the main system window.
+                        The screenshot above in the main window shows the interface of the selected Data browser action
+                        with the collected monitoring data and a graph.
+
+                    h4 Action Search
+                    p.
+                        Above the Actions system menu is a search form for actions. If you start typing some part of
+                        the name of the action in the form, hints will appear from which you can select the desired
+                        action. If no action matches the typed text, ALEPIZ will automatically switch to searching
+                        for objects.
+                    p.
+                        If you click on the #[i.material-icons search] icon next to the search bar, a hint will appear
+                        on how to use the search.
+                    img(src="./images/help.mainActionSearch.png").materialboxed.card-panel.hoverable
+
+                    h3 Objects
+                    p.
+                        The Objects tab contains objects. Objects are any entities in the system that can have a name.
+                        Each object in the system must have a unique name. Examples of objects might be a host name,
+                        a group that includes other objects (for example, a Servers object that includes servers),
+                        a program, a service, a template with counters, and so on. You can independently create and
+                        delete objects, manage their grouping and filtering.
+
+                    h4 Object navigation
+                    p.
+                        When you select the "Objects" tab, the name of the "Objects" tab will be changed to "To top".
+                        Clicking on "To top" takes you to the top level of objects.
+                    p.
+                        If you click on the name of an object, a list of nested objects will appear. If there are no
+                        nested objects, then the object will be selected. An element of the CheckBox type is used to
+                        select an object, which is located to the left of each object.
+
+                    img(src="./images/help.mainObjectsList.png").materialboxed.card-panel.hoverable
+
+                    h4 Interactions between objects.
+                    p.
+                        The configured interactions between objects allow you to filter objects in the Objects system
+                        menu. Interactions can be configured using the Objects Interactions action. By selecting two or
+                        more objects and clicking on one of them, you can get a list of objects contained in them,
+                        which will be generated depending on the configured interaction between objects. This can be
+                        all objects included in the selected parent objects. Or it can only be shared objects for the
+                        selected parent objects. Or it can only be non-shared objects for the selected parent.
+                        A detailed description of interactions and their settings can be found on the help page for
+                        the action
+                        #[a(href="/actions/objects_interactions/help/") Objects Interactions].
+
+                    h4 Search for objects
+                    p.
+                        Above the Objects system menu is the object search form. If you start typing some part of the
+                        object name in the form, after entering a few characters in the Objects system menu, objects
+                        will appear whose names contain the typed text.
+                    p.
+                        You can use the characters "&" (and) and "|" (or) to combine search queries into a boolean
+                        expression. Instead of the symbol "|" line breaks can be used.
+                    p.
+                        To search for objects, you can use patterns: "_" - any one character and
+                        "*" - a sequence of zero or more characters.
+                    p.
+                        If you want to use the characters "_" or "*" not as wildcards, but as part of object names,
+                        they must be escaped with the "\" character.
+                    p.
+                        If you click on the #[i.material-icons search] icon next to the search bar, a hint will appear
+                        on how to use the search.
+
+                    img(src="./images/help.mainObjectsSearch.png").materialboxed.card-panel.hoverable
+
+                    h4 Filters
+                    p.
+                        The FILTERS menu allows you to set filters for objects. When using filters, objects that do
+                        not match the selected filters will not be displayed. The administrator can set up arbitrary
+                        filters based on object properties, top-level object properties, and received historical data.
+                        The FILTERS menu will not be displayed if the administrator has not configured any filters.
+                        Filters are only applied to objects that have properties or counters that match the filters
+                        to retrieve historical data. Objects that do not have corresponding properties or counters
+                        will be displayed regardless of the filters set. If filters are selected, FILTERS is
+                        highlighted in red.
+                    img(src="./images/help.mainFilters.png").materialboxed.card-panel.hoverable
+                    p.
+                        You can select multiple filters and change the logical operator linking the filters together.
+                        By default, multiple filters are linked with a logical "AND" operator. In order to change the
+                        operator, you need to click on "Change filter expression" under the filters and in the filter
+                        editor that appears, click on the operator you want to change.
+                        Operators "AND" and "OR" are supported.
+                    img(src="./images/help.mainFiltersExpression.png").materialboxed.card-panel.hoverable
+
+                    h4 Navigation bar icons
+                    p The icons are in the upper right corner of the screen.
+                    div.row
+                        div.col.s12.m6.l4
+                            img(src="./images/help.mainNavBarIcons.png").materialboxed.card-panel.hoverable
+                        div.col.s12.m6.l8
+                            p.
+                                #[i.material-icons open_in_new] opens a new browser tab with ALEPIZ.
+                            p.
+                                #[i.material-icons file_upload] opens a window with information about the process of
+                                running actions.
+                            p.
+                                #[i.material-icons account_box] opens a dialog with which you can log in or change the
+                                password in the system
+                            p.
+                                #[i.material-icons help_outline] opens a help page depending on the selected action
+
+                    h4 Window with information about the process of running actions
+                    img(src="./images/help.mainLogWindow.png" width="1024").materialboxed.card-panel.hoverable
+                    p.
+                        The window is opened when the action starts or when the #[i.material-icons file_upload] icon is
+                        clicked, which is located in the upper right corner of the screen. The data is presented as a
+                        sequence of records and represents information about an action.
+                    p.
+                        The information is divided into sections, each of which is responsible for running a specific
+                        action. Depending on the debug level configured, the amount of information displayed may vary.
+                        Clicking on a section heading will show or hide the contents of the section. The information
+                        is updated automatically while the information window is open.
+                    h4 Control buttons
+                    div.row
+                        div.col.l10.m8.s6
+                            p.
+                                Control buttons appear when you hover over the main orange round button
+                                #[a.btn-floating.btn-small.waves-effect.waves-circle.waves-light.orange.darken-1: i.material-icons.large more_horiz].
+                                It is located at the bottom right of the screen. Depending on the availability of
+                                rights to run or save actions, all or only part of the control buttons will appear.
+                            h5.
+                                #[a.btn-small.btn-floating.waves-effect.waves-light.blue: i.material-icons card_travel]
+                                Object Clipboard
+                            p.
+                                The clipboard allows you to create an arbitrary list of objects in the Objects system
+                                menu, even if such a list cannot be created using the search and grouping of objects.
+                                The button allows you to remember the selected objects, and then display them as a list.
+                                For example, if you select multiple objects and click on
+                                #[a.btn-small.btn-floating.waves-effect.waves-light.blue: i.material-icons card_travel],
+                                the selected objects will be placed on the clipboard and the color of the button will
+                                change from blue to grey. The gray color of the button means that there are some objects
+                                in the buffer. Then you can go to other objects, select a few more and put them in the
+                                clipboard in the same way by clicking on
+                                #[a.btn-small.btn-floating.waves-effect.waves-light.grey: i.material-icons card_travel].
+                                The color will remain grey. The operation of placing objects in the clipboard can be
+                                repeated as many times as necessary. In order to display a list of objects from the
+                                clipboard, you need to deselect all objects in the Objects system menu and click on
+                                the gray button
+                                #[a.btn-small.btn-floating.waves-effect.waves-light.grey: i.material -icons card_travel].
+                                A list of objects from the clipboard will appear in the Objects system menu, and the
+                                #[a.btn-small.btn-floating.waves-effect.waves-light.blue: i.material-icons card_travel]
+                                button will turn blue again. The blue color of the button means that the buffer is
+                                empty and you can fill it with new objects.
+
+                            h5.
+                                #[a.btn-small.btn-floating.waves-effect.waves-light.purple.darken-1: i.material-icons done_all]
+                                Group selection of objects
+                            p.
+                                Group selection is used to select or deselect all objects that are displayed in the
+                                Objects system menu. If you click on
+                                #[a.btn-small.btn-floating.waves-effect.waves-light.purple.darken-1: i.material-icons done_all]
+                                for the first time, regardless of whether any objects was selected, all objects will be
+                                selected. The
+                                #[a.btn-small.btn-floating.waves-effect.waves-light.purple.darken-1: i.material-icons done_all]
+                                button will change color to gray. If you click again on the gray button
+                                #[a.btn-small.btn-floating.waves-effect.waves-light.grey.darken-1: i.material-icons done_all],
+                                all objects will be deselected.
+
+                            h5.
+                                #[a.btn-small.btn-floating.waves-effect.waves-light.green: i.material-icons cached]
+                                Update Current Action
+                            p.
+                                By clicking on
+                                #[a.btn-small.btn-floating.waves-effect.waves-light.green: i.material-icons cached],
+                                the current action's interface will be updated, all parameter values will be reset to
+                                default values. The action's server executable components will be reconnected by the
+                                system. If the included server-side JavaScript action files have been updated, in order
+                                for the changes to take effect, you must click on the button
+                                #[a.btn-small.btn-floating.waves-effect.waves-light.green: i.material-icons cached].
+
+                        div.col.l2.m4.s6
+                            img(src="./images/help.mainButtons.png").materialboxed.card-panel.hoverable
+
+                    h5.
+                        #[a.btn-small.btn-floating.waves-effect.waves-light.yellow.darken-2: i.material-icons playlist_add]
+                        Create a task from an action
+                    p.
+                        Tasks are used to create automation. A task is a set of actions with parameters that will be
+                        running in a given sequence. To create a task, you need to set the necessary parameters for
+                        an action and add it to the task. Then repeat the operation to add other actions with the set
+                        parameters to the task. The result is a task consisting of several actions. A task can be
+                        edited using the Task maker action and executed in any of the available ways:
+                    ol
+                        li Run a task manually
+                        li Set the execution time at which the task will automatically run
+                        li Assign a condition under which the task will be running
+                        li.
+                            Using the Counter settings action and the Task runner collector, create a counter that
+                            run the task. A counter can depend on another counter and, if specified conditions are met,
+                            launch a dependent counter with a task to execute. In this case, dynamically generated
+                            parameters can be passed to the task.
+                    p.
+                        As an example, a task might be updating some application service, consisting of the actions
+                        "Update service files", "Apply SQL script to the service database" and
+                        "Edit service configuration file". After creating such a task, you can assign a condition
+                        for its execution: stop the service. As soon as the service is stopped, the task to update the
+                        service will be performed automatically.
+                    p.
+                        Another example would be to create objects in the system to monitor automatically found hosts
+                        on the network. To do this, use the Counter settings action to create a counter that, using
+                        the Objects discovery collector, will search for objects on the network. Next, create another
+                        dependent counter, which, using the Task runner collector, will launch a previously created
+                        task to create the found objects, set the properties of the objects, and connect the necessary
+                        counters to them for collecting data.
+                    p.
+                        You can also create a task that will perform service maintenance. For example, backup,
+                        packaging and rotation of logs, database maintenance, and so on. To do this, you can create
+                        a task or several tasks that will automatically start actions on some condition, for
+                        example, "service stop".
+
+                    h5.
+                        #[a.btn-small.btn-floating.waves-effect.waves-light.red: i.material-icons play_arrow]
+                        Run current action (Ctrl+Enter)
+                    p.
+                        After all the parameters have been set in the selected action, it is necessary to run the action.
+                        To do this, use the action launch button
+                        #[a.btn-small.btn-floating.waves-effect.waves-light.red: i.material-icons play_arrow].
+                        Changes will only occur after you click the action's launch button. Until then, no changes
+                        to the action's parameters will result in real changes that the action performs.
+                        During the execution of the action, a window with information about the details of the execution
+                        of the action will open. From this information, you can determine that the action was running
+                        correctly and no errors occurred during the run of the action.
+                    img(src="./images/help.mainActionRun.png" width="1024").materialboxed.card-panel.hoverable
+                    p.
+                        You can run an action by pressing the key combination &lt;Ctrl&gt; + &lt;Enter&gt;.
+                        In this case, the action will be running, and a corresponding notification will be displayed.
+                        The window with detailed information about the execution of the action will not open.
+                        You can always see the information about the execution of the action by clicking on the
+                        #[i.material-icons file_upload] icon in the upper right corner of the screen.
+                    img(src="./images/help.mainActionRunCtrlEnter.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h3 Information in the address bar of the browser
+                    p.
+                        The address bar of the browser contains information about the selected objects in the
+                        Objects system menu, the selected action in the Actions system menu, and the parameters of the
+                        selected action. For information about the state of objects and actions,
+                        the parameters u,c,s (for information about objects) and a (for information about an action)
+                        are used.
+                    p u - list of selected objects
+                    p c - list of unselected objects
+                    p s - object search string that displays objects
+                    p a - action
+                    p.
+                        The example below renders the objects_creator action
+                        (a=%2Factions%2Fobjects_creator). Object17, Object18 and Object19 objects are not selected
+                        (u=Object17%2CObject18%2CObject19). Object15 and Object16 selected (c=Object15%2CObject16)
+                    pre.
+                        https://localhost/?a=%2Factions%2Fobjects_creator&u=Object17%2CObject18%2CObject19&c=Object15%2CObject16
+                    img(src="./images/help.mainURL1.png" width="1024").materialboxed.card-panel.hoverable
+                    p.
+                        In addition to information about the state of the system menu, the address bar of the browser
+                        may contain information about the parameters of the current action. The example below displays
+                        information about the settings set by the administrator for plotting the Data browser activity.
+                        If you send the contents of the command line and the recipient has the appropriate rights,
+                        when he open the received link in their browser, he will see exactly the same graph.
+                    img(src="./images/help.mainURL.png" width="1024").materialboxed.card-panel.hoverable
+                    p
+
+
+
+
+
+

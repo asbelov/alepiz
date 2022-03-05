@@ -1150,9 +1150,12 @@ function startMessageListener() {
             if(!newVariables.length) return false;
 
             if(++attempts >= maxAttemptsToResolveVariables) {
+                var unresolvedVariables = newVariables.filter(newVariable => prevNewVariables.indexOf(newVariable) === -1);
                 log.options('Attempts: ', attempts,': ', objectName, '(', counterName,
-                    '): new\\prev unresolved variables: ', newVariables ,'\\', prevNewVariables,
-                    '; variables : ', variables, '; source data from DB: ', data, {
+                    '): new - prev vars: ', unresolvedVariables,
+                    '; vars : ', variables,
+                    '; new: ', newVariables ,'; prev: ', prevNewVariables,
+                    '; source data from DB: ', data, {
                         filenames: ['counters/' + counterID, 'counters.log'],
                         emptyLabel: true,
                         noPID: true,
