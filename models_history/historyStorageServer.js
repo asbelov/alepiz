@@ -73,6 +73,8 @@ if(require.main !== module) {
 }
 
 function dbOpen() {
+    if(!isTransactionProcess && !fs.existsSync(dbPath)) return setTimeout(dbOpen, 30000);
+
     log.info('Open storage file ', dbPath, ' for ', (isTransactionProcess ? 'transactions' : 'queries'),' operations...');
     try {
         db = new Database(dbPath, {readonly: !isTransactionProcess});
@@ -81,7 +83,7 @@ function dbOpen() {
         db.pragma('encoding = "UTF-8"');
         db.pragma('journal_mode = "WAL"');
     } catch (err) {
-        return log.throw('Can\'t open DB ', dbPath, ' or set some required pragma modes: ', err.message);
+        return log.warn('Can\'t open DB ', dbPath, ' or set some required pragma modes: ', err.message);
     }
 }
 
