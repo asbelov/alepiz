@@ -2,7 +2,12 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var sites = ['pad-asbel', 'alepiz.com', 'alepiz.cloudno.de'];
+var sites = ['alepiz.com']; // in lower case
+
+// redirect to https if protocol is not a https and site is alepiz.com
+if (location.protocol !== 'https:' && sites.indexOf(window.location.hostname.toLowerCase()) !== -1) {
+    location.replace(`https:${location.href.substring(location.protocol.length)}`);
+}
 
 document.addEventListener('DOMContentLoaded', function () {
     // similar behavior as an HTTP redirect

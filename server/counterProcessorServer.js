@@ -80,7 +80,8 @@ function initBuildInServer(collectorsNamesStr, _serverID, callback) {
             path.parse(cfg.updateEventsDumpFile).ext) :
         'db/updateEvents-' + serverID + '.json';
 
-    storeUpdateEventsData.loadUpdateEventsData([updateEventsStatusFilePath], serverID, function (err, _updateEventsStatus) {
+    storeUpdateEventsData.loadUpdateEventsData([updateEventsStatusFilePath], serverID,
+        function (err, _updateEventsStatus) {
         updateEventsStatus = _updateEventsStatus;
 
         collectors.get(null, function (err, collectorsObj) {
@@ -148,7 +149,7 @@ function runChildren(callback) {
         log.info('Starting ', childrenNumber, ' children for server: ', serverName,
             '. CPU cores number: ', os.cpus().length, ', servers number: ', serversNumber);
         childrenProcesses = new threads.parent({
-            childProcessExecutable: path.join(__dirname, 'childGetCountersValue.js'),
+            childProcessExecutable: path.join(__dirname, 'child', 'getCountersValue.js'),
             onMessage: processChildMessage,
             childrenNumber: childrenNumber,
             killTimeout: killTimeout-3000, // less than server killTimeout
@@ -459,36 +460,38 @@ function processChildMessage(message) {
     //    return;
     //}
 
-    if(message.messagesQueue && message.tid) {
-        // save queue data for child
-        var id = message.tid;
-
-        if(!childrenInfo[id]) {
-            childrenInfo[id] = {
+    if(message.tid) {
+        if(!childrenInfo[message.tid]) {
+            childrenInfo[message.tid] = {
                 tid: message.tid,
             };
-            log.debug('Registered child tid: ', message.tid, '; message queue: ', message.messagesQueue, 'Mb');
+            log.debug('Registered child tid: ', message.tid);
         }
-        childrenInfo[id].messagesQueue = Number(message.messagesQueue);
     }
 
     if (message.value === undefined) return;
     ++receivingValues;
 
-    var objectCounterID = Number(message.objectCounterID), processedObj = processedObjects.get(objectCounterID);
+    if(message.variables.UPDATE_EVENT_STATE !== undefined) {
+        var updateEventKey = message.parentOCID + '-' + message.objectCounterID;
+        updateEventsStatus.set(updateEventKey, message.variables.UPDATE_EVENT_STATE);
+    }
+
+    var objectCounterID = Number(message.objectCounterID),
+        processedObj = processedObjects.get(objectCounterID);
 
     // may be
     if (!processedObj) {
 
         if(!message.collector || !activeCollectors[message.collector]) {
             log.warn('Can\'t processing data from passive collector ', message.collector, ' with unreachable OCID for ',
-                message.variables.OBJECT_NAME, '(', message.variables.COUNTER_NAME, '): with unreachable OCID: ',
+                message.variables.OBJECT_NAME, '(', message.variables.COUNTER_NAME, '), unreachable OCID: ',
                 objectCounterID, ', message: ', message);
             return;
         }
 
-        log.info('Returned data with unreachable OCID ', objectCounterID,' for active collector ', message.collector, ": ", message.variables.OBJECT_NAME,
-            '(', message.variables.COUNTER_NAME, ') message: ', message);
+        log.info('Returned data with unreachable OCID ', objectCounterID,' for active collector ', message.collector,
+            ": ", message.variables.OBJECT_NAME, '(', message.variables.COUNTER_NAME, ') message: ', message);
 
         processedObjects.set(objectCounterID, { active: true });
         processedObj = processedObjects.get(objectCounterID);
@@ -514,12 +517,6 @@ function processChildMessage(message) {
     if(!processedObj.active) {
         delete processedObj[message.processedID];
         if (Object.keys(processedObj).length === 1) delete processedObjects.delete(objectCounterID);
-    }
-
-
-    if(message.variables.UPDATE_EVENT_STATE !== undefined) {
-        var updateEventKey = message.parentOCID + '-' + message.objectCounterID;
-        updateEventsStatus.set(updateEventKey, message.variables.UPDATE_EVENT_STATE);
     }
 
     /*
