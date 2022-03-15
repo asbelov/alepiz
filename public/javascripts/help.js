@@ -10,11 +10,6 @@ if (location.protocol !== 'https:' && sites.indexOf(window.location.hostname.toL
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    // similar behavior as an HTTP redirect
-    //if(window.location.hostname === 'alepiz.cloudno.de') {
-    //    var newLocation = window.location.href.replace('http://', 'https://').replace('alepiz.cloudno.de', 'alepiz.com');
-    //    window.location.replace(newLocation);
-    //}
 
     var bodyElm = document.getElementsByTagName('body')[0];
     bodyElm.style.maxWidth = '1400px';
