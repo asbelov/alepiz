@@ -72,7 +72,7 @@ function loadUpdateEventsData(updateEventsStatusFilesPath, serverID, callback) {
             var updateEventsStatusStr = fs.readFileSync(filePath, 'utf8');
             var _updateEventsStatus = JSON.parse(updateEventsStatusStr);
         } catch (e) {
-            log.warn('Can\'t load update events data from ', filePath, ': ', e.message);
+            log.info('Can\'t load update events data from ', filePath, ': ', e.message);
             return 0;
         }
         var removedUpdateEvents = 0;

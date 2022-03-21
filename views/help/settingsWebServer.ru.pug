@@ -19,6 +19,9 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
             div.row
                 div.col.s12.m10.offset-m1
                     ul.browser-default
+                        li.
+                            disable (true|false) - с помощью этой настройки можно отключить web сервер, например для
+                            распределения нагрузки между несколькими экземплярами ALEPIZ. По умолчанию false.
                         li httpPort или port - TCP порт для работы HTTP сервера. По умолчанию 80
                         li.
                             httpsPort - TCP порт для работы HTTPS сервера. По умолчанию 443.

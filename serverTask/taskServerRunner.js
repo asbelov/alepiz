@@ -8,19 +8,16 @@ const thread = require("../lib/threads");
 const Conf = require('../lib/conf');
 const confTaskServer = new Conf('config/taskServer.json');
 
-var cfg = confTaskServer.get();
-
-const taskServer = {};
+const taskServer = {
+    start: taskServerStart,
+    stop: function(callback) { if(typeof callback === 'function') callback() },
+};
 module.exports = taskServer;
 
-// before init real stop function
-taskServer.stop = function(callback) {
-    callback()
-};
 
-taskServer.start = function (callback) {
-    if(!cfg) {
-        log.warn('Task server is not configured. Server not started');
+function taskServerStart(callback) {
+    if(!confTaskServer.get() || confTaskServer.get('disable')) {
+        log.warn('Task server is not configured or disabled in configuration. Server not started');
         return callback();
     }
 

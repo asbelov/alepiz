@@ -3,19 +3,27 @@
  */
 
 
-var log = require('../lib/log')(module);
-var webSecrets = require('./webSecrets');
+const log = require('../lib/log')(module);
+const webSecrets = require('./webSecrets');
 const thread = require("../lib/threads");
 const path = require("path");
+const Conf = require('../lib/conf');
+const confWebServer = new Conf('config/webServer.json');
 
-var webServerClient = {};
-module.exports = webServerClient;
 
-webServerClient.start = function (_callback) {
-    var callback = function(err) {
-        if(typeof _callback === 'function') return _callback(err);
-        if(err) log.error(err.message)
-    };
+var webServerRunner = {
+    start: webServerStart,
+    stop: function (callback) { if(typeof callback === 'function') return callback(); },
+    kill: function (callback) { if(typeof callback === 'function') return callback(); },
+};
+
+module.exports = webServerRunner;
+
+function webServerStart (callback) {
+    if(confWebServer.get('disable')) {
+        log.info('The web server has been disabled in the configuration');
+        return callback();
+    }
 
     webSecrets.checkAndCreate(function(err) {
         if (err) return callback(err);
@@ -37,7 +45,7 @@ webServerClient.start = function (_callback) {
             });
         });
 
-        webServerClient.stop = webServerProcess.stop;
-        webServerClient.kill = webServerProcess.kill;
+        webServerRunner.stop = webServerProcess.stop;
+        webServerRunner.kill = webServerProcess.kill;
     });
-};
+}

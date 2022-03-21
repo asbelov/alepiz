@@ -3,9 +3,9 @@
  */
 
 const log = require('../lib/log')(module);
-const path = require("path");
+const path = require('path');
 const collectors = require("../lib/collectors");
-const os = require("os");
+const os = require('os');
 const countersDB = require("../models_db/countersDB");
 const threads = require("../lib/threads");
 const exitHandler = require('../lib/exitHandler');
@@ -120,14 +120,15 @@ function initCfgVariables(cfg) {
 function stopServer(callback) {
     if(stopServerInProgress) return;
     stopServerInProgress = Date.now();
+    log.info('Stopping server ', serverName, '...');
 
     // if the server is killed by timeout, there will still be a saved update event state
     storeUpdateEventsData.saveUpdateEventsStatus(updateEventsStatusFilePath, updateEventsStatus);
     childrenProcesses.stopAll(function(err) {
         if(err) {
-            log.error('Error stopping children: ', err.message, '. Stopping server...');
+            log.error('Error stopping children: ', err.message, '. Exiting for ', serverName, '...');
         } else {
-            log.warn('Children were stopped successfully. Stopping server...');
+            log.warn('Children were stopped successfully. Exiting for ', serverName, '...');
         }
         storeUpdateEventsData.saveUpdateEventsStatus(updateEventsStatusFilePath, updateEventsStatus);
 

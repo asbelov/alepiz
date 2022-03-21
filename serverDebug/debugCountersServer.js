@@ -21,7 +21,7 @@ cfg.logSize = cfg.logSize || 10;
 cfg.dumpFile = path.join(conf.get('tempDir') || 'temp', cfg.dumpFile || 'counterDebugger.json');
 
 fs.readFile(cfg.dumpFile, 'utf8', function(err, data) {
-    if(err) log.warn('Can\'t read dump file ' + cfg.dumpFile + ': ' + err.message);
+    if(err) log.info('Can\'t read dump file ' + cfg.dumpFile + ': ' + err.message);
     else {
         try {
             counterDebuggerData = new Map(Object.entries(JSON.parse(String(data))));

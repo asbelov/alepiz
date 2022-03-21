@@ -29,11 +29,12 @@ fix error, when overlay closing sideNav menu
 a.object {
     margin: 0 0 2px 0 !important;
     padding: 10px 0 0 24px !important;
-    min-height: 48px !important;
+    height: 48px !important;
     cursor: pointer !important;
 }
 
 div.object-checkbox {
+    height: 32px !important;
     padding: 0 !important;
 }
 

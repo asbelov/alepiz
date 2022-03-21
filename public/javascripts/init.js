@@ -39,9 +39,16 @@ var initJQueryNamespace = (function($){
                     objectsInObjectsTab = getObjectsFromObjectsList();
 
                     // redraw object list every 60 seconds
-                    setInterval(function(){
-                        var objectsNames = getObjectsFromObjectsList();
-                        createObjectsList(objectsNames.unchecked, objectsNames.checked);
+                    setInterval(function() {
+                        // don't redraw object list when object list is not active
+                        if(!getActiveObjectsList()) return;
+
+                        getParametersFromURL(function (parametersFromURL) {
+                            createObjectsList(parametersFromURL.uncheckedObjectsNames, parametersFromURL.checkedObjectsNames);
+                        });
+
+                        //var objectsNames = getObjectsFromObjectsList();
+                        //createObjectsList(objectsNames.unchecked, objectsNames.checked);
                     }, 60000);
                 });
             });
@@ -123,6 +130,10 @@ var initJQueryNamespace = (function($){
         searchObjectsElm,
         searchActionsElm,
         searchActionsAutocompleteInstance,
+        useGlobalSearch = false,
+        minSearchStrLength = 2,
+        prevSearchStrLength = 0,
+        timeWhenNoObjectsWereFound = 0,
 
         runActionBtnElm,
         makeTaskBtnElm,
@@ -493,73 +504,14 @@ var initJQueryNamespace = (function($){
         filterTabSwitchElm.click(initObjectsFiltersTab);
 
         // Search objects when enter something in search string
-        var minSearchStrLength = 2, prevSearchStrLength = 0, useGlobalSearch = false;
         searchObjectsElm.keyup(function(e){
-            var searchStr = searchObjectsElm.val();
-
             // When pressing Esc, clear search field ang go to the top of the object list
             if(e.which === 27) { // Esc pressed in search string
                 // if not empty, make it empty
                 searchObjectsElm.val('');
-                searchStr = '';
                 $('ul#objectsList').find('li').removeClass('hide');
-                // go to the top
-                /*
-                createFilteredObjectsList(null, function() {
-                    setBrowserHistory();
-                    redrawIFrameDataOnChangeObjectsList();
-                 });
-                 */
                 useGlobalSearch = false;
-                return;
-            }
-
-            // do this before starting local search
-            if(searchStr.length < minSearchStrLength) useGlobalSearch = false;
-
-            if (searchStr.length && !useGlobalSearch) {
-                // try to find search string in names of current objects and filter its
-                var elementsWithSearchStrCount = 0;
-                var rows = $('ul#objectsList').find('li').addClass('hide');
-                rows.find("input[objectName]").each(function(index, elm) {
-                    if($(elm).attr('objectname').toUpperCase().indexOf(searchStr.toUpperCase()) !== -1) {
-                        $(elm).closest('li').removeClass('hide');
-                        ++elementsWithSearchStrCount;
-                    }
-                    if( $(elm).is(':checked')) $(elm).closest('li').removeClass('hide');
-                });
-
-                if(elementsWithSearchStrCount) {
-                    prevSearchStrLength = searchStr.length;
-                    return;
-                }
-                if(prevSearchStrLength) {
-                    if(searchStr.length > prevSearchStrLength+1) prevSearchStrLength = 0;
-                    return;
-                }
-                rows.removeClass('hide');
-            }
-            // begin global search only after print 2 characters
-            if(searchStr.length < minSearchStrLength) return;
-
-            prevSearchStrLength = 0;
-            useGlobalSearch = true;
-
-            // if active tab for objects
-            // replace new string to "+"
-            // set first object to @search for correct search request processing in createFilterMenu
-            $.post('/mainMenu', {
-                f: 'searchObjects',
-                searchStr: searchStr.replace(/[\r\n]+/g, '|'),
-                filterNames: getCheckedFilterNames().join(','),
-                filterExpression: getFilterExpression(),
-            }, function(objects) {
-                // objects: [{name: objectName1, description: objectDescription1, id: objectID1, color: <color>:<shade>, disabled: <1|0>},...]
-                prevCheckedObjectsNames = [];
-
-                if(!objects || !objects.length) M.toast({html: 'No objects found or too many objects found', displayLength: 3000});
-                drawObjectsList(objects, setBrowserHistory);
-            });
+            } else searchObjects();
         });
 
         // help button click
@@ -579,15 +531,7 @@ var initJQueryNamespace = (function($){
         });
 
         // reload button click
-        $('#reloadBtn').click(function() {
-            //initActionsAndObjectsListsFromBrowserURL(redrawIFrameDataOnChangeObjectsList);
-            initActionsAndObjectsListsFromBrowserURL(function() {
-                getActionHTMLAndShowActionButtons(true, function(html){
-                    drawAction(html);
-                    setTimeout(redrawIFrameDataOnChangeObjectsList, 300);
-                });
-            });
-        });
+        $('#reloadBtn').click(reload);
 
         $('#selectAllObjBtn').click(function(){
             if(!$(this).attr('allChecked')) {
@@ -657,6 +601,76 @@ var initJQueryNamespace = (function($){
                 objectsTabSwitchElm.addClass('active');
                 redrawTabsIndicatorElm();
             }
+        });
+    }
+
+    function reload() {
+        initActionsAndObjectsListsFromBrowserURL(function() {
+            getActionHTMLAndShowActionButtons(true, function(html){
+                drawAction(html);
+                setTimeout(redrawIFrameDataOnChangeObjectsList, 300);
+            });
+        });
+    }
+
+    function searchObjects(objects, callback) {
+        if(objects) drawObjectsList(objects);
+
+        var searchStr = searchObjectsElm.val();
+        // do this before starting local search
+        if(searchStr.length < minSearchStrLength) useGlobalSearch = false;
+
+        if (searchStr.length && !useGlobalSearch) {
+            // try to find search string in names of current objects and filter its
+            var elementsWithSearchStrCount = 0;
+            var rows = $('ul#objectsList').find('li').addClass('hide');
+            rows.find("input[objectName]").each(function(index, elm) {
+                if($(elm).attr('objectname').toUpperCase().indexOf(searchStr.toUpperCase()) !== -1) {
+                    $(elm).closest('li').removeClass('hide');
+                    ++elementsWithSearchStrCount;
+                }
+                if( $(elm).is(':checked')) $(elm).closest('li').removeClass('hide');
+            });
+
+            if(elementsWithSearchStrCount) {
+                prevSearchStrLength = searchStr.length;
+                if(typeof callback === 'function') callback();
+                return;
+            }
+            if(prevSearchStrLength) {
+                if(searchStr.length > prevSearchStrLength+1) prevSearchStrLength = 0;
+                if(typeof callback === 'function') callback();
+                return;
+            }
+            rows.removeClass('hide');
+        }
+        // begin global search only after print 2 characters
+        if(searchStr.length < minSearchStrLength) {
+            if(typeof callback === 'function') callback();
+            return;
+        }
+
+        prevSearchStrLength = 0;
+        useGlobalSearch = true;
+
+        // if active tab for objects
+        // replace new string to "+"
+        // set first object to @search for correct search request processing in createFilterMenu
+        $.post('/mainMenu', {
+            f: 'searchObjects',
+            searchStr: searchStr.replace(/[\r\n]+/g, '|'),
+            filterNames: getCheckedFilterNames().join(','),
+            filterExpression: getFilterExpression(),
+        }, function(objects) {
+            // objects: [{name: objectName1, description: objectDescription1, id: objectID1, color: <color>:<shade>, disabled: <1|0>},...]
+            prevCheckedObjectsNames = [];
+
+            if((!objects || !objects.length) && Date.now() - timeWhenNoObjectsWereFound > 4000) {
+                timeWhenNoObjectsWereFound = Date.now();
+                M.toast({html: 'No objects found or too many objects found', displayLength: 3000});
+            }
+            drawObjectsList(objects, setBrowserHistory);
+            if(typeof callback === 'function') callback();
         });
     }
 
@@ -794,7 +808,8 @@ var initJQueryNamespace = (function($){
             }
             // replace last record in history if action and list of objects are not changed.
             // may be change only checked and unchecked objects in the list
-            if(!objectListIsDifferent && parametersFromURL.activeActionLink  === activeActionLink) {
+            //if(!objectListIsDifferent && parametersFromURL.activeActionLink  === activeActionLink) {
+            if(!objectListIsDifferent) {
                 window.history.replaceState(null, document.title, '?' + (document.title.length + URL.length < maxUrlLength ? URL : window.location.search.substring(1)));
             } else {
                 window.history.pushState(null, document.title, '?' + (document.title.length + URL.length < maxUrlLength ? URL : window.location.search.substring(1)));
@@ -1075,7 +1090,7 @@ var initJQueryNamespace = (function($){
                     }
                 }
                 //objects: [{name: objectName1, description: objectDescription1, id: objectID1, selected: <true|false>, color: <color>:<shade>, disabled: <1|0>},...]
-                drawObjectsList(objects, callback);
+                searchObjects(objects, callback);
             }
         );
     }
@@ -1699,12 +1714,13 @@ var initJQueryNamespace = (function($){
                     iframeDOMElm.contentWindow[callbackName](
                         selectedObjects,
                         function (err) {
-                            if (err) log.error(err.stack);
+                            if (err) log.error(err.message);
                         }
                     );
                 }
                 catch (err) {
-                    log.error('Can\'t running callback "', callbackName, '" from embedded HTML document "', activeActionLink ,
+                    reload();
+                    console.error('Can\'t running callback "', callbackName, '" from embedded HTML document "', activeActionLink ,
                         '" after changing object list. Callback set into the action configuration file: ', err.stack);
                 }
             }
@@ -1735,31 +1751,6 @@ var initJQueryNamespace = (function($){
             if(selectedObjects.length) iframeDOMElm.contentWindow.parameters.objects = selectedObjects;
             iframeDOMElm.contentWindow.parameters.additionalObjects = selectedAdditionalObjects;
         } catch (err) {}
-
-        // if onChangeAdditionalObjectMenuEvent is enabled, then action developer can creating depend from additional objects list changing
-        // and action can't work properly when init from browser URL, because list of additional objects don't save into the URL
-        // it's switched off also at createHTMLWithActionsList function
-        /*
-        var onChangeAdditionalObjectMenuEvent = activeActionElm.attr('on_change_additional_object_menu_event');
-        if(!onChangeAdditionalObjectMenuEvent) return;
-
-        if (onChangeAdditionalObjectMenuEvent.toLowerCase().indexOf('callback:') === 0) {
-            var callbackName = onChangeAdditionalObjectMenuEvent.substring(String('callback:').length);
-            // try to run callback function in iframe when change objects menu
-            try {
-                iframeDOMElm.contentWindow[callbackName](
-                    selectedAdditionalObjects,
-                    function (err) {
-                        if (err) log.error(err.stack);
-                    }
-                );
-            }
-            catch (err) {
-                log.error('Can\'t running callback "', callbackName, '" from embedded HTML document "', activeActionLink ,
-                    '" after changing additional object list. Callback set into the action configuration file: ', err.stack);
-            }
-        }
-        */
     }
 
 
@@ -1809,13 +1800,14 @@ var initJQueryNamespace = (function($){
             try {
                 iframeDOMElm.contentWindow[actionCallback](
                     function (err) {
-                        if (err) return log.error(err.stack);
+                        if (err) return log.error(err.message);
                         return getInputDataAndExecServer(executionMode, dontOpenLogWindows);
                     }
                 );
             }
             catch (err) {
-                log.error('Error running function "', actionCallback + '(..){....}": ', err.stack);
+                reload();
+                console.error('Error running function "', actionCallback + '(..){....}": ', err.stack);
             }
             // without callback function for action executing action directly
         } else getInputDataAndExecServer(executionMode, dontOpenLogWindows);
@@ -1944,7 +1936,8 @@ var initJQueryNamespace = (function($){
                         if(elm.attr('type') === 'checkbox') elm.prop('checked', false);
                         else elm.val('');
                     } catch (err) {
-                        log.error('Can\'t clean elements with IDs: ', cleanElmIDs, ': ', err.stack);
+                        reload();
+                        console.error('Can\'t clean elements with IDs: ', cleanElmIDs, ': ', err.stack);
                     }
                 })
             }
@@ -1954,13 +1947,14 @@ var initJQueryNamespace = (function($){
                 try {
                     var callback = iframeDOMElm.contentWindow[callbackName];
                     callback(returnObj, function (err) {
-                        if (err) return log.error(err.stack);
+                        if (err) return log.error(err.message);
                     });
                     bodyElm.css("cursor", "auto");
                 }
                 catch (err) {
-                    log.error('Error running callback on browser side after execution action. ',
-                        'Callback name is: "', callbackName, '(data, callback)": ', err.stack);
+                    reload();
+                    console.error('Error running callback on browser side after execution action. ',
+                        'Callback name is: "', callbackName, '(data, callback)": ', err.message);
                 }
             } else {
                 bodyElm.css("cursor", "auto");
