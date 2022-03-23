@@ -535,13 +535,25 @@ var initJQueryNamespace = (function($){
 
         $('#selectAllObjBtn').click(function(){
             if(!$(this).attr('allChecked')) {
-                $('input[objectName]').prop('checked', true);
+                // I don't know why, but it's does not work
+                //$('li:not(.hide) :input[objectName]').prop('checked', true);
+                $('input[objectName]').each(function () {
+                    if(!$(this).parent().parent().parent().parent().hasClass('hide')) {
+                        $(this).prop('checked', true);
+                    }
+                });
                 $(this).attr('allChecked', '1');
                 $(this).addClass('grey');
                 redrawIFrameDataOnChangeObjectsList();
                 setBrowserHistory();
             } else {
-                $('input[objectName]').prop('checked', false);
+                // I don't know why, but it's does not work
+                //$('li:not(.hide) :input[objectName]').prop('checked', false);
+                $('input[objectName]').each(function () {
+                    if(!$(this).parent().parent().parent().parent().hasClass('hide')) {
+                        $(this).prop('checked', false);
+                    }
+                });
                 $(this).attr('allChecked', '');
                 $(this).removeClass('grey');
                 redrawIFrameDataOnChangeObjectsList();
