@@ -1,0 +1,42 @@
+//
+    Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 10.04.2022, 16:15:07
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Action name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Action name
+                    h5.light.
+                        You can make some actions using Action name
+
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
+
+                    h2 Action name description
+                    p.
+                        You can make some actions with some objects using Action name actions
+
+                    h5.
+                        Returned value: ObjectID used in action
+
+                    h2 Interface description
+                    h3 Objects list
+                    p.
+                        You can add objects to Objects list. To do this, select the
+                        objects in the Objects system menu and click on
+                        ADD SELECTED OBJECTS. If you click on the "x" to the right of
+                        the object in Objects list, the object will be deleted.
+                        You can delete all objects from Objects list by clicking on
+                        REMOVE ALL OBJECTS.

@@ -61,7 +61,7 @@ rightsWrapper.renameObjects = function(user, objects, callback){
  newObjectNames - array of new objects names
  description - description for new object names
  order - sort position for new objects. Top objects has order < 10 objectsFilterDB.js
- callback(err, newObjectsIDs),
+ callback(err, newObjectsIDs, newObjects),
  newObjectsIDs - array of a new objects IDs;
  */
 rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOrder, disabled, callback){
@@ -88,7 +88,7 @@ rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOr
 
 /*
  Update description and sort position for objects with IDs
- user - user name
+ user - username
  IDs - array of objects IDs
  description - object description one for all
  order - object sort position in a objects menu, one for all.  Top objects has order < 10 objectsFilterDB.js

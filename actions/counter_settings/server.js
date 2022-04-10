@@ -169,26 +169,42 @@ module.exports = function(args, callback) {
     }
     log.debug('Variables: ', variables);
 
-    counterSaveDB.saveCounter(args.username, linkedObjectsIDs, {
-        name: args.name,
-        collectorID: args.collectorID,
-        groupID: args.groupID,
-        unitID: args.unitID,
-        keepHistory: args.keepHistory,
-        keepTrends: args.keepTrends,
-        sourceMultiplier: args.sourceMultiplier,
-        objectID: args.objectID,
-        counterID: args.counterID,
-        description: (args.description ? args.description : null),
-        disabled: (args.disabled ? 1 : 0),
-        debug: (args.debug ? 1 : 0),
-        taskCondition: (args.taskCondition ? 1 : 0),
-        updateVariablesRef: args.updateVariablesRef //= oldCounterName: update variables references when counter name is changed
-    }, collectorParameters, updateEvents, variables, function(err, counterID) {
+    var counterData = {
+        initObjectsIDs: linkedObjectsIDs,
+        counter: {
+            name: args.name,
+            collectorID: args.collectorID,
+            groupID: args.groupID,
+            unitID: args.unitID,
+            keepHistory: args.keepHistory,
+            keepTrends: args.keepTrends,
+            sourceMultiplier: args.sourceMultiplier,
+            objectID: args.objectID,
+            counterID: args.counterID,
+            description: (args.description ? args.description : null),
+            disabled: (args.disabled ? 1 : 0),
+            debug: (args.debug ? 1 : 0),
+            taskCondition: (args.taskCondition ? 1 : 0),
+            updateVariablesRef: args.updateVariablesRef //= oldCounterName: update variables references when counter name is changed
+        },
+        counterParameters: collectorParameters,
+        updateEvents: updateEvents,
+        variables: variables,
+    };
+
+    if(args.exportCounter && args.counterID) {
+        log.info('Counter with ID ', args.counterID, '(' + args.name + ') was exported successfully: ', args, collectorParameters, updateEvents, variables);
+        counterData.exportCounter = true;
+        return callback(null, counterData);
+    }
+
+    counterSaveDB.saveCounter(args.username, counterData, function(err, counterID) {
         if(err) return callback(err);
 
         log.info('Counter with ID ', counterID, '(' + args.name + ') was ', (args.counterID ? ' updated' : ' added'), ' successfully: ', args, collectorParameters, updateEvents, variables);
 
-        callback(null, counterID);
+        // set counterID for new counter
+        counterData.counter.counterID = counterID;
+        callback(null, counterData);
     });
 };

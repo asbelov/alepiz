@@ -56,10 +56,11 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                 script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
                 div#tabPanel.col.s12
                     ul(style="overflow-x:hidden")#mainTabs.tabs
-                        li.tab.col.s3: a(href='#counterSettingsTab').active Counter
-                        li.tab.col.s3: a(href='#objectsLinksTab') Links
+                        li.tab.col.s2: a(href='#counterSettingsTab').active Counter
+                        li.tab.col.s2: a(href='#objectsLinksTab') Links
                         li(style="overflow: auto").tab.col.s3: a(href='#variablesDefinitionsTab') Variables
-                        li.tab.col.s3.disabled#logTabSelector: a(href='#logTab') Log
+                        li.tab.col.s2.disabled#logTabSelector: a(href='#logTab') Log
+                        li.tab.col.s2#importExportTabSelector: a(href='#importExportTab') Import\Export
                 div#counterSettingsTab
                     div.row
                         div.col.s12
@@ -207,6 +208,32 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                     option(value="win1251") Windows CP-1251
                                     option(value="cp866") MS-DOS CP-866
                                 label Code page
+                div#importExportTab
+                    div.row
+                        div.col.s4.m2.l1.input-field
+                            a(data-tooltip='Generate JSON data for exporting the parameters of the edited counter').tooltipped.btn.waves-light#getDataFromCounterBtn Generate
+                        div.col.s4.m2.l1.input-field
+                            a(data-tooltip='Apply data from the editor to the counter').tooltipped.btn.waves-light#applyDataToCounterBtn &nbsp;&nbsp;Apply&nbsp;&nbsp;
+                        div.col.s4.m2.l1.input-field
+                            a(data-tooltip='Save data from editor to file').tooltipped.btn.waves-light#exportCounterBtn &nbsp;Export&nbsp;
+                        div.col.s4.m2.l1.input-field.file-field
+                            a(data-tooltip='Load counter data from file to editor' style="height: 36px; line-height: 36px").tooltipped.btn.waves-light &nbsp;Import&nbsp;
+                                input(type="file" accept=".json")#importCounterBtn
+                            div.file-path-wrapper.hide
+                                input.file-path.validate(type="text" placeholder="Upload counter" style="height: 36px; line-height: 36px")
+                        div.col.s6.m4.l2.input-field.file-field
+                            a(data-tooltip='Load counter data from file to editor and apply to counter' style="height: 36px; line-height: 36px").btn.waves-light Import And Apply
+                                input(type="file" accept=".json")#importAndApplyCounterBtn
+                            div.file-path-wrapper.hide
+                                input.file-path.validate(type="text" placeholder="Upload counter" style="height: 36px; line-height: 36px")
+                        div.col.s12.m12.l6.input-field
+                            label
+                                input(type='checkbox' checked)#skipLinkedObjects
+                                span(data-tooltip='Skip information about objects linked to the counter').tooltipped Skip linked objects
+                    div.row
+                        div.col.s12
+                            div.card-panel
+                                textarea#importExportJSONEditor
 
         div#counterGroupsSettings.modal.modal-fixed-footer
             div.modal-content
@@ -277,7 +304,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         div#modalDeleteConfirm.modal
             div.modal-content
                 h4 Delete confirmation
-                p Are you sure you want to delete the selected counter??
+                p Are you sure you want to delete the selected counter?
             div.modal-footer
                 a(href='#!')#modalDeleteConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
                 a(href='#!')#modalDeleteConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
@@ -307,6 +334,34 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                 a(href='#!')#modalCounterNameChangedConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
                 a(href='#!')#modalCounterNameChangedConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
                 a(href='#!')#modalCounterNameChangedConfirmCancel.modal-action.modal-close.waves-effect.waves-green.btn-flat Cancel
+
+        div#modalImportEntitiesNotFoundInfo.modal
+            div.modal-content
+                h4.red-text Import warning
+                p.
+                    For the correct operation of the counter, it is necessary to export all external
+                    entities associated with it.
+                p Some entities associated with the counter were not found:
+                ul.browser-default#modalImportEntitiesNotFoundList
+                p.red-text
+                    span(data-import-errror)#groupNotExist.hide Counter group does not exist.
+                    span(data-import-errror)#unitNotExist.hide Counter unit does not exist.
+                    span(data-import-errror)#sourceMultiplierNotExist.hide Counter source multiplier does not exist.
+
+            div.modal-footer
+                a(href='#!').modal-action.modal-close.waves-effect.waves-green.btn Ok
+
+        div#modalExportExternalEntitiesInfo.modal
+            div.modal-content
+                h4 Information about external associations
+                p.
+                    For the correct operation of the counter, it is necessary to export all external
+                    entities associated with it.
+                p List of external entities associated with the counter:
+                ul.browser-default#modalExportExternalEntitiesList
+            div.modal-footer
+                a(href='#!').modal-action.modal-close.waves-effect.waves-green.btn Ok
+
 
     footer
         input(type="hidden" name="actionName" value= action.name)

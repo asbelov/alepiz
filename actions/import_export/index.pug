@@ -1,0 +1,56 @@
+//
+    Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 10.04.2022, 16:15:07
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+            var entityMap = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+                '/': '&#x2F;',
+                '`': '&#x60;',
+                '=': '&#x3D;',
+            };
+
+            function escapeHtml(string) {
+                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
+                    return entityMap[s];
+                });
+            }
+    body
+        script(src='/javascripts/javaScriptEditor.js')
+        script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+        main
+            // example of action starts from here
+            div.row
+                div.col.s4.m2.l1.input-field
+                    a(data-tooltip='Generate JSON data for exporting the parameters of the edited object').tooltipped.btn.waves-light#getDataFromObjectBtn Generate
+                div.col.s4.m2.l1.input-field
+                    a(data-tooltip='Save data from editor to file').tooltipped.btn.waves-light#exportObjectBtn &nbsp;Export&nbsp;
+                div.col.s4.m2.l1.input-field.file-field
+                    a(data-tooltip='Load object data from file to editor' style="height: 36px; line-height: 36px").tooltipped.btn.waves-light &nbsp;Import&nbsp;
+                        input(type="file" accept=".json")#importObjectBtn
+                    div.file-path-wrapper.hide
+                        input.file-path.validate(type="text" placeholder="Upload object" style="height: 36px; line-height: 36px")
+
+            div.row
+                div.col.s12
+                    div.card-panel
+                        textarea#importExportJSONEditor
+            // end example of action

@@ -46,7 +46,8 @@ function callbackBeforeExec(callback) {
     JQueryNamespace.onSaveCounterWithNewName(callback);
 }
 
-function callbackAfterExec(counterID, callback) {
+function callbackAfterExec(counterData, callback) {
+    var counterID = counterData ? Number(counterData.counter.counterID) : null;
 
     // waiting while onChangeObjects with initCountersSelector() is executed for set returned counterID
     // to select#counterIDSelector element for a new counter
@@ -64,6 +65,7 @@ var JQueryNamespace = (function ($) {
         initCountersUnits();
         initObjectsLinkageTab();
         initVariablesDefinitionsTab();
+        initImportExport();
         M.FormSelect.init(document.querySelectorAll('select'), {});
         M.Modal.init(document.getElementById('counterGroupsSettings'), {});
         M.Modal.init(document.getElementById('unitsSettings'), {});
@@ -76,6 +78,11 @@ var JQueryNamespace = (function ($) {
     // do not set 0!!! in childServer.js we check 'if(variableNumber){...}' for undefined, NaN, '', null etc.
     var variableNumber = 1,
         updateEventNumber = 1,
+        reloadCounterListForAllVariablesLastRun = {
+            time: 0,
+            setTimeout: 0,
+        },
+        collectors,
         historyFunctionsHTML = '',
         historyFunctionsDescription = {},
         unitsParams = {},
@@ -83,7 +90,8 @@ var JQueryNamespace = (function ($) {
         selectedObjects = [],
         sharedCountersNames,
         notSharedSuffix = ' [NOT SHARED]',
-        logViewerObj;
+        logViewerObj,
+        importExportEditor;
 
     return {
         initCountersSelector: initCountersSelector,
@@ -201,6 +209,7 @@ var JQueryNamespace = (function ($) {
                 return (new Intl.Collator('us', { numeric: true }).compare(a.name, b.name));
             }).map(function (counter) {
                 var selected = initCounterID === counter.id ? ' selected' : '';
+                // dont change ' (#'+ counter.id + ') to something. It used in replace function in import\export
                 return '<option value="' + counter.id + '"' + selected + '>' + escapeHtml(counter.name) + ' (#'+ counter.id + ')</option>';
             }).join('');
             }
@@ -220,6 +229,478 @@ var JQueryNamespace = (function ($) {
 
             if(typeof callback === 'function') return callback();
         });
+    }
+
+    function initImportExport() {
+        importExportEditor = javaScriptEditor({parentID: 'importExportJSONEditor', jsonMode: true});
+
+        $('#importExportTabSelector').click(function() {
+            setTimeout(function() {
+                importExportEditor.init();
+                importExportEditor.save();
+                if(!$('#importExportJSONEditor').val()) {
+                    generateCounterJSON();
+                }
+            }, 100);
+        });
+
+        $('#getDataFromCounterBtn').click(generateCounterJSON);
+
+        $('#applyDataToCounterBtn').click(function () {
+            importExportEditor.save();
+            var counterDataStr = $('#importExportJSONEditor').val();
+
+            try {
+                var counterData = checkCounterData(counterDataStr);
+            } catch(e) {
+                log.error('Error in counter data: ', e.message);
+                return;
+            }
+
+            applyCounterJSON(counterData);
+        });
+
+        $("#importCounterBtn").on('change', load);
+        $("#importAndApplyCounterBtn").on('change', loadAndApply);
+
+        $('#exportCounterBtn').click(function () {
+            importExportEditor.save();
+            var counterDataStr = $('#importExportJSONEditor').val();
+
+            try {
+                var counterData = checkCounterData(counterDataStr);
+            } catch(e) {
+                log.error('Error in counter data: ', e.message);
+                return;
+            }
+
+            saveText(counterDataStr, counterData.name);
+        });
+
+        function saveText(text, fileName) {
+            var a = document.createElement('a');
+            a.setAttribute('href', 'data:application/json;charset=utf-8,'+ encodeURIComponent(text));
+            a.setAttribute('download', fileName);
+            a.click();
+        }
+
+        function checkCounterData(counterDataStr) {
+            try {
+                var counterData = JSON.parse(counterDataStr);
+            } catch (e) {
+                log.error('Can\'t parse counter data: ', e.message);
+                return;
+            }
+            if(!counterData) throw new Error('Counter data is empty');
+            //if(!counterData.name) throw new Error('Counter name is not set');
+
+            return counterData;
+        }
+
+        // Load btn
+        function readTextFile(file, callback) {
+            var rawFile = new XMLHttpRequest();
+            rawFile.overrideMimeType("application/json");
+            rawFile.open("GET", file, true);
+            rawFile.onreadystatechange = function() {
+                if (rawFile.readyState === 4 && rawFile.status === 200) {
+                    callback(rawFile.responseText);
+                }
+            }
+            rawFile.send(null);
+        }
+        function load(e, callback){
+            var file =  e.target.files[0];
+            var path = (window.URL || window.webkitURL).createObjectURL(file);
+            readTextFile(path, function(counterDataStr) {
+                try {
+                    checkCounterData(counterDataStr)
+                } catch (e) {
+                    log.error('Error in counter data: ', e.message);
+                }
+                importExportEditor.setValue(counterDataStr);
+                //console.log(data);
+                if(typeof callback === 'function') callback(counterDataStr);
+            });
+        }
+
+        function loadAndApply(e) {
+            load(e, function(counterDataStr) {
+                try {
+                    var counterData = checkCounterData(counterDataStr);
+                } catch(e) {
+                    log.error('Error in counter data: ', e.message);
+                    return;
+                }
+
+                applyCounterJSON(counterData);
+            })
+        }
+
+        function generateCounterJSON() {
+            var collectorParameters = [];
+            $('[data-collectorParameter]').each(function () {
+                var name = $(this).attr('id').replace('collectorParameter_', '');
+                var value = $(this).val();
+                if(Number(value) === parseFloat(value)) value = Number(value);
+                collectorParameters.push({
+                    name: name,
+                    value: value,
+                    //type: $(this).attr('data-collectorParameter')
+                })
+            });
+
+            var linkedObjects = [],
+                updateEvents = [],
+                updateEventOrder = 0,
+                externalCounterNames = [],
+                externalObjectNames = [];
+
+            if(!$('#skipLinkedObjects').is(':checked')) {
+                $('[linkedobjectsids-object-id]').each(function () {
+                    var objectName = $(this).children('span').text();
+                    var objectID = Number($(this).attr('linkedobjectsids-object-id'));
+                    linkedObjects.push({
+                        name: objectName,
+                    });
+
+                    externalObjectNames.push({
+                        name: objectName,
+                        id: objectID,
+                        where: 'linked objects',
+                    })
+                });
+            }
+
+            $('[data-update-event]').each(function () {
+                var parentObjectID = Number($(this).find('[data-update-event-objectID]').val());
+                var parentObjectName = parentObjectID ? $(this).find('[data-update-event-object-name]').text() : null;
+                var parentCounterID = Number($(this).find('[objectID] option:selected').val());
+                var parentCounterName = $(this).find('[objectID] option:selected').text();
+                var mode = Number($(this).find('[data-update-event-mode]').val());
+                var expression = $(this).find('[data-textarea-update-event]').val();
+                var description = $(this).find('[data-textarea-variable]').val();
+                var objectFilter = $(this).find('[data-update-event-object-filter]').val() || null;
+
+                updateEvents.push({
+                    counterName: parentCounterName,
+                    name: parentObjectName,
+                    expression: expression,
+                    mode: mode,
+                    description: description,
+                    objectFilter: objectFilter,
+                    updateEventOrder: updateEventOrder++,
+                });
+                if(parentObjectName) {
+                    externalObjectNames.push({
+                        name: parentObjectName,
+                        id: parentObjectID,
+                        where: 'update events'
+                    });
+                }
+                if(parentCounterName) {
+                    externalCounterNames.push({
+                        name: parentCounterName,
+                        id: parentCounterID,
+                        where: 'update events'
+                    })
+                }
+            })
+
+            var variables = [];
+
+            $('[data-variable]').each(function () {
+                var variableOrder = Number($(this).attr('id').replace('variable_', ''));
+                var objectID = Number($(this).find('[variableObjectID]').val()) || null;
+                var objectName = $(this).find('[data-variable-object]').val() || null;
+                var isObjectVariable = !$(this).find('[data-variable-object]').is(':disabled');
+                var parentCounterID= Number($(this).find('option:selected').attr('data-variable-counter-id'));
+                var parentCounterName = $(this).find('[data-variable-counter] option:selected').text();
+                var variableName = $(this).find('[data-variable-name]').val();
+                var functionName = $(this).find('[data-variable-function] option:selected').text();
+                var functionParameters = $(this).find('[data-variable-function-parameters]').val();
+                var expression = $(this).find('[data-variable-expression]').val();
+                var description = $(this).find('[data-variable-description]').val();
+
+                if(functionName) {
+                    variables.push({
+                        name: variableName,
+                        objectName: (isObjectVariable ? null : objectName),
+                        parentCounterName: parentCounterName,
+                        function: functionName,
+                        functionParameters: functionParameters,
+                        objectVariable:  (isObjectVariable ? objectName : null), // object name or variable with object name
+                        description: description,
+                        variableOrder: variableOrder,
+                    });
+                    if(objectName && !isObjectVariable) {
+                        externalObjectNames.push({
+                            name: objectName,
+                            id: objectID,
+                            where: 'historical variable %:' + variableName + ':%',
+                        })
+                    }
+                    if(parentCounterName) {
+                        externalCounterNames.push({
+                            name: (parentCounterID ? parentCounterName : ''),
+                            id: parentCounterID,
+                            where: 'historical variable ' +
+                                (variableName ? '%:' + variableName + ':%' :
+                                    '<b class="red-text">with no name set</b>'),
+                        })
+                    }
+                } else {
+                    variables.push({
+                        name: variableName,
+                        expression: expression,
+                        description: description,
+                        variableOrder: variableOrder,
+                    });
+                }
+            });
+
+            var counterJSON = {
+                name: $('#name').val(),
+                keepHistory: Number($('#keepHistory').val()),
+                keepTrends: Number($('#keepTrends').val()),
+                description: $('#description').val() || null,
+                disabled: $('#disabled').is(':checked'),
+                debug: $('#debug').is(':checked'),
+                taskCondition: $('#taskCondition').is(':checked'),
+                collectorID: $('#collectorID').val(),
+                groupName: $('#groupID option:selected').text(),
+                unitName: $('#unitID option:selected').text(),
+                sourceMultiplier: Number($('#sourceMultiplier').val()) || null,
+                collectorParameters: collectorParameters,
+                linkedObjects: linkedObjects,
+                updateEvents: updateEvents,
+                variables,
+            };
+
+            importExportEditor.setValue(JSON.stringify(counterJSON, null, 4));
+            importExportEditor.save();
+
+            if(!externalObjectNames.length && !externalCounterNames.length) {
+                M.toast({html: 'Successfully generating JSON from counter', displayLength: 2000});
+            } else {
+                $('#modalExportExternalEntitiesList').html(
+                    externalObjectNames.map(o => {
+                        return '<li>object:&nbsp;&nbsp; <b>' + '<a href="/?a=%2Factions%2Fimport_export&c=' + encodeURIComponent(o.name) +
+                            '" target="_blank">"' + escapeHtml(o.name) + '"</a> (#' + o.id +
+                            ')</b> for ' + o.where + '</li>';
+                    }).join('') +
+                    externalCounterNames.map(o => {
+                        return '<li>counter: <b>' +
+                            (o.id ?
+                                '<a href="/?a=%2Factions%2Fcounter_settings&cid=' + o.id +
+                                '" target="_blank">"' + escapeHtml(o.name) + '"</a> (#' + o.id + ')' :
+                                '<span class="red-text">Not selected</span>') +
+                            '</b> for ' + o.where + '</li>';
+                    }).join('')
+                )
+                var modalExportExternalEntitiesInfoInstance =
+                    M.Modal.init(document.getElementById('modalExportExternalEntitiesInfo'));
+                modalExportExternalEntitiesInfoInstance.open();
+            }
+
+        }
+
+        function applyCounterJSON(counterData) {
+            if(counterData.name) {
+                $('#counterIDSelector option').each(function () {
+                    if ($(this).text().replace(/ \(#\d+\)$/, '').toLowerCase() === counterData.name.toLowerCase()) {
+                        $(this).prop('selected', true);
+                    } else $(this).prop('selected', false);
+                })
+            }
+
+            initCounterData(counterData);
+            $('#collectorID').val(counterData.collectorID);
+
+            var isGroupExist = false;
+            if(counterData.groupName && typeof counterData.groupName === 'string') {
+                $('#groupID option').each(function () {
+                    if ($(this).text().toLowerCase() === counterData.groupName.toLowerCase()) {
+                        $(this).prop('selected', true);
+                        isGroupExist = true;
+                    } else $(this).prop('selected', false);
+                });
+            }
+
+            var isUnitExist = false;
+            var isSourceMultiplierExist = true;
+            // must be before setCollectorParameters()
+            if(counterData.unitName && typeof counterData.unitName === 'string') {
+                $('#unitID option').each(function () {
+                    if($(this).text().toLowerCase() === counterData.unitName.toLowerCase()) {
+                        $(this).prop('selected', true);
+                        isUnitExist = true;
+                    } else $(this).prop('selected', false);
+                });
+
+                var sourceMultiplierElm = $('#sourceMultiplier');
+                sourceMultiplierElm.val(undefined);
+                if(counterData.sourceMultiplier !== null) {
+                    sourceMultiplierElm.val(counterData.sourceMultiplier);
+                    isSourceMultiplierExist = sourceMultiplierElm.val();
+                } else {
+                    sourceMultiplierElm.html('<option selected>None</option>');
+                    sourceMultiplierElm.prop('disabled', true);
+                }
+            }
+
+            setCollectorParameters(counterData.collectorID, null, counterData.collectorParameters);
+
+            var externalObjectNames = {}, externalCounterNames = {};
+            counterData.linkedObjects.forEach(linkedObject => {
+                externalObjectNames[linkedObject.name] = 0;
+            });
+
+            counterData.updateEvents.forEach(updateEvent => {
+                if(updateEvent.name) {
+                    externalObjectNames[updateEvent.name] = 0;
+                }
+                if(updateEvent.counterName) {
+                    externalCounterNames[updateEvent.counterName] = 0;
+                }
+            });
+
+            counterData.variables.forEach(variable => {
+                if(variable.objectName) {
+                    externalObjectNames[variable.objectName] = 0;
+                }
+                if(variable.parentCounterName) {
+                    externalCounterNames[variable.parentCounterName] = 0;
+                }
+            });
+            $.post(serverURL, {
+                func: 'getObjectsByNames',
+                objectNames: Object.keys(externalObjectNames).join('\r').replace(/([%_])/g, '\\$1'),
+            }, function (rows) {
+                // select * from objects where name like ...
+                var objectNames = {};
+                rows.forEach(row => {
+                    objectNames[row.name] = row.id;
+                });
+
+                $.post(serverURL, {
+                    func: 'getCountersByNames',
+                    counterNames: Object.keys(externalCounterNames).join('\r').replace(/([%_])/g, '\\$1'),
+                }, function (rows) {
+                    // SELECT name, id FROM counters WHERE name IN (...
+                    var counterNames = {};
+                    rows.forEach(row => {
+                        counterNames[row.name] = row.id;
+                    });
+
+                    var unresolvedObjects = [], unresolvedCounters = [];
+
+                    if(!$('#skipLinkedObjects').is(':checked')) {
+                        counterData.linkedObjects.forEach(linkedObject => {
+                            if (linkedObject.name && objectNames[linkedObject.name]) {
+                                linkedObject.id = objectNames[linkedObject.name];
+                            } else {
+                                unresolvedObjects.push({
+                                    where: 'linked objects',
+                                    name: linkedObject.name,
+                                });
+                            }
+                        });
+                        $('#linkedObjectsIDs').objectsSelector(counterData.linkedObjects, reloadCounterListForAllVariables);
+                    }
+
+                    counterData.updateEvents.forEach(updateEvent => {
+                        if(updateEvent.name) {
+                            if(objectNames[updateEvent.name]) {
+                                updateEvent.objectID = objectNames[updateEvent.name];
+                            } else {
+                                unresolvedObjects.push({
+                                    where: 'update events',
+                                    name: updateEvent.name,
+                                });
+                            }
+                        }
+                        if(updateEvent.counterName) {
+                            if(counterNames[updateEvent.counterName]) {
+                                updateEvent.counterID = counterNames[updateEvent.counterName];
+                            } else {
+                                unresolvedCounters.push({
+                                    where: 'update events',
+                                    name: updateEvent.counterName,
+                                });
+                            }
+                        }
+                    });
+                    $('#updateEventsArea').empty();
+                    addUpdateEvents(counterData.updateEvents);
+
+
+
+                    $('#variables').empty();
+                    counterData.variables.sort(function (a, b) {
+                        if(a.variableOrder === null || b.variableOrder === null) return 0;
+                        return a.variableOrder - b.variableOrder;
+                    }).forEach(variable => {
+                        if(variable.objectName) {
+                            if(objectNames[variable.objectName]) {
+                                variable.objectID = objectNames[variable.objectName];
+                            } else {
+                                unresolvedObjects.push({
+                                    where: 'historical variable %:' + escapeHtml(variable.name) + ':%',
+                                    name: variable.objectName,
+                                });
+                            }
+                        }
+                        console.log(counterData.variables, counterNames)
+                        if(variable.parentCounterName) {
+                            if(counterNames[variable.parentCounterName]) {
+                                variable.parentCounterID = counterNames[variable.parentCounterName];
+                            } else {
+                                unresolvedCounters.push({
+                                    where: 'historical variable %:' + escapeHtml(variable.name) + ':%',
+                                    name: variable.parentCounterName,
+                                });
+                            }
+                        }
+
+                        if(variable.function) {
+                            addVariable(
+                                variable.name,
+                                {id: variable.objectID, name: variable.objectName},
+                                variable.parentCounterName,
+                                variable.function,
+                                variable.functionParameters,
+                                variable.objectVariable,
+                                variable.description);
+                        } else addVariableExpression(variable.name, variable.expression, variable.description);
+                    })
+
+                    if(!unresolvedObjects.length && !unresolvedCounters.length &&
+                        isGroupExist && isUnitExist && isSourceMultiplierExist
+                    ) {
+                        M.toast({html: 'Successfully applying JSON for counter', displayLength: 2000});
+                    } else {
+                        $('#modalImportEntitiesNotFoundList').html(
+                            unresolvedObjects.map(o => {
+                                return '<li>object: <b>"' + escapeHtml(o.name) + '"</b> for ' + o.where + '</li>';
+                            }).join('') +
+                            unresolvedCounters.map(o => {
+                                return '<li>counter: <b>"' + escapeHtml(o.name) + '"</b> for ' + o.where + '</li>';
+                            }).join('')
+                        );
+
+                        $('span[data-import-errror]').addClass('hide');
+                        if(!isGroupExist) $('span#groupNotExist').removeClass('hide');
+                        if(!isUnitExist) $('span#unitNotExist').removeClass('hide');
+                        if(!isSourceMultiplierExist) $('span#sourceMultiplierNotExist').removeClass('hide');
+
+                        var modalImportEntitiesNotFoundInfoInstance =
+                            M.Modal.init(document.getElementById('modalImportEntitiesNotFoundInfo'));
+                        modalImportEntitiesNotFoundInfoInstance.open();
+                    }
+                });
+            });
+        }
     }
 
     function initLogViewer() {
@@ -337,25 +818,9 @@ var JQueryNamespace = (function ($) {
             if(!counter) return M.toast({html: 'Error while getting counter by ID '+counterID, displayLength: 5000});
 
             // used here only to disable or enable the LOG tab
-            // will be redraw when logTab clicked for correct size drawing
+            // will be redrawn when logTab clicked for correct size drawing
             initLogViewer();
-            $('#name').val(counter.name);
-            $('#keepHistory').val(counter.keepHistory);
-            $('#keepTrends').val(counter.keepTrends);
-
-            if(counter.description) $('#description').val(counter.description);
-            else $('#description').val('');
-
-            if(counter.disabled) $('#disabled').prop('checked', true);
-            else $('#disabled').prop('checked', false);
-
-            if(counter.debug) $('#debug').prop('checked', true);
-            else $('#debug').prop('checked', false);
-            getDebugInfo();
-
-            if(counter.taskCondition) $('#taskCondition').prop('checked', true);
-            else $('#taskCondition').prop('checked', false);
-
+            initCounterData(counter)
 
             initCollectors(counter.collectorID, counter.id);
             initCountersGroups(counter.groupID);
@@ -385,13 +850,13 @@ var JQueryNamespace = (function ($) {
                         if(!sharedCountersNames) getSharedCountersNamesAndMarkNotSharedCounters();
                         else {
                             markNotSharedCounters($('select[objectID="0"]'));
-                            markNotSharedCounters($('select[countersForHistoryVariables]'));
+                            markNotSharedCounters($('select[data-variable-counter]'));
                         }
                     });
                 })
             });
 
-            // remove class 'active' from label elements, which input elements has not value
+            // remove class 'active' from label elements, which input elements has not valued
             // add class 'active' to label elements, which input elements has value
             $('input[type=text]').each(function() {
                 if($(this).val()) $(this).next('label').addClass('active');
@@ -400,7 +865,7 @@ var JQueryNamespace = (function ($) {
 
             /*
             var inputTextElms = $('input[type=text]');
-            // remove class 'active' from label elements, which input elements has not value
+            // remove class 'active' from label elements, which input elements has not valued
             inputTextElms.filter(function(){return !this.value}).next('label').removeClass('active');
             // add class 'active' to label elements, which input elements has value
             inputTextElms.filter(function(){return this.value}).next('label').addClass('active');
@@ -423,6 +888,25 @@ var JQueryNamespace = (function ($) {
 
             inheritedVariablesElm.html('<h4>Parent counters and inherited variables</h4><ul>' + htmlArr.join('') + '</ul>');
         });
+    }
+
+    function initCounterData(counter) {
+        $('#name').val(counter.name);
+        $('#keepHistory').val(counter.keepHistory);
+        $('#keepTrends').val(counter.keepTrends);
+
+        if(counter.description) $('#description').val(counter.description);
+        else $('#description').val('');
+
+        if(counter.disabled) $('#disabled').prop('checked', true);
+        else $('#disabled').prop('checked', false);
+
+        if(counter.debug) $('#debug').prop('checked', true);
+        else $('#debug').prop('checked', false);
+        getDebugInfo();
+
+        if(counter.taskCondition) $('#taskCondition').prop('checked', true);
+        else $('#taskCondition').prop('checked', false);
     }
 
     function initObjectsLinkageTab() {
@@ -535,7 +1019,7 @@ var JQueryNamespace = (function ($) {
             if(!counter.objectID) counter.objectID = 0;
 
             if(!countersHTML[counter.objectID]) countersHTML[counter.objectID] = '';
-            countersHTML[counter.objectID] += '<option value="' + counter.id + '">' + counter.name + '</option>';
+            countersHTML[counter.objectID] += '<option value="' + counter.id + '">' + escapeHtml(counter.name) + '</option>';
         });
 
         return countersHTML;
@@ -568,7 +1052,8 @@ var JQueryNamespace = (function ($) {
                 } else {
                     thisObjectWarning = '';
                     objectFilter = '<div class="input-field col s12">' +
-                        '<input type="text" id="' + updateEventID + '_objectFilter" value="'+updateEvent.objectFilter+'"/>' +
+                        '<input type="text" id="' + updateEventID +
+                        '_objectFilter" data-update-event-object-filter value="' + updateEvent.objectFilter + '"/>' +
                         '<label for="' + updateEventID + '_objectFilter">' +
                         'Regular expression for filtering dependent objects by object names. You can only use the variables of the parent object. The variables will be replaced with values.' +
                         '</label>' +
@@ -579,10 +1064,10 @@ var JQueryNamespace = (function ($) {
 
                 $('#updateEventsArea').append('\
 <li class="card" id="' + updateEventID + '" style="cursor: pointer" data-update-event>\
-    <input type="hidden" id="' +updateEventID+ '_objectID" value="' +updateEvent.objectID+ '"/>\
+    <input type="hidden" id="' +updateEventID+ '_objectID" data-update-event-objectID value="' +updateEvent.objectID+ '"/>\
     <div class="card-content">\
         <div class="row">\
-            <div class="col s11 card-title">Update event, generated by <u>'+ updateEvent.name +'</u></div>\
+            <div class="col s11 card-title">Update event, generated by <u data-update-event-object-name>'+ updateEvent.name +'</u></div>\
             <div class="col s1">\
                 <a href="#!" class="secondary-content" removeObjectForUpdateEvent>\
                     <i class="material-icons">close</i>\
@@ -596,7 +1081,7 @@ var JQueryNamespace = (function ($) {
                 <label>Counter</label>\
             </div>\
             <div class="input-field col s12 m12 l6">\
-                <select id="' +updateEventID+ '_mode">\
+                <select id="' +updateEventID+ '_mode" data-update-event-mode>\
                     <option value="0"' +modeSelected[0]+ '>Update each time when expression value is true</option>\
                     <option value="1"' +modeSelected[1]+ '>Update once when expression value is changed to true</option>\
                     <option value="2"' +modeSelected[2]+ '>Update once when expression value is changed to true and once when changed to false</option>\
@@ -628,7 +1113,7 @@ var JQueryNamespace = (function ($) {
                 if(updateEvent.counterID) updateEventSelectCounterElm.val(updateEvent.counterID);
                 if(!updateEventSelectCounterElm.val()) {
                     updateEventSelectCounterElm.append('<option value="' + updateEvent.counterID + '" selected>' + updateEvent.counterName + '</option>');
-                    M.toast({html: 'Counter ' + updateEvent.counterName + '(#' +updateEvent.counterID+ ') is not linked to ' + updateEvent.name + ' and update event for this object is never occurred', displayLength: 10000});
+                    M.toast({html: 'Counter ' + updateEvent.counterName + '(#' +updateEvent.counterID+ ') is not linked to ' + escapeHtml(updateEvent.name) + ' and update event for this object is never occurred', displayLength: 10000});
                     //updateEventSelectCounterElm.val(updateEventVal);
                 }
 
@@ -674,7 +1159,8 @@ var JQueryNamespace = (function ($) {
     }
 
     function initCollectors(activeCollectorID, counterID) {
-        $.post(serverURL, {func: 'getCollectors'}, function(collectors){
+        $.post(serverURL, {func: 'getCollectors'}, function(_collectors){
+            collectors = _collectors;
             var collectorsSelectElm = $('#collectorID'), collectorHelpBtn = $('#collectorHelpBtn');
             collectorsSelectElm.empty();
 
@@ -716,164 +1202,173 @@ var JQueryNamespace = (function ($) {
             });
 
             M.FormSelect.init(collectorsSelectElm[0], {});
-
-            // Be attention: This is an async function without callback at the end
-            function setCollectorParameters(collectorID, counterID){
-                if(!collectorID) return;
-
-                collectorHelpBtn.attr('href', '/collectors/' + collectorID + '/help/');
-
-                var collector = collectors[collectorID];
-                if(!collector || !collector.parameters) return;
-
-                var collectorParametersParentElm = $('#collectorParameters');
-                collectorParametersParentElm.empty();
-
-                // set hidden element #activeCollector to value of collector.active for sing is selected collector
-                // is active. It's used for warning, when user try to set update event for active collector.
-                // Active collector usually updating using internal mechanism.
-                $('#activeCollector').val(collector.active);
-
-                if(counterID) var getCounterParameters = function(counterID, callback){
-                    // callback(counterParameters); counterParameters: [{name:.., value:..}, ...]
-                    $.post(serverURL, {func: 'getCounterParameters', id: counterID}, function(counterParameters){
-                        callback(counterParameters)
-                    });
-                };
-                else getCounterParameters = function(counterID, callback){ callback() };
-
-
-                getCounterParameters(counterID, function(counterParameters) {
-
-                    for (var parameterName in collector.parameters) {
-                        if (!collector.parameters.hasOwnProperty(parameterName)) continue;
-
-                        var parameter = collector.parameters[parameterName];
-
-                        var rawValue = undefined, labelClass = '';
-                        for(var i = 0; $.isArray(counterParameters) && i < counterParameters.length; i++) {
-                            if(counterParameters[i].name.toLowerCase() === parameterName.toLowerCase()){
-                                rawValue = counterParameters[i].value;
-                                break;
-                            }
-                        }
-
-                        // rawValue can be a null f.e. for unchecked checkbox
-                        if (rawValue === undefined/* || rawValue === null*/) {
-                            if(parameter.default !== undefined) {
-                                rawValue = parameter.default;
-                                labelClass = ' class="active" ';
-                            } else rawValue = '';
-                        }
-
-                        // replace null value to ''
-                        var value = rawValue !== null ? escapeHtml(rawValue) : '';
-
-                        if (!parameter.type) parameter.type = 'textinput';
-                        else parameter.type = parameter.type.toLowerCase();
-
-                        if (parameter.type === 'javascripteditor') {
-                            collectorParametersParentElm.append('<div class="col s12">' +
-                                '<span>' + parameter.description + '</span>' +
-                                '<textarea id="collectorParameter_' + parameterName+'">'+value+'</textarea></div>');
-                            var editorNum = editor.length;
-                            editor[editorNum] = javaScriptEditor({parentID: 'collectorParameter_' + parameterName});
-                            if (value) editor[editorNum].setValue(rawValue);
-
-                        } else if(parameter.type === 'jsoneditor') {
-                            collectorParametersParentElm.append('<div class="col s12">' +
-                                '<span>' + parameter.description + '</span>' +
-                                '<textarea id="collectorParameter_' + parameterName+'">'+value+'</textarea></div>');
-                            editorNum = editor.length;
-                            editor[editorNum] = javaScriptEditor({
-                                parentID: 'collectorParameter_' + parameterName,
-                                jsonMode: true,
-                                height: 100,
-                            });
-                            if (value) editor[editorNum].setValue(rawValue);
-                        } else if (parameter.type === 'textinputlong') {
-                            collectorParametersParentElm.append(
-                                '<div class="input-field col s12">' +
-                                '<input type="text" id="collectorParameter_' + parameterName + '" value="'+value+'"/>' +
-                                '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
-                                parameter.description +
-                                '</label>' +
-                                '</div>');
-                        } else if (parameter.type === 'textinputpassword') {
-                            collectorParametersParentElm.append(
-                                '<div class="input-field col s12 m6 l4">' +
-                                '<input type="password" class="validate" id="collectorParameter_' + parameterName + '" value="'+value+'"/>' +
-                                '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
-                                parameter.description +
-                                '</label>' +
-                                '</div>');
-                        } else if (parameter.type === 'textinputmiddle') {
-                            collectorParametersParentElm.append(
-                                '<div class="input-field col s12 m6 l8">' +
-                                '<input type="text" id="collectorParameter_' + parameterName + '" value="'+value+'"/>' +
-                                '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
-                                parameter.description +
-                                '</label>' +
-                                '</div>');
-                        } else if (parameter.type === 'textinputshort') {
-                            collectorParametersParentElm.append(
-                                '<div class="input-field col s12 m6 l2">' +
-                                '<input type="text" id="collectorParameter_' + parameterName + '" value="'+value+'"/>' +
-                                '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
-                                parameter.description +
-                                '</label>' +
-                                '</div>');
-                        } else if (parameter.type === 'checkbox') {
-                            collectorParametersParentElm.append(
-                                '<p class="col s12 m6 l4">' +
-                                '<label><input type="checkbox" id="collectorParameter_' + parameterName + '" ' + (value ? 'value="'+value+'" checked' : '') + '/>' +
-                                '<span>' + parameter.description +
-                                '</span></label>' +
-                                '</p>');
-                        } else if (parameter.type === 'textarea') {
-                            collectorParametersParentElm.append(
-                                '<div class="input-field col s12">' +
-                                '<textarea id="collectorParameter_' + parameterName + '" class="materialize-textarea">' +
-                                value + '</textarea>' +
-                                '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
-                                parameter.description +
-                                '</label>' +
-                                '</div>');
-                        } else if (parameter.type === 'select' && typeof parameter.selectOptions  === 'object') {
-                            var optionsHTML = '';
-                            for(var val in parameter.selectOptions) {
-                                if(typeof parameter.selectOptions[val] !== 'string' &&
-                                    typeof parameter.selectOptions[val] !== 'number') continue;
-                                var selected = value === val ? ' selected' : '';
-                                optionsHTML += '<option value="' + val + '"' + selected + '>' + parameter.selectOptions[val] + '</option>';
-                            }
-                            collectorParametersParentElm.append(
-                                '<div class="input-field col s12 m6 l4">' +
-                                '<select id="collectorParameter_' + parameterName + '">' +
-                                optionsHTML + '</select>' +
-                                '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
-                                parameter.description +
-                                '</label>' +
-                                '</div>');
-                        } else {
-                            collectorParametersParentElm.append(
-                                '<div class="input-field col s12 m6 l4">' +
-                                '<input type="text" id="collectorParameter_' + parameterName + '" value="'+value+'"/>' +
-                                '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
-                                parameter.description +
-                                '</label>' +
-                                '</div>');
-                        }
-                    }
-                    // add class 'active' to label elements, which input elements has value
-                    $('input[type=text]').filter(function(){return this.value}).next('label').addClass('active');
-                    M.textareaAutoResize($('textarea'));
-                    M.FormSelect.init(document.querySelectorAll('select'), {});
-                });
-            }
-
         });
     }
+
+    // Be attention: This is an async function without callback at the end
+    function setCollectorParameters(collectorID, counterID, counterParameters){
+        if(!collectorID) return;
+
+        $('#collectorHelpBtn').attr('href', '/collectors/' + collectorID + '/help/');
+
+        var collector = collectors[collectorID];
+        if(!collector || !collector.parameters) return;
+
+        var collectorParametersParentElm = $('#collectorParameters');
+        collectorParametersParentElm.empty();
+
+        // set hidden element #activeCollector to value of collector.active for sing is selected collector
+        // is active. It's used for warning, when user try to set update event for active collector.
+        // Active collector usually updating using internal mechanism.
+        $('#activeCollector').val(collector.active);
+
+        if(counterID) var getCounterParameters = function(counterID, callback){
+            // callback(counterParameters); counterParameters: [{name:.., value:..}, ...]
+            $.post(serverURL, {func: 'getCounterParameters', id: counterID}, function(counterParameters){
+                callback(counterParameters)
+            });
+        };
+        else getCounterParameters = function(counterID, callback){ callback(counterParameters) };
+
+
+        getCounterParameters(counterID, function(counterParameters) {
+
+            for (var parameterName in collector.parameters) {
+                if (!collector.parameters.hasOwnProperty(parameterName)) continue;
+
+                var parameter = collector.parameters[parameterName];
+
+                var rawValue = undefined, labelClass = '';
+                for(var i = 0; $.isArray(counterParameters) && i < counterParameters.length; i++) {
+                    if(counterParameters[i].name.toLowerCase() === parameterName.toLowerCase()){
+                        rawValue = counterParameters[i].value;
+                        break;
+                    }
+                }
+
+                // rawValue can be a null f.e. for unchecked checkbox
+                if (rawValue === undefined/* || rawValue === null*/) {
+                    if(parameter.default !== undefined) {
+                        rawValue = parameter.default;
+                        labelClass = ' class="active" ';
+                    } else rawValue = '';
+                }
+
+                // replace null value to ''
+                var value = rawValue !== null ? escapeHtml(rawValue) : '';
+
+                if (!parameter.type) parameter.type = 'textinput';
+                else parameter.type = parameter.type.toLowerCase();
+
+                if (parameter.type === 'javascripteditor') {
+                    collectorParametersParentElm.append('<div class="col s12">' +
+                        '<span>' + parameter.description + '</span>' +
+                        '<textarea id="collectorParameter_' + parameterName +
+                        '" data-collectorParameter="javascripteditor">' + value + '</textarea></div>');
+                    var editorNum = editor.length;
+                    editor[editorNum] = javaScriptEditor({parentID: 'collectorParameter_' + parameterName});
+                    if (value) editor[editorNum].setValue(rawValue);
+
+                } else if(parameter.type === 'jsoneditor') {
+                    collectorParametersParentElm.append('<div class="col s12">' +
+                        '<span>' + parameter.description + '</span>' +
+                        '<textarea id="collectorParameter_' + parameterName +
+                        '" data-collectorParameter="jsoneditor">' + value + '</textarea></div>');
+                    editorNum = editor.length;
+                    editor[editorNum] = javaScriptEditor({
+                        parentID: 'collectorParameter_' + parameterName,
+                        jsonMode: true,
+                        height: 100,
+                    });
+                    if (value) editor[editorNum].setValue(rawValue);
+                } else if (parameter.type === 'textinputlong') {
+                    collectorParametersParentElm.append(
+                        '<div class="input-field col s12">' +
+                        '<input type="text" id="collectorParameter_' + parameterName +
+                        '" data-collectorParameter="textinputlong" value="' + value + '"/>' +
+                        '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
+                        parameter.description +
+                        '</label>' +
+                        '</div>');
+                } else if (parameter.type === 'textinputpassword') {
+                    collectorParametersParentElm.append(
+                        '<div class="input-field col s12 m6 l4">' +
+                        '<input type="password" class="validate" id="collectorParameter_' + parameterName +
+                        '" data-collectorParameter="textinputpassword" value="' + value + '"/>' +
+                        '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
+                        parameter.description +
+                        '</label>' +
+                        '</div>');
+                } else if (parameter.type === 'textinputmiddle') {
+                    collectorParametersParentElm.append(
+                        '<div class="input-field col s12 m6 l8">' +
+                        '<input type="text" id="collectorParameter_' + parameterName +
+                        '" data-collectorParameter="textinputmiddle" value="' + value + '"/>' +
+                        '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
+                        parameter.description +
+                        '</label>' +
+                        '</div>');
+                } else if (parameter.type === 'textinputshort') {
+                    collectorParametersParentElm.append(
+                        '<div class="input-field col s12 m6 l2">' +
+                        '<input type="text" id="collectorParameter_' + parameterName +
+                        '" data-collectorParameter="textinputshort" value="' + value + '"/>' +
+                        '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
+                        parameter.description +
+                        '</label>' +
+                        '</div>');
+                } else if (parameter.type === 'checkbox') {
+                    collectorParametersParentElm.append(
+                        '<p class="col s12 m6 l4">' +
+                        '<label><input type="checkbox" id="collectorParameter_' + parameterName +
+                        '" data-collectorParameter="checkbox" ' + (value ? 'value="'+value+'" checked' : '') + '/>' +
+                        '<span>' + parameter.description +
+                        '</span></label>' +
+                        '</p>');
+                } else if (parameter.type === 'textarea') {
+                    collectorParametersParentElm.append(
+                        '<div class="input-field col s12">' +
+                        '<textarea id="collectorParameter_' + parameterName +
+                        '" data-collectorParameter="textarea" class="materialize-textarea">' +
+                        value + '</textarea>' +
+                        '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
+                        parameter.description +
+                        '</label>' +
+                        '</div>');
+                } else if (parameter.type === 'select' && typeof parameter.selectOptions  === 'object') {
+                    var optionsHTML = '';
+                    for(var val in parameter.selectOptions) {
+                        if(typeof parameter.selectOptions[val] !== 'string' &&
+                            typeof parameter.selectOptions[val] !== 'number') continue;
+                        var selected = value === val ? ' selected' : '';
+                        optionsHTML += '<option value="' + val + '"' + selected + '>' + parameter.selectOptions[val] + '</option>';
+                    }
+                    collectorParametersParentElm.append(
+                        '<div class="input-field col s12 m6 l4">' +
+                        '<select id="collectorParameter_' + parameterName + '" data-collectorParameter="select">' +
+                        optionsHTML + '</select>' +
+                        '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
+                        parameter.description +
+                        '</label>' +
+                        '</div>');
+                } else {
+                    collectorParametersParentElm.append(
+                        '<div class="input-field col s12 m6 l4">' +
+                        '<input type="text" id="collectorParameter_' + parameterName +
+                        '" data-collectorParameter="textinput" value="' + value + '"/>' +
+                        '<label for="collectorParameter_' + parameterName + '"' + labelClass + '>' +
+                        parameter.description +
+                        '</label>' +
+                        '</div>');
+                }
+            }
+            // add class 'active' to label elements, which input elements has value
+            $('input[type=text]').filter(function(){return this.value}).next('label').addClass('active');
+            M.textareaAutoResize($('textarea'));
+            M.FormSelect.init(document.querySelectorAll('select'), {});
+        });
+    }
+
 
     function initCountersGroups(activeGroupID) {
         $('#groupsEditBtn').click(function () {
@@ -901,7 +1396,7 @@ var JQueryNamespace = (function ($) {
                 else selected = '';
 
                 if (group.isDefault === 1) $('#defaultGroup').val(group.id);
-                selectHTML += '<option value="' + group.id + '"' + selected + '>' + group.name + '</option>';
+                selectHTML += '<option value="' + group.id + '"' + selected + '>' + escapeHtml(group.name) + '</option>';
             });
             groupSelectorElm.html(selectHTML);
             M.FormSelect.init(groupSelectorElm[0], {});
@@ -1011,6 +1506,7 @@ var JQueryNamespace = (function ($) {
                     }
                 }
                 unitsParams[unit.id] = {
+                    name: unit.name,
                     abbreviation: unit.abbreviation,
                     multiplies: multipliers,
                     prefixes: prefixes,
@@ -1019,7 +1515,7 @@ var JQueryNamespace = (function ($) {
 
                 if (unit.id === activeUnitID) var selected = ' selected';
                 else selected = '';
-                unitsSelectElm.append('<option value="' + unit.id + '"' + selected + '>' + unit.name + '</option>');
+                unitsSelectElm.append('<option value="' + unit.id + '"' + selected + '>' + escapeHtml(unit.name) + '</option>');
             }
             noneUnitSourceMultiplies('None');
             M.FormSelect.init(unitsSelectElm[0], {});
@@ -1119,7 +1615,7 @@ var JQueryNamespace = (function ($) {
 
                     if (func.name === 'last') var selected = 'selected';
                     else selected = '';
-                    return '<option value="' + func.name + '" ' + selected + '>' + func.name + '</option>';
+                    return '<option value="' + escapeHtml(func.name) + '" ' + selected + '>' + escapeHtml(func.name) + '</option>';
                 }).sort().join('');
             }
         });
@@ -1221,11 +1717,11 @@ var JQueryNamespace = (function ($) {
       <label for="' + variableID + '_name">Variable name</label>\
     </div>\
     <div class="input-field col s12 tooltipped" data-tooltip="Variable expression">\
-      <textarea id="' + variableID + '_expression" class="materialize-textarea" data-textarea-variable>' + expression + '</textarea>\
+      <textarea id="' + variableID + '_expression" class="materialize-textarea" data-variable-expression data-textarea-variable>' + expression + '</textarea>\
       <label for="' + variableID + '_expression">Expression</label>\
     </div>\
     <div class="input-field col s12 tooltipped" data-tooltip="Variable expression description">\
-      <textarea id="' + variableID + '_description" class="materialize-textarea" data-textarea-variable>' + description + '</textarea>\
+      <textarea id="' + variableID + '_description" class="materialize-textarea" data-variable-description data-textarea-variable>' + description + '</textarea>\
       <label for="' + variableID + '_description">Description</label>\
     </div>\
   </div>\
@@ -1265,9 +1761,9 @@ var JQueryNamespace = (function ($) {
     </a>\
     <input type="hidden" variableObjectID id="' + variableID + '_objectID" variableID="' + variableID + '"/>\
     <input type="hidden" id="' + variableID + '_objectName"/>\
-    <div>For “THIS OBJECT”, make sure all linked objects contain the selected counter. Otherwise, the variable will not be calculated for all objects. Also if you change the name of the counter, change the counter for the variable manually</div>\
+    <div>For “THIS OBJECT”, make sure all linked objects contain the selected counter. Otherwise, the variable will not be calculated for all objects. Also, if you change the name of the counter, change the counter for the variable manually</div>\
     <div class="input-field col s11 m11 l2">\
-      <input type="text" id="' + variableID + '_objectVariable" placeholder="THIS OBJECT" disabled class="tooltipped" data-tooltip="Get data from this object or from selected object or object name, created from variable value"\>\
+      <input type="text" id="' + variableID + '_objectVariable" data-variable-object placeholder="THIS OBJECT" disabled class="tooltipped" data-tooltip="Get data from this object or from selected object or object name, created from variable value"\>\
       <label for="' + variableID + '_objectVariable" class="active">Object</label>\
     </div>\
     <div class="input-field col s1 m1 l1">\
@@ -1276,7 +1772,7 @@ var JQueryNamespace = (function ($) {
       </a>\
     </div>\
     <div class="input-field col s11 m11 l4">\
-      <select countersForHistoryVariables id="' + variableID + '_parentCounterName">\
+      <select id="' + variableID + '_parentCounterName" data-variable-counter>\
         <option value="" disabled>Counters are not exists</option>\
       </select>\
       <label>Counter</label>\
@@ -1291,15 +1787,15 @@ var JQueryNamespace = (function ($) {
       <label for="' + variableID + '_name">Variable name</label>\
     </div>\
     <div class="input-field col s12 m12 l4">\
-      <select id="' + variableID + '_function">' + historyFunctionsHTML + '</select>\
+      <select id="' + variableID + '_function" data-variable-function>' + historyFunctionsHTML + '</select>\
       <label>Function</label>\
     </div>\
     <div class="input-field col s12 m12 l8 tooltipped" data-tooltip="Set comma separated parameters for a function">\
-      <input type="text" id="' + variableID + '_function_parameters" value="' + escapeHtml(functionParameters) + '"/>\
+      <input type="text" id="' + variableID + '_function_parameters" data-variable-function-parameters value="' + escapeHtml(functionParameters) + '"/>\
       <label for="' + variableID + '_function_parameters">Function parameters</label>\
     </div>\
     <div class="input-field col s12 tooltipped" data-tooltip="Variable description">\
-      <textarea id="' + variableID + '_description" class="materialize-textarea" data-textarea-variable>' + description + '</textarea>\
+      <textarea id="' + variableID + '_description" class="materialize-textarea" data-variable-description data-textarea-variable>' + description + '</textarea>\
       <label for="' + variableID + '_description">Description</label>\
     </div>\
   </div>\
@@ -1358,6 +1854,20 @@ var JQueryNamespace = (function ($) {
 
 
     function reloadCounterListForAllVariables() {
+        if(Date.now() - reloadCounterListForAllVariablesLastRun.time < 2500 ||
+            reloadCounterListForAllVariablesLastRun.setTimeout) {
+
+            if(!reloadCounterListForAllVariablesLastRun.setTimeout) {
+                reloadCounterListForAllVariablesLastRun.setTimeout = 1;
+                setTimeout(function() {
+                    reloadCounterListForAllVariablesLastRun.setTimeout = 0;
+                    reloadCounterListForAllVariables();
+                }, 3000);
+            }
+            return;
+        }
+
+        reloadCounterListForAllVariablesLastRun.time = Date.now();
 
         var selectElements = $('select[objectID="0"]');
 
@@ -1421,7 +1931,7 @@ var JQueryNamespace = (function ($) {
         } catch (e) {
             sharedCountersNames = [];
             markNotSharedCounters($('select[objectID="0"]'));
-            markNotSharedCounters($('select[countersForHistoryVariables]'));
+            markNotSharedCounters($('select[data-variable-counter]'));
             return;
         }
 
@@ -1438,7 +1948,7 @@ var JQueryNamespace = (function ($) {
                 });
 
                 markNotSharedCounters($('select[objectID="0"]'));
-                markNotSharedCounters($('select[countersForHistoryVariables]'));
+                markNotSharedCounters($('select[data-variable-counter]'));
             }
         );
     }
@@ -1501,12 +2011,12 @@ var JQueryNamespace = (function ($) {
                     selected = ' selected';
                 }
                 else selected = '';
-                selectElm.append('<option value="' + counter.name + '"' + selected + '>' + counter.name + '</option>');
+                selectElm.append('<option value="' + escapeHtml(counter.name) + '"' + selected + ' data-variable-counter-id="' + counter.id +'">' + escapeHtml(counter.name) + '</option>');
             }
 
             if (parentCounterName && variableName) {
                 if(!isFoundParentCounterName) {
-                    selectElm.append('<option value="' + parentCounterName + '" selected>' + parentCounterName + '</option>');
+                    selectElm.append('<option value="' + parentCounterName + '" selected data-variable-counter-id="' + counter.id +'">' + parentCounterName + '</option>');
                     //M.toast({html: 'Selected object do not have a linked counter ' + parentCounterName + ' for calculate variable ' + variableName, displayLength: 20000});
                 }
                 $('#' + variableID + '_name').val(variableName);

@@ -4,33 +4,46 @@
     "active": "",
     "separate": "",
     "runCollectorSeparately": "",
+    "runCollectorAsThread": "",
     "parameters": {
         "host": {
             "description": "IP address or host name",
             "checkAs": "hostOrIP",
+            "type": "textInputShort",
             "default": "127.0.0.1"
         },
         "community": {
             "description": "SNMP community",
+            "type": "textInputShort",
             "default": "public"
         },
         "OID": {
-            "description": "SNMP OID"
+            "description": "SNMP OID",
+            "type": "textInputMiddle"
         },
         "port": {
             "description": "SNMP TCP port",
             "checkAs": "TCPPort",
+            "type": "textInputShort",
             "default": 161
         },
         "version": {
             "description": "SNMP protocol version (1 or 2)",
             "checkAs": "Integer",
+            "type": "textInputShort",
             "default": 1
         },
         "retries": {
             "description": "Number of SNMP Request Attempts",
             "checkAs": "Integer",
+            "type": "textInputShort",
             "default": 1
+        },
+        "timeout": {
+            "description": "SNMP request timeout (sec)",
+            "checkAs": "Integer",
+            "type": "textInputShort",
+            "default": 5
         }
     }
 }

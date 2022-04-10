@@ -8,7 +8,7 @@ function callbackBeforeExec(callback) {
     callback()
 }
 
-var JQueryNamespace = (function ($) {
+(function ($) {
     $(function () {
         objects = parameters.objects;
         disabledCBElm = $('#disabledCB');
@@ -36,7 +36,17 @@ var JQueryNamespace = (function ($) {
     }
 
     function initSourceObjects() {
+        objectsInteractions = objectsCountersLinkage = objectsProperties = objectsParameters = undefined;
         var objectsIDs = $('#sourceObjectsIDs').val();
+
+        // objects were not selected
+        if(!objectsIDs || !objectsIDs.length) {
+            drawInteractions();
+            drawCounters();
+            drawObjectsProperties();
+            drawObjectParameters();
+            return;
+        }
 
         $.post(serverURL, {func: 'getInteractions', ids: objectsIDs.join(',')}, drawInteractions);
         $.post(serverURL, {func: 'getCounters', ids: objectsIDs.join(',')}, drawCounters);
@@ -117,19 +127,6 @@ var JQueryNamespace = (function ($) {
 
         $('#cloneToObjectsIDs').objectsSelector();
         $('#upLevelObjectsIDs').objectsSelector();
-
-        $('#export').click(function () {
-            prepareDataForSaveToFile(function(JSONData) {
-                console.log(JSONData);
-                saveToFile(JSONData, 'ALEPIZ.json');
-            });
-        });
-
-        $('#import').click(function () {
-            loadFromFile('ALEPIZ.json', function (json) {
-                console.log(json);
-            });
-        });
     }
 
     function drawInteractions(_objectsInteractions) {
@@ -160,18 +157,17 @@ var JQueryNamespace = (function ($) {
                     return (objectsIDs.indexOf(b.id1) === -1 ? a.name1.localeCompare(b.name1) : a.name2.localeCompare(b.name2))
                 }).forEach(function (interaction, idx) {
 
-                if (objectsIDs.indexOf(interaction.id1) !== -1) {
+                if (objectsIDs.indexOf(String(interaction.id1)) !== -1) {
                     interactions[interactionTypes[interaction.type] + interaction.name2] = {
                         id: interaction.id2,
                         idx: idx,
                     };
-                    if (objectsIDs.indexOf(interaction.id2) !== -1) {
+                    if (objectsIDs.indexOf(String(interaction.id2)) !== -1) {
                         interactions[interactionTypes[interaction.type] + interaction.name1] = {
                             id: interaction.id1,
                             idx: idx,
                         };
                     }
-
                 } else {
                     interactions[interactionTypes[interaction.type + 100] + interaction.name1] = {
                         id: interaction.id1,
@@ -181,15 +177,13 @@ var JQueryNamespace = (function ($) {
             });
         }
 
-        //$('#interactingObjects').text(Object.keys(interactions).join('; '));
-
         $('#interactingObjects').html(Object.keys(interactions).map(function(name) {
             return '\
 <div style="margin-top:0.7em">\
     <label><input type="checkbox" data-interactionObjectID="' +  interactions[name].idx + '" id="interactionID-' + interactions[name].id + '" checked disabled="disabled" />\
     <span>' + name + '</span></label>\
 </div>';
-        }));
+        }).join(''));
     }
 
     function drawCounters(_objectsCountersLinkage) {
@@ -274,116 +268,6 @@ var JQueryNamespace = (function ($) {
 
         M.updateTextFields();
         M.FormSelect.init(objectsOrderElm[0], {});
-    }
-
-    function makeInteractions() {
-        if(!objectsInteractions || !$('#cloneAllInteractions').is(':checked')) {
-            objectsInteractions = [];
-            return;
-        }
-        if($('#isCloneInteractions').is(':checked')) return;
-
-        $('input[data-interactionObjectID]').each(function() {
-            if(!$(this).is(':checked')) {
-                var idx = $(this).attr('data-interactionObjectID');
-                objectsInteractions.splice(idx, 1);
-            }
-        });
-    }
-
-    function makeCounters() {
-        if(!objectsCountersLinkage || !$('#cloneAllCounters').is(':checked')) {
-            objectsCountersLinkage = [];
-            return;
-        }
-        if($('#isCloneCounters').is(':checked')) return;
-
-        $('input[data-counterID]').each(function() {
-            if(!$(this).is(':checked')) {
-                var idx = $(this).attr('data-counterID');
-                objectsCountersLinkage.splice(idx, 1);
-            }
-        });
-    }
-
-    function makeObjectsProperties() {
-        if(!objectsProperties || !$('#cloneAllProperties').is(':checked')) {
-            objectsProperties = [];
-            return;
-        }
-        if($('#isCloneProperties').is(':checked')) return;
-
-        $('input[data-propertyID]').each(function() {
-            if(!$(this).is(':checked')) {
-                var idx = $(this).attr('data-propertyID');
-                objectsProperties.splice(idx, 1);
-            }
-        });
-    }
-
-    function makeObjectsParameters() {
-        if(!objectsParameters) return;
-
-        objectsParameters.forEach(function (obj) {
-            if(disabledCBElm.is(':checked')) obj.disabled = 1;
-            if(Number(objectsOrderElm.val())) obj.sortPosition = objectsOrderElm.val();
-            if(objectsDescriptionElm.val()) obj.description = objectsDescriptionElm.val();
-        });
-    }
-
-    function prepareDataForSaveToFile(callback) {
-        makeInteractions();
-        makeCounters()
-        makeObjectsProperties()
-        makeObjectsParameters();
-
-        var num = objectsCountersLinkage.length;
-        var counters = {};
-        objectsCountersLinkage.forEach(function (counter) {
-            $.post(serverURL, {func: 'getAllForCounter', ids: counter.id}, function(data) {
-                counter.counterData = data;
-                --num;
-                if(num === 0) callback({
-                    parameters: objectsParameters,
-                    properties: objectsProperties,
-                    counters: objectsCountersLinkage,
-                    interactions: objectsInteractions,
-                });
-            });
-        });
-    }
-
-    function saveToFile(exportObj, fileName) {
-        var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 4));
-        var downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href",     dataStr);
-        downloadAnchorNode.setAttribute("download", fileName);
-        document.body.appendChild(downloadAnchorNode); // required for firefox
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
-    }
-
-    function loadFromFile(fileName, callback) {
-        var input = document.createElement('input');
-        input.type = 'file';
-
-        input.onchange = e => {
-
-            // getting a hold of the file reference
-            var file = e.target.files[0];
-
-            // setting up the reader
-            var reader = new FileReader();
-            reader.readAsText(file,'UTF-8');
-
-            // here we tell the reader what to do when it's done reading...
-            reader.onload = readerEvent => {
-                var content = readerEvent.target.result; // this is the content!
-                callback( content );
-            }
-
-        }
-        input.click();
     }
 
 })(jQuery); // end of jQuery name space

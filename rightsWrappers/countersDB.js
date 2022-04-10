@@ -121,7 +121,7 @@ rightsWrapper.getCounterByID = function(user, id, callback) {
 
                     if(!rows || !rows[0] || !rows[0].id)
                         return callback(new Error('Can\'t get objectCounterID for counterID ' + checkedID +
-                            ': object to counters relations not found'));
+                            ': object to counter relations not found'));
 
                     callback(null, counter);
                 });

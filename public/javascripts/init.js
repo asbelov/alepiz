@@ -131,6 +131,7 @@ var initJQueryNamespace = (function($){
         searchActionsElm,
         searchActionsAutocompleteInstance,
         useGlobalSearch = false,
+        canSetFocusToSearchBar = true,
         minSearchStrLength = 2,
         prevSearchStrLength = 0,
         timeWhenNoObjectsWereFound = 0,
@@ -225,6 +226,11 @@ var initJQueryNamespace = (function($){
                 $('#changePasswordForm').addClass('hide');
                 $('#newUserPass1').val('');
                 $('#newUserPass2').val('');
+                canSetFocusToSearchBar = false;
+            },
+            onCloseEnd: function () {
+                canSetFocusToSearchBar = true;
+                setFocusToSearchBar();
             }
         });
 
@@ -252,18 +258,14 @@ var initJQueryNamespace = (function($){
         actionBtnElm.mouseleave(function () {
             if(actionBtnInstance.isOpen) actionBtnInstance.close();
         });
-        actionBtnElm.click(function () {
-            if(!isMobile) {
-                if (objectsTabSwitchElm.hasClass('active')) searchObjectsElm.focus();
-                else searchActionsElm.focus();
-            }
+
+        actionBtnElm.click(function (e) {
+            setTimeout(function() { actionBtnInstance.open(); }, 300);
         });
 
         searchActionsElm.keydown(function (e) {
             if (e.keyCode === 13) return false;
         });
-
-        if(!isMobile) searchActionsElm.focus();
 
         $('#searchTip').click(function (e) {
             e.preventDefault(); // prevent default
@@ -303,7 +305,6 @@ var initJQueryNamespace = (function($){
         additionalObjectsTabSwitchElm.text(additionalObjectsTabName);
         searchActionsElm.addClass('hide');
         searchObjectsElm.removeClass('hide');
-        if(!isMobile) searchObjectsElm.focus();
         walletBtnElm.removeClass('hide');
         selectAllObjBtnElm.removeClass('hide');
     }
@@ -426,6 +427,19 @@ var initJQueryNamespace = (function($){
 
     }
 
+    function setFocusToSearchBar() {
+        if(!isMobile && canSetFocusToSearchBar) {
+            setTimeout( function() {
+                if(!searchActionsElm.hasClass('hide')) {
+                    return searchActionsElm.focus();
+                }
+                if(!searchObjectsElm.hasClass('hide')) {
+                    return searchObjectsElm.focus();
+                }
+            });
+        }
+    }
+
     // init events
     function initEvents() {
 
@@ -437,6 +451,10 @@ var initJQueryNamespace = (function($){
 
         runActionBtnElm.click(processIframeInputsData);
         makeTaskBtnElm.click(processIframeInputsData);
+
+        setFocusToSearchBar();
+        // after every mouse click set focus to the search bar
+        bodyElm.click(setFocusToSearchBar);
 
         $('#logWindowBtn').click(openLogWindow);
 
@@ -469,7 +487,6 @@ var initJQueryNamespace = (function($){
                 objectsTabSwitchElm.text('OBJECTS');
                 searchActionsElm.addClass('hide');
                 searchObjectsElm.removeClass('hide');
-                if(!isMobile) searchObjectsElm.focus();
                 walletBtnElm.removeClass('hide');
                 selectAllObjBtnElm.removeClass('hide');
             }
@@ -491,7 +508,6 @@ var initJQueryNamespace = (function($){
 
                 searchObjectsElm.addClass('hide');
                 searchActionsElm.removeClass('hide');
-                if(!isMobile) searchActionsElm.focus();
                 walletBtnElm.addClass('hide');
                 selectAllObjBtnElm.addClass('hide');
 
@@ -1142,10 +1158,9 @@ var initJQueryNamespace = (function($){
             }).join('');
         }
 
-        //if (!isMobile) searchObjectsElm.focus();
 
         // don't redraw objects list if previous objects list html is the same with current
-        if(previousHTMLWithObjectList === html){
+        if(previousHTMLWithObjectList === html) {
             if(typeof(callback) === 'function') return callback();
             return;
         }
@@ -1290,7 +1305,7 @@ var initJQueryNamespace = (function($){
             // check for the new action menu is equal to the previous generated action menu
             // and redraw actions menu only if it changed
             var newActionsMenuHTML = drawData.html;
-            if(newActionsMenuHTML === prevActionsListHTML){
+            if(newActionsMenuHTML === prevActionsListHTML) {
                 if(typeof callback !== 'function') return;
                 return callback();
             }
@@ -1644,6 +1659,8 @@ var initJQueryNamespace = (function($){
                 }, callback);
             }
         } catch (err) { }
+
+        iframeDOMElm.contentWindow.log = log;
 
         ctrlEnter();
         setTimeout(ctrlEnter, 60000);
@@ -2513,7 +2530,7 @@ var initJQueryNamespace = (function($){
     }
 
 
-    // it mast be at the end, because before we initialising variables and execute commands
+    // it must be at the end, because before we initialising variables and execute commands
     return {
         log: function (level, args) {
             if(!args) return;

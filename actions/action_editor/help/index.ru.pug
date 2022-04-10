@@ -198,7 +198,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         Если jquery не требуется, его можно отключить.
                     p.
                         Ниже представлен пример скрипта. После формирования пользовательского интерфейса
-                        (запуск из функции $(function () {...}) он выводит в консоль параметры из файла конфигурации
+                        (запуск из JQuery функции $(function () {...}) он выводит в консоль параметры из файла конфигурации
                         действия и выбранные пользователем объекты.
                         Выполняет AJAX запрос к серверу и выводит его результат на консоль.
                         При изменении выбранных объектов, новый список будет выведен на консоль.
@@ -365,6 +365,19 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                             из объектов, типа:
                             [{key: &lt;param1&gt;, val: &lt;value1&gt;}, {key: &lt;param2&gt;, val: &lt;value2&gt;}, .... {}, ...].
                             param это название параметра, а value - его значение.
+                        li.
+                            setActionConfig(config[, callback]), сохраняет в базу данных настройки действия для
+                            пользователя, который запустил действие.
+                            config - текст или объект с настройками действия для пользователя, callback(err) -
+                            возвращает ошибку, если настройки сохранить не удалось.
+                        li.
+                            getActionConfig(callback), загружает из базы данных сохраненные настройки действия для
+                            пользователя, который запустил действие. callback(config) - функция, которая возвращает
+                            сохраненный в базе данных текстовые данные о настройках действия для пользователя.
+                        li.
+                            log - объект с функциями log.silly(), log.debug(), log.info(), log.warn(), log.warning(),
+                            log.error() - при вызове преобразует все переданные параметры в текст и отображает
+                            полученный текст во всплывающем окне.
                     p.
                         В примере ниже записываем параметры действия param1=value1 и param2=value2 в адресную строку, затем
                         считываем их и печатаем в консоль браузера.
@@ -386,6 +399,28 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                     console.log("Parameters: ", param.key, "=", param.val);
                                 }
                             });
+
+                            // save action configuration for user to DB
+                            setActionConfig({
+                                param1: "This is saved parameter #1"
+                                param2: 123,
+                                param3: true
+                                }, function() {
+                                console.log("All parameters were saved successfully");
+                            });
+
+                            // get action configuration for user from DB
+                            getActionConfig(function(actionConfigStr) {
+                                var actionConfig = JSON.parse(actionConfigStr);
+                                console.log(actionConfig);
+                            });
+
+                            // Show error message
+                            try {
+                                var actionConfig = JSON.parse(actionConfigStr);
+                            } catch(e) {
+                                return log.error("Can't parse action configuration: ", err.message);
+                            }
                     h4 ajax.js - backend скрипт
                     p.
                         Компонент служит для передачи данных с сервера в браузер по протоколу AJAX.

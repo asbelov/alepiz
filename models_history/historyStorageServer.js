@@ -2,7 +2,8 @@
  * Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var log = require('../lib/log')(module);
+const log = require('../lib/log')(module);
+const async = require('async');
 const threads = require('../lib/threads');
 const Database = require('better-sqlite3');
 const fs = require("fs");
@@ -10,7 +11,6 @@ const exitHandler = require("../lib/exitHandler");
 const countersDB = require("../models_db/countersDB");
 const historyStorage = require('../models_history/historyStorage');
 var parameters = require('../models_history/historyParameters');
-const Conf = require("../lib/conf");
 
 // array of minutes for trends. long time (keepTrends time) keeps only trends with time interval 60
 // trends less the 60 will keep as history data (keepHistory time)
@@ -646,6 +646,58 @@ functions.delRecords = function (IDs, daysToKeepHistory, daysToKeepTrends, callb
 
     if(!IDs.length) return callback();
 
+    var arrayPartsIdx = [0], iterateNum = 0, deletedObjectsNum = 0, printInfoTime = Date.now();
+
+    // Math.ceil(.95)=1; Math.ceil(7.004) = 8
+    for(var i = 1; i < Math.ceil(IDs.length / parameters.maxNumberObjectsToDeleteAtTime); i++) {
+        arrayPartsIdx.push(i *  parameters.maxNumberObjectsToDeleteAtTime);
+    }
+
+    var deleteRecordsInProgress = 0;
+    async.eachSeries(arrayPartsIdx, function (idx, callback) {
+        var IDsPart = IDs.slice(idx, idx + parameters.maxNumberObjectsToDeleteAtTime);
+        ++iterateNum;
+        deletedObjectsNum += IDsPart.length;
+
+        functions.beginTransaction('Delete records IDs: ' + IDsPart.join(', '), function (err) {
+            if (err) return callback(err);
+
+            //log.info(Date.now(), ' Starting del transaction:  ', transactionDescriptionInProgress, ': ', transactionInProgress);
+            if(iterateNum === 1) deleteRecordsInProgress = Date.now();
+            delRecords(IDsPart, daysToKeepHistory, daysToKeepTrends, function (err) {
+                //log.info(Date.now(), ' Finishing del transaction: ', transactionDescriptionInProgress, ': ', transactionInProgress, ' (', transactionsFunctions.length, '): ', err);
+                functions.commitTransaction(err, function(err) {
+
+                    if(Date.now() - printInfoTime > 60000) {
+                        log.info('Deleting ', Math.round(deletedObjectsNum * 100 / IDs.length),
+                            '% (', deletedObjectsNum, '/', IDs.length, ') objects since ',
+                            new Date(deleteRecordsInProgress).toLocaleString());
+                        printInfoTime = Date.now();
+                    }
+
+                    if(iterateNum === arrayPartsIdx.length ) return callback(err);
+                    setTimeout(callback, parameters.pauseBetweenDeletingSeriesObjects, err);
+                });
+            });
+        });
+    }, callback);
+};
+
+/*
+functions.delRecords = function (IDs, daysToKeepHistory, daysToKeepTrends, _callback) {
+    if (!_callback) {
+        _callback = daysToKeepHistory;
+        daysToKeepHistory = 0;
+    }
+
+    if(!IDs.length || deleteRecordsInProgress) return _callback();
+    deleteRecordsInProgress = Date.now();
+
+    function callback(err) {
+        deleteRecordsInProgress = 0;
+        return _callback(err);
+    }
+
     functions.beginTransaction('Delete records IDs: ' + IDs.join(', '), function(err) {
         if(err) return callback(err);
 
@@ -656,6 +708,7 @@ functions.delRecords = function (IDs, daysToKeepHistory, daysToKeepTrends, callb
         });
     });
 };
+ */
 
 function delRecords(IDs, daysToKeepHistory, daysToKeepTrends, _callback) {
 

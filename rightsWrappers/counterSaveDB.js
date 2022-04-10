@@ -73,10 +73,11 @@ rightsWrapper.delete = function(user, counterID, callback) {
     objectsCountersIDs: array oj objects with object and counter IDs [{objectID:.., counterID:..}, {..}, ...]
     initObjectsIDs: array of objects IDs
     initCountersIDs: array of counters IDs. For each object ID will be linked all initCountersIDs
-    callback(err)
+    callback(err, objectsCountersIDs) objectsCountersIDs = [{objectID:, counterID:}, ...]
  */
 rightsWrapper.saveObjectsCountersIDs = function(user, initObjectIDs, initCountersIDs,  callback) {
 
+    if(!initCountersIDs) return callback();
     checkIDs(initCountersIDs, function(err, countersIDs) {
         if(err && (!Array.isArray(countersIDs) || !countersIDs.length)) {
             return callback(new Error('Incorrect counters IDs: ' + err.message));
@@ -110,7 +111,7 @@ rightsWrapper.saveObjectsCountersIDs = function(user, initObjectIDs, initCounter
                         var counterID = countersIDs[i];
 
                         // don't check user rights to counters because it's will be checking user rights to the linked objects and will
-                        // deny to add a new link with the object to the counter
+                        // deny adding a new link with the object to the counter
                         objectsIDs.forEach(function (objectID) {
 
                             var isThisObjectCounterIDExist = false;
@@ -142,8 +143,14 @@ rightsWrapper.saveObjectsCountersIDs = function(user, initObjectIDs, initCounter
 };
 
 
-rightsWrapper.saveCounter = function(user, initObjectsIDs, counter, counterParameters, updateEvents, variables, callback) {
+rightsWrapper.saveCounter = function(user, counterData, callback) {
     log.debug('Saving counter into the database', counter, '; linked objects: ', initObjectsIDs);
+
+    var initObjectsIDs = counterData.initObjectsIDs;
+    var counter = counterData.counter;
+    var counterParameters = counterData.counterParameters;
+    var updateEvents = counterData.updateEvents;
+    var variables = counterData.variables;
 
     checkIDs(initObjectsIDs, function(err, checkedIDs) {
         if (err && (!Array.isArray(checkedIDs) || !checkedIDs.length)) {

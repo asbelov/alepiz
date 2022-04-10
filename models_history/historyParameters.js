@@ -33,6 +33,8 @@ var parameters = {
     cacheServiceTimeoutForSaveObjectRecords: 0, // terminate cache service when saving records for object more than 5 min
     timeoutForDeleteObjectRecords: 0, // terminate delete operation when delete delayed more than 60 sec per object id
     timeoutForCommitTransaction: 0, // log slow committed transaction (more than 3 min)
+    maxNumberObjectsToDeleteAtTime: 100, // maximum number of objects to delete at one time
+    pauseBetweenDeletingSeriesObjects: 1000, // pause between deleting a series of objects
     housekeeperInterval: 1800000, // how often houseKeeper will run
     housekeeperWaitTimeout: 0, // time to wait until the housekeeper is not checked or not made changes
     housekeeperWatchdogCheckInterval: 300000, // time interval for checking housekeeper

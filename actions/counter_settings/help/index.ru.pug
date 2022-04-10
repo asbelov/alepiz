@@ -26,15 +26,59 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
 
                     h2 Предназначение Counter settings
                     p.
-                        Counter settings предназначен для создания новых или редактирования счетчиков и
-                        подключения счетчиков к объектам.
+                        Counter settings предназначен для создания, изменения, экспорта и импорта счетчиков.
                         Счетчик предназначен для сбора или генерации информации, которая может быть сохранена в базу
                         данных и обработана. Например, счетчиком может быть система сбора информации о свободной памяти
                         на сервере,
                         система сбора информации о статусе дисков в RAID контроллере, система генерации событий при
                         превышении счетчиком порогового значения, система поиска новых объектов в сети и так далее.
 
-                    h5 Возвращаемое значение: counterID (идентификатор в базе данных нового или редактируемого счетчика)
+                    h5 Возвращаемое значение: объект с данными счетчика:
+                    pre.
+                        {
+                            initObjectsIDs: &lt;array of object IDs&gt;,
+                            counter: {
+                                name: &lt;counter name&gt;,
+                                collectorID: &lt;collector ID (directory name)&gt;,
+                                groupID: &lt;counter group ID&gt;,
+                                unitID: &lt;counter unit ID&gt;,
+                                keepHistory: &lt;keep history in days&gt;,
+                                keepTrends: &lt;keep trends in days&gt;,
+                                sourceMultiplier: &lt;source multiplier (from counter unit)&gt;,
+                                counterID: &lt;counter ID&gt;,
+                                description: &lt;counter description or null&gt;,
+                                disabled: &lt;enabled or disabled counter (1 or 0)&gt;,
+                                debug: &lt;enabled or disabled counter debug (1 or 0)&gt;,
+                                taskCondition: &lt;use counter as a task condition (1 or 0)&gt;,
+                                updateVariablesRef: &lt;oldCounterName: update variables references when counter name is changed&gt;
+                            },
+                            counterParameters: &lt;object with parameters for collector&gt;
+                                {
+                                    &lt;name1&gt;: &lt;value1&gt;,
+                                    &lt;name2&gt;: &lt;value2&gt;,
+                                 ...},
+                            updateEvents: &lt;array with update events objects&gt;:
+                                [{
+                                    counterID:,
+                                    objectID:,
+                                    expression:,
+                                    mode:,
+                                    objectFilter,
+                                    description:,
+                                    updateEventOrder:
+                                }, ...],
+                            variables: &lt;object with variables objects&gt;
+                                {&lt;variableName1&gt;: {
+                                    variableOrder:,
+                                    description:,
+                                    expression:,
+                                    parentCounterName:,
+                                    objectID:,
+                                    objectVariable:,
+                                    function:,
+                                    functionParameters
+                                }, ...},
+                        }
 
                     h3 COUNTER
                     p.
@@ -235,7 +279,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         Сохранять тренды в течение указанного количества дней. Тренды, собранные позже указанного
                         количества дней, будут удаляться для сохранения дискового пространства. Параметр влияет только
                         на тренды с временем усреднения в один час или более.
-                        Если установлено 0, то тренды не будут создаваться не будут.
+                        Если установлено 0, то тренды создаваться не будут.
 
                     img(src="./images/help.unitsAndKeeps.png" width="1024").materialboxed.card-panel.hoverable
 
@@ -753,6 +797,124 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         каталог logs) в подкаталоге counters. В качестве имени для файла используется counterID.
                         Количество дней за которые можно просматривать сообщения, регулируется системной настройкой
                         глубины ротации логов.
+
+                    h3 IMPORT\EXPORT
+                    p.
+                        Вкладка используется для импорта или экспорта настроек счетчика.
+                        С ее помощью можно передавать настройки между различными экземплярами  ALEPIZ.
+                        Для передачи данных используется объект в формате JSON, который отображается в
+                        редакторе. Редактор служит для того, можно было вручную вносить изменения в
+                        экспортируемый или импортируемый объект с настройками счетчика.
+                    img(src="./images/help.importExport.png" width="1024").materialboxed.card-panel.hoverable
+                    h4 Формат импортируемого и экспортируемого объекта
+                    pre.
+                        {
+                            &quot;name&quot;: &lt;counter name&gt;
+                            &quot;keepHistory&quot;: &lt;number of days to store historical data&gt;,
+                            &quot;keepTrends&quot;: &lt;number of days to store averages of historical data (trends)&gt;,
+                            &quot;description&quot;: &lt;counter description&gt;,
+                            &quot;disabled&quot;: &lt;disable or enable counter (true|false)&gt;,
+                            &quot;debug&quot;: &lt;enable or disable counter debugging (true|false)&gt;,
+                            &quot;taskCondition&quot;: &lt;use a counter as a task execution condition (true|false)&gt;,
+                            &quot;collectorID&quot;: &lt;collector name (collector directory name)&gt;,
+                            &quot;groupName&quot;: &lt;counter group name&gt;,
+                            &quot;unitName&quot;: &lt;counter unit name&gt;,
+                            &quot;sourceMultiplier&quot;: &lt;multiplier for the value of the variable from the unit&gt;,
+                            &quot;collectorParameters&quot;: [ &lt;collector parameter arrays&gt;
+                                {
+                                    &quot;name&quot;: &lt;parameter name&gt;,
+                                    &quot;value&quot;: &lt;parameter value&gt;
+                                },
+                                ...
+                            ],
+                            &quot;linkedObjects&quot;: [ &lt;array of names for counter linked objects&gt;
+                                {
+                                    &quot;name&quot;: &lt;linked object name&gt;
+                                }
+                            ],
+                            &quot;updateEvents&quot;: [ &lt;array of update events&gt;
+                                {
+                                    &quot;counterName&quot;: &lt;update event parent counter name&gt;,
+                                    &quot;name&quot;: &lt;the name of the object for the update event, or null for the current object&gt;,
+                                    &quot;expression&quot;: &lt;update event expression&gt;,
+                                    &quot;mode&quot;: &lt;update event mode&gt;:
+                                        1: Update once when expression value is changed to true and result is changed to true
+                                        2: Update once when expression value is changed to true and once when changed to false and result is changed to true or false
+                                        3: Update each time when expression value is true and once when changed to false and result is changed to true or false
+                                        4: Update once when expression value is changed to false and result is changed to false,
+                                    &quot;description&quot;: &lt;update event description&gt;
+                                    &quot;objectFilter&quot;: &lt;object filter regExp&gt;,
+                                    &quot;updateEventOrder&quot;: &lt;current update event order&gt;
+                                }
+                            ],
+                            &quot;variables&quot;: [ &lt;array of historical or expression variables&gt;
+                                { &lt;historical variable&gt;
+                                    &quot;name&quot;: &lt;variable name&gt;,
+                                    &quot;objectName&quot;: &lt;the name of the object to receive data for the variable. null for
+                                        the current object or for an object name that is defined by a variable&gt;,
+                                    &quot;parentCounterName&quot;: &lt;the name of the parent counter to get data for the variable&gt;,
+                                    &quot;function&quot;: &lt;historical function name&gt;,
+                                    &quot;functionParameters&quot;: &lt;comma separated historical function parameters&gt;,
+                                    &quot;objectVariable&quot;: variable to define the name of the object that is used to obtain historical data&gt;,
+                                    &quot;description&quot;: &lt;variable description&gt;,
+                                    &quot;variableOrder&quot;: &lt;current variable order&gt;
+                                },
+                                { &lt;expression variable&gt;
+                                    &quot;name&quot;: &lt;variable name&gt;,
+                                    &quot;expression&quot;: &lt;expression to evaluate the value of a variable&gt;,
+                                    &quot;description&quot;: &lt;variable description&gt;,
+                                    &quot;variableOrder&quot;: &lt;current variable order&gt;
+                                }
+                            ]
+                        }
+                    h4 Описание интерфейса управления импортом и экспортом:
+                    img(src="./images/help.importExportButtons.png").materialboxed.card-panel.hoverable
+                    div.row
+                        div.col.s12.m12.l4.
+                            GENERATE - генерировать данные для экспорта параметров редактируемого счетчика. Параметры
+                            подставляются из web интерфейса действия Counter settings. Можно открыть счетчик на
+                            редактирование, изменить требуемые параметры и, без сохранения изменений, создать
+                            объект JSON для экспорта. При необходимости, экспортируемые параметры можно отредактировать
+                            вручную в редакторе данных экспорта и импорта.
+                            При создании данных для экспорта появится окно с информацией об объектах и счетчиках,
+                            от которых зависит экспортируемый счетчик. При нажатии на ссылки будут открываться действия
+                            для редактирования счетчиков или объектов, с помощью которых также можно произвести экспорт
+                            данных.
+                        div.col.s12.m12.l8
+                            img(src="./images/help.ImportExportGenerateAssociations.png").materialboxed.card-panel.hoverable
+
+                    div.row
+                        div.col.s12.m12.l4.
+                            APPLY - применить данные из редактора импорта и экспорта к счетчику.
+                            Импортируемые данные будут загружены в web
+                            интерфейс действия Counter settings, без сохранения в базу данных.
+                            Для сохранения изменений счетчика необходимо запустить действие Counter settings на выполнение.
+                            Таким образом, перед сохранением, можно внести изменения в импортируемые настройки счетчика.
+                            При необходимости, параметры можно отредактировать вручную в редакторе данных для экспорта и
+                            импорта.
+                            Если при анализе импортируемых данных было обнаружено, что в системе отсутствуют объекты
+                            или счетчики, от которых зависит импортируемый счетчик, будет выведено соответствующее предупреждение.
+                        div.col.s12.m12.l8
+                            img(src="./images/help.importExportImportWarning.png").materialboxed.card-panel.hoverable
+                    p.
+                        EXPORT - сохранить данные из редактора экспорта и импорта в файл. Имя файла формируется
+                        автоматически из названия счетчика. Расширение файла будет .json
+                    p.
+                        IMPORT - загрузить данные счетчика из файла в редактор импорта и экспорта данных. Производится
+                        поиск файлов с расширением .json. Для того, чтобы применить загруженные данные к счетчику в web
+                        интерфейс действия Counter settings, необходимо нажать на APPLY.
+                    p.
+                        IMPORT AND APPLY - загрузить данные счетчика из файла в редактор импорта и экспорта данных и
+                        применить загруженные данные к счетчику. Данные будут загружены только в web интерфейс действия,
+                        без сохранения в базу данных.
+                        Для сохранения изменений счетчика необходимо запустить действие Counter settings на выполнение.
+                    p.
+                        Skip linked objects - Не импортировать, не экспортировать и не применять информацию об объектах,
+                        подключенных к счетчику.
+
+
+
+
 
 
 

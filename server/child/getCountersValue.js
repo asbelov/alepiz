@@ -872,6 +872,16 @@ function getVariablesValues(property, parentVariables, updateEventState, callbac
             }
         }
         */
+
+        // send UPDATE_EVENT_STATE anyway if previous updateEventState was undefined,
+        // because after the child may have nothing to send to the server
+        if (property.parentOCID && property.expression &&
+            updateEventState === undefined && variables.UPDATE_EVENT_STATE !== undefined) {
+            childProc.send({
+                updateEventKey: property.parentOCID + '-' + property.OCID,
+                updateEventState: variables.UPDATE_EVENT_STATE, // don't replace to !!result
+            });
+        }
         callback(null, whyNotNeedToCalculateCounter, variables, variablesDebugInfo);
     });
 }

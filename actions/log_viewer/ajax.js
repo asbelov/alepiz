@@ -178,7 +178,8 @@ function getFiles(dir, skipDirs, filterFilesRE, recursion, subDir, callback) {
 function getFilePart(args, callback) {
 
     fs.stat(args.fileName, function(err, stats) {
-        if(err) return callback(new Error('Can\'t get file size for file ' + args.fileName + ': ' + err.message));
+        //if(err) return callback(new Error('Can\'t get file size for file ' + args.fileName + ': ' + err.message));
+        if(err) return callback(null, '');
 
         var fileSize = stats.size;
         if (args.function === 'getFileSize') return callback(null, fileSize);

@@ -156,8 +156,8 @@ function runChildren(callback) {
             killTimeout: killTimeout-3000, // less than server killTimeout
             args: [serverName, '%:childID:%'],
             restartAfterErrorTimeout: 0, // we will restart server with all children after exit one of children
-            onChildExit: function() {
-                log.error('One child was terminated unexpectedly. Restarting server');
+            onChildExit: function(err) {
+                log.error('One child was terminated unexpectedly with error\\exit code: ', err, '. Restarting server...');
             },
             module: 'childGetCountersValue:'+serverName,
         }, function(err, childrenProcesses) {
@@ -456,10 +456,10 @@ function processServerMessage(message) {
 function processChildMessage(message) {
     if(!message) return;
 
-    //if(message.updateEventKey) {
-    //    updateEventsStatus.set(message.updateEventKey, message.updateEventState);
-    //    return;
-    //}
+    if(message.updateEventKey) {
+        updateEventsStatus.set(message.updateEventKey, message.updateEventState);
+        return;
+    }
 
     if(message.tid) {
         if(!childrenInfo[message.tid]) {

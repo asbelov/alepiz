@@ -11,6 +11,8 @@ var path = require('path');
 var log = require('../../lib/log')(module);
 var collectors = require('../../lib/collectors');
 var rightsWrappersCountersDB = require('../../rightsWrappers/countersDB');
+var rightsWrappersObjectsDB = require('../../rightsWrappers/objectsDB');
+var counterDB = require('../../models_db/countersDB');
 var groupsDB = require('../../models_db/countersGroupsDB');
 var unitsDB = require('../../models_db/countersUnitsDB');
 var history = require('../../models_history/history');
@@ -21,7 +23,7 @@ const confLog = new Conf('config/log.json');
 var logViewerAjax = require('../log_viewer/ajax');
 
 module.exports = function(args, callback) {
-    log.debug('Starting ajax with parameters', args);
+    //log.debug('Starting ajax with parameters ', args);
 
     var func = args.func || args.function;
 
@@ -83,6 +85,10 @@ module.exports = function(args, callback) {
     if(func === 'getFilesList') return getLogFileList(args, callback);
 
     if(func === 'getFilePart' || func === 'getFileSize') return logViewerAjax(args, callback);
+
+    if(func === 'getObjectsByNames') return rightsWrappersObjectsDB.getObjectsIDs(args.username, args.objectNames.split('\r'), callback);
+
+    if(func === 'getCountersByNames') return counterDB.getCountersIDsByNames(args.counterNames.split('\r'), callback);
 
     callback(new Error('Unknown function ' + func));
 };

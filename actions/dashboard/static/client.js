@@ -1665,7 +1665,7 @@ var JQueryNamespace = (function ($) {
     }
 
     function floatToHuman(str) {
-        return escapeHtml(str.replace(/(\d+\.\d\d)\d+/g, '$1'));
+        return escapeHtml(str.replace(/( \d+\.\d\d)\d\d+([^._])/g, '$1$2'));
     }
 
     function getHumanImportance(importance) {

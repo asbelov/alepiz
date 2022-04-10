@@ -1,0 +1,24 @@
+{
+    "name": "Import&Export",
+    "description": "Import and export objects",
+    "homePage": "index",
+    "ajaxServer": "ajax.js",
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "launcherPrms": { "javaScript": "server.js" },
+    "staticDir": "static",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": true,
+    "onChangeObjectMenuEvent": "callback:onChangeObjects",
+    "callbackBeforeExec": "callbackBeforeExec",
+    "callbackAfterExec": "callbackAfterExec",
+    "outputFormat": "text",
+    "descriptionTemplate": "Import or export objects %:o:%",
+    "icon": "settings",
+    "canAddParametersToAction": false,
+    "parameters": {
+        "objects": {
+            "description": "List of objects IDs, used as templates"
+        }
+    }
+}

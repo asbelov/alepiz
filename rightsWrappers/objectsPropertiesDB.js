@@ -179,11 +179,11 @@ rightsWrapper.getObjectsForProperty = function(user, propertyName, callback) {
  * @example
  * // returned properties object
  * {
- *      insert: {<objectID1>: propertiyForSave1 ,...}, // props for insert
- *      update: {<objectID1>: propertiyForSave1 ,...}, // props for update
+ *      insert: {<objectID1>: propertyForSave1 ,...}, // props for insert
+ *      update: {<objectID1>: propertyForSave1 ,...}, // props for update
  *      updateDescription: propertiesForSave, // properties with different descriptions,
  *      deleteShared: deleteNotListedProperties ? Object.keys(sharedPropertiesNamesForDelete) : undefined,
- *      shared: {<objectID1>: propertiyForSave1 ,...}, // sharedPropertiesNamesForDelete
+ *      shared: {<objectID1>: propertyForSave1 ,...}, // sharedPropertiesNamesForDelete
  * }
  */
 

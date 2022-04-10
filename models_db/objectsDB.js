@@ -63,6 +63,7 @@ objectsDB.getAllObjects = function(callback) {
  order - sort position for new objects.  Top objects has order < 10 objectsFilterDB.js
  callback(err, newObjectsIDs),
  newObjectsIDs - array of a new objects IDs;
+ newObjects - object like {<objectName1>: <objectID1>, ...}
  */
 objectsDB.addObjects = function(newObjectsNames, description, order, disabled, callback){
     log.debug('Add objects: ', newObjectsNames, ', description: ', description, ', order: ', order, ', disabled: ', disabled);
@@ -73,8 +74,9 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled, c
         if(err) return callback(err);
 
         // array with IDs of a new objects, which inserting
-        var newObjectsIDs = [];
-        // async inserting new objects into a database. series used for transaction rollback if error
+        var newObjectsIDs = [], newObjects = {};
+        // async inserting new objects into a database. series used for transaction rollback if error and
+        // save order of newObjectsIDs
         async.eachSeries(newObjectsNames, function(name, callback){
             stmt.run({
                 $name: name,
@@ -85,13 +87,15 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled, c
             }, function (err, info) {
                 if(err) return callback(err);
                 // push new object ID into array
-                newObjectsIDs.push(this.lastID === undefined ? info.lastInsertRowid : this.lastID);
+                var newObjectID = this.lastID === undefined ? info.lastInsertRowid : this.lastID;
+                newObjectsIDs.push(newObjectID);
+                newObjects[name] = newObjectID;
                 callback();
             });
         }, function(err){
             stmt.finalize();
             if(err) return callback(err);
-            callback(null, newObjectsIDs);
+            callback(null, newObjectsIDs, newObjects);
         });
     });
 };

@@ -18,17 +18,17 @@
 // get-objects-from-additional-objects-list=1 - by default objects selector getting objects from main objects list
 //              in navigation menu. If you want, that objects selector getting objects from additional objects list,
 //              set this attribute
-// add-custom-object=<name> - show button for adding custom object to objects list. <name> must be a common name of the custom objects.
+// add-custom-object=<name> - show button for adding custom object to object list. <name> must be a common name of the custom objects.
 //          if name contain 'variable', then add custom object as variable. It's mean, that you can add only one custom object to object list
 //          and if any objects are present in objects list, you will get error
-//      f.e. add-custom-object="variable" will be add button "ADD VARIABLE". All custom objects will have ID = 0
+//      f.e. add-custom-object="variable" will be added button "ADD VARIABLE". All custom objects will have ID = 0
 // tag 'option' - used for initialize objects in objects selector if object selector was initialized using 'select' tag:
 //              value - object id
 //              text of 'option' - name of object
 // if select initialized using 'input' tag you can put data to input value as JSON string, f.e. '[{id:<object1 ID>, name:<object1 name>}, ....]'
 
 // functions (jQuery plugins)
-// .objectsSelector([objects], [callback]) - initialize objects selector and/or set objects to objects selector. Parameters is
+// .objectsSelector([objects], [callback]) - initialize objects selector and/or set objects to object selector. Parameters are
 //      not required.
 //      [objects] - array of objects [{id: objectID1, name: objectName1}, {id: objectID2, name: objectName2} ....].
 //          if first element of array is a string, then don't remove previous objects from panel, f.e.
@@ -36,11 +36,11 @@
 //          if array of objects is undefined or null, then initialize objects selector from tag <option>
 //      [callback(<jQuery objects>)] - callback is a function. It will be called, when objects selector contents is changed.
 //          previous callback will be unbinding from events
-//          Callback is not not called when initialize objects selector.
+//          Callback is not called when initialize objects selector.
 //          <jQuery objects> - is a jQuery object reference to <select>,
 //          f.e. if <select id="selector1" class="objects-selector">, then <jQuery objects> = $('#selector1')
 //
-// .clearObjectsSelector() - clear objects panel from objects
+// .clearObjectSelector() - clear objects' panel from objects
 // Examples:
 
 // Automatically init objects selector with title "Objects selector" with initial
@@ -61,7 +61,7 @@
 
 
 
-// Automatically init objects selector with title "My objects selector", created from ID and
+// Automatically init objects selector with title "My objects' selector", created from ID and
 // description "This is my objects list"
 //
 // <select id="my-objects-selector" class="objects-selector" description "This is my objects list"></select>
@@ -75,7 +75,7 @@
 //  var objectsIDsArray = $('#objects-selector").val();
 // </script>
 
-// Init objects selector from JS with title "My new objects selector", created from ID
+// Init objects selector from JS with title "My new objects' selector", created from ID
 // then get objects IDs array to objectsIDsArray.
 //
 // <select id="my-new-objects-selector">
@@ -123,6 +123,7 @@
 
     // clear panel from objects
     $.fn.clearObjectSelector = function(){
+        objects = {};
         return this.each(function(i, elm){
             $('#' + $(elm).attr('id') + '-objects-panel').empty();
             $(elm).empty();
@@ -161,14 +162,14 @@
 
         var elmTag = $(elm).prop("tagName"); // 'SELECT' or 'INPUT' etc
 
-        // for each objects selector set own callback
+        // for each objects' selector set own callback
         if(typeof(initCallback) === "function") _callback[id] = initCallback;
 
         var prefixID = id + '-';
         var maxObjects = 20;
         var activePage = 1;
 
-        // Check for existing objects selector
+        // Check for existing objects' selector
         // If objects selector element with id="id+'-objects-panel'" not exist, then init object selector
         var objectsPanelElm = $('#'+prefixID+'objects-panel');
         if(!objectsPanelElm.length) {
@@ -439,7 +440,7 @@
             })
         }
 
-        // add objects to objects selector.
+        // add objects to object selector.
         // objects - array of objects [{id: object1ID, name: object1Name}, {id: object2ID, name: object2Name, ...]
         //      or undefined on add all objects to the empty panel
         function addObjectsToPanel(newObjects, callback) {
