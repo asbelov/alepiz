@@ -8,7 +8,7 @@ const transactionDB = require("../../models_db/transaction");
 const objectsDB = require("../../rightsWrappers/objectsDB");
 const modelsDBObjectsDB = require('../../models_db/objectsDB');
 const objectsPropertiesDB = require("../../rightsWrappers/objectsPropertiesDB");
-const countersDB = require("../../rightsWrappers/countersDB");
+const modelsDBCountersDB = require('../../models_db/countersDB');
 const counterSaveDB = require("../../rightsWrappers/counterSaveDB");
 
 
@@ -22,8 +22,8 @@ module.exports = function(args, callback) {
     }
 
     if(!Array.isArray(importedData) || !importedData.length) {
-        log.info('Imported data is not an array or is empty: ', args.importExportJSONEditor);
-        return callback();
+        return callback(new Error('Imported data is not an array or is empty: ' +
+            JSON.stringify(args.importExportJSONEditor)));
     }
 
     // find existing objects in database for update
@@ -49,7 +49,7 @@ module.exports = function(args, callback) {
 
         rows.forEach(row => objects[row.name] = row.id);
 
-        countersDB.getCountersIDsByNames(Object.keys(counters), function (err, rows) {
+        modelsDBCountersDB.getCountersIDsByNames(Object.keys(counters), function (err, rows) {
             if (err) {
                 return callback(new Error('Can\'t get counter IDs by counter names: ' + err.message +
                     '; counter names: ' + Object.keys(counters).join(', ')));
@@ -68,27 +68,27 @@ module.exports = function(args, callback) {
                         color: param.color,
                     }, function (err, objectID) {
                         if (err) {
-                            log.error('Can\'t insert or update object ', param.name,': ', err.message, ': ', param);
-                            callback();
+                            return callback(new Error('Can\'t insert or update object ' + param.name + ': ' +
+                                err.message + ': ' + JSON.stringify(param)));
                         }
 
                         async.waterfall([function (callback) {
                                 saveProperties(args.user, {
                                     id: objectID,
                                     name: param.name,
-                                    properties: param.properties,
+                                    properties: args.skipProperties ? null : param.properties,
                                 }, callback);
                             }, function (callback) {
                                 saveLinkedCounters(args.user, {
                                     id: objectID,
                                     name: param.name,
-                                    counters: param.counters,
+                                    counters: args.skipLinkedCounters ? null : param.counters,
                                 }, counters, callback);
                             }, function (callback) {
                                 saveInteractions(args.user, {
                                     id: objectID,
                                     name: param.name,
-                                    interactions: param.interactions,
+                                    interactions: args.skipInteractions ? null : param.interactions,
                                 }, objects, callback);
                             }
                         ], callback);
@@ -97,8 +97,11 @@ module.exports = function(args, callback) {
                 }, function (err) {
                     if(err) transactionDB.rollback(err, callback);
                     else {
-                        transactionDB.end(callback);
-                        log.info('Objects ', Object.keys(objects), ' successfully imported');
+                        transactionDB.end(function (err) {
+                            if(err) return callback(err);
+                            log.info('Objects ', Object.keys(objects), ' successfully imported');
+                            callback(null, importedData);
+                        });
                     }
                 });
             });
@@ -109,7 +112,7 @@ module.exports = function(args, callback) {
 function addOrUpdateObjects(user, param, callback) {
     if (!param.name) return callback(new Error('Object name is not set'));
 
-    var order = Number(param.order);
+    var order = Number(param.sortPosition);
     if (order !== parseInt(String(order), 10) || !order) {
         return callback(new Error('Object order is not set'));
     }
@@ -185,7 +188,8 @@ function saveInteractions(user, param, objects, callback) {
             rows.forEach(row => interactionsForCheck[row.id1 + ':' + row.id2 + ':' + row.type] = 1);
         }
 
-        param.interactions.forEach(interaction => {
+        for(var i = 0; i < param.interactions.length; i++) {
+            var interaction = param.interactions[i];
             if (!objects[interaction.name1]) {
                 return callback(new Error('Can\'t insert object interaction for object ' + param.name +
                     ': object ' + interaction.name1 + ' is not exist'));
@@ -212,7 +216,7 @@ function saveInteractions(user, param, objects, callback) {
                     type: interaction.type,
                 });
             }
-        });
+        }
 
         objectsDB.insertInteractions(user, interactions, function (err) {
             if(err) {

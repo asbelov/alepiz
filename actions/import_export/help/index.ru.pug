@@ -4,7 +4,7 @@
 doctype
 html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
     head
-        title Action name
+        title Import&Export: импорт и экспорт объектов
         link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
         link(rel='stylesheet', href='/material-design-icons/material-icons.css')
         meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
@@ -15,28 +15,88 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         header
             div.row
                 div.col.s12.m10.offset-m1
-                    h1 Action name
+                    h1 Import&Export
                     h5.light.
-                        You can make some actions using Action name
-
+                        Действие предназначено для импорта и экспорта объектов, свойств объектов,
+                        подключений счетчиков к объектам и пересечений объектов.
         main
             div.row
                 div.col.s12.m10.offset-m1
                     img(src="./images/help.main.png" width="1024").materialboxed.card-panel.hoverable
 
-                    h2 Action name description
+                    h2 Предназначение Import&Export
                     p.
-                        You can make some actions with some objects using Action name actions
+                        Импорт и экспорт объектов предназначен для передачи настроек объектов между экземплярами
+                        ALEPIZ.
+                        Действие позволяет экспортировать и импортировать настройки объектов, включая их свойства,
+                        пересечения и подключение счетчиков к объектам. Экспорт и импорт осуществляется через
+                        объект в формате JSON. Описание JSON объекта приведено ниже. При экспорте и импорте
+                        производится проверка на зависимости данных от внешних объектов и счетчиков. В случае обнаружения
+                        таких зависимостей, появится предупреждение.
 
-                    h5.
-                        Returned value: ObjectID used in action
+                    h5 Возвращаемое значение: JSON объект с импортируемыми данными.
+                    div.card-panel
+                        pre.
+                            [
+                                {
+                                    &quot;name&quot;: &lt;object name&gt;,
+                                    &quot;description&quot;: &lt;object description&gt;,
+                                    &quot;sortPosition&quot;: &lt;object sort order&gt;,
+                                    &quot;color&quot;: &lt;object color&gt;,
+                                    &quot;disabled&quot;: &lt;is object disabled (0|1)&gt;,
+                                    &quot;properties: [
+                                        {
+                                            &quot;name&quot;: &lt;property name&gt;,
+                                            &quot;value&quot;: &lt;property value&gt;,
+                                            &quot;description&quot; &lt;property description&gt;,
+                                            &quot;mode&quot;: &lt;property mode&gt;
+                                        }
+                                    ]
+                                    &quot;interactions&quot;: [
+                                        {
+                                            &quot;name1&quot;: &lt;object1 name&gt;,
+                                            &quot;name2&quot;: &lt;object2 name&gt;,
+                                            &quot;type&quot;: &lt;interaction type:0|1|2&gt;
+                                        },
+                                        ...
+                                    ],
+                                    &quot;counters&quot;: [
+                                        &lt;counter name 1&gt;,
+                                        &lt;counter name 2&gt;,
+                                        ...
+                                    ]
+                                }
+                            ]
 
-                    h2 Interface description
-                    h3 Objects list
+                    h3 Управление Import&Export
+                    img(src="./images/help.controls.png").materialboxed.card-panel.hoverable
+
                     p.
-                        You can add objects to Objects list. To do this, select the
-                        objects in the Objects system menu and click on
-                        ADD SELECTED OBJECTS. If you click on the "x" to the right of
-                        the object in Objects list, the object will be deleted.
-                        You can delete all objects from Objects list by clicking on
-                        REMOVE ALL OBJECTS.
+                        GENERATE - генерировать данные для экспорта параметров выбранных объектов.
+                        При необходимости, после генерации, экспортируемые параметры можно отредактировать
+                        вручную в редакторе данных экспорта и импорта.
+                        При создании данных для экспорта производится анализ зависимостей экспортируемых данных от
+                        других объектов и счетчиков. В случае выявления зависимостей, появится окно с
+                        соответствующей информацией. При нажатии на ссылки будут открываться действия
+                        для редактирования счетчиков или объектов, с помощью которых также можно произвести экспорт
+                        данных.
+                    img(src="./images/help.ImportExportGenerateAssociations.png").materialboxed.card-panel.hoverable
+
+                    p.
+                        EXPORT - сохранить данные из редактора экспорта и импорта в файл. Имя файла формируется
+                        автоматически из названия объекта в случае, если выбран один объект или устанавливается в
+                        ALEPIZ_objectsData.json для нескольких объектов.
+                    p.
+                        IMPORT - загрузить данные объектов из файла в редактор импорта и экспорта данных.
+                        Производится поиск файлов с расширением .json. После загрузки выполняется проверка
+                        существования объектов и счетчиков, от которых зависят импортируемые объекты. Если требуемые
+                        объекты и счетчики не существуют, появится окно с предупреждением о том, что импортируемые
+                        объекты будут работать некорректно. При необходимости, импортируемые параметры можно
+                        отредактировать вручную в редакторе данных экспорта и импорта. Для импорта объектов необходимо
+                        запустить действие на выполнение.
+                    img(src="./images/help.importExportImportWarning.png").materialboxed.card-panel.hoverable
+
+                    p Skip object properties - не выполнять импорт или экспорт свойств объектов
+                    p Skip linked counters - не выполнять импорт или экспорт связей объектов со счетчиками
+                    p Skip object interactions - не выполнять импорт или экспорт настроек пересечений объектов
+

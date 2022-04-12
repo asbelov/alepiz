@@ -74,6 +74,10 @@ var JQueryNamespace = (function ($) {
         });
 
         $("#importObjectBtn").on('change', load);
+
+        M.Tooltip.init(document.querySelectorAll('.tooltipped'), {enterDelay: 500});
+
+        generateJSON();
     }
 
     function checkData(objectsDataStr) {
@@ -103,17 +107,17 @@ var JQueryNamespace = (function ($) {
         rawFile.send(null);
     }
 
-    function load(e, callback){
+    function load(e, callback) {
         var file =  e.target.files[0];
         var path = (window.URL || window.webkitURL).createObjectURL(file);
+        $(e.target).val(''); // to be able to open the same file multiple times
         readTextFile(path, function(objectDataStr) {
             try {
-                checkData(objectDataStr)
+                var objectsData = checkData(objectDataStr)
             } catch (e) {
-                log.error('Error in object data: ', e.message);
+                return log.error('Error in object data: ', e.message);
             }
-            importExportEditor.setValue(objectDataStr);
-            if(typeof callback === 'function') callback(objectDataStr);
+            checkDependencies(objectsData, callback);
         });
     }
 
@@ -138,6 +142,9 @@ var JQueryNamespace = (function ($) {
         $.post(serverURL, {func: 'getObjectParameters', IDs: objectsIDs.join(',')}, function(data) {
             if(!data || !Array.isArray(data.objects)) return;
 
+            var externalObjectNames = [], externalCounterNames = [];
+            var externalObjectsNamesForCheck = {}, externalCountersNamesForCheck = {};
+            var objectsNames = data.objects.map(obj => obj.name);
             var objectsJSON = data.objects.map(param => {
 
                 var objectJSON = {
@@ -148,45 +155,181 @@ var JQueryNamespace = (function ($) {
                     disabled: param.disabled,
                 };
 
-                var properties = data.properties
-                    .filter(prop => prop.objectID === param.id)
-                    .map(prop => {
-                        return {
-                            name: prop.name,
-                            value: prop.value,
-                            description: prop.description,
-                            mode: prop.mode,
-                        }
-                    });
+                if(!$('#skipProperties').is(':checked')) {
+                    var properties = data.properties
+                        .filter(prop => prop.objectID === param.id)
+                        .map(prop => {
+                            return {
+                                name: prop.name,
+                                value: prop.value,
+                                description: prop.description,
+                                mode: prop.mode,
+                            }
+                        });
 
-                if(properties.length) objectJSON.properties = properties;
+                    if (properties.length) objectJSON.properties = properties;
+                }
 
-                var interactions = data.interactions
-                    .filter(interact => interact.id1 === param.id || interact.id2 === param.id)
-                    .map(interact => {
-                        return {
-                            name1: interact.name1,
-                            name2: interact.name2,
-                            type: interact.type,
-                        }
-                    });
+                if(!$('#skipInteractions').is(':checked')) {
+                    var interactions = data.interactions
+                        .filter(interact => interact.id1 === param.id || interact.id2 === param.id)
+                        .map(interact => {
+                            if(objectsNames.indexOf(interact.name1) !== -1 || objectsNames.indexOf(interact.name2) !== -1) {
+                                var name = objectsNames.indexOf(interact.name1) === -1 ? interact.name1 : interact.name2;
+                                if(!externalObjectsNamesForCheck[name]) {
+                                    externalObjectNames.push({
+                                        where: 'interactions',
+                                        name: name,
+                                        id: objectsNames.indexOf(interact.name1) === -1 ? interact.id1 : interact.id2,
+                                    });
+                                    externalObjectsNamesForCheck[name] = 1;
+                                }
+                            }
+                            return {
+                                name1: interact.name1,
+                                name2: interact.name2,
+                                type: interact.type,
+                            }
+                        });
 
-                if(interactions.length) objectJSON.interactions = interactions;
+                    if (interactions.length) objectJSON.interactions = interactions;
+                }
 
-                var counters = data.counters
-                    .filter(counter => counter.objectID === param.id)
-                    .map(counter => counter.name);
+                if(!$('#skipLinkedCounters').is(':checked')) {
+                    var counters = data.counters
+                        .filter(counter => counter.objectID === param.id)
+                        .map(counter => {
+                            if(!externalCountersNamesForCheck[counter.name]) {
+                                externalCounterNames.push({
+                                    where: 'linked counters',
+                                    name: counter.name,
+                                    id: counter.id,
+                                });
+                                externalCountersNamesForCheck[counter.name] = 1;
+                            }
+                            return counter.name
+                        });
 
-                if(counters.length) objectJSON.counters = counters;
+                    if (counters.length) objectJSON.counters = counters;
+                }
 
                 return objectJSON;
             });
 
             importExportEditor.setValue(JSON.stringify(objectsJSON, null, 4));
             importExportEditor.save();
+
+            if(!externalObjectNames.length && !externalCounterNames.length) {
+                M.toast({html: 'Successfully generating JSON from objects', displayLength: 2000});
+            } else {
+                $('#modalExportExternalEntitiesList').html(
+                    (externalObjectNames.length > 1 ? (
+                    '<li>All objects: <b>' + '<a href="/?a=%2Factions%2Fimport_export&c=' +
+                        encodeURIComponent(externalObjectNames.map(o => o.name).join(',')) +
+                        '" target="_blank">"' + escapeHtml(externalObjectNames.map(o => o.name).join(', ')) +
+                    '"</a></b></li>') : '') +
+                    externalObjectNames.map(o => {
+                        return '<li>object:&nbsp;&nbsp; <b>' + '<a href="/?a=%2Factions%2Fimport_export&c=' +
+                            encodeURIComponent(o.name) +
+                            '" target="_blank">"' + escapeHtml(o.name) + '"</a> (#' + o.id +
+                            ')</b> for ' + o.where + '</li>';
+                    }).join('') +
+                    externalCounterNames.map(o => {
+                        return '<li>counter: <b>' +
+                            (o.id ?
+                                '<a href="/?a=%2Factions%2Fcounter_settings&cid=' + o.id +
+                                '" target="_blank">"' + escapeHtml(o.name) + '"</a> (#' + o.id + ')' :
+                                '<span class="red-text">Not selected</span>') +
+                            '</b> for ' + o.where + '</li>';
+                    }).join('')
+                )
+                var modalExportExternalEntitiesInfoInstance =
+                    M.Modal.init(document.getElementById('modalExportExternalEntitiesInfo'));
+                modalExportExternalEntitiesInfoInstance.open();
+            }
         });
     }
 
+    function checkDependencies(objectsData, callback) {
 
+        var externalObjectNames = {}, externalCounterNames = {};
 
+        objectsData.forEach(objectData => {
+            if($('#skipProperties').is(':checked')) delete objectData.properties;
+            if($('#skipInteractions').is(':checked')) delete objectData.interactions;
+            if($('#skipLinkedCounters').is(':checked')) delete objectData.counters;
+
+            if(Array.isArray(objectData.interactions) && objectData.interactions.length) {
+                objectData.interactions.forEach(intersection => {
+                    externalObjectNames[intersection.name1] = 0;
+                    externalObjectNames[intersection.name2] = 0;
+                });
+            }
+
+            if(Array.isArray(objectData.counters) && objectData.counters.length) {
+                objectData.counters.forEach(counter => externalCounterNames[counter] = 0);
+            }
+        });
+
+        $.post(serverURL, {
+            func: 'getObjectsByNames',
+            objectNames: Object.keys(externalObjectNames).join('\r'),
+        }, function (rows) {
+            // select * from objects where name like ...
+            rows.forEach(row => {
+                externalObjectNames[row.name] = row.id;
+            });
+
+            $.post(serverURL, {
+                func: 'getCountersByNames',
+                counterNames: Object.keys(externalCounterNames).join('\r'),
+            }, function (rows) {
+                // SELECT name, id FROM counters WHERE name IN (...
+                rows.forEach(row => {
+                    externalCounterNames[row.name] = row.id;
+                });
+
+                var unresolvedObjects = [], unresolvedCounters = [];
+
+                for(var objectName in externalObjectNames) {
+                    if(!externalObjectNames[objectName]) {
+                        unresolvedObjects.push({
+                            where: 'interactions',
+                            name: objectName,
+                        });
+                    }
+                }
+
+                for(var counterName in externalCounterNames) {
+                    if(!externalCounterNames[counterName]) {
+                        unresolvedCounters.push({
+                            where: 'linked counters',
+                            name: counterName,
+                        });
+                    }
+                }
+
+                importExportEditor.setValue(JSON.stringify(objectsData, null, 4));
+
+                if(!unresolvedObjects.length && !unresolvedCounters.length) {
+                    M.toast({html: 'Successfully loading JSON for objects', displayLength: 2000});
+                } else {
+                    $('#modalImportEntitiesNotFoundList').html(
+                        unresolvedObjects.map(o => {
+                            return '<li>object: <b>"' + escapeHtml(o.name) + '"</b> for ' + o.where + '</li>';
+                        }).join('') +
+                        unresolvedCounters.map(o => {
+                            return '<li>counter: <b>"' + escapeHtml(o.name) + '"</b> for ' + o.where + '</li>';
+                        }).join('')
+                    );
+
+                    var modalImportEntitiesNotFoundInfoInstance =
+                        M.Modal.init(document.getElementById('modalImportEntitiesNotFoundInfo'));
+                    modalImportEntitiesNotFoundInfoInstance.open();
+                }
+
+                if(typeof callback === 'function') callback(objectDataStr);
+            });
+        });
+    }
 })(jQuery); // end of jQuery name space

@@ -312,6 +312,7 @@ var JQueryNamespace = (function ($) {
         function load(e, callback){
             var file =  e.target.files[0];
             var path = (window.URL || window.webkitURL).createObjectURL(file);
+            $(e.target).val(''); // to be able to open the same file multiple times
             readTextFile(path, function(counterDataStr) {
                 try {
                     checkCounterData(counterDataStr)
@@ -355,20 +356,23 @@ var JQueryNamespace = (function ($) {
                 updateEventOrder = 0,
                 externalCounterNames = [],
                 externalObjectNames = [];
+            var externalObjectsNamesForCheck = {}, externalCountersNamesForCheck = {};
 
             if(!$('#skipLinkedObjects').is(':checked')) {
-                $('[linkedobjectsids-object-id]').each(function () {
-                    var objectName = $(this).children('span').text();
-                    var objectID = Number($(this).attr('linkedobjectsids-object-id'));
+                $('#linkedObjectsIDs').getObjects().forEach(object => {
+                    var objectName = object.name;
+                    var objectID = object.id;
                     linkedObjects.push({
                         name: objectName,
                     });
-
-                    externalObjectNames.push({
-                        name: objectName,
-                        id: objectID,
-                        where: 'linked objects',
-                    })
+                    if(!externalObjectsNamesForCheck[objectName]) {
+                        externalObjectNames.push({
+                            name: objectName,
+                            id: objectID,
+                            where: 'linked objects',
+                        });
+                        externalObjectsNamesForCheck[objectName] = 1;
+                    }
                 });
             }
 
@@ -391,19 +395,21 @@ var JQueryNamespace = (function ($) {
                     objectFilter: objectFilter,
                     updateEventOrder: updateEventOrder++,
                 });
-                if(parentObjectName) {
+                if(parentObjectName && !externalObjectsNamesForCheck[parentObjectName]) {
                     externalObjectNames.push({
                         name: parentObjectName,
                         id: parentObjectID,
                         where: 'update events'
                     });
+                    externalObjectsNamesForCheck[parentObjectName] = 1;
                 }
-                if(parentCounterName) {
+                if(parentCounterName && !externalCountersNamesForCheck[parentCounterName]) {
                     externalCounterNames.push({
                         name: parentCounterName,
                         id: parentCounterID,
                         where: 'update events'
-                    })
+                    });
+                    externalCountersNamesForCheck[parentCounterName] = 1;
                 }
             })
 
@@ -433,21 +439,23 @@ var JQueryNamespace = (function ($) {
                         description: description,
                         variableOrder: variableOrder,
                     });
-                    if(objectName && !isObjectVariable) {
+                    if(objectName && !isObjectVariable && !externalObjectsNamesForCheck[objectName]) {
                         externalObjectNames.push({
                             name: objectName,
                             id: objectID,
                             where: 'historical variable %:' + variableName + ':%',
-                        })
+                        });
+                        externalObjectsNamesForCheck[objectName] = 1;
                     }
-                    if(parentCounterName) {
+                    if(parentCounterName && !externalCountersNamesForCheck[parentCounterName]) {
                         externalCounterNames.push({
                             name: (parentCounterID ? parentCounterName : ''),
                             id: parentCounterID,
                             where: 'historical variable ' +
                                 (variableName ? '%:' + variableName + ':%' :
                                     '<b class="red-text">with no name set</b>'),
-                        })
+                        });
+                        externalCountersNamesForCheck[parentCounterName] = 1;
                     }
                 } else {
                     variables.push({
@@ -484,8 +492,14 @@ var JQueryNamespace = (function ($) {
                 M.toast({html: 'Successfully generating JSON from counter', displayLength: 2000});
             } else {
                 $('#modalExportExternalEntitiesList').html(
+                    (externalObjectNames.length > 1 ? (
+                        '<li>All objects: <b>' + '<a href="/?a=%2Factions%2Fimport_export&c=' +
+                        encodeURIComponent(externalObjectNames.map(o => o.name).join(',')) +
+                        '" target="_blank">"' + escapeHtml(externalObjectNames.map(o => o.name).join(', ')) +
+                        '"</a></b></li>') : '') +
                     externalObjectNames.map(o => {
-                        return '<li>object:&nbsp;&nbsp; <b>' + '<a href="/?a=%2Factions%2Fimport_export&c=' + encodeURIComponent(o.name) +
+                        return '<li>object:&nbsp;&nbsp; <b>' + '<a href="/?a=%2Factions%2Fimport_export&c=' +
+                            encodeURIComponent(o.name) +
                             '" target="_blank">"' + escapeHtml(o.name) + '"</a> (#' + o.id +
                             ')</b> for ' + o.where + '</li>';
                     }).join('') +
@@ -538,15 +552,18 @@ var JQueryNamespace = (function ($) {
                     } else $(this).prop('selected', false);
                 });
 
-                var sourceMultiplierElm = $('#sourceMultiplier');
-                sourceMultiplierElm.val(undefined);
-                if(counterData.sourceMultiplier !== null) {
-                    sourceMultiplierElm.val(counterData.sourceMultiplier);
-                    isSourceMultiplierExist = sourceMultiplierElm.val();
-                } else {
-                    sourceMultiplierElm.html('<option selected>None</option>');
-                    sourceMultiplierElm.prop('disabled', true);
-                }
+                // add pause
+                setTimeout(function () {
+                    var sourceMultiplierElm = $('#sourceMultiplier');
+                    sourceMultiplierElm.val(undefined);
+                    if(counterData.sourceMultiplier !== null) {
+                        sourceMultiplierElm.val(counterData.sourceMultiplier);
+                        isSourceMultiplierExist = sourceMultiplierElm.val();
+                    } else {
+                        sourceMultiplierElm.html('<option selected>None</option>');
+                        sourceMultiplierElm.prop('disabled', true);
+                    }
+                }, 500)
             }
 
             setCollectorParameters(counterData.collectorID, null, counterData.collectorParameters);
@@ -575,7 +592,7 @@ var JQueryNamespace = (function ($) {
             });
             $.post(serverURL, {
                 func: 'getObjectsByNames',
-                objectNames: Object.keys(externalObjectNames).join('\r').replace(/([%_])/g, '\\$1'),
+                objectNames: Object.keys(externalObjectNames).join('\r'),
             }, function (rows) {
                 // select * from objects where name like ...
                 var objectNames = {};
@@ -585,7 +602,7 @@ var JQueryNamespace = (function ($) {
 
                 $.post(serverURL, {
                     func: 'getCountersByNames',
-                    counterNames: Object.keys(externalCounterNames).join('\r').replace(/([%_])/g, '\\$1'),
+                    counterNames: Object.keys(externalCounterNames).join('\r'),
                 }, function (rows) {
                     // SELECT name, id FROM counters WHERE name IN (...
                     var counterNames = {};
@@ -651,7 +668,6 @@ var JQueryNamespace = (function ($) {
                                 });
                             }
                         }
-                        console.log(counterData.variables, counterNames)
                         if(variable.parentCounterName) {
                             if(counterNames[variable.parentCounterName]) {
                                 variable.parentCounterID = counterNames[variable.parentCounterName];

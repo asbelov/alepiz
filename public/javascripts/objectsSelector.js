@@ -40,7 +40,15 @@
 //          <jQuery objects> - is a jQuery object reference to <select>,
 //          f.e. if <select id="selector1" class="objects-selector">, then <jQuery objects> = $('#selector1')
 //
-// .clearObjectSelector() - clear objects' panel from objects
+// .getObjects(id) get objects from objectSelector like [{id:, name: },  ...].
+//      If id attribute is not defined, get objects from all object selector for specified elements.
+//      f.e. for $('#objectSelector).getObjects() you will get something like [{id:, name: },  ...].
+//      but for $('.objects-selector).getObjects() you will get something like object {[<id1>: [{id:, name: },  ...], ...]}
+// .clearObjectSelector(id) - clear objects' panel from objects.
+//      If id defined, clear objectSelector with required id attribute
+//      If id attribute is not defined, clear object selector for specified elements.
+//      f.e. for $('#objectSelector).clearObjectSelector() clearing object selector with id=objectSelector.
+//      but for $('.objects-selector).clearObjectSelector() clearing all object selectors with class="objects-selector"
 // Examples:
 
 // Automatically init objects selector with title "Objects selector" with initial
@@ -116,16 +124,26 @@
     // objects - array of objects [{id: object1ID, name: object1Name}, {id: object2ID, name: object2Name, ...]
     // callback will be called when objects will be added or removed into the objects selector
     $.fn.objectsSelector = function(objects, callback){
-        return this.each(function(i, elm){
+        return this.each(function(i, elm) {
             initObjectsSelector(i, elm, objects, callback);
         })
     };
 
+    $.fn.getObjects = function(id) {
+        if(id === undefined) id = $(this).attr('id');
+        if(id === undefined) return objects;
+        else return objects[id];
+    };
+
     // clear panel from objects
-    $.fn.clearObjectSelector = function(){
-        objects = {};
-        return this.each(function(i, elm){
-            $('#' + $(elm).attr('id') + '-objects-panel').empty();
+    $.fn.clearObjectSelector = function(id) {
+        if(id === undefined) id = $(this).attr('id');
+        if(id !== undefined) delete objects[id];
+        return this.each(function(i, elm) {
+            var _id = $(elm).attr('id');
+            if(id !== undefined && id !== _id) return;
+            delete delete objects[_id];
+            $('#' + _id + '-objects-panel').empty();
             $(elm).empty();
             $(elm).val('');
         })

@@ -42,15 +42,50 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                 div.col.s4.m2.l1.input-field
                     a(data-tooltip='Generate JSON data for exporting the parameters of the edited object').tooltipped.btn.waves-light#getDataFromObjectBtn Generate
                 div.col.s4.m2.l1.input-field
-                    a(data-tooltip='Save data from editor to file').tooltipped.btn.waves-light#exportObjectBtn &nbsp;Export&nbsp;
-                div.col.s4.m2.l1.input-field.file-field
-                    a(data-tooltip='Load object data from file to editor' style="height: 36px; line-height: 36px").tooltipped.btn.waves-light &nbsp;Import&nbsp;
+                    a(data-tooltip='Save data from editor to file').tooltipped.btn.waves-light#exportObjectBtn &nbsp;Export&nbsp;&nbsp;&nbsp;
+                div.col.s4.m2.l2.input-field.file-field
+                    a(data-tooltip='Load object data from file to editor' style="height: 36px; line-height: 36px").tooltipped.btn.waves-light &nbsp;&nbsp;Import&nbsp;&nbsp;
                         input(type="file" accept=".json")#importObjectBtn
                     div.file-path-wrapper.hide
                         input.file-path.validate(type="text" placeholder="Upload object" style="height: 36px; line-height: 36px")
+                div.col.s6.m4.l2.input-field
+                    label
+                        input(type='checkbox')#skipProperties
+                        span(data-tooltip='Skip information about object properties').tooltipped Skip object properties
+                div.col.s6.m4.l2.input-field
+                    label
+                        input(type='checkbox' checked)#skipLinkedCounters
+                        span(data-tooltip='Skip information about counters linked to the objects').tooltipped Skip linked counters
+                div.col.s6.m4.l2.input-field
+                    label
+                        input(type='checkbox' checked)#skipInteractions
+                        span(data-tooltip='Skip information about object interactions').tooltipped Skip object interactions
 
             div.row
                 div.col.s12
                     div.card-panel
                         textarea#importExportJSONEditor
             // end example of action
+
+            div#modalImportEntitiesNotFoundInfo.modal
+                div.modal-content
+                    h4.red-text Import warning
+                    p.
+                        For the correct operation of the objects, it is necessary to export all external
+                        entities associated with it.
+                    p Some entities associated with the objects were not found:
+                    ul.browser-default#modalImportEntitiesNotFoundList
+
+                div.modal-footer
+                    a(href='#!').modal-action.modal-close.waves-effect.waves-green.btn Ok
+
+            div#modalExportExternalEntitiesInfo.modal
+                div.modal-content
+                    h4 Information about external associations
+                    p.
+                        For the correct operation of the objects, it is necessary to export all external
+                        entities associated with it.
+                    p List of external entities associated with the objects:
+                    ul.browser-default#modalExportExternalEntitiesList
+                div.modal-footer
+                    a(href='#!').modal-action.modal-close.waves-effect.waves-green.btn Ok

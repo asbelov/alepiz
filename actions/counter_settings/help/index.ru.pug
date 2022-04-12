@@ -34,51 +34,52 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         превышении счетчиком порогового значения, система поиска новых объектов в сети и так далее.
 
                     h5 Возвращаемое значение: объект с данными счетчика:
-                    pre.
-                        {
-                            initObjectsIDs: &lt;array of object IDs&gt;,
-                            counter: {
-                                name: &lt;counter name&gt;,
-                                collectorID: &lt;collector ID (directory name)&gt;,
-                                groupID: &lt;counter group ID&gt;,
-                                unitID: &lt;counter unit ID&gt;,
-                                keepHistory: &lt;keep history in days&gt;,
-                                keepTrends: &lt;keep trends in days&gt;,
-                                sourceMultiplier: &lt;source multiplier (from counter unit)&gt;,
-                                counterID: &lt;counter ID&gt;,
-                                description: &lt;counter description or null&gt;,
-                                disabled: &lt;enabled or disabled counter (1 or 0)&gt;,
-                                debug: &lt;enabled or disabled counter debug (1 or 0)&gt;,
-                                taskCondition: &lt;use counter as a task condition (1 or 0)&gt;,
-                                updateVariablesRef: &lt;oldCounterName: update variables references when counter name is changed&gt;
-                            },
-                            counterParameters: &lt;object with parameters for collector&gt;
-                                {
-                                    &lt;name1&gt;: &lt;value1&gt;,
-                                    &lt;name2&gt;: &lt;value2&gt;,
-                                 ...},
-                            updateEvents: &lt;array with update events objects&gt;:
-                                [{
-                                    counterID:,
-                                    objectID:,
-                                    expression:,
-                                    mode:,
-                                    objectFilter,
-                                    description:,
-                                    updateEventOrder:
-                                }, ...],
-                            variables: &lt;object with variables objects&gt;
-                                {&lt;variableName1&gt;: {
-                                    variableOrder:,
-                                    description:,
-                                    expression:,
-                                    parentCounterName:,
-                                    objectID:,
-                                    objectVariable:,
-                                    function:,
-                                    functionParameters
-                                }, ...},
-                        }
+                    div.card-panel
+                        pre.
+                            {
+                                initObjectsIDs: &lt;array of object IDs&gt;,
+                                counter: {
+                                    name: &lt;counter name&gt;,
+                                    collectorID: &lt;collector ID (directory name)&gt;,
+                                    groupID: &lt;counter group ID&gt;,
+                                    unitID: &lt;counter unit ID&gt;,
+                                    keepHistory: &lt;keep history in days&gt;,
+                                    keepTrends: &lt;keep trends in days&gt;,
+                                    sourceMultiplier: &lt;source multiplier (from counter unit)&gt;,
+                                    counterID: &lt;counter ID&gt;,
+                                    description: &lt;counter description or null&gt;,
+                                    disabled: &lt;enabled or disabled counter (1 or 0)&gt;,
+                                    debug: &lt;enabled or disabled counter debug (1 or 0)&gt;,
+                                    taskCondition: &lt;use counter as a task condition (1 or 0)&gt;,
+                                    updateVariablesRef: &lt;oldCounterName: update variables references when counter name is changed&gt;
+                                },
+                                counterParameters: &lt;object with parameters for collector&gt;
+                                    {
+                                        &lt;name1&gt;: &lt;value1&gt;,
+                                        &lt;name2&gt;: &lt;value2&gt;,
+                                     ...},
+                                updateEvents: &lt;array with update events objects&gt;:
+                                    [{
+                                        counterID:,
+                                        objectID:,
+                                        expression:,
+                                        mode:,
+                                        objectFilter,
+                                        description:,
+                                        updateEventOrder:
+                                    }, ...],
+                                variables: &lt;object with variables objects&gt;
+                                    {&lt;variableName1&gt;: {
+                                        variableOrder:,
+                                        description:,
+                                        expression:,
+                                        parentCounterName:,
+                                        objectID:,
+                                        objectVariable:,
+                                        function:,
+                                        functionParameters
+                                    }, ...},
+                            }
 
                     h3 COUNTER
                     p.

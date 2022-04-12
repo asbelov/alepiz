@@ -6,6 +6,7 @@ const log = require('../../lib/log')(module);
 const objectsDB = require("../../rightsWrappers/objectsDB");
 const countersDB = require("../../rightsWrappers/countersDB");
 const objectsProperties = require("../../rightsWrappers/objectsPropertiesDB");
+const counterDB = require("../../models_db/countersDB");
 
 module.exports = function(args, callback) {
     log.info('Starting ajax ', __filename, ' with parameters', args);
@@ -37,6 +38,10 @@ module.exports = function(args, callback) {
         });
         return
     }
+
+    if(func === 'getObjectsByNames') return objectsDB.getObjectsIDs(args.username, args.objectNames.split('\r'), callback);
+
+    if(func === 'getCountersByNames') return counterDB.getCountersIDsByNames(args.counterNames.split('\r'), callback);
 
     return callback(new Error('Ajax function is not set or unknown function'));
 };
