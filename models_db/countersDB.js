@@ -388,8 +388,25 @@ WHERE objectsCounters.id = ?`, OCID, callback);
  * [{name: <counterName>, id: <counterID>}]
  */
 countersDB.getCountersIDsByNames = function (countersNames, callback) {
-    db.all('SELECT name, id FROM counters WHERE name IN (' +
-        (new Array(countersNames.length)).fill('?').join(',') + ')', countersNames, callback);
+    if(!countersNames || !countersNames.length) return;
+    //db.all('SELECT name, id FROM counters WHERE name IN (' +
+    //    (new Array(countersNames.length)).fill('?').join(',') + ') COLLATE NOCASE', countersNames, callback);
+
+    var rows = [];
+    var stmt = db.prepare('SELECT name, id FROM counters WHERE name = ? COLLATE NOCASE', function(err) {
+        if(err) return callback(err);
+
+        async.eachLimit(countersNames,100,function(counterName, callback) {
+            stmt.all(counterName, function(err, res) {
+                if(err) return callback(err);
+                rows.push.apply(rows, res);
+                callback();
+            })
+        }, function(err) {
+            stmt.finalize();
+            callback(err, rows);
+        })
+    });
 }
 
 /** Get union from variables and variablesExpressions table for parent counters

@@ -380,7 +380,7 @@ var JQueryNamespace = (function ($) {
                 var parentObjectID = Number($(this).find('[data-update-event-objectID]').val());
                 var parentObjectName = parentObjectID ? $(this).find('[data-update-event-object-name]').text() : null;
                 var parentCounterID = Number($(this).find('[objectID] option:selected').val());
-                var parentCounterName = $(this).find('[objectID] option:selected').text();
+                var parentCounterName = $(this).find('[objectID] option:selected').text().replace(notSharedSuffix, '');
                 var mode = Number($(this).find('[data-update-event-mode]').val());
                 var expression = $(this).find('[data-textarea-update-event]').val();
                 var description = $(this).find('[data-textarea-variable]').val();
@@ -421,7 +421,7 @@ var JQueryNamespace = (function ($) {
                 var objectName = $(this).find('[data-variable-object]').val() || null;
                 var isObjectVariable = !$(this).find('[data-variable-object]').is(':disabled');
                 var parentCounterID= Number($(this).find('option:selected').attr('data-variable-counter-id'));
-                var parentCounterName = $(this).find('[data-variable-counter] option:selected').text();
+                var parentCounterName = $(this).find('[data-variable-counter] option:selected').text().replace(notSharedSuffix, '');
                 var variableName = $(this).find('[data-variable-name]').val();
                 var functionName = $(this).find('[data-variable-function] option:selected').text();
                 var functionParameters = $(this).find('[data-variable-function-parameters]').val();
@@ -597,7 +597,7 @@ var JQueryNamespace = (function ($) {
                 // select * from objects where name like ...
                 var objectNames = {};
                 rows.forEach(row => {
-                    objectNames[row.name] = row.id;
+                    objectNames[row.name.toUpperCase()] = row.id;
                 });
 
                 $.post(serverURL, {
@@ -607,15 +607,15 @@ var JQueryNamespace = (function ($) {
                     // SELECT name, id FROM counters WHERE name IN (...
                     var counterNames = {};
                     rows.forEach(row => {
-                        counterNames[row.name] = row.id;
+                        counterNames[row.name.toUpperCase()] = row.id;
                     });
 
                     var unresolvedObjects = [], unresolvedCounters = [];
 
                     if(!$('#skipLinkedObjects').is(':checked')) {
                         counterData.linkedObjects.forEach(linkedObject => {
-                            if (linkedObject.name && objectNames[linkedObject.name]) {
-                                linkedObject.id = objectNames[linkedObject.name];
+                            if (linkedObject.name && objectNames[linkedObject.name.toUpperCase()]) {
+                                linkedObject.id = objectNames[linkedObject.name.toUpperCase()];
                             } else {
                                 unresolvedObjects.push({
                                     where: 'linked objects',
@@ -628,8 +628,8 @@ var JQueryNamespace = (function ($) {
 
                     counterData.updateEvents.forEach(updateEvent => {
                         if(updateEvent.name) {
-                            if(objectNames[updateEvent.name]) {
-                                updateEvent.objectID = objectNames[updateEvent.name];
+                            if(objectNames[updateEvent.name.toUpperCase()]) {
+                                updateEvent.objectID = objectNames[updateEvent.name.toUpperCase()];
                             } else {
                                 unresolvedObjects.push({
                                     where: 'update events',
@@ -638,8 +638,8 @@ var JQueryNamespace = (function ($) {
                             }
                         }
                         if(updateEvent.counterName) {
-                            if(counterNames[updateEvent.counterName]) {
-                                updateEvent.counterID = counterNames[updateEvent.counterName];
+                            if(counterNames[updateEvent.counterName.toUpperCase()]) {
+                                updateEvent.counterID = counterNames[updateEvent.counterName.toUpperCase()];
                             } else {
                                 unresolvedCounters.push({
                                     where: 'update events',
@@ -659,8 +659,8 @@ var JQueryNamespace = (function ($) {
                         return a.variableOrder - b.variableOrder;
                     }).forEach(variable => {
                         if(variable.objectName) {
-                            if(objectNames[variable.objectName]) {
-                                variable.objectID = objectNames[variable.objectName];
+                            if(objectNames[variable.objectName.toUpperCase()]) {
+                                variable.objectID = objectNames[variable.objectName.toUpperCase()];
                             } else {
                                 unresolvedObjects.push({
                                     where: 'historical variable %:' + escapeHtml(variable.name) + ':%',
@@ -669,8 +669,8 @@ var JQueryNamespace = (function ($) {
                             }
                         }
                         if(variable.parentCounterName) {
-                            if(counterNames[variable.parentCounterName]) {
-                                variable.parentCounterID = counterNames[variable.parentCounterName];
+                            if(counterNames[variable.parentCounterName.toUpperCase()]) {
+                                variable.parentCounterID = counterNames[variable.parentCounterName.toUpperCase()];
                             } else {
                                 unresolvedCounters.push({
                                     where: 'historical variable %:' + escapeHtml(variable.name) + ':%',
@@ -780,7 +780,7 @@ var JQueryNamespace = (function ($) {
         objectsCnt: count of objects
         countersArray: [{id: <counterID>, .....}, ]
 
-        return sharedCounters: [{id: <counterID>, .....}, ]
+        return sharedCounters: [{id: <counterID>, name:}, ]
 
      */
     function getSharedCounters(objectsCnt, countersArray) {
@@ -1987,9 +1987,9 @@ var JQueryNamespace = (function ($) {
         // get object ID from object, linked to a variable
         var objectsIDs = $('#' + variableID + '_objectID').val();
 
-        // if selected 'This object', then get objects IDs from all objects, linked to a counter
-        // but it's can be some times very long query
-        // use selected obejcts in objects list instead
+        // if selected 'This object', then get objects IDs from all objects, linked to a counter,
+        // but it can be sometimes very long query
+        // use selected objects in objects list instead
         //if (!objectsIDs) objectsIDs = JSON.parse($('#linkedObjectsIDs').val()).map(function (object) {
         //             return object.id;
         //         });
@@ -2000,51 +2000,71 @@ var JQueryNamespace = (function ($) {
         else objectsIDs = [objectsIDs];
 
         $.post(serverURL, {
-            func: 'getCountersForObjects',
-            ids: objectsIDs.join(',')
-        }, function (allCounters) {
-            var counters = getSharedCounters(objectsIDs.length, allCounters);
-
-            var selectElm = $('#' + variableID + '_parentCounterName');
-            selectElm.empty();
-
-            if (!counters) {
-                selectElm.append('<option value="" disabled>Counters are not exists</option>');
-
-                M.FormSelect.init(selectElm[0], {});
-                return M.toast({html: obj.message, displayLength: 5000});
-            }
-
-            if (!parentCounterName) var selected = ' selected';
-            else selected = '';
-            selectElm.append('<option value="" disabled' + selected + '>Select counter from list</option>');
-
-            var isFoundParentCounterName = false;
-            for (var i = 0; counters && i < counters.length; i++) {
-                var counter = counters[i];
-                if (parentCounterName === counter.name.toUpperCase()) {
-                    isFoundParentCounterName = true;
-                    selected = ' selected';
+            func: 'getCountersByNames',
+            counterNames: parentCounterName || '',
+        }, function (parentCounterRows) {
+            var allCounters = {};
+            // add parentCounterID to list of counters when objects that are not linked to parentCounter are selected
+            parentCounterRows.forEach(row => {
+                allCounters[row.name.toUpperCase()] = {
+                    id: row.id,
+                    name: row.name,
                 }
+            });
+            $.post(serverURL, {
+                func: 'getCountersForObjects',
+                ids: objectsIDs.join(',')
+            }, function (countersForObjectsRows) {
+
+                countersForObjectsRows.forEach(row => {
+                    allCounters[row.name.toUpperCase()] = {
+                        id: row.id,
+                        name: row.name,
+                    }
+                });
+                var counters = getSharedCounters(objectsIDs.length, Object.values(allCounters));
+                var selectElm = $('#' + variableID + '_parentCounterName');
+                selectElm.empty();
+
+                if (!counters || !counters.length) {
+                    selectElm.append('<option value="" disabled>Counters are not exists</option>');
+
+                    M.FormSelect.init(selectElm[0], {});
+                    return M.toast({html: 'There are no shared counters for selected objects', displayLength: 5000});
+                }
+
+                if (!parentCounterName) var selected = ' selected';
                 else selected = '';
-                selectElm.append('<option value="' + escapeHtml(counter.name) + '"' + selected + ' data-variable-counter-id="' + counter.id +'">' + escapeHtml(counter.name) + '</option>');
-            }
+                selectElm.append('<option value="" disabled' + selected + '>Select counter from list</option>');
 
-            if (parentCounterName && variableName) {
-                if(!isFoundParentCounterName) {
-                    selectElm.append('<option value="' + parentCounterName + '" selected data-variable-counter-id="' + counter.id +'">' + parentCounterName + '</option>');
-                    //M.toast({html: 'Selected object do not have a linked counter ' + parentCounterName + ' for calculate variable ' + variableName, displayLength: 20000});
+                var isFoundParentCounterName = false;
+                for (var i = 0; counters && i < counters.length; i++) {
+                    var counter = counters[i];
+                    if (parentCounterName.toUpperCase() === counter.name.toUpperCase()) {
+                        isFoundParentCounterName = true;
+                        selected = ' selected';
+                    } else selected = '';
+                    selectElm.append('<option value="' + escapeHtml(counter.name) + '"' + selected + ' data-variable-counter-id="' + counter.id + '">' + escapeHtml(counter.name) + '</option>');
                 }
-                $('#' + variableID + '_name').val(variableName);
-                // add class 'active' to label elements, which input elements has value
-                $('input[type=text]').filter(function () {
-                    return this.value
-                }).next('label').addClass('active');
-            } else $('#' + variableID + '_name').val('');
 
-            // don\'t understand why, but it does not work without setTimeout
-            if(thisObjects) setTimeout(function() {markNotSharedCounters(selectElm); }, 500);
-            M.FormSelect.init(selectElm[0], {});
+                if (parentCounterName && variableName) {
+                    if (!isFoundParentCounterName) {
+                        //selectElm.append('<option value="' + parentCounterName + '" selected data-variable-counter-id="0">' + parentCounterName + '</option>');
+                        M.toast({html: 'Selected object do not have a linked counter ' + parentCounterName + ' for calculate variable ' + variableName, displayLength: 20000});
+                    }
+                    $('#' + variableID + '_name').val(variableName);
+                    // add class 'active' to label elements, which input elements has value
+                    $('input[type=text]').filter(function () {
+                        return this.value
+                    }).next('label').addClass('active');
+                } else $('#' + variableID + '_name').val('');
+
+                // don\'t understand why, but it does not work without setTimeout
+                if (thisObjects) setTimeout(function () {
+                    markNotSharedCounters(selectElm);
+                }, 500);
+                M.FormSelect.init(selectElm[0], {});
+            });
         });
     }
 

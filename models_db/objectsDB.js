@@ -193,22 +193,22 @@ objectsDB.deleteInteractions = function(interactions, callback){
 */
 objectsDB.getObjectsByIDs = function(IDs, callback) {
     // SELECT * FROM objects WHERE id=?
-    getObjectsByX(IDs, 'id=', callback);
+    getObjectsByX(IDs, 'id=', '', callback);
 };
 
 objectsDB.getObjectsByNames = function(names, callback) {
     // SELECT * FROM objects WHERE name=?
-    getObjectsByX(names, 'name=', callback);
+    getObjectsByX(names, 'name=', 'COLLATE NOCASE', callback);
 };
 
 objectsDB.getObjectsLikeNames = function(namesLike, callback) {
     // SELECT * FROM objects WHERE name LIKE ?
-    getObjectsByX(namesLike, 'name LIKE ', callback);
+    getObjectsByX(namesLike, 'name LIKE ', 'ESCAPE "\\" COLLATE NOCASE', callback);
 };
 
-function getObjectsByX(IDs, condition, callback) {
+function getObjectsByX(IDs, condition, suffix, callback) {
     var rows = [];
-    var stmt = db.prepare('SELECT * FROM objects WHERE ' + condition + '? ORDER BY name', function(err) {
+    var stmt = db.prepare('SELECT * FROM objects WHERE ' + condition + '? ' + suffix + ' ORDER BY name', function(err) {
         if(err) return callback(err);
         async.each(IDs, function(ID, callback) {
             stmt.all(ID, function(err, subRows) {

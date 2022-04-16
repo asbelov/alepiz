@@ -32,11 +32,11 @@ var collectorsObj = {};
 var serversIDs = {};
 var mainCollectorsCfg = confServer.get('collectors');
 
-runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collectorNamesStr},
+runInThread(path.join(__dirname, 'serverController'), {moduleName: collectorNamesStr},
     function (err, counterProcessorServerThreadObj) {
-    if(err) return log.error(err.message);
+    if(err) throw(err);
 
-    var counterProcessorServer = counterProcessorServerThreadObj.func;
+    var serverController = counterProcessorServerThreadObj.func;
 
     collectorsCfg.get(null, function (err, collectorsParam) {
         if (err) return log.error(err.message);
@@ -84,9 +84,10 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                     '). Will be used ', serverID);
             }
 
-            counterProcessorServer.init(collectorNamesStr, serverID, function (err) {
+            serverController.init(collectorNamesStr, serverID, function (err) {
                 if (err) return log.error(err.message);
 
+                var serverProcess;
                 history.connect(serverPort, function () {
                     new IPC.server({
                         serverAddress: serverAddress,
@@ -98,7 +99,7 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                             stopInProgress = true;
 
                             log.exit(err.message);
-                            counterProcessorServer.stop(function () {
+                            serverController.stop(function () {
                                 destroyCollectors(function () {
                                     log.disconnect(function () {
                                         process.exit(2)
@@ -113,14 +114,14 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                             log.info('Active collectors ', collectorNamesStr, ' starting and listening ',
                                 serverAddress, ':', serverPort, ' for IPC');
                             stopInProgress = false;
-                            var serverProcess = new proc.child({
+                            serverProcess = new proc.child({
                                 module: 'activeCollector',
                                 onStop: function (callback) {
                                     if (stopInProgress) return callback();
                                     stopInProgress = true;
                                     log.warn('Stopping ' + collectorNamesStr);
 
-                                    counterProcessorServer.stop(function () {
+                                    serverController.stop(function () {
                                         destroyCollectors(callback);
                                     });
                                 },
@@ -149,7 +150,7 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                             if (message.server.stop && serverProcess) return serverProcess.send({ stop: 1 });
                             if (message.server.start && serverProcess) return serverProcess.send({ start: 1 });
 
-                            return counterProcessorServer.send(message.server);
+                            return serverController.send(message.server);
 
                         }
 
@@ -172,7 +173,7 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
 
                                         if(message.data.$variables) {
                                             var preparedResult = history.add(message.data.$id, result)
-                                            counterProcessorServer.processCounterResult({
+                                            serverController.processCounterResult({
                                                 err: err,
                                                 result: preparedResult,
                                                 parameters: message.data,

@@ -873,10 +873,12 @@ function getVariablesValues(property, parentVariables, updateEventState, callbac
         }
         */
 
-        // send UPDATE_EVENT_STATE anyway if previous updateEventState was undefined,
+        // send UPDATE_EVENT_STATE anyway if previous updateEventState is not equal to new updateEventState,
         // because after the child may have nothing to send to the server
         if (property.parentOCID && property.expression &&
-            updateEventState === undefined && variables.UPDATE_EVENT_STATE !== undefined) {
+            updateEventState !== variables.UPDATE_EVENT_STATE &&
+            variables.UPDATE_EVENT_STATE !== undefined) {
+        //if (property.parentOCID && property.expression && variables.UPDATE_EVENT_STATE !== undefined) {
             childProc.send({
                 updateEventKey: property.parentOCID + '-' + property.OCID,
                 updateEventState: variables.UPDATE_EVENT_STATE, // don't replace to !!result
@@ -885,4 +887,3 @@ function getVariablesValues(property, parentVariables, updateEventState, callbac
         callback(null, whyNotNeedToCalculateCounter, variables, variablesDebugInfo);
     });
 }
-

@@ -1,26 +1,33 @@
 /*
  * Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
+
+const log = require('../lib/log')(module);
 const async = require("async");
 const countersDB = require("../models_db/countersDB");
 const objectsPropertiesDB = require("../models_db/objectsPropertiesDB");
 const objectsDB = require("../models_db/objectsDB");
 const checkIDs = require("../lib/utils/checkIDs");
 
+var recordsFromDBCnt = 0,
+    lastFullUpdateTime = Date.now(),
+    updateCacheInProgress = 0,
+    needToUpdateCache = new Set();
+
 var serverCache = {
     createCache: createCache,
     recordsFromDBCnt: recordsFromDBCnt,
+    updateCache: updateCache,
+    needToUpdateCache,
 };
 module.exports = serverCache;
 
-var recordsFromDBCnt = 0;
-
-
-function createCache(updateMode, callback) {
+function createCache(updateMode, objectsAndCountersForUpdate, callback) {
     if(updateMode && (!updateMode.updateObjectsCounters && !updateMode.getHistoryVariables.length &&
         !updateMode.getVariablesExpressions.length && !updateMode.geObjectsProperties.length)) return callback();
 
     async.parallel({
+        updateMode: function (callback) { callback(null, updateMode) },
         countersObjects: function(callback) {
             if(updateMode  && !updateMode.updateObjectsCounters) return callback();
 
@@ -44,7 +51,9 @@ function createCache(updateMode, callback) {
             if(updateMode && !updateMode.geObjectsProperties.length) return callback();
             getVariables(updateMode ? updateMode.geObjectsProperties : null, objectsPropertiesDB.getProperties, 'objectID', callback);
         }
-    }, callback); // function(err, cache){}
+    }, function (err, cache) {
+        callback(err, cache, updateMode, objectsAndCountersForUpdate)
+    }); // function(err, cache){}
 }
 
 function getDataForCheckDependencies(callback) {
@@ -151,3 +160,60 @@ function getVariables(initIDs, func, key, callback) {
         });
     })
 }
+
+function updateCache(cfg, callback) {
+    if((!needToUpdateCache.size &&
+            (!cfg.fullUpdateCacheInterval || Date.now() - lastFullUpdateTime < cfg.fullUpdateCacheInterval) ) ||
+        (updateCacheInProgress && Date.now() - updateCacheInProgress < cfg.updateCacheInterval)) return;
+
+    if (updateCacheInProgress) {
+        log.warn('The previous cache update operation was not completed in ',
+            Math.round((Date.now() - updateCacheInProgress)/60000), '/', (cfg.updateCacheInterval / 60000) , 'min');
+    }
+    updateCacheInProgress = Date.now();
+    var objectsAndCountersForUpdate = Array.from(needToUpdateCache.values());
+    needToUpdateCache = new Set();
+    if(cfg.fullUpdateCacheInterval && Date.now() - lastFullUpdateTime > cfg.fullUpdateCacheInterval) {
+        var updateMode = null;
+        lastFullUpdateTime = Date.now();
+    } else {
+        updateMode = {
+            updateObjectsCounters: false,
+            getHistoryVariables: [],
+            getVariablesExpressions: [],
+            geObjectsProperties: []
+        };
+        for (var i = 0; i < objectsAndCountersForUpdate.length; i++) {
+            var message = objectsAndCountersForUpdate[i];
+            if (!message.update) {
+                updateMode = null;
+                break;
+            }
+            if (message.update.objectsCounters) updateMode.updateObjectsCounters = true;
+            if (message.updateCountersIDs && message.updateCountersIDs.length) {
+
+                // remove equals counters IDs. Use Object.values for save Number type for counterID
+                var countersIDs = {};
+                message.updateCountersIDs.forEach(counterID => countersIDs[counterID] = counterID);
+                if (message.update.historyVariables) Array.prototype.push.apply(updateMode.getHistoryVariables, Object.values(countersIDs));
+                if (message.update.variablesExpressions) Array.prototype.push.apply(updateMode.getVariablesExpressions, Object.values(countersIDs));
+            }
+            if (message.updateObjectsIDs && message.updateObjectsIDs.length && message.update.objectsProperties) {
+
+                // remove equals objects IDs. Use Object.values for save Number type for objectID
+                var objectsIDs = {};
+                message.updateObjectsIDs.forEach(objectID => objectsIDs[objectID] = objectID);
+                Array.prototype.push.apply(updateMode.geObjectsProperties, Object.values(objectsIDs));
+            }
+        }
+    }
+
+    // Update cache for || Reload all data to cache for (added for simple search)
+    /*
+    log.info((updateMode ? 'Update' : 'Reload all data to') + ' cache for: ', objectsAndCountersForUpdate.length,
+        '; counters for remove: ', countersForRemove.size, '; update mode: ', updateMode);
+
+     */
+    createCache(updateMode, objectsAndCountersForUpdate, callback);
+}
+
