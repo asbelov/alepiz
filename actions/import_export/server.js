@@ -29,19 +29,21 @@ module.exports = function(args, callback) {
     // find existing objects in database for update
     var counters = {};
     var objects = {};
-    importedData.forEach(o => {
-        if(Array.isArray(o.counters)) {
-            o.counters.forEach(counterName => counters[counterName] = 0);
+    importedData.forEach(obj => {
+        if(Array.isArray(obj.counters)) {
+            obj.counters.forEach(counterName => counters[counterName] = 0);
         }
-        objects[o.name] = 0;
+        objects[obj.name] = 0;
 
-        if(Array.isArray(o.interactions)) {
-            o.interactions.forEach(interaction => {
+        if(Array.isArray(obj.interactions)) {
+            obj.interactions.forEach(interaction => {
                 objects[interaction.name1] = 0;
                 objects[interaction.name2] = 0;
             });
         }
     });
+
+    if(!Object.keys(objects).length) return callback(new Error('Can\'t find objects in the imported data'));
 
     // get object IDs by object names
     modelsDBObjectsDB.getObjectsByNames(Object.keys(objects), function (err, rows) {
@@ -56,15 +58,19 @@ module.exports = function(args, callback) {
             }
             rows.forEach(row => counters[row.name] = row.id);
 
+            log.info('Import objects from ', importedData);
+            log.info('Objects: ', objects);
+            log.info('Counters: ', counters);
             transactionDB.begin(function (err) {
                 if (err) return callback(err);
 
                 async.eachSeries(importedData, function (param, callback) {
-                    addOrUpdateObjects(args.user, {
+                    addOrUpdateObjects(args.username, {
                         id: objects[param.name],
                         name: param.name,
                         description: param.description,
                         disabled: param.disabled,
+                        sortPosition: param.sortPosition,
                         color: param.color,
                     }, function (err, objectID) {
                         if (err) {
@@ -72,20 +78,22 @@ module.exports = function(args, callback) {
                                 err.message + ': ' + JSON.stringify(param)));
                         }
 
+                        objects[param.name] = objectID;
+
                         async.waterfall([function (callback) {
-                                saveProperties(args.user, {
+                                saveProperties(args.username, {
                                     id: objectID,
                                     name: param.name,
                                     properties: args.skipProperties ? null : param.properties,
                                 }, callback);
                             }, function (callback) {
-                                saveLinkedCounters(args.user, {
+                                saveLinkedCounters(args.username, {
                                     id: objectID,
                                     name: param.name,
                                     counters: args.skipLinkedCounters ? null : param.counters,
                                 }, counters, callback);
                             }, function (callback) {
-                                saveInteractions(args.user, {
+                                saveInteractions(args.username, {
                                     id: objectID,
                                     name: param.name,
                                     interactions: args.skipInteractions ? null : param.interactions,

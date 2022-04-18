@@ -388,7 +388,7 @@ WHERE objectsCounters.id = ?`, OCID, callback);
  * [{name: <counterName>, id: <counterID>}]
  */
 countersDB.getCountersIDsByNames = function (countersNames, callback) {
-    if(!countersNames || !countersNames.length) return;
+    if(!countersNames || !countersNames.length) return callback(null, []);
     //db.all('SELECT name, id FROM counters WHERE name IN (' +
     //    (new Array(countersNames.length)).fill('?').join(',') + ') COLLATE NOCASE', countersNames, callback);
 

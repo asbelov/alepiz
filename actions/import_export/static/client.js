@@ -75,6 +75,19 @@ var JQueryNamespace = (function ($) {
 
         $("#importObjectBtn").on('change', load);
 
+        $('#checkDependenciesBtn').click(function() {
+            importExportEditor.save();
+            var objectsDataStr = $('#importExportJSONEditor').val();
+
+            try {
+                var objectsData = checkData(objectsDataStr);
+            } catch(e) {
+                log.error('Error in object data: ', e.message);
+                return;
+            }
+            checkDependencies(objectsData)
+        })
+
         M.Tooltip.init(document.querySelectorAll('.tooltipped'), {enterDelay: 500});
 
         generateJSON();
@@ -126,6 +139,7 @@ var JQueryNamespace = (function ($) {
         importExportEditor.setValue('[]');
         importExportEditor.save();
 
+        if(!objectsIDs.length) return;
 
         var objectsIDs = objects.map(o => o.id);
         // objects = [{id:, name:, description:, sortPosition:, color:, disabled:}, ...]
@@ -252,6 +266,11 @@ var JQueryNamespace = (function ($) {
 
     function checkDependencies(objectsData, callback) {
 
+        if(!Array.isArray(objectsData) || !objectsData.length) {
+            M.toast({html: 'Object data not found in editor', displayLength: 3000});
+            return;
+        }
+
         var externalObjectNames = {}, externalCounterNames = {};
 
         objectsData.forEach(objectData => {
@@ -261,8 +280,14 @@ var JQueryNamespace = (function ($) {
 
             if(Array.isArray(objectData.interactions) && objectData.interactions.length) {
                 objectData.interactions.forEach(intersection => {
-                    externalObjectNames[intersection.name1] = 0;
-                    externalObjectNames[intersection.name2] = 0;
+                    if(objectData.name) {
+                        if (intersection.name1 && objectData.name.toUpperCase() !== intersection.name1.toUpperCase()) {
+                            externalObjectNames[intersection.name1] = 0;
+                        }
+                        if (intersection.name2 && objectData.name.toUpperCase() !== intersection.name2.toUpperCase()) {
+                            externalObjectNames[intersection.name2] = 0;
+                        }
+                    }
                 });
             }
 
@@ -312,7 +337,7 @@ var JQueryNamespace = (function ($) {
                 importExportEditor.setValue(JSON.stringify(objectsData, null, 4));
 
                 if(!unresolvedObjects.length && !unresolvedCounters.length) {
-                    M.toast({html: 'Successfully loading JSON for objects', displayLength: 2000});
+                    M.toast({html: 'Successfully checking JSON data. No errors found', displayLength: 2000});
                 } else {
                     $('#modalImportEntitiesNotFoundList').html(
                         unresolvedObjects.map(o => {

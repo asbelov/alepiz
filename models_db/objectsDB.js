@@ -207,6 +207,8 @@ objectsDB.getObjectsLikeNames = function(namesLike, callback) {
 };
 
 function getObjectsByX(IDs, condition, suffix, callback) {
+    if(!IDs || !IDs.length) return callback(null, []);
+
     var rows = [];
     var stmt = db.prepare('SELECT * FROM objects WHERE ' + condition + '? ' + suffix + ' ORDER BY name', function(err) {
         if(err) return callback(err);

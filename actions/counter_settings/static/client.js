@@ -2040,7 +2040,7 @@ var JQueryNamespace = (function ($) {
                 var isFoundParentCounterName = false;
                 for (var i = 0; counters && i < counters.length; i++) {
                     var counter = counters[i];
-                    if (parentCounterName.toUpperCase() === counter.name.toUpperCase()) {
+                    if (parentCounterName && parentCounterName.toUpperCase() === counter.name.toUpperCase()) {
                         isFoundParentCounterName = true;
                         selected = ' selected';
                     } else selected = '';
