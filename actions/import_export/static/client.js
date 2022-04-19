@@ -139,9 +139,9 @@ var JQueryNamespace = (function ($) {
         importExportEditor.setValue('[]');
         importExportEditor.save();
 
-        if(!objectsIDs.length) return;
 
         var objectsIDs = objects.map(o => o.id);
+        if(!objectsIDs.length) return;
         // objects = [{id:, name:, description:, sortPosition:, color:, disabled:}, ...]
         // properties = [{id:..., objectID:..., name:..., value:..., description:..., mode:...}, ...]
         // counters = [{id:.., name:.., unitID:..., collector:..., sourceMultiplier:..., groupID:..., OCID:..., objectID:..., objectName:..., objectDescription:..}, ...]
@@ -338,6 +338,7 @@ var JQueryNamespace = (function ($) {
 
                 if(!unresolvedObjects.length && !unresolvedCounters.length) {
                     M.toast({html: 'Successfully checking JSON data. No errors found', displayLength: 2000});
+                    if(typeof callback === 'function') callback(objectDataStr);
                 } else {
                     $('#modalImportEntitiesNotFoundList').html(
                         unresolvedObjects.map(o => {
@@ -351,9 +352,11 @@ var JQueryNamespace = (function ($) {
                     var modalImportEntitiesNotFoundInfoInstance =
                         M.Modal.init(document.getElementById('modalImportEntitiesNotFoundInfo'));
                     modalImportEntitiesNotFoundInfoInstance.open();
-                }
 
-                if(typeof callback === 'function') callback(objectDataStr);
+                    $('#modalImportEntitiesNotFoundOkBtn').click(function () {
+                        if(typeof callback === 'function') callback(objectDataStr);
+                    });
+                }
             });
         });
     }

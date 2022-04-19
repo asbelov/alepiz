@@ -1,0 +1,189 @@
+//
+    Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 18.04.2022, 22:11:22
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Telegram: отправить сообщение телеграм боту
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov <asbel@alepiz.com>")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Telegram
+                    h5.light.
+                        Отправка сообщения telegram боту
+
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+
+                    h2 Описание
+                    p.
+                        #[a(href="https://telegram.org/" target="_blank") Telegram] - это один из мессенджеров,
+                        с интерфейсом API для автоматической отправки сообщений. Клиенты Telegram есть практически
+                        под все платформы.
+                        Средство связи Telegram позволяет отправлять сообщения боту телеграм. Это единственный
+                        возможный способ автоматической отправки сообщений в Telegram. Отправка сообщений напрямую
+                        пользователям в Telegram запрещена для того, чтобы было невозможно создавать спам ботов.
+                    p.
+                        Для отправки сообщений в телеграм необходимо:
+                    ul.browser-default
+                        li Создать своего телеграм бота
+                        li Создать группу в телеграм и включить в нее телеграм бота
+                        li Включить в группу телеграм пользователей, которым необходимо отправлять сообщения ALEPIZ
+                        li Настроить средство связи Telegram (указать token телеграмм бота и идентификатор созданной группы)
+                    p.
+                        Ниже приведено подробное описание создания телеграм бота, получения его token, создания группы
+                        телеграм и получения ее chatID для настройки средства связи.
+
+                    h3 Описание параметров файла конфигурации config.json
+                    ul.browser-default
+                        li description: описание средства связи, например "Sending a message to a telegram bot"
+                        li.
+                            address: описание адреса средства связи. В случае с телеграм, адрес средства связи
+                            отсутствует. Для удобства назначения средства связи пользователям вместо адреса
+                            можно указать группу телеграм, в которую будут транслироваться сообщения
+                        li.
+                            re: регулярное выражение с помощью которого можно проверить корректность адреса для
+                            средства связи. В данном случае это "^$"
+                        li.
+                            &lt;configID&gt;: идентификатор конфигурации средства связи. Для одного средства связи можно
+                            сделать несколько конфигураций и в дальнейшем выбирать требуемую конфигурацию при отправке
+                            сообщения. Например, в разных конфигурациях одного и того же средства связи могут быть
+                            различные телеграм боты для отправки сообщений разным группам пользователей.
+                        ul.browser-default
+                            li.
+                                transport: объект с параметрами для средства связи. Если значение transport не объект,
+                                а строка, то она будет интерпретирована как ссылка на идентификатор конфигурации, из
+                                которого необходимо взять параметры средства связи.
+                            li.
+                                message: объект, который служит в качестве шаблона сообщения для средства связи.
+                                Параметр message может отсутствовать.
+
+                        h4 Описание transport
+                        ul.browser-default
+                            li token: <string> - token телеграм бота, которому будут отправляться сообщения
+                            li chaiID: <string> - идентификатор группы телеграм, в которую будут отправляться сообщения
+                            li localAddress: <IP> - если указан, то подключение будет осуществляться с указанного IP адреса
+                            li proxyHost: <string> - имя хоста HTTP прокси. Если не указан, то прокси не используется
+                            li proxyPort: <0-65536> - TCP порт HTTP прокси
+                            li.
+                                proxyUser: <string> - пользователь для авторизации на HTTP прокси сервере.
+                                Поддерживается Basic авторизация. Если не указан, авторизация не осуществляется
+                            li proxyPass: <string> - пароль для авторизации на HTTP прокси сервере
+
+                        h4 Описание message
+                        ul.browser-default
+                            li.
+                                text: шаблон текста сообщения. Может содержать переменную %:MESSAGE:%, которая будет
+                                заменена на содержание отправленного из ALEPIZ сообщения.
+
+                        h3 Пример конфигурации
+                        div.card-panel
+                            pre.
+                                {
+                                    "description": "Sending a message to a telegram bot",
+                                    "address": "@Alepiz monitoring",
+                                    "re": "^$",
+                                    "default": {
+                                        "transport": {
+                                            "token": "1234567890:ABC-Ab1_ab1Cde2fGHi3jqR_abcdE1fgH",
+                                            "chatID": "-123456789",
+                                            "localAddress": "1.2.3.4",
+                                            "proxyHost": "proxy.mydomain.com",
+                                            "proxyPort": 3128,
+                                            "proxyUser": "proxyUserName",
+                                            "proxyPass": "proxyUserPassword"
+                                        },
+                                        "message": {
+                                          "text": "%:MESSAGE:%"
+                                        }
+                                    }
+                                }
+                        h3 Создание телеграм бота
+                        p.
+                            Телеграм бот требуется для автоматической отправки сообщений из ALEPIZ в телеграм.
+                            Чтобы сделать своего бота, понадобится бот — @BotFather. Это официальный инструмент для
+                            создания ботов и управления ими. Найти @BotFather можно через поиск. Обратите внимание на
+                            синюю галочку рядом с именем: именно она укажет на правильный бот.
+                        img(src="./images/help.01_findBotFather.png").materialboxed.card-panel.hoverable
+                        p Запустите диалог с ним и нажмите «Запустить».
+                        img(src="./images/help.02_runBotFather.png").materialboxed.card-panel.hoverable
+                        p Наберите /newbot
+                        img(src="./images/help.03_newbotBotFather.png").materialboxed.card-panel.hoverable
+                        p Введите любое название вашего бота
+                        img(src="./images/help.04_enterBotNameBotFather.png").materialboxed.card-panel.hoverable
+                        p.
+                            Введите ник вашего бота. Он должен быть уникальным в формате &lt;something&gt;_bot или
+                            &lt;Something&gt;Bot, где &lt;something&gt; - буквы, цифры, тире или подчеркивание.
+                            Если что-то будет некорректно, вас попросят ввести другой ник.
+                        img(src="./images/help.05_enterBotNikBotFather.png").materialboxed.card-panel.hoverable
+                        p.
+                            Далее @BotFather предоставит ссылку на созданного бота и его token. Ссылка нужна для поиска
+                            бота, ею можно делиться. Token - это внешняя ссылка, с помощью которого осуществляется
+                            обращение к боту извне и отправка сообщения.
+                            Сохраните его в надёжном месте и никому не показывайте. На скриншоте токен был изменен.
+                        img(src="./images/help.06_botCreatedBotFather.png").materialboxed.card-panel.hoverable
+                        p После сохранения token, подключитесь к новому боту нажав на ссылку
+                        img(src="./images/help.07_runAlepizBot.png").materialboxed.card-panel.hoverable
+                        p Запустите новый бот
+                        img(src="./images/help.08_AlepizBot.png").materialboxed.card-panel.hoverable
+
+                        h3 Создание группы в телеграм
+                        p.
+                            Группа будет использоваться для отображения сообщений, отправленных из ALEPIZ.
+                            Пользователи, включенные в группу, смогут получать сообщения. Для создания группы необходимо
+                            выполнить следующие действия:
+                        p Выберите "Создать группу" из меню телеграм
+                        img(src="./images/help.09_createNewGroupAlepizBot.png").materialboxed.card-panel.hoverable
+                        p Введите название новой группы
+                        img(src="./images/help.10_alepizMonitoringGroupCreateAlepizBot.png").materialboxed.card-panel.hoverable
+                        p Добавьте в качестве пользователя в группу созданного вами телеграм бота
+                        img(src="./images/help.11_addAlepizBotToAlepizMonitoringGroup.png").materialboxed.card-panel.hoverable
+                        p.
+                            Введите /join @ник_бота в созданном чате, потому что бывает, что не добавляется в логи запись
+                            о приглашении бота в группу.
+                        img(src="./images/help.12_joinAlepizBotToAlepizMonitoringGroup.png").materialboxed.card-panel.hoverable
+
+                        h3 Получение идентификатора созданной группы
+                        p В адресной строке браузера необходимо ввести
+                        pre.
+                            https://api.telegram.org/botXXXXXXXXXXXXXXXXXXXXXXX/getUpdates
+                        p.
+                            где XXXXXXXXXXXXXXXXXXXXXXX - token вашего бота. Если все прошло успешно, то получим примерно
+                            следующее
+                        img(src="./images/help.13_getChatID.png").materialboxed.card-panel.hoverable
+                        p Необходимо найти объект «chat»:{«id:XXXXXXXXXX…}. Обычно id группового чата начинается с минуса.
+
+                        h3 Настройка средства связи
+                        p В файл конфигурации средства связи Telegram, в transport, необходимо внести token и chatID:
+                        div.card-panel
+                            pre.
+                                {
+                                    "description": "Sending a message to a telegram bot",
+                                    "address": "@Alepiz monitoring",
+                                    "re": "^$",
+                                    "default": {
+                                        "transport": {
+                                            "token": "1234567890:ABC-Ab1_ab1Cde2fGHi3jqR_abcdE1fgH",
+                                            "chatID": "-123456789",
+
+                        h3 Проверка работы средства связи
+                        p.
+                            Для проверки работы средства связи Telegram, запустите действие Development\Send message и
+                            заполните поля как на скриншоте
+                        img(src="./images/help.14_sendMessage.png").materialboxed.card-panel.hoverable
+                        p Запустите действие на исполнение. В группе телеграм должно появиться отправленное вами сообщение
+                        img(src="./images/help.15_receiveMessage.png").materialboxed.card-panel.hoverable
+
+
+
+
+
+

@@ -25,7 +25,7 @@ SolidCompression=yes
 PrivilegesRequired=admin
 
 [Files]
-Source: "C:\Users\asbel\WebstormProjects\alepiz\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: ".*, config\*, logs\*, DB\*, private\*, tests, *.zip, *.7z, copyLog.cmd, sign.cmd, mk7z*.bat, alepizSetup*.exe, *.iss, *.~is, bin\install_build_tools.cmd, actions\qmonitor, actions\procdump, actions\ARQA*, collectors\qmz"
+Source: "C:\Users\asbel\WebstormProjects\alepiz\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: ".*, config\*, logs\*, DB\*, private\*, tests, *.zip, *.7z, copyLog.cmd, sign.cmd, mk7z*.bat, alepizSetup*.exe, *.iss, *.~is, bin\install_build_tools.cmd, communication\telegram\config.json, actions\qmonitor, actions\procdump, actions\ARQA*, collectors\qmz"
 Source: "C:\Users\asbel\WebstormProjects\alepiz\.distr\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Run]

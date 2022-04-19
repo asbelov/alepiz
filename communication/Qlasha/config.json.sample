@@ -4,7 +4,12 @@
     "re": "^$",
     "default": {
         "transport": {
-            "host": "localhost"
+            "host": "localhost",
+            "localAddress": "127.0.0.1",
+            "proxyHost": "proxy.mydomain.com",
+            "proxyPort": 3128,
+            "proxyUser": "proxyUserName",
+            "proxyPass": "proxyUserPassword"
         },
         "message": {
             "rate": 1,

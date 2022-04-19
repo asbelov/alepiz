@@ -1,0 +1,19 @@
+{
+    "description": "Sending a message to a telegram bot",
+    "address": "@Alepiz monitoring",
+    "re": "^$",
+    "default": {
+        "transport": {
+            "token": "1234567890:ABC-Ab1_ab1Cde2fGHi3jqR_abcdE1fgH",
+            "chatID": "-123456789",
+            "//localAddress": "127.0.0.1",
+            "//proxyHost": "proxy.mydomain.com",
+            "//proxyPort": 3128,
+            "//proxyUser": "proxyUserName",
+            "//proxyPass": "proxyUserPassword"
+        },
+        "message": {
+          "text": "%:MESSAGE:%"
+        }
+    }
+}
