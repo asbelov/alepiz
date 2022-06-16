@@ -301,7 +301,7 @@ function createURL(query, pass, text, sender, rcpt, phonesDiv, phonePrefix, phon
 
     var multiple = [],
         newQuery = {},
-        senderPhone = sender ? getPhone(sender[0].address, phonePrefix, phoneLen) : ''; // some times sender has not phone number
+        senderPhone = sender ? getPhone(sender[0].address, phonePrefix, phoneLen) : ''; // sometimes sender has not phone number
     for(var key in query) {
         if(query[key] === '%:TEXT:%') newQuery[key] = text;
         else if(query[key] === '%:PHONES:%') newQuery[key] = phones.join(typeof phonesDiv === 'string' ? phonesDiv : ',');

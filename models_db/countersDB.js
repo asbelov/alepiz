@@ -77,7 +77,7 @@ countersDB.getCounterParameters = function(counterID, callback){
 };
 
 /*
-    used in history.js for housekeeper procedure and don't requiring for check user rights
+    used in history.js for housekeeper procedure and don't require for check user rights
 
     callback(err, row), where
     row: [{OCID:.., history: .., trends: ...}, ...]
@@ -148,7 +148,12 @@ countersDB.getVariables = function(counter, callback){
         JOIN counters parentCounters ON parentCounters.name = variables.parentCounterName COLLATE NOCASE \
         LEFT OUTER JOIN objects ON objects.id = variables.objectID \
         LEFT OUTER JOIN objectsCounters ON objects.id = objectsCounters.objectID AND parentCounters.id = objectsCounters.counterID' +
-        (counter ? (counter === parseInt(counter, 10) ? ' WHERE variables.counterID = ?' : ' WHERE variables.parentCounterName = ? COLLATE NOCASE') : ''),
+        (counter ?
+            (counter === parseInt(counter, 10) ?
+                // GROUP BY variables.id used for remove duplicates with a different parent counter ID
+                ' WHERE variables.counterID = ? GROUP BY variables.id' :
+                // there may be duplicates with a different parent counter ID and the same parent counter name
+                ' WHERE variables.parentCounterName = ? COLLATE NOCASE') : ''),
         counter ? counter : [], callback);
 };
 
@@ -219,9 +224,9 @@ WHERE objectsCounters.id = ?', function(err) {
         if(err) return callback(err);
 
         async.eachLimit(OCIDsArray, 100,function(objectCounterID, callback) {
-            stmt.all(objectCounterID, function(err, prms) {
+            stmt.all(objectCounterID, function(err, param) {
                 if(err) return callback(err);
-                rows.push.apply(rows, prms);
+                rows.push.apply(rows, param);
                 callback();
             })
         }, function(err) {
@@ -384,7 +389,7 @@ WHERE objectsCounters.id = ?`, OCID, callback);
 /** Get counter IDs by specific counter names
  *
  * @param {Array[string]} countersNames - array of counter names
- * @param {function(Error)|function(null, Array)} callback - callback(err, rows) return error or array of rows loke
+ * @param {function(Error)|function(null, Array)} callback - callback(err, rows) return error or array of rows like
  * [{name: <counterName>, id: <counterID>}]
  */
 countersDB.getCountersIDsByNames = function (countersNames, callback) {

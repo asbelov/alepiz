@@ -931,7 +931,7 @@ var initJQueryNamespace = (function($){
 
             URL = parameters.join('&');
             if(document.title.length + URL.length >= maxUrlLength) {
-                console.log('Can\'t save action parameters to URL: parameters length more then ',  maxUrlLength, '. ',
+                console.log('Can\'t save action parameters to URL: parameters length more than ',  maxUrlLength, '. ',
                     document.title + '?' + URL);
             }
             window.history.pushState(null, document.title, '?' + (document.title.length + URL.length < maxUrlLength ? URL : window.location.search.substring(1)));

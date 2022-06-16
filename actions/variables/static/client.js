@@ -157,7 +157,7 @@ var JQueryNamespace = (function ($) {
                             }).join('<br/>') +
                             '</div></li>';
                     }
-                    var functions = variables[name].functionDebug && variables[name].functionDebug.length ? (variables[name].functionDebug.map(function (f) {
+                    var functions = Array.isArray(variables[name].functionDebug) && variables[name].functionDebug.length ? (variables[name].functionDebug.map(function (f) {
                         if(f.name) {
                             return escapeHtml(f.name + '(' + (
                                 f.parameters.map(function (p) {

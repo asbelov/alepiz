@@ -167,7 +167,7 @@ rightsWrapper.getCounterObjects = function(user, id, callback){
 /*
     Checking user rights for specific counter and getting parameters for variables and variables with expressions
 
-    user: user name
+    user: username
     counterID:counter ID
     callback(err, object), where
 

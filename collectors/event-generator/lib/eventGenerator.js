@@ -131,7 +131,7 @@ eventGenerator.get = eventGenerator.getOnce = function (param, _callback) {
         param.$variables.UPDATE_EVENT_TIMESTAMP : param.$dataTimestamp;
 
     // param.$variables.UPDATE_EVENT_STATE === undefined when we has not an update event expression
-    if(param.$variables.UPDATE_EVENT_STATE === true || param.$variables.UPDATE_EVENT_STATE === undefined) {
+    if(param.$variables.UPDATE_EVENT_STATE === 1 || param.$variables.UPDATE_EVENT_STATE === undefined) {
         // !!!don't touch this horror
         if(disabledEventsCache[OCID]) {
             if(disabledEventsCache[OCID].disableUntil < Date.now()) {
@@ -184,7 +184,7 @@ eventGenerator.get = eventGenerator.getOnce = function (param, _callback) {
             param.eventDuration = Number(param.eventDuration);
             var solve_problem = function(newEventID) {
                 solveEvent(newEventID, callback)
-                param.$variables.UPDATE_EVENT_STATE = false;
+                param.$variables.UPDATE_EVENT_STATE = 0;
                 eventGenerator.get(param, _callback); // use _callback()!!!
             }
 
@@ -196,11 +196,11 @@ eventGenerator.get = eventGenerator.getOnce = function (param, _callback) {
         // save new event to history database too
         if(newEventID) callback(null, 1);
         else callback();
-    } else if(param.$variables.UPDATE_EVENT_STATE === false) {
+    } else if(param.$variables.UPDATE_EVENT_STATE === 0) {
         solveEvent(0, callback);
     } else {
         callback(new Error('Can\'t generate event: incorrect variable value for UPDATE_EVENT_STATE (' +
-            param.$variables.UPDATE_EVENT_STATE + ') can be "true|false|undefined" for ' +
+            param.$variables.UPDATE_EVENT_STATE + ') can be "1|0|undefined" for ' +
             param.$variables.OBJECT_NAME + '->' + param.$variables.PARENT_OBJECT_NAME + ': parent counter "' +
             (param.$variables.PARENT_COUNTER_NAME  || 'Undefined parent counter: ' +
                 param.$variables.PARENT_COUNTER_NAME) + '" value: ' + param.$variables.PARENT_VALUE));

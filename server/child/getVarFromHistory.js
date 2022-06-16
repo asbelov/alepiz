@@ -2,161 +2,206 @@
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-const log = require('../../lib/log')(module);
 const async = require("async");
-const calc = require("../../lib/calc");
+const fromHuman = require('../../lib/utils/fromHuman');
+const variablesReplace = require('../../lib/utils/variablesReplace');
 const history = require("../../models_history/history");
 
-var historyFunctionList = new Set(); // to check if the function name exists
-history.getFunctionList().forEach(function (func) {
-    historyFunctionList.add(func.name);
-});
+/**
+ * List of historical function names to check if the function name exists
+ * @type {Set<any>}
+ */
+const historyFunctionList = new Set(history.getFunctionList().map(func => func.name));
 
-module.exports = function (historyVariables, variables, property, countersObjects, variablesDebugInfo, newVariables, callback) {
+module.exports = getVarFromHistory;
 
-    if (!historyVariables.length) return callback();
-    async.each(historyVariables, function (variable, callback) {
-        // if this variable was calculated at previous loop
-        if (!variable.name) return callback();
+function getVarFromHistory(historyVariable, variables, getVariableValue, param, callback) {
 
-        /* I don't understand this condition
-        if(!property.parentOCID) {
-            return callback(new Error('Variable ' + variable.name + ' for objectID ' + property.objectID +
-                ' and counterID ' + property.counterID + ': ' +
-                property.objectName + '(' + property.counterName + ') did not have an object to counter relation objectCounterID'));
-        }
-         */
+    var functionParametersStr = historyVariable.functionParameters;
+    var variablesDebugInfo = {
+        timestamp: Date.now(),
+        name: historyVariable.name,
+        expression: (historyVariable.objectVariable || param.objectName) +
+            '(' + historyVariable.parentCounterName + '): ' + historyVariable.function + '(' +
+            functionParametersStr + ')',
+        variables: variables,
+        result: '',
+    };
 
-        var res = calc.variablesReplace(variable.functionParameters, variables);
-        if (res) {
-            log.options('Replacing variables in func parameters ', property.objectName,
-                '(', property.counterName, '): ', variable.name, ' = ', variable.function,
-                '(', variable.functionParameters, ' => ', res.value, '); ', variables, {
-                    filenames: ['counters/' + property.counterID, 'counters.log'],
-                    emptyLabel: true,
-                    noPID: true,
-                    level: 'D'
-                });
-            variable.functionParameters = res.value;
+    // historyFunctionList = new Set()
+    if (!historyVariable.function || !historyFunctionList.has(historyVariable.function)) {
+        variablesDebugInfo.result = 'Unknown history function: ' + historyVariable.function + '(' + functionParametersStr + ')';
+        return callback(new Error(param.objectName + '(' + param.counterName + ' #' + param.counterID +
+            '): Unknown history function: "' + historyVariable.function + '(' + functionParametersStr +
+            ')" for get data for variable ' + historyVariable.name), null, variablesDebugInfo);
+    }
 
-            if (res.unresolvedVariables.length) return callback();
-        }
-
-        // historyFunctionList = new Set()
-        if (!variable.function || !historyFunctionList.has(variable.function)) {
-            return callback(new Error('Unknown history function: "' + variable.function +
-                '" for get data for variable ' + variable.name + ', ' +
-                property.objectName + '(' + property.counterName + ')'));
+    calcFunctionParameters(functionParametersStr, variables, getVariableValue, function (err, funcParameters) {
+        if(err) {
+            variablesDebugInfo.result = err.message;
+            return callback(new Error(param.objectName + '(' + param.counterName +
+                ' #' + param.counterID + '): ' + err.message), null, variablesDebugInfo);
         }
 
-        var funcParameters = [];
-        if (variable.functionParameters)
-            if (typeof (variable.functionParameters) === 'string') {
-                funcParameters = variable.functionParameters.split(/[ ]*,[ ]*/).map(function (parameter) {
-                    // try to convert Gb, Mb, Kb, B or date\time to numeric or return existing parameter
-                    var hasExclamation = false;
-                    if (String(parameter).charAt(0) === '!') {
-                        parameter = parameter.slice(1);
-                        hasExclamation = true;
+        variablesDebugInfo.expression = (historyVariable.objectVariable || param.objectName) +
+            '(' + historyVariable.parentCounterName + '): ' + historyVariable.function + '(' +
+            funcParameters.join(', ') + ')';
+
+        calcObjectName(historyVariable, variables, getVariableValue, param,
+            function(err, OCID, variableObjectName) {
+
+            if(err) {
+                variablesDebugInfo.result = err.message;
+                return callback(new Error(param.objectName + '(' + param.counterName +
+                    ' #' + param.counterID + '): ' + err.message), null, variablesDebugInfo);
+            }
+
+            funcParameters.unshift(OCID);
+
+            // add callback function as last parameter to history function
+            (function (_historyVariable, _param, _callback) {
+                funcParameters.push(function (err, _result) {
+                    funcParameters.pop(); // remove callback for debugging
+                    funcParameters.shift();
+
+                    var result = _result ? _result.data : _result;
+
+                    var variablesDebugInfo = {
+                        timestamp: Date.now(),
+                        name: _historyVariable.name,
+                        expression: variableObjectName + '(' + _historyVariable.parentCounterName + '): ' + _historyVariable.function + '(' +
+                            funcParameters.join(', ') + ')',
+                        variables: variables,
+                        functionDebug: result ? result.records : undefined,
+                        result: JSON.stringify(result),
+                    };
+
+                    if (err) {
+                        variablesDebugInfo.result += ': err: ' + err.message
+                        return _callback(new Error(_param.objectName + '(' + _param.counterName +
+                            ' #' + _param.counterID + '): ' + err.message), result, variablesDebugInfo);
                     }
-                    return hasExclamation ? '!' + String(calc.convertToNumeric(parameter)) : calc.convertToNumeric(parameter);
+
+                    _callback(null, result, variablesDebugInfo);
                 });
-            } else funcParameters.push(variable.functionParameters);
+            }) (historyVariable, param, callback);
 
-        // calculate and add objectCounterID as first parameter for history function
-        if (variable.objectVariable) { // objectVariable is right, not property.objectName
-            res = calc.variablesReplace(variable.objectVariable, variables);
-            if (res) {
-                if (res.unresolvedVariables.length) return callback();
-                //try {
-                var variableObjectName = String(res.value).toUpperCase();
-                //} catch(e) {
-                //    log.error('Error calc objectCounterID as first parameter for history function: ', e.message,
-                //        ': typeof res.value: ', typeof(res.value), '; res.value: ', res.value);
-                //}
-            } else variableObjectName = String(variable.objectVariable).toUpperCase();
+            // send array as a function parameters, i.e. func.apply(this, [prm1, prm2, prm3, ...]) = func(prm1, prm2, prm3, ...)
+            // funcParameters = [objectCounterID, prm1, prm2, prm3,..., callback]; callback(err, result, variablesDebugInfo), where result = [{data:<data>, }]
+            history[historyVariable.function].apply(this, funcParameters);
+        })
+    });
+}
 
-            var OCID = countersObjects.objectName2OCID.has(variableObjectName) ?
-                countersObjects.objectName2OCID.get(variableObjectName).get(Number(variable.parentCounterID)) : null;
-            if (!OCID) return callback();
+function calcFunctionParameters(functionParametersStr, variables, getVariableValue, callback) {
+    var functionParameters = [];
+    if(!functionParametersStr) return callback(null, functionParameters);
+    if(typeof functionParametersStr !== 'string') return callback(null, [functionParametersStr]);
+
+    var rawFuncParameters = functionParametersStr.split(/ *, */);
+
+    async.eachSeries(rawFuncParameters, function(functionParameter, callback) {
+        var res = variablesReplace(functionParameter, variables);
+        if(!res) {
+            functionParameters.push('');
+            return callback();
+        }
+
+        if(!res.allUnresolvedVariables.length) {
+            functionParameters.push(parameterValueFromHuman(res.value));
+            return callback();
+        }
+
+        async.eachSeries(res.allUnresolvedVariables, function(variableName, callback) {
+            if(variables[variableName]) return callback();
+            getVariableValue(variableName, callback);
+        }, function(err) {
+            if(err) return callback(err);
+
+            var res = variablesReplace(functionParameter, variables);
+            if(!res) {
+                functionParameters.push('');
+                return callback();
+            }
+
+            if (res.unresolvedVariables.length) {
+                return callback(new Error('Found unresolved variables in function parameters: ' +
+                    res.unresolvedVariables.join(', ')));
+            }
+
+            functionParameters.push(parameterValueFromHuman(res.value));
+            callback();
+        });
+    }, function(err) {
+        if(err) return callback(err);
+
+        callback(null, functionParameters);
+    });
+}
+
+function parameterValueFromHuman(parameter) {
+    // try to convert Gb, Mb, Kb, B or date\time to numeric or return existing parameter
+    if (String(parameter).charAt(0) !== '!') return fromHuman(parameter);
+    return '!' + fromHuman(parameter.slice(1));
+}
+
+function calcObjectName(historyVariable, variables, getVariableValue, param, callback) {
+
+    // calculate and add objectCounterID as first parameter for history function
+    if (historyVariable.objectVariable) { // objectVariable is right, not param.objectName
+
+        var res = variablesReplace(historyVariable.objectVariable, variables);
+        if (res) {
+            if (res.allUnresolvedVariables.length) {
+                var variableObjectName = '';
+                async.each(res.allUnresolvedVariables, function(variableName, callback) {
+                    if(variables[variableName]) return callback();
+                    getVariableValue(variableName, callback);
+                }, function(err) {
+                    if(err) return callback(err);
+
+                    var res = variablesReplace(historyVariable.objectVariable, variables);
+                    if(!res) return callback(null, String(historyVariable.objectVariable).toUpperCase());
+
+                    if (res.unresolvedVariables.length) {
+                        return callback(new Error('Found unresolved variables while calculating object name from ' +
+                            historyVariable.objectVariable + ': ' + res.unresolvedVariables.join(', ')));
+                    }
+                    variableObjectName = String(res.value).toUpperCase();
+
+                    var OCID = param.countersObjects.objectName2OCID.has(variableObjectName) ?
+                        param.countersObjects.objectName2OCID.get(variableObjectName).get(Number(historyVariable.parentCounterID)) : null;
+                    if (!OCID) {
+                        return callback(new Error('Can\'t get OCID for object ' + variableObjectName +
+                            ' and counterID: ' + historyVariable.parentCounterName));
+                    }
+
+                    callback(null, OCID, variableObjectName);
+                });
+                return;
+            } else variableObjectName = String(res.value).toUpperCase();
+        } else variableObjectName = String(historyVariable.objectVariable).toUpperCase();
+
+        var OCID = param.countersObjects.objectName2OCID.has(variableObjectName) ?
+            param.countersObjects.objectName2OCID.get(variableObjectName).get(Number(historyVariable.parentCounterID)) : null;
+        if (!OCID) {
+            return callback(new Error('Can\'t get OCID for object ' + variableObjectName +
+                ' and counterID: ' + historyVariable.parentCounterName));
+        }
+    } else {
+        if (historyVariable.OCID) {
+            variableObjectName = historyVariable.objectName;
+            OCID = historyVariable.OCID;
         } else {
-            if (variable.OCID) {
-                variableObjectName = variable.objectName;
-                OCID = variable.OCID;
-            } else {
-                variableObjectName = property.objectName;
-                OCID = countersObjects.counters.has(Number(variable.parentCounterID)) ?
-                    countersObjects.counters.get(Number(variable.parentCounterID)).objectsIDs.get(Number(property.objectID)) : null;
-                if (!OCID) {
-                    log.options('CounterID: ', variable.parentCounterID, ' is not linked to the objectID: ',
-                        property.objectID, ' for getting historical data for variable: ', variableObjectName,
-                        '(', variable.parentCounterName + '): ', variable.name, ' = ', variable.function,
-                        '(`', funcParameters.join('`, `'), '`)', {
-                            filenames: ['counters/' + property.counterID, 'counters.log'],
-                            emptyLabel: true,
-                            noPID: true,
-                            level: 'D'
-                        });
-                    return callback();
-                }
+            variableObjectName = param.objectName;
+            OCID = param.countersObjects.counters.has(Number(historyVariable.parentCounterID)) ?
+                param.countersObjects.counters.get(Number(historyVariable.parentCounterID)).objectsIDs.get(Number(param.objectID)) : null;
+            if (!OCID) {
+                return callback(new Error('Can\'t get OCID for object ' + variableObjectName +
+                    ' and counter: ' + historyVariable.parentCounterName));
             }
         }
+    }
 
-        // add callback function as last parameter to history function
-        log.options('Processing history variable: ', variableObjectName,
-            '(', variable.parentCounterName + '): ', variable.name, ' = ', variable.function,
-            '(`', funcParameters.join('`, `'), '`), OCID:', OCID, ' variable: ', variable, {
-                filenames: ['counters/' + property.counterID, 'counters.log'],
-                emptyLabel: true,
-                noPID: true,
-                level: 'D'
-            });
-        funcParameters.unshift(OCID);
-
-        (function (_variable, _property, _callback) {
-            funcParameters.push(function (err, result) {
-                if (err) return _callback(err);
-
-                if (result !== undefined && result !== null) {
-                    variables[_variable.name] = result ? result.data : result;
-                    newVariables.push(_variable.name);
-                }
-
-                funcParameters.pop(); // remove callback for debugging
-                log.options('History variable value for ', _property.objectName,
-                    '(', _property.counterName, '): ', variableObjectName + '(' + _variable.parentCounterName + '): ',
-                    _variable.name, ': ', _variable.function, '(', funcParameters.join(', '), ') = ', result, {
-                        filenames: ['counters/' + _property.counterID, 'counters.log'],
-                        emptyLabel: true,
-                        noPID: true,
-                        level: 'D'
-                    });
-
-                funcParameters.shift();
-                if (_property.debug) {
-                    var initVariables = {};
-                    for (var name in variables) {
-                        initVariables[name] = variables[name];
-                    }
-                    variablesDebugInfo[_variable.name] = {
-                        timestamp: Date.now(),
-                        name: _variable.name,
-                        expression: variableObjectName + '(' + _variable.parentCounterName + '): ' + _variable.function + '(' + funcParameters.join(', ') + ')',
-                        variables: initVariables,
-                        functionDebug: result ? result.records : undefined,
-                        result: result ? result.data : result
-                    };
-                }
-                _variable.name = null;
-                _callback();
-            });
-        }) (variable, property, callback);
-
-        // send array as a function parameters, i.e. func.apply(this, [prm1, prm2, prm3, ...]) = func(prm1, prm2, prm3, ...)
-        // funcParameters = [objectCounterID, prm1, prm2, prm3,..., callback]; callback(err, result), where result = [{data:<data>, }]
-        history[variable.function].apply(this, funcParameters);
-
-    }, callback)
-
-    // resolve variables from objects properties
+    callback(null, OCID, variableObjectName);
 }

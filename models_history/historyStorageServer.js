@@ -77,7 +77,10 @@ function dbOpen() {
 
     log.info('Open storage file ', dbPath, ' for ', (isTransactionProcess ? 'transactions' : 'queries'),' operations...');
     try {
-        db = new Database(dbPath, {readonly: !isTransactionProcess});
+        db = new Database(dbPath, {
+            readonly: !isTransactionProcess,
+            timeout: Number(parameters.dbLockTimeout) || 5000
+        });
         db.pragma('synchronous = "OFF"');
         db.pragma('foreign_keys = "ON"');
         db.pragma('encoding = "UTF-8"');

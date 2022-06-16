@@ -230,10 +230,10 @@ function childFunc() {
 }
 
 function initDB(dbPath, callback) {
-    log.info('Open storage file ', dbPath, '...');
+    //log.info('Open storage file ', dbPath, '...');
 
     try {
-        var db = new Database(dbPath);
+        var db = new Database(dbPath, {timeout: Number(parameters.dbLockTimeout) || 5000});
     } catch (err) {
         return log.throw('Can\'t open DB ', dbPath, ': ', err.message);
     }

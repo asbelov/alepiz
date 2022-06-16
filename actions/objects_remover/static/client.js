@@ -67,7 +67,7 @@ var JQueryNamespace = (function ($) {
 
     function showObjects(objects) {
         if (!objects || !objects.length) {
-            objectsNamesInObjectsListElm.text('No object are loaded from database');
+            objectsNamesInObjectsListElm.text('No objects are loaded from database');
             return;
         }
 

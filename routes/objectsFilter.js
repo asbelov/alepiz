@@ -7,6 +7,7 @@ var countersDB = require('../models_db/countersDB');
 var objectsDB = require('../models_db/objectsDB');
 var objectPropertiesDB = require('../models_db/objectsPropertiesDB');
 var history = require('../models_history/history');
+const fromHuman = require('../lib/utils/fromHuman');
 var calc = require('../lib/calc');
 var Conf = require('../lib/conf');
 const confObjectFilters = new Conf('config/objectFilters.json');
@@ -51,7 +52,7 @@ function initCounterNames2IDs(cfg, callback) {
     var newCounters = {};
     for(var variableName in cfg.variables) {
         var variable = cfg.variables[variableName];
-        if (variable.expiration) variable.expiration = calc.convertToNumeric(variable.expiration);
+        if (variable.expiration) variable.expiration = fromHuman(variable.expiration);
         if (variable.counter && !counterNames2IDs[variable.counter]) newCounters[variable.counter] = 0;
     }
 
@@ -242,7 +243,7 @@ function applyFilterToObjects(filterNamesStr, filterExpression, objects, callbac
                         initVariables[variableName.toUpperCase()] = variables[variableName].results[obj.id];
                     }
 
-                    calc(filterObj.expression, initVariables, 0,
+                    calc(filterObj.expression, initVariables,null,
                         function (err, result, functionDebug, unresolvedVariables) {
                         if(err) {
                             return callback(new Error('Can\'t calculate ' + filterObj.expression +
@@ -265,7 +266,7 @@ function applyFilterToObjects(filterNamesStr, filterExpression, objects, callbac
                         if(filterObj.results) initVariables[filterObj.name.toUpperCase()] = filterObj.results[obj.id];
                     })
 
-                    calc(filterExpression, initVariables, 0,
+                    calc(filterExpression, initVariables, null,
                         function (err, result, functionDebug, unresolvedVariables) {
                         if(err) {
                             return callback(new Error('Can\'t calculate ' + filterExpression +

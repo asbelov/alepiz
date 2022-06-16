@@ -897,9 +897,11 @@ var JQueryNamespace = (function ($) {
                 if(a.counterName < b.counterName) return -1;
                 return 0;
             }).map(function (row) {
-                return '<li>' + row.counterName + ': ' + (row.variableName ?
+                return '<li><a href="/?a=%2Factions%2Fcounter_settings&cid=' +
+                        row.counterID + '" target="_blank">' + escapeHtml(row.counterName) + ' (#' +  + row.counterID + ')</a>' +
+                    ': ' + escapeHtml((row.variableName ?
                 '<b>' + row.variableName + '</b> [ <i>' + (row.variableExpression || '') + '</i> ]' + (row.variableDescription ?
-                    ' - ' + row.variableDescription : '') : ' NO VARIABLES' ) + '</li>';
+                    ' - ' + row.variableDescription : '') : ' NO VARIABLES' )) + '</li>';
             });
 
             inheritedVariablesElm.html('<h4>Parent counters and inherited variables</h4><ul>' + htmlArr.join('') + '</ul>');

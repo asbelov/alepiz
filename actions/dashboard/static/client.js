@@ -1310,7 +1310,7 @@ var JQueryNamespace = (function ($) {
 
         // find all inputs in the current table (tbody) with attribute counterID whth equal <counterID> of selected checkbox
         // and revert they checked property
-        clickedCheckboxElm.closest('tbody').find('input[counterID="' + counterID+ '"]').prop('checked', newCheckedProp);
+        clickedCheckboxElm.closest('tbody').find('tr:not(.hide)').find('input[counterID="' + counterID+ '"]').prop('checked', newCheckedProp);
     }
 
     /** Multiple selection of several events in order (like selection when pressed Shift)

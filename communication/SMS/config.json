@@ -14,6 +14,7 @@
             "//localAddress": "192.168.0.1",
             "timeout": 30000,
             "//proxyHost": "proxy.domain.com",
+            "proxyProtocol": "http|https",
             "proxyPort": 3128,
             "proxyUser": "proxyUser",
             "proxyPass": "proxyPassword",

@@ -180,7 +180,7 @@ ORDER BY disabledEvents.eventID DESC, events.startTime DESC').all(queryParameter
             else if (hintsCounterID[event.counterID]) event.hintID = hintsCounterID[event.counterID].id;
 
             // make list of disabled events
-            // events are sorted by disabledEvents.eventID and at first of the events list we have a disabled events
+            //  are sorted by disabledEvents.eventID and at first of the events list we have a disabled events
             if (event.disableUntil) disabledOCID[event.OCID] = event;
 
             // add disabled event information

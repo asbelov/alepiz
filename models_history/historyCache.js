@@ -194,7 +194,7 @@ historyCache.add = function (id, newRecord){
         } else { // add a new record to the cache otherwise
           //log.debug('Inserting new newRecord to history. id: ', id, ' newRecord: ', newRecord);
 
-            if(!recordsInCacheCnt || cacheObj.records[recordsInCacheCnt-1].timestamp < newRecord.timestamp) {
+            if(!recordsInCacheCnt || cacheObj.records[recordsInCacheCnt-1].timestamp <= newRecord.timestamp) {
                 if(checkDuplicateRecords(recordsInCacheCnt, id, recordsInCacheCnt-1, newRecord)) return;
                 cacheObj.records.push(newRecord);
             } else {

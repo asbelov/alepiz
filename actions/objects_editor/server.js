@@ -68,7 +68,7 @@ function editObjects(user, parameters, callback){
         var countersObjectsLinkage = {}, OCIDsForDelete = [], OCIDsToInsert = [],
             newCountersIDs = typeof parameters.linkedCountersIDs === 'string' ? parameters.linkedCountersIDs.split(',') : [];
 
-        if(parameters.linkedCountersIDs && parameters.linkedCountersIDs.trim() !== '0') {
+        if(typeof parameters.linkedCountersIDs === 'string' && parameters.linkedCountersIDs.trim() !== '0') {
             objectsCountersLinkage.forEach(function (counter) {
                 if (!countersObjectsLinkage[counter.id]) countersObjectsLinkage[counter.id] = {};
                 countersObjectsLinkage[counter.id][counter.objectID] = counter.OCID;

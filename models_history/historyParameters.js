@@ -28,6 +28,7 @@ var parameters = {
     dumpFileName: 'unsavedData.json',
     queriesMaxQueueLength: 200,
     slowQueueSec: 15,
+    dbLockTimeout: 5000, // the number of milliseconds to wait when executing queries on a locked database, before throwing a SQLITE_BUSY error (default: 5000).
     cacheServiceExitTimeout: 0, // exit when running more than 24 hours
     cacheServiceTimeout: 0, // terminate cache service when running more than 1 hour
     cacheServiceTimeoutForSaveObjectRecords: 0, // terminate cache service when saving records for object more than 5 min
@@ -52,4 +53,3 @@ var parameters = {
 };
 
 module.exports = parameters;
-

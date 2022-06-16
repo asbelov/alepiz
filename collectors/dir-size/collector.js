@@ -127,7 +127,7 @@ function getDirSize(dirName, excluded, sleepTime, paramStr, dontLogErrors, callb
                 });
             }
         }, function() {
-            callback(null, size. allObjectsNum, filesNum);
+            callback(null, size, allObjectsNum, filesNum);
         });
     });
 }

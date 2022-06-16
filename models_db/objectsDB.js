@@ -10,7 +10,7 @@ var objectsDB = {};
 module.exports = objectsDB;
 /*
  Delete objects.
- Check user rights before using it functions
+ Check user rights before using this functions
  IDs - array objects IDs
  callback(err)
 */
@@ -31,7 +31,7 @@ objectsDB.deleteObjects = function(IDs, callback) {
 
 /*
  renaming objects with IDs in initIDs to names in newObjectsNamesStr
- Check user rights before using it functions
+ Check user rights before using this functions
  objects - [{id: XX, name: "newObjectName1"}, {..},.... ]
  callback(err)
  */
@@ -104,7 +104,7 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled, c
 // Check user rights before using this functions
 // IDs - array of objects IDs
 // description - object description one for all
-// order - object sort position in a objects menu, one for all.  Top objects has order < 10 objectsFilterDB.js
+// order - object sort position in an objects' menu, one for all.  Top objects has order < 10 objectsFilterDB.js
 // disabled - 1|0|undefined if unchanged
 // callback(err, true|undefined), where "true" if objects information are updated
 //
@@ -265,7 +265,7 @@ Checks if objects (objectsNames) are in specific groups (groupsNames)
  groupsNames: objects names in !!lower case!!, which include searched objects i.e. groups of objects
  objectsNames: check is this objects names in !!lower case!! in a groups
  callback(err, objectsNames), where objectsNames is an array of objects names
- // function can used for less then 999 objects, according  SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999
+ // function can be used for less than 999 objects, according  SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999
 // https://www.sqlite.org/limits.html
  */
 objectsDB.getObjectsFromGroups = function(groupsNames, objectsNames, callback){

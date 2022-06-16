@@ -8,7 +8,8 @@ var objectsPropertiesDB = require('../../models_db/objectsPropertiesDB');
 var objectsDB = require('../../rightsWrappers/objectsDB');
 var countersDB = require('../../models_db/countersDB');
 var history = require('../../models_history/history');
-var calc = require('../../lib/calc');
+const fromHuman = require('../../lib/utils/fromHuman');
+const toHuman = require('../../lib/utils/toHuman');
 
 var cfg = {};
 
@@ -88,7 +89,7 @@ function getData(args, callback) {
                                     parameter = parameter.slice(1);
                                     hasExclamation = true;
                                 }
-                                return hasExclamation ? '!' + String(calc.convertToNumeric(parameter)) : calc.convertToNumeric(parameter);
+                                return hasExclamation ? '!' + String(fromHuman(parameter)) : fromHuman(parameter);
                             });
                         }
                         if (!counters2TableHeads.has(prop.counter)) counters2TableHeads.set(prop.counter, []);
@@ -238,7 +239,7 @@ function resultProcessing(cfg, result) {
     }
 
     if(cfg.toHuman) {
-        result = calc.convertToHuman(result, cfg.toHuman);
+        result = toHuman(result, cfg.toHuman);
     }
 
     return result;

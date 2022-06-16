@@ -893,8 +893,15 @@ var JQueryNamespace = (function ($) {
 
                     tableHeaderHTML += '<thead style="background-color:rgba(255, 255, 255, 0.7)" id="historyTHead"><tr><th>Time</th>';
                     // set start index (OCIDsIndexes[ocid] variable) to 0 and drawing table header
-                    var OCIDsIndexes = {};
+                    var OCIDsIndexes = {}, hasNumericData = false;
                     Object.keys(objectsCountersValues).forEach(function (ocid) {
+                        if (objectsCountersValues[ocid] && objectsCountersValues[ocid].length) {
+                            objectsCountersValues[ocid] = objectsCountersValues[ocid].sort(function (a, b) {
+                                if(isFinite(a.data) && !isNaN(a.data)) hasNumericData = true;
+                                return a.timestamp - b.timestamp;
+                            });
+                        }
+
                         OCIDsIndexes[ocid] = 0;
                         for (var i = 0; i < counters.length; i++) {
                             var counter = counters[i];
@@ -925,14 +932,6 @@ var JQueryNamespace = (function ($) {
                                     escapeHtml(counter.objectName + ':' + counter.name) + '</th>';
                                 return;
                             }
-                        }
-
-                        if (objectsCountersValues[ocid] && objectsCountersValues[ocid].length) {
-                            objectsCountersValues[ocid] = objectsCountersValues[ocid].sort(function (a, b) {
-                                if (a.timestamp < b.timestamp) return 1;
-                                if (a.timestamp > b.timestamp) return -1;
-                                return 0;
-                            })
                         }
                     });
 
@@ -981,7 +980,11 @@ var JQueryNamespace = (function ($) {
                         enterDelay: 1000
                     });
 
-                    prepareDataForGraph(objectsCountersValues);
+                    if(hasNumericData) {
+                        graphAreaElm.removeClass('hide');
+                        prepareDataForGraph(objectsCountersValues);
+                    } else graphAreaElm.addClass('hide');
+
                     /*
                     if(drawingHistoryInProgress > 1) {
                         drawingHistoryInProgress = 0;
@@ -1023,8 +1026,9 @@ var JQueryNamespace = (function ($) {
         if(!dataExist) return []; // no data
 
         var HTML = [];
-        while(true) {
-            var to = null, from = null;
+        // max attempts (and rows) to draw table is 10 000. Was while(true) {
+        for(var i = 0; i < 5000; i++) {
+            var to = null, from = null, hasDataInRow = false;
             var minTimestamp = getMaxTimestampFromPrevRow(data, pos);
             var row = OCIDs.map(function (ocid) {
                 if(!data[ocid] || pos[ocid] < 0) return '<td>&nbsp;</td>';
@@ -1035,6 +1039,7 @@ var JQueryNamespace = (function ($) {
                     var recordFromCacheClass = data[ocid][0].recordsFromCache &&
                         data[ocid][0].recordsFromCache >= data[ocid].length - pos[ocid] ? ' blue-text text-darken-4' : '';
                     --pos[ocid];
+                    hasDataInRow = true;
                     var multipliedValue = !isNaN(parseFloat(d.data)) && isFinite(d.data) ?
                         d.data * counterObj[ocid].multiplier : escapeHtml(d.data);
 
@@ -1051,7 +1056,7 @@ var JQueryNamespace = (function ($) {
                 (from !== null && from + 1000 < to ? timestampToTimeStr(from, timestampWithDate) + '-': '') +
                 timestampToTimeStr(to) + '</td>' +
                 row.join('')+ '</tr>');
-            if(minTimestamp === null) break;
+            if(minTimestamp === null || !hasDataInRow) break;
         }
 
         return HTML;
@@ -1271,7 +1276,7 @@ var JQueryNamespace = (function ($) {
             countersNames[counterObj[ocid].counterName] = true;
             objectsNames[counterObj[ocid].objectName] = true;
 
-            // Y axis will be 1 (left) or 2 (right) axis
+            // Y-axis will be 1 (left) or 2 (right) axis
             var yAxisNumber = 0;
 
             /*
@@ -1393,13 +1398,13 @@ var JQueryNamespace = (function ($) {
                 key: 'f', // full screen 1 or 0
                 val: leftDivElm.hasClass('hide') ? 1 : 0
             }, {
-                key: 'y', // limits for y axis
+                key: 'y', // limits for y-axis
                 val: yMinLeft + '-' + yMaxLeft + '-' + yMinRight + '-' + yMaxRight
             }, {
-                key: 'l', // OCIDs on a left y axis
+                key: 'l', // OCIDs on a left y-axis
                 val: leftAxisObjects.join('-')
             }, {
-                key: 'r', // OCIDs on a right y axis
+                key: 'r', // OCIDs on a right y-axis
                 val: rightAxisObjects.join('-')
             }, {
                 key: 'n', // auto update graph property. not 'n' because 'a' is reserved
