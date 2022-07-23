@@ -168,22 +168,22 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                 span#lastUpdate
                                 span#updateTime
                             div.col.s3
-                                a(href="#!" data-tooltip='Filter events by importance' data-target='importanceFilterDropDown')#importanceFilter.secondary-content.tooltipped.dropdown-trigger.hide
+                                a(href="#" data-tooltip='Filter events by importance' data-target='importanceFilterDropDown')#importanceFilter.secondary-content.tooltipped.dropdown-trigger.hide
                                     i#importanceFilterIcon.material-icons visibility
                                 ul#importanceFilterDropDown.dropdown-content
-                                a(href="#!" data-tooltip='Enable\\disable sound')#sound.secondary-content.tooltipped
+                                a(href="#" data-tooltip='Enable\\disable sound')#sound.secondary-content.tooltipped
                                     i#soundIcon.material-icons volume_up
-                                a(href="#!" data-tooltip='Open selected event objects in a new window')#openInNew.secondary-content.tooltipped
+                                a(href="#" data-tooltip='Open selected event objects in a new window')#openInNew.secondary-content.tooltipped
                                     i.material-icons open_in_new
-                                a(href="#!" data-tooltip='Start\\Pause update events &lt;Esc&gt;')#reload.secondary-content.tooltipped
+                                a(href="#" data-tooltip='Start\\Pause update events &lt;Esc&gt;')#reload.secondary-content.tooltipped
                                     i.material-icons play_arrow
-                                //a(href="#!" data-tooltip='Show\\hide commented events &lt;Alt&gt;+&lt;4&gt;')#showCommented.secondary-content.tooltipped
+                                //a(href="#" data-tooltip='Show\\hide commented events &lt;Alt&gt;+&lt;4&gt;')#showCommented.secondary-content.tooltipped
                                     i.material-icons view_headline
-                                //a(href="#!" data-tooltip='Show\\hide disabled events &lt;Alt&gt;+&lt;3&gt;')#showDisabled.secondary-content.tooltipped
+                                //a(href="#" data-tooltip='Show\\hide disabled events &lt;Alt&gt;+&lt;3&gt;')#showDisabled.secondary-content.tooltipped
                                     i.material-icons cancel
-                                //a(href="#!" data-tooltip='Show\\hide current active events &lt;Alt&gt;+&lt;2&gt;')#showCurrent.secondary-content.tooltipped
+                                //a(href="#" data-tooltip='Show\\hide current active events &lt;Alt&gt;+&lt;2&gt;')#showCurrent.secondary-content.tooltipped
                                     i.material-icons alarm
-                                a(href="#!" data-tooltip='Show\\hide message editor &lt;Alt&gt;+&lt;0&gt;')#showEditor.secondary-content.tooltipped
+                                a(href="#" data-tooltip='Show\\hide message editor &lt;Alt&gt;+&lt;0&gt;')#showEditor.secondary-content.tooltipped
                                     i.material-icons email
                         div.collapsible-body
                             table.bordered.highlight.responsive-table
@@ -202,7 +202,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                         th(var="DURATION") Duration
                                         th(var="LAST_TIME") Last time
                                         th Info
-                                        th: a(href="#!" uncheckSelected data-tooltip='Check all or uncheck selected events').tooltipped Select
+                                        th: a(href="#" uncheckSelected data-tooltip='Check all or uncheck selected events').tooltipped Select
                                 tbody#historyEventsTable
                                     tr
                                         td(colspan=12 style="text-align: center;") Waiting for initializing...
@@ -226,7 +226,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                         th(var="DURATION") Duration
                                         th(var="LAST_TIME") Last time
                                         th Info
-                                        th: a(href="#!" uncheckSelected data-tooltip='Check all or uncheck selected events').tooltipped Select
+                                        th: a(href="#" uncheckSelected data-tooltip='Check all or uncheck selected events').tooltipped Select
                                 tbody#eventsTable
                                     tr
                                         td(colspan=11 style="text-align: center;") Waiting for initializing...
@@ -252,7 +252,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                         th(var="DISABLED_INTERVALS") Disabled intervals
                                         th(var="DISABLED_USER") Disabled by user
                                         th Info
-                                        th: a(href="#!" uncheckSelected data-tooltip='Check all or uncheck selected events').tooltipped Select
+                                        th: a(href="#" uncheckSelected data-tooltip='Check all or uncheck selected events').tooltipped Select
                                 tbody#disabledEventsTable
                                     tr
                                         td(colspan=15 style="text-align: center;") Waiting for initializing...
@@ -267,7 +267,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                 input(type="text" style="margin:0; height:2em;" placeholder="To")#commentsTo
                                 //label(for="commentsTo") To
                             div.col.s6
-                                a(href="#!" data-tooltip='Reload comments')#reloadComments.right.secondary-content.tooltipped
+                                a(href="#" data-tooltip='Reload comments')#reloadComments.right.secondary-content.tooltipped
                                     i.material-icons replay
                         div.collapsible-body
                             table.bordered.responsive-table
@@ -296,15 +296,15 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                 input(type="text")#modalAdditionalComment
                                 span Enter additional comment for composed message
                     div.modal-footer
-                        a(href="#!")#modalOpenEditor.modal-close.waves-effect.waves-green.btn-flat Open message editor
-                        a(href="#!")#modalSendMessage.modal-close.waves-effect.waves-green.btn-flat Send message
+                        a(href="#")#modalOpenEditor.modal-close.waves-effect.waves-green.btn-flat Open message editor
+                        a(href="#")#modalSendMessage.modal-close.waves-effect.waves-green.btn-flat Send message
 
                 div#hintDialog.modal.modal-fixed-footer
                     div.modal-content
                         h5#hintSubject
                         p#hintComment
                     div.modal-footer
-                        a(href="#!").modal-close.waves-effect.waves-green.btn-flat Close
+                        a(href="#").modal-close.waves-effect.waves-green.btn-flat Close
 
                 div#prevCommentDialog.modal
                     div.modal-content
@@ -314,14 +314,13 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                             When you add a new comment or hints, the old information will be overwritten.
                             Please add the required information manually.
                     div.modal-footer
-                        a(href="#!").modal-close.waves-effect.waves-green.btn-flat Close
+                        a(href="#").modal-close.waves-effect.waves-green.btn-flat Close
 
                 div#actionChangeDialog.modal
                     div.modal-content
                         h5 Message has been generated for another action
                         p A current message has been generated for another action. Verify that the current message corresponds to the new action.
                     div.modal-footer
-                        a(href="#!").modal-close.waves-effect.waves-green.btn-flat Close
+                        a(href="#").modal-close.waves-effect.waves-green.btn-flat Close
     footer
         input(type="hidden" name="actionName" value= action.name)
-

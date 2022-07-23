@@ -344,13 +344,13 @@ var JQueryNamespace = (function ($) {
         if(!restrictions.importanceFilter) importanceFilterElm.addClass('hide');
         else {
             importanceFilterElm.removeClass('hide');
-            var importanceHTML = '<li><a href="#!" data-importance-filter="-1">Show all</a></li>';
+            var importanceHTML = '<li><a href="#" data-importance-filter="-1">Show all</a></li>';
             var lowerImportance = 0;
 
             Object.keys(parameters.action.importance).sort(function(max, min) {
                 return max - min;
             }).forEach(function (importance) {
-                importanceHTML += '<li><a href="#!" data-importance-filter="' + importance +
+                importanceHTML += '<li><a href="#" data-importance-filter="' + importance +
                     '" data-importance-filter-color="' + parameters.action.importance[importance].color + '">' +
                     escapeHtml(parameters.action.importance[importance].text) + '</a></li>';
                 lowerImportance = Number(importance);
@@ -484,7 +484,7 @@ var JQueryNamespace = (function ($) {
             createFilteredEventTable();
         });
 
-        // set focus to event filter when focus is not on recipients, subject or message editor
+        // set focus to eventFilter when focus is not on recipients, subject or message editor
         eventsFilterElm.focus();
         /*
         $('body').click(function () {
@@ -1118,7 +1118,7 @@ var JQueryNamespace = (function ($) {
             <th var="DURATION">Duration</th>\
             <th var="LAST_TIME">Last time</th>\
             <th>Actions</th>\
-            <th><a href="#!" uncheckSelected>Select</a></th>\
+            <th><a href="#" uncheckSelected>Select</a></th>\
         </tr>\
     </thead>\
     <tbody id="historyEventsTableForCommentedEvents">\
@@ -1168,7 +1168,7 @@ var JQueryNamespace = (function ($) {
             <th var="DURATION">Duration</th>\
             <th var="LAST_TIME">Last time</th>\
             <th>Actions</th>\
-            <th><a href="#!" uncheckSelected>Select</a></th>\
+            <th><a href="#" uncheckSelected>Select</a></th>\
         </tr>\
     </thead>\
     <tbody id="historyEventsTableForHistoryData">\
@@ -1463,9 +1463,9 @@ var JQueryNamespace = (function ($) {
                 if (promise !== undefined) {
                     promise.then(_ => {
                         //console.log('Autoplay started!');
-                    }).catch(error => {
-                        console.log('Autoplay was prevented. Show a "Play" button so that user can start playback.');
-                    });
+                    }).catch((/*error*/) => {
+                        //console.log('Autoplay was prevented. Show a "Play" button so that user can start playback: ', error);
+                    })
                 }
                 if(Date.now() - startTime > updateInterval - 10000) {
                     tooManyEventsSpoken = true;
