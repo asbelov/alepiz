@@ -64,7 +64,7 @@ function getVarFromHistory(historyVariable, variables, getVariableValue, param, 
                     funcParameters.pop(); // remove callback for debugging
                     funcParameters.shift();
 
-                    var result = _result ? _result.data : _result;
+                    var result = _result ? (_result.data === undefined ? null : _result.data) : null;
 
                     var variablesDebugInfo = {
                         timestamp: Date.now(),
@@ -72,12 +72,12 @@ function getVarFromHistory(historyVariable, variables, getVariableValue, param, 
                         expression: variableObjectName + '(' + _historyVariable.parentCounterName + '): ' + _historyVariable.function + '(' +
                             funcParameters.join(', ') + ')',
                         variables: variables,
-                        functionDebug: result ? result.records : undefined,
+                        functionDebug: _result ? _result.records : undefined,
                         result: JSON.stringify(result),
                     };
 
                     if (err) {
-                        variablesDebugInfo.result += ': err: ' + err.message
+                        variablesDebugInfo.result += ': Error: ' + err.message
                         return _callback(new Error(_param.objectName + '(' + _param.counterName +
                             ' #' + _param.counterID + '): ' + err.message), result, variablesDebugInfo);
                     }

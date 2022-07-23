@@ -8,6 +8,82 @@ const getVarFromExpression = require("./getVarFromExpression");
 
 module.exports = initCache;
 
+/**
+ *
+ * @param message {Object}
+ * @param cache {Object}
+ * @returns {*}
+ * @example
+ * cache {
+ *     countersObjects: {
+ *         counters: Map<counterID: Number, {
+ *             objectsIDs: Map<objectID: Number, OCID: Number>,
+ *             // counters[row.parentCounterID].dependedUpdateEvents[row.counterID] = {...}
+ *             dependedUpdateEvents: Map<counterID: Number, {
+ *                  counterID: Number,
+ *                  expression: String,
+ *                  mode: Number,
+ *                  objectFilter: Number,
+ *                  parentObjectID: Number
+ *             }>,
+ *             collector: String,
+ *             counterName: String,
+ *             debug: {0|null|1},
+ *             taskCondition: {0|null|1},
+ *             counterParams: [{name: String, value: String}, ... ]
+ *         },
+ *         OCIDs: Map<<OCID>: {objectID: Number, counterID: Number}, ...>
+ *         // for getVarFromHistory.js
+ *         objects: Map<objectID: Number, objectName: String>
+ *         objectName2OCID: Map<objectName: Map<counterID, OCID>>
+ *     },
+ *     variablesDBCache: Map<counterID: Number, Map<
+ *         <historicalVariableName>: {
+ *              func: getVarFromHistory,
+ *              prop: {
+ *                  name: String,
+ *                  counterID: Number,
+ *                  objectID: Number,
+ *                  objectName: String,
+ *                  parentCounterName: String,
+ *                  function: String,
+ *                  functionParameters: String,
+ *                  objectVariable: String|Null,
+ *                  description: String,
+ *                  variableOrder: String,
+ *                  OCID: Number,
+ *                  counterName: String,
+ *                  parentCounterID: Number
+ *              }
+ *         }, ... ,
+ *         <expressionVariableName>: {
+ *              func: getVarFromExpression
+ *              prop: {
+ *                  id: Number,
+ *                  name: String,
+ *                  counterID: Number,
+ *                  expression: String,
+ *                  description: String,
+ *                  variableOrder: Number
+ *              }
+ *         }, ...
+ *     >>,
+ *     objectsPropertiesDBCache: Map<objectID: Number: Map<
+ *          <objectPropertyName>: {
+ *              func: getVarFromProperty,
+ *              prop: {
+ *                  id: Number,
+ *                  objectID: Number,
+ *                  name: String,
+ *                  value: String,
+ *                  description: String,
+ *                  mode: Number
+ *              }
+ *          }, ...
+ *     >>
+ * }
+ */
+
 function initCache(message, cache) {
 
     if (message.countersObjects) {
@@ -29,8 +105,8 @@ function initCache(message, cache) {
                 variables.set(variable.name.toUpperCase(), {
                     func: getVarFromHistory,
                     prop: variable,
-                })
-            })
+                });
+            });
 //if(counterID == 163) console.log('!!initCache hist: ', cache.variablesDBCache.get(Number(counterID)));
         }
     }
@@ -50,8 +126,8 @@ function initCache(message, cache) {
                 variables.set(variable.name.toUpperCase(), {
                     func: getVarFromExpression,
                     prop: variable,
-                })
-            })
+                });
+            });
 //if(counterID == 163) console.log('!!2initCache expr: ', cache.variablesDBCache.get(Number(counterID)));
         }
     }
@@ -76,7 +152,7 @@ function initCache(message, cache) {
 }
 
 function convertCountersObjectsToMap(countersObjectsObj) {
-    var objects = new Map(), counters = new Map(), objectName2OCID = new Map();
+    var objects = new Map(), counters = new Map(), objectName2OCID = new Map(), OCIDs = new Map();
 
     // objects[id] = name
     for (var id in countersObjectsObj.objects) {
@@ -112,9 +188,18 @@ function convertCountersObjectsToMap(countersObjectsObj) {
         }
         objectName2OCID.set(objectName, object);
     }
+
+    for(var OCID in countersObjectsObj.OCIDs) {
+        OCIDs.set(Number(OCID), {
+            objectID: countersObjectsObj.OCIDs[OCID].objectID,
+            counterID: countersObjectsObj.OCIDs[OCID].counterID,
+        });
+    }
+
     return {
         counters: counters,
         objects: objects,
         objectName2OCID: objectName2OCID,
+        OCIDs,
     }
 }

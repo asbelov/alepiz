@@ -13,7 +13,7 @@ var reloadRightsInterval = ( conf.get('reloadRightsIntervalSec') || 180 ) * 1000
 var rightsDB = {};
 module.exports = rightsDB;
 
-var objectsRights, callbacksQueue = [];
+var objectsRights, callbacksQueue = new Set();
 
 // reload rights from DB every reloadRightsIntervalSec milliseconds
 // TODO: it's used for load changes from DB to cache, but it is not a good way
@@ -25,8 +25,8 @@ setInterval(function() {
 
 function loadObjectsRights(callback) {
 
-    callbacksQueue.push(callback);
-    if(callbacksQueue.length > 1) return;
+    callbacksQueue.add(callback);
+    if(callbacksQueue.size > 1) return;
 
     db.all('\
 SELECT users.name AS user, rightsForObjects.objectID AS objectID, rightsForObjects.view AS view, \
@@ -39,7 +39,7 @@ WHERE isDeleted=0', function(err, rows) {
             callbacksQueue.forEach(function (callback) {
                 callback(new Error('Can\'t read rights for objects data from DB: ' + err.message));
             });
-            callbacksQueue = [];
+            callbacksQueue.clear();
             return;
         }
 
@@ -71,7 +71,7 @@ WHERE isDeleted=0', function(err, rows) {
         callbacksQueue.forEach(function (callback) {
             callback();
         });
-        callbacksQueue = [];
+        callbacksQueue.clear();
         //log.info('Loading objects rights from DB to cache is complete. Loaded ', rows.length, ' roles.');
     });
 }
@@ -85,8 +85,8 @@ WHERE isDeleted=0', function(err, rows) {
  p.checkChange - check rights to change object
  p.checkMakeTask - check rights to make task with objects
  p.checkChangeInteractions - check rights for change interactions for objects
- p.errorOnNoRights - generate error when you has no rights for some objects
- callback(err, ids): ids is a array of the objects ids
+ p.errorOnNoRights - generate an error when the user does not have rights to some objects
+ callback(err, ids): ids is an array of the object ids
  */
 rightsDB.checkObjectsIDs = function(p, callback) {
 
@@ -136,7 +136,7 @@ rightsDB.checkObjectsIDs = function(p, callback) {
  If user has not rights for linked objects to counter, then user also has not rights to counter
  look at checkObjectsRightsWrapper description for other p.* values
  p.id - counter id for check
- p.errorOnNoRights - generate error when you has no rights for some objects counters
+ p.errorOnNoRights - generate error when you have no rights for some objects counters
  callback(err, id): id is a counter id
  */
 rightsDB.checkCounterID = function(p, callback) {
@@ -184,7 +184,7 @@ rightsDB.checkCountersIDs = function(counters, p, callback) {
 /*
 Get user rights for specific action
 
-user: user name
+user: username
 actionID: actionID (ie dir name for action)
 actionFolder: Folder in actions menu for actions
 
@@ -224,9 +224,10 @@ END',
 
 
 rightsDB.checkAuditsRights = function(user, sessionID, callback){
-    db.get('SELECT auditUsers.timestamp AS timestamp, auditUsers.actionID AS actionID, auditUsers.actionName AS actionName ' +
-        'FROM auditUsers ' +
-        'JOIN users ON users.id=auditUsers.userID ' +
-        'WHERE users.name=? AND auditUsers.sessionID=?', [user, sessionID], callback);
+    db.get('\
+SELECT auditUsers.timestamp AS timestamp, auditUsers.actionID AS actionID, auditUsers.actionName AS actionName \
+FROM auditUsers \
+JOIN users ON users.id=auditUsers.userID \
+WHERE users.name=? AND auditUsers.sessionID=?',
+        [user, sessionID], callback);
 };
-

@@ -17,16 +17,19 @@ var actionClient = {};
 module.exports = actionClient;
 
 /*
-Don't concatenate this file with actionServer.js because it will making circulate requirements in task.js file
+Don't concatenate this file with actionServer.js because it will make circulate requirements in task.js file
  */
 
 actionClient.connect = function(callback){
     var cfg = confActions.get();
 
-    clientIPC = new IPC.client(cfg, function(err, msg, isConnected) {
+    new IPC.client(cfg, function(err, msg, _clientIPC) {
         if(err) log.error(err.message);
-        if(isConnected && !reconnectInProgress) callback();
-        reconnectInProgress = true;
+        if(_clientIPC) {
+            clientIPC = _clientIPC;
+            if (!reconnectInProgress) callback();
+            reconnectInProgress = true;
+        }
     });
 };
 

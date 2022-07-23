@@ -11,7 +11,7 @@ const confSqlite = new Conf('config/sqlite.json');
 const path = require("path");
 
 var cfg = confSqlite.get(); // configuration for each module
-var clientIPC, connectInProgress = false, cache = [], dbServerProcess;
+var clientIPC, connectInProgress = false, cache = new Set(), dbServerProcess;
 
 var dbClient = {
     stop: function(callback) {callback()},
@@ -23,10 +23,11 @@ module.exports = dbClient;
 dbClient.connect = function (callback) {
 
     cfg.id = 'dbClient';
-    clientIPC = new IPC.client(cfg, function (err, msg, isConnecting) {
+    new IPC.client(cfg, function (err, msg, _clientIPC) {
         if (err) log.error(err.message);
-        else if (isConnecting && typeof callback === 'function') {
+        else if (_clientIPC && typeof callback === 'function') {
             log.info('Connecting to dbServer');
+            clientIPC = _clientIPC;
             callback();
             callback = null; // prevent running callback on reconnect
         }
@@ -68,7 +69,7 @@ dbClient.start = function (_callback) {
 
 function dbDo(func, args, stmtID, prepareCallback) {
     if(!clientIPC) {
-        cache.push({
+        cache.add({
             func: func,
             args: args,
             stmtID: stmtID,
@@ -77,10 +78,8 @@ function dbDo(func, args, stmtID, prepareCallback) {
         if(!connectInProgress) {
             connectInProgress = true;
             dbClient.connect(function () {
-                cache.forEach((obj => {
-                    dbDo(obj.func, obj.args, obj.stmtID, obj.prepareCallback);
-                }));
-                cache = [];
+                cache.forEach(obj => dbDo(obj.func, obj.args, obj.stmtID, obj.prepareCallback));
+                cache.clear();
             });
         }
         return;

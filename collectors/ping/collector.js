@@ -525,7 +525,7 @@ function runServerProcess() {
                     ID: ID,
                     family: target.family,
                     processedSequences: {},
-                    lastPacketTime: Date.now()
+                    lastPacketTime: 0,
                 };
 
                 log.info((sequenceNumber ? 'Updating' : 'Adding'),
@@ -760,7 +760,7 @@ function runServerProcess() {
     */
     function sendICMPMessage(target) {
 
-        if(target.lastPacketTime + target.interval > Date.now()) {
+        if(target.lastPacketTime && target.lastPacketTime + target.interval > Date.now()) {
             log.info('Preventing an attempt to send a packet more often than the time interval ', target.interval / 1000
                 ,'sec for ', target.host, '(', target.address, '). Last packet send ',
                 Math.round((Date.now() - target.lastPacketTime) / 1000), 'sec ago');
@@ -847,12 +847,12 @@ function runServerProcess() {
                     delete target.processedSequences[sequenceNumber];
                     //reInitSocket(target.family); it's does not help
 
-                    sendICMPMessage(target);
+                    setTimeout(sendICMPMessage, target.interval > 5000 ? 5000 : target.interval , target);
                 }
             }
 
-            if (now - target.lastPacketTime > target.timeout + 1000) {
-                log.warn('Ping: last packet for ', target.host, '(', target.address, ') was sending ',
+            if (target.lastPacketTime && now - target.lastPacketTime > target.timeout + 1000) {
+                log.info('Ping: last packet for ', target.host, '(', target.address, ') was sending ',
                     now - target.lastPacketTime, 'ms ago. It is more than timeout ', target.timeout,
                     'ms. Restarting ping for this host');
                 sendICMPMessage(target);

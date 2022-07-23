@@ -106,6 +106,13 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                              "Zabbix agent returned error for active check...", , например когда невозможно
                              собрать какие-то данные. В некоторых случаях ошибок может быть много и это усложняет
                              чтение лога.
+                        li.
+                            logZabbixAgentErrorObtainPerformanceInformation - не выводить сообщения об ошибках Windows
+                            Performance Counters: "Cannot obtain performance information from collector"
+                        li.
+                            initializingDelay - задержка в миллисекундах после запуска коллектора в течение которой
+                            поступающие данные будут обработаны повторно в случае, если соответствующий
+                            каунтер не успел инициализироваться. По умолчанию 120000
                     h3 Возвращаемое значение
                     p.
                         Сборщик возвращает данные, которые вернул Zabbix агент. Подробную информацию о возвращаемых
@@ -118,5 +125,3 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         #[a(href="https://www.zabbix.com/ru/download_agents" target="_blank") Zabbix SIA],
                         так и специально адаптированный пакет под ALEPIZ со страницы
                         #[a(href="https://alepiz.com/download/" target="_blank") https://alepiz.com/download/].
-
-

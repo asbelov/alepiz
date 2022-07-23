@@ -66,7 +66,7 @@ var JQueryNamespace = (function ($) {
             groupID: $('#filterGroupID').val()
         }, function (counters) {
 
-            var selectHTML = '';
+            var selectHTML = '', counterID2OCID = {};
             if(counters && counters.length) {
                 selectHTML += counters.sort(function(a,b) {
                     if(a.objectName + a.name < b.objectName + b.name) return -1;
@@ -74,7 +74,8 @@ var JQueryNamespace = (function ($) {
                 }).map(function (counter) {
                     if(objects.length === 1) var name = counter.name;
                     else name = counter.objectName + ': ' + counter.name;
-                    return '<option value="' + counter.OCID + '">' + escapeHtml(name) + '</option>';
+                    counterID2OCID[counter.id] = counter.OCID;
+                    return '<option value="' + counter.OCID + '" data-counter-id="' + counter.id + '">' + escapeHtml(name) + ' #' + counter.id + '</option>';
                 }).join('');
             }
 
@@ -85,8 +86,19 @@ var JQueryNamespace = (function ($) {
             counterSelectorElm.unbind('change');
             counterSelectorElm.change(showVariablesLog);
 
-            M.FormSelect.init(counterSelectorElm[0], {});
+            var counterID = null;
+            getActionParametersFromBrowserURL(function(actionParametersFromURL) {
+                actionParametersFromURL.forEach(function (prm) {
+                    if (prm.key === 'cid') counterID = Number(prm.val);
+                });
 
+                if(counterID && counterID2OCID[counterID]) {
+                    counterSelectorElm.val(counterID2OCID[counterID]);
+                    showVariablesLog();
+                }
+            });
+
+            M.FormSelect.init(counterSelectorElm[0], {});
             if(typeof callback === 'function') return callback();
         });
     }
@@ -119,11 +131,27 @@ var JQueryNamespace = (function ($) {
     }
 
     function showVariablesLog() {
-        $('#loadDataInfo').text('Starting update at ' + new Date().toLocaleString() + '...');
-        $.post(serverURL, {func: 'getVariablesInfo', OCID: counterSelectorElm.val()}, function (variablesInfo) {
+        var loadDataInfoElm = $('#loadDataInfo');
+        loadDataInfoElm.text('Starting update at ' + new Date().toLocaleString() + '...');
+
+        var OCID = counterSelectorElm.val()
+        var counterID = counterSelectorElm.find('option[value="' + OCID+'"]').attr('data-counter-id');
+        setActionParametersToBrowserURL([{
+            key: 'cid',
+            val: counterID,
+        }]);
+
+
+        $.post(serverURL, {func: 'getVariablesInfo', OCID: OCID}, function (variablesInfo) {
             //console.log(variablesInfo);
 
-            $('#loadDataInfo').text('Loading ' + (variablesInfo ? variablesInfo.length : 0) +' debug data updates at ' + new Date().toLocaleString());
+            if(typeof variablesInfo === 'object' && !Array.isArray(variablesInfo)) {
+                loadDataInfoElm.text('Counter debugger service was disabled in configuration or waiting while enabled. ');
+                variablesInfo = [];
+            } else {
+                loadDataInfoElm.text('Loading ' + (variablesInfo ? variablesInfo.length : 0) +
+                    ' debug data updates at ' + new Date().toLocaleString());
+            }
             var variablesLogElm = $('#variablesLog');
             if(!variablesInfo || !variablesInfo.length) {
                 variablesLogElm.empty().append('<li><div class="collapsible-header">' +

@@ -21,7 +21,7 @@ var actionClient = require('../serverActions/actionClient');
 var router = express.Router();
 module.exports = router;
 
-var actionsForUpdate = {}; // {<actionLink>: {updateAjax: true|false, updateServer: true|false}, ...}
+var actionsForUpdate = new Map(); // {<actionLink>: {updateAjax: true|false, updateServer: true|false}, ...}
 
 
 // Initializing action, load and save user action configuration
@@ -114,10 +114,10 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
                 var actionHomePage = path.join(__dirname, '..', actionLink, result.action.homePage);
 
                 if(req.body.actionUpdate === '1') {
-                    actionsForUpdate[actionID] = {
+                    actionsForUpdate.set(actionID, {
                         ajax: true,
                         server: true
-                    }
+                    });
                 }
 
                 //res.render(actionHomePage, result);
@@ -227,7 +227,7 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
             user: user,
             args: args,
             sessionID: sessionID,
-            updateAction: actionsForUpdate[actionID] ? actionsForUpdate[actionID][executionMode] : false
+            updateAction: actionsForUpdate.has(actionID) ? actionsForUpdate.get(actionID)[executionMode] : false
         }, function(err, data){
             if(!data) data = {actionError: ''};
             if(err) {
@@ -235,7 +235,7 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
                 data.actionError = err.message;
             }
 
-            if(actionsForUpdate[actionID]) actionsForUpdate[actionID][executionMode] = false;
+            if(actionsForUpdate.has(actionID)) actionsForUpdate.get(actionID)[executionMode] = false;
 
             if(executionMode === 'ajax') {
                 log.debug('Sending back for action "',actionID,'", mode: ajax: ', data,

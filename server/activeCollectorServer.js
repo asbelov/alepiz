@@ -13,7 +13,6 @@ const runInThread = require("../lib/runInThread");
 const history = require("../models_history/history");
 const IPC = require("../lib/IPC");
 const proc = require("../lib/proc");
-const taskServer = require("../serverTask/taskServerClient");
 
 /*
  node.exe = process.argv[0]
@@ -86,8 +85,8 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
 
             counterProcessorServer.init(collectorNamesStr, serverID, function (err) {
                 if (err) return log.error(err.message);
-
                 history.connect(serverPort, function () {
+                    var serverProcess;
                     new IPC.server({
                         serverAddress: serverAddress,
                         serverPort: serverPort,
@@ -113,7 +112,7 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                             log.info('Active collectors ', collectorNamesStr, ' starting and listening ',
                                 serverAddress, ':', serverPort, ' for IPC');
                             stopInProgress = false;
-                            var serverProcess = new proc.child({
+                            serverProcess = new proc.child({
                                 module: 'activeCollector',
                                 onStop: function (callback) {
                                     if (stopInProgress) return callback();
@@ -164,8 +163,9 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
 
                         try {
                             if (message.data !== undefined) {
-                                if (message.type !== 'get') collectorsObj[message.name][message.type](message.data, callback);
-                                else { // save collector data to history
+                                if (message.type !== 'get') {
+                                    collectorsObj[message.name][message.type](message.data, callback);
+                                } else { // save collector data to history
                                     collectorsObj[message.name].get(message.data, function (err, result) {
                                         //if(Number(message.data.id$) === 155101) log.warn('Add record ', message.data.$id, ':', result, ': ', message);
                                         //log.warn('Add record ', message.data.$id, ':', result, ': ', message);
@@ -177,13 +177,9 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                                                 result: preparedResult,
                                                 parameters: message.data,
                                                 collectorName: message.name,
-                                                taskCondition: message.taskCondition,
+                                                taskCondition: message.$taskCondition,
                                             });
 
-                                            if(message.$taskCondition) {
-                                                taskServer.checkCondition(message.data.$id, preparedResult,
-                                                    message.data.$variables.OBJECT_NAME, message.data.$variables.COUNTER_NAME);
-                                            }
                                         } else {
                                             // not for a counterProcessor.
                                             // f.e. it may be a result for the event-generator actions

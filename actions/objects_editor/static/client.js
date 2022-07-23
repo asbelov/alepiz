@@ -81,8 +81,8 @@ var JQueryNamespace = (function ($) {
 
     function init(_objects) {
         objects = _objects;
-        var IDs = objects.map(function(obj){ return obj.id});
-        if(!IDs || !IDs.length) return;
+        var objectIDs = objects.map(function(obj){ return obj.id});
+        if(!objectIDs || !objectIDs.length) return;
 
         if(objects.length === 1) {
             objectsREField.addClass('hide');
@@ -94,7 +94,7 @@ var JQueryNamespace = (function ($) {
             newObjectsNamesElm.val('');
         }
 
-        $.post(serverURL, {func: 'getObjectsParameters', IDs: IDs.join(',')}, function(data) {
+        $.post(serverURL, {func: 'getObjectsParameters', IDs: objectIDs.join(',')}, function(data) {
             //objectsParameters = [{id: <id>, name: <objectName>, description: <objectDescription>,
             // sortPosition: <objectOrder>, color:.., disabled:..., created:...}, {...},...]
 
@@ -129,19 +129,18 @@ var JQueryNamespace = (function ($) {
             M.updateTextFields();
             M.FormSelect.init(objectsOrderElm[0], {});
 
-            var chipsData = [], _linkedCounters = {};
+            var chipsData = [], linkedCounters = {}, prevSharedLinkedCounterIDs = [];
             data.objectsCountersLinkage.forEach(function (counter) {
-                if(!_linkedCounters[counter.id]) _linkedCounters[counter.id] = [counter.objectID];
-                else _linkedCounters[counter.id].push(counter.objectID);
+                if(!linkedCounters[counter.id]) linkedCounters[counter.id] = [counter.objectID];
+                else linkedCounters[counter.id].push(counter.objectID);
 
-                if(_linkedCounters[counter.id].length === IDs.length) {
+                if(linkedCounters[counter.id].length === objectIDs.length) {
                     chipsData.push({
                         tag: createChipName(counter.name, counter.id)
                     });
+                    prevSharedLinkedCounterIDs.push(counter.id);
                 }
             });
-
-            var countersIDsElm = $('input#linkedCountersIDs');
 
             var countersChips = {};
             data.counters.forEach(function (counter) {
@@ -157,17 +156,38 @@ var JQueryNamespace = (function ($) {
                     limit: 30,
                     minLength: 3
                 },
-                onChipAdd: setCountersIDsElm,
-                onChipDelete: setCountersIDsElm
+                onChipAdd: setCounterIDsElm,
+                onChipDelete: setCounterIDsElm
             });
 
-            setCountersIDsElm();
+            var addCounterIDs = {}, delCounterIDs = {};
 
             // set value of 'input#linkedCountersIDs' to comma separated counters IDs
-            function setCountersIDsElm() {
-                countersIDsElm.val(linkedCountersInstance.chipsData.map(function (chip) {
-                    return Number(chip.tag.replace(/^.+\(#(\d+)\)$/, '$1'));
-                }).join(','));
+            function setCounterIDsElm() {
+                var sharedLinkedCounterIDs = linkedCountersInstance.chipsData.map(function (chip) {
+                    return Number(chip.tag.replace(/^.+\(#(\d+)\)$/, '$1')) });
+
+                // add counter linkage
+                if(prevSharedLinkedCounterIDs.length < sharedLinkedCounterIDs.length) {
+                    for(var i = 0; i < sharedLinkedCounterIDs.length; i++) {
+                        if(prevSharedLinkedCounterIDs.indexOf(sharedLinkedCounterIDs[i]) === -1) {
+                            addCounterIDs[sharedLinkedCounterIDs[i]] = true;
+                            delete delCounterIDs[sharedLinkedCounterIDs[i]];
+                            break;
+                        }
+                    }
+                } else { // del counter linkage
+                    for(i = 0; i < prevSharedLinkedCounterIDs.length; i++) {
+                        if(sharedLinkedCounterIDs.indexOf(prevSharedLinkedCounterIDs[i]) === -1) {
+                            delCounterIDs[prevSharedLinkedCounterIDs[i]] = true;
+                            delete addCounterIDs[prevSharedLinkedCounterIDs[i]];
+                            break;
+                        }
+                    }
+                }
+                prevSharedLinkedCounterIDs = sharedLinkedCounterIDs;
+                $('#linkedCounterIDsAdd').val(Object.keys(addCounterIDs).join(','));
+                $('#linkedCounterIDsDel').val(Object.keys(delCounterIDs).join(','));
             }
         });
     }

@@ -10,17 +10,16 @@ const conf = new Conf('config/common.json');
 const confCollectors = new Conf('config/collectors.json');
 const confSettings = new Conf(confCollectors.get('dir') + '/event-generator/settings.json');
 const eventActions = require('./eventsActions');
-
+const setShift = require('../../../lib/utils/setShift');
 
 var eventGenerator = {};
 module.exports = eventGenerator;
 
 const systemUser = conf.get('systemUser') || 'system';
-var isInitializing = 0;
-var isEventProcessed = 0;
-var db, dbPath, eventsCache = {}, repeatEventsCache = {}, disabledEventsCache = {},
-    collectorHighPriorityActionsQueue = [], collectorActionsQueue = [],
-    eventNum = 0, prevEventNum = 0, prevErrorTime = 0, processedEventsParam = 'You can not view this message';
+var isEventProcessedOrNotInitialized = Date.now();
+var db, dbPath, eventsCache = new Map(), repeatEventsCache = new Map(), disabledEventsCache = new Map(),
+    collectorHighPriorityActionsQueue = new Set(), collectorActionsQueue = new Set(),
+    eventNum = 0, prevEventNum = 0, prevErrorTime = 0, processedEventParam = 'You can not view this message';
 /*
     get data and return it to server
 
@@ -50,63 +49,57 @@ eventGenerator.init = function (_dbPath, callback) {
     eventsCache = cache.eventsCache;
     disabledEventsCache = cache.disabledEventsCache;
     eventActions.init(cache, enableEvents, onSolvedEvent, onEvent);
-    isInitializing = Date.now();
     var saveRepeatEventsCacheInterval = confSettings.get('saveRepeatEventsCacheInterval') * 1000 || 15000;
     setInterval(saveRepeatedEventsToCache, saveRepeatEventsCacheInterval);
+    isEventProcessedOrNotInitialized = 0;
+    processQueue();
     log.info('Events processor thread complete initializing for ', dbPath);
     callback();
 }
 
 eventGenerator.isEventDisabled = isEventDisabled; // for ajax
 
-eventGenerator.get = eventGenerator.getOnce = function (param, _callback) {
+eventGenerator.get = eventGenerator.getOnce = function (param, callback) {
     param.$dataTimestamp = Date.now();
 
-    if(isOtherEventInProgress(param, _callback)) return;
+    if(isEventProcessedOrNotInitialized) return addToQueue(param, callback);
 
-    function callback(err, result) {
-        if(typeof _callback === 'function') _callback(err, result);
-        else if(err) log.error(err.message, ' for ', dbPath);
+    isEventProcessedOrNotInitialized = param.$dataTimestamp;
+    processedEventParam = JSON.stringify(param);
+    ++eventNum;
+    eventGeneratorGet(param, function(err, result) {
+        if (typeof callback === 'function') callback(err, result);
+        else if (err) log.error(err.message, ' for ', dbPath);
 
-        isEventProcessed = 0;
-        ++eventNum;
-        if(!collectorHighPriorityActionsQueue.length) {
-            collectorHighPriorityActionsQueue = [];
+        isEventProcessedOrNotInitialized = 0;
+        if (!collectorHighPriorityActionsQueue.size || !collectorActionsQueue.size) {
             return;
         }
-
-        if(!collectorActionsQueue.length) {
-            collectorActionsQueue = [];
-            return;
-        }
-
 
         /*
         setTimeout for
         PID: 87724, D:\ALEPIZ\collectors\event-generator\lib\eventGenerator.js
             Stack: RangeError: Maximum call stack size exceeded
-                at JSON.stringify (<anonymous>)
-                at isOtherEventInProgress (D:\ALEPIZ\collectors\event-generator\lib\eventGenerator.js:283:33)
-                at Object.eventGenerator.get (D:\ALEPIZ\collectors\event-generator\lib\eventGenerator.js:65:8)
-                at callback (D:\ALEPIZ\collectors\event-generator\lib\eventGenerator.js:78:24)
-                at solveEvent (D:\ALEPIZ\collectors\event-generator\lib\eventGenerator.js:217:9)
-                at Object.eventGenerator.get (D:\ALEPIZ\collectors\event-generator\lib\eventGenerator.js:173:9)
-                at callback (D:\ALEPIZ\collectors\event-generator\lib\eventGenerator.js:78:24)
-                at solveEvent (D:\ALEPIZ\collectors\event-generator\lib\eventGenerator.js:217:9)
-                at Object.eventGenerator.get (D:\ALEPIZ\collectors\event-generator\lib\eventGenerator.js:173:9)
-                at callback (D:\ALEPIZ\collectors\event-generator\lib\eventGenerator.js:78:24)
+            ...
          */
-        setTimeout(function () {
-            var collectorAction = collectorHighPriorityActionsQueue.length ?
-                collectorHighPriorityActionsQueue.shift() : collectorActionsQueue.shift();
-            if(!collectorAction) return;
+        setTimeout(processQueue, 0).unref();
+    });
+}
 
-            eventGenerator.get(collectorAction.param, function(err, result) {
-                if(typeof collectorAction.callback === 'function') collectorAction.callback(err, result);
-                else if(err) log.error(err.message);
-            });
-        }, 0).unref();
-    }
+function processQueue() {
+    if(isEventProcessedOrNotInitialized && Date.now() - isEventProcessedOrNotInitialized < 60000) return;
+
+    var collectorAction = collectorHighPriorityActionsQueue.size ?
+        setShift(collectorHighPriorityActionsQueue) : setShift(collectorActionsQueue);
+    if (!collectorAction) return;
+
+    eventGenerator.get(collectorAction.param, function (err, result) {
+        if (typeof collectorAction.callback === 'function') collectorAction.callback(err, result);
+        else if (err) log.error(err.message);
+    });
+}
+
+function eventGeneratorGet(param, callback) {
 
     if(param.action) {
         try {
@@ -115,26 +108,24 @@ eventGenerator.get = eventGenerator.getOnce = function (param, _callback) {
         } catch (err) {
             return callback(err);
         }
-        callback();
-        return;
+        return callback();
     }
 
-    var OCID = param.$id;
+    const OCID = Number(param.$id);
 
-    if(Number(OCID) !== parseInt(String(OCID), 10) || !Number(OCID) ||
+    if(OCID !== parseInt(String(OCID), 10) || !OCID ||
         Number(param.$counterID) !== parseInt(String(param.$counterID), 10) || !Number(param.$counterID) ||
         typeof param.$variables !== 'object' || !param.$variables.OBJECT_NAME || !param.$variables.COUNTER_NAME) {
         return callback(new Error('Some parameters are not correct: ' + JSON.stringify(param)));
     }
 
-    var eventTimestamp = param.$variables.UPDATE_EVENT_TIMESTAMP ?
-        param.$variables.UPDATE_EVENT_TIMESTAMP : param.$dataTimestamp;
+    var eventTimestamp = param.$variables.UPDATE_EVENT_TIMESTAMP || param.$dataTimestamp;
 
-    // param.$variables.UPDATE_EVENT_STATE === undefined when we has not an update event expression
+    // param.$variables.UPDATE_EVENT_STATE === undefined when we have not an update event expression
     if(param.$variables.UPDATE_EVENT_STATE === 1 || param.$variables.UPDATE_EVENT_STATE === undefined) {
         // !!!don't touch this horror
-        if(disabledEventsCache[OCID]) {
-            if(disabledEventsCache[OCID].disableUntil < Date.now()) {
+        if(disabledEventsCache.has(OCID)) {
+            if(disabledEventsCache.get(OCID).disableUntil < Date.now()) {
                 try {
                     enableEvents(db, {events: [{OCID: OCID}]});
                 } catch (err) {
@@ -142,20 +133,20 @@ eventGenerator.get = eventGenerator.getOnce = function (param, _callback) {
                 }
             }
             else {
-                if(isEventDisabled(disabledEventsCache[OCID].intervals)) {
-                    if(!eventsCache[OCID]) {
+                if(isEventDisabled(disabledEventsCache.get(OCID).intervals)) {
+                    if(!eventsCache.has(OCID)) {
                         log.info('Disabled event occurred: ', param.$variables.OBJECT_NAME,
                             '(', param.$variables.COUNTER_NAME, '): importance: ',
                             param.importance, ', time: ', new Date(eventTimestamp).toLocaleString(),
                             ', parentOCID: ', param.$parentID,
-                            ', OCID: ', OCID, ', disabled: ', disabledEventsCache[OCID], ' for ', dbPath);
+                            ', OCID: ', OCID, ', disabled: ', disabledEventsCache.get(OCID), ' for ', dbPath);
                     }
                     return callback();
                 }
             }
         }
 
-        if(!eventsCache[OCID]) {
+        if(!eventsCache.has(OCID)) {
             log.info('Event occurred: ', param.$variables.OBJECT_NAME, '(', param.$variables.COUNTER_NAME, '): importance: ',
                 param.importance, ', time: ', new Date(eventTimestamp).toLocaleString(), ', parentOCID: ', param.$parentID,
                 ', OCID: ', OCID, ' for ', dbPath);
@@ -182,14 +173,13 @@ eventGenerator.get = eventGenerator.getOnce = function (param, _callback) {
 
         if(Number(param.eventDuration) === parseInt(String(param.eventDuration), 10)) {
             param.eventDuration = Number(param.eventDuration);
-            var solve_problem = function(newEventID) {
-                solveEvent(newEventID, callback)
-                param.$variables.UPDATE_EVENT_STATE = 0;
-                eventGenerator.get(param, _callback); // use _callback()!!!
-            }
 
-            if(!param.eventDuration || param.eventDuration < 1) solve_problem(newEventID);
-            else setTimeout(solve_problem, param.eventDuration * 1000, newEventID);
+            setTimeout(function(newEventID, param, callback) {
+                callback(solveEvent(param, eventTimestamp), newEventID ? 1 : undefined);
+                param.$variables.UPDATE_EVENT_STATE = 0;
+                eventGenerator.get(param, callback);
+                }, (!param.eventDuration || param.eventDuration < 1 ? 0 : param.eventDuration * 1000),
+                newEventID, param, callback);
             return;
         }
 
@@ -197,7 +187,7 @@ eventGenerator.get = eventGenerator.getOnce = function (param, _callback) {
         if(newEventID) callback(null, 1);
         else callback();
     } else if(param.$variables.UPDATE_EVENT_STATE === 0) {
-        solveEvent(0, callback);
+        callback(solveEvent(param, eventTimestamp), 0);
     } else {
         callback(new Error('Can\'t generate event: incorrect variable value for UPDATE_EVENT_STATE (' +
             param.$variables.UPDATE_EVENT_STATE + ') can be "1|0|undefined" for ' +
@@ -205,49 +195,51 @@ eventGenerator.get = eventGenerator.getOnce = function (param, _callback) {
             (param.$variables.PARENT_COUNTER_NAME  || 'Undefined parent counter: ' +
                 param.$variables.PARENT_COUNTER_NAME) + '" value: ' + param.$variables.PARENT_VALUE));
     }
-
-    function solveEvent(newEventID, callback) {
-        if(eventsCache[OCID]) {
-            log.info('Event solved: ', param.$variables.OBJECT_NAME, '(', param.$variables.COUNTER_NAME, '): importance: ',
-                param.importance, ', time: ', new Date(eventTimestamp).toLocaleString(), ', parentOCID: ', param.$parentID,
-                ', OCID: ', OCID, ' for ', dbPath);
-        } else var dontRunTask = true;
-
-        try {
-            onSolvedEvent(db, OCID, eventTimestamp);
-        } catch (err) {
-            return callback(err, newEventID ? 1 : undefined);
-        }
-
-        if(disabledEventsCache[OCID]) if(disabledEventsCache[OCID].disableUntil < Date.now()) {
-            try {
-                enableEvents(db, {events: [{OCID: OCID}]});
-            } catch (err) {
-                log.error(err.message, ' for ', dbPath);
-            }
-        }
-
-        var runTaskOnSolve = confSettings.get('runTaskOnSolve');
-        if(runTaskOnSolve &&
-            (!disabledEventsCache[OCID] || !isEventDisabled(disabledEventsCache[OCID].intervals)) &&
-            param.solvedTaskID && !dontRunTask) {
-            task.runTask({
-                userName: systemUser,
-                taskID: param.solvedTaskID,
-                variables: param.$variables,
-            },function(err) {
-                if(err) log.error(err.message, ' for ', dbPath);
-            });
-        }
-
-        // 0 save solved event to history database too
-        callback(null, newEventID ? 1 : 0);
-    }
 }
+
+function solveEvent(param, eventTimestamp) {
+    const OCID = Number(param.$id);
+    if(eventsCache.has(OCID)) {
+        log.info('Event solved: ', param.$variables.OBJECT_NAME, '(', param.$variables.COUNTER_NAME, '): importance: ',
+            param.importance, ', time: ', new Date(eventTimestamp).toLocaleString(), ', parentOCID: ', param.$parentID,
+            ', OCID: ', OCID, ' for ', dbPath);
+    } else var dontRunTask = true;
+
+    try {
+        onSolvedEvent(db, OCID, eventTimestamp);
+    } catch (err) {
+        return err
+    }
+
+    if(disabledEventsCache.has(OCID) && disabledEventsCache.get(OCID).disableUntil < Date.now()) {
+        try {
+            enableEvents(db, {events: [{OCID: OCID}]});
+        } catch (err) {
+            log.error(err.message, ' for ', dbPath);
+        }
+    }
+
+    var runTaskOnSolve = confSettings.get('runTaskOnSolve');
+    if(runTaskOnSolve &&
+        (!disabledEventsCache.has(OCID) || !isEventDisabled(disabledEventsCache.get(OCID).intervals)) &&
+        param.solvedTaskID && !dontRunTask) {
+        task.runTask({
+            userName: systemUser,
+            taskID: param.solvedTaskID,
+            variables: param.$variables,
+        },function(err) {
+            if(err) log.error(err.message, ' for ', dbPath);
+        });
+    }
+
+    // 0 save solved event to history database too
+    return null;
+}
+
 
 eventGenerator.removeCounters = function(OCIDs, callback) {
     OCIDs.forEach(OCID => {
-        if(!eventsCache[OCID]) return;
+        if(!eventsCache.has(Number(OCID))) return;
 
         log.info('Remove OCID: ', OCID, ' from event-generator collector for ', dbPath);
         try {
@@ -261,7 +253,7 @@ eventGenerator.removeCounters = function(OCIDs, callback) {
 
 eventGenerator.destroy = function(callback) {
     log.warn('Destroying collector event-generator for ', dbPath);
-    eventsCache = {};
+    eventsCache.clear();
     try {
         db.close();
     } catch (err) {
@@ -271,44 +263,45 @@ eventGenerator.destroy = function(callback) {
     setTimeout(process.exit, 100);
 };
 
-function isOtherEventInProgress(param, _callback) {
-    if(isEventProcessed || !isInitializing) {
-        if(param.action) {
-            collectorHighPriorityActionsQueue.push({
-                param: param,
-                callback: _callback
-            });
-        } else {
-            collectorActionsQueue.push({
-                param: param,
-                callback: _callback
-            });
-        }
+function addToQueue(param, callback) {
 
-        if((collectorActionsQueue.length > 100 &&
-                Math.round(collectorActionsQueue.length / 10) === collectorActionsQueue.length / 10) ||
-            (collectorHighPriorityActionsQueue.length > 10 &&
-                Math.round(collectorHighPriorityActionsQueue.length / 10) === collectorHighPriorityActionsQueue.length / 10)
-        ) {
-            log.warn('Events actions queue: ',
-                collectorHighPriorityActionsQueue.length, '; write events queue: ', collectorActionsQueue.length,
-                (prevEventNum ? '; processing speed: ' +
-                    Math.round((eventNum - prevEventNum) / (Date.now() - prevErrorTime) / 1000 ) + ' events/sec.' : ''),
-                '; last event processed: ', (Date.now() - isEventProcessed), 'ms',
-                (Date.now() - isEventProcessed > 5000 ? '; last event params: ' + processedEventsParam : ''),
-                ' for ', dbPath
-            );
-            prevEventNum = eventNum;
-            prevErrorTime = Date.now();
-        } else {
-            prevEventNum = prevErrorTime = 0;
-        }
-        return true;
+    if(param.action) {
+        collectorHighPriorityActionsQueue.add({
+            param: param,
+            callback: callback
+        });
+    } else {
+        collectorActionsQueue.add({
+            param: param,
+            callback: callback
+        });
     }
 
-    isEventProcessed = Date.now();
-    processedEventsParam = JSON.stringify(param);
-    return false;
+    var eventProcessingToSlow = Date.now() - isEventProcessedOrNotInitialized >
+        ((confSettings.get('maxEventProcessingTime') || 30000) * 1000);
+
+    if((collectorActionsQueue.size > 100 &&
+            Math.round(collectorActionsQueue.size / 10) === collectorActionsQueue.size / 10) ||
+        (collectorHighPriorityActionsQueue.size > 10 &&
+            Math.round(collectorHighPriorityActionsQueue.size / 10) === collectorHighPriorityActionsQueue.size / 10) ||
+        eventProcessingToSlow
+    ) {
+        log.warn((eventProcessingToSlow ? 'Event processing is slow. ' : ''),
+            'Events actions queue: ',
+            collectorHighPriorityActionsQueue.size, '; write events queue: ', collectorActionsQueue.size,
+            (prevEventNum ? '; processing speed: ' +
+                Math.round((eventNum - prevEventNum) / (Date.now() - prevErrorTime) / 1000 ) + ' events/sec.' : ''),
+            '; last event processed: ', (Date.now() - isEventProcessedOrNotInitialized), 'ms',
+            (Date.now() - isEventProcessedOrNotInitialized > 5000 ? '; last event params: ' + processedEventParam : ''),
+            ' for ', dbPath
+        );
+        if(eventProcessingToSlow) isEventProcessedOrNotInitialized = 0;
+        prevEventNum = eventNum;
+        prevErrorTime = Date.now();
+
+    } else {
+        prevEventNum = prevErrorTime = 0;
+    }
 }
 
 
@@ -348,9 +341,9 @@ function enableEvents(db, enable) {
     log.info('Enable events: ', enable, ' for ' + dbPath);
 
     enable.events.forEach( function(event) {
-        var OCID = event.OCID;
+        var OCID = Number(event.OCID);
         // make it at first for immediately enable events when function called without callback
-        if (disabledEventsCache[OCID]) delete disabledEventsCache[OCID];
+        if (disabledEventsCache.has(OCID)) disabledEventsCache.delete(OCID);
         else {
             log.error('Can\'t enable event for OCID: ' + OCID +
                 ': event not exist in the list of disabled events for ', dbPath);
@@ -359,21 +352,22 @@ function enableEvents(db, enable) {
             db.prepare('DELETE FROM disabledEvents WHERE OCID=?').run(OCID);
         } catch (err) {
             throw(new Error('Can\'t enable event for OCID ' + OCID + ': ' +
-                JSON.stringify(disabledEventsCache[OCID]) + ': ' + err.message));
+                JSON.stringify(disabledEventsCache.get(OCID)) + ': ' + err.message));
         }
     });
 }
 
 function onEvent(db, OCID, objectID, counterID, objectName, counterName, parentOCID, importance, eventDescription,
                  eventTimestamp, dataTimestamp, pronunciation) {
-    var eventID = eventsCache[OCID];
+    OCID = Number(OCID)
+    var eventID = eventsCache.get(OCID);
     if(eventID && dataTimestamp) { // dataTimestamp - check for run not from eventEditor
-        repeatEventsCache[eventID] = {
+        repeatEventsCache.set(eventID, {
             eventID: eventID,
             data: eventDescription || null,
             timestamp: eventTimestamp,
             pronunciation: pronunciation
-        };
+        });
         // return here for clear events queue
         return;
     }
@@ -402,14 +396,15 @@ function onEvent(db, OCID, objectID, counterID, objectName, counterName, parentO
         throw(new Error('Can\'t add event with OCID: ' + OCID + ' into events table event database: ' +
             err.message + ' data: ' + JSON.stringify(queryParameters)));
     }
-    // dont save eventID to the eventsCache when event generated by eventsEditor (dataTimestamp = 0)
-    if(dataTimestamp) eventsCache[OCID] = info.lastInsertRowid;
+    // do not save eventID to the eventsCache when event generated by eventsEditor (dataTimestamp = 0)
+    if(dataTimestamp) eventsCache.set(OCID, Number(info.lastInsertRowid));
 
     return info.lastInsertRowid; // return new event ID
 }
 
 function onSolvedEvent(db, OCID, timestamp) {
-    var eventID = eventsCache[OCID];
+    OCID = Number(OCID)
+    var eventID = eventsCache.get(OCID);
     if(!eventID) {
         //log.debug('Can\'t add event end time for OCID: ' + OCID + ' into events table: Opened event with current OCID does not exist');
         // it's not an error. it can be when previous state of trigger is unknown, and new state is false
@@ -417,7 +412,7 @@ function onSolvedEvent(db, OCID, timestamp) {
         return;
     }
 
-    delete eventsCache[OCID];
+    eventsCache.delete(OCID);
     try {
         db.prepare('UPDATE events set endTime=$endTime WHERE id=$eventID').run({
             endTime: timestamp,
@@ -430,13 +425,12 @@ function onSolvedEvent(db, OCID, timestamp) {
 }
 
 function saveRepeatedEventsToCache() {
-    if (!Object.keys(repeatEventsCache).length) return;
+    if (!repeatEventsCache.size) return;
 
     var savedEventsCnt = 0;
-    for (var eventID in repeatEventsCache) {
-        var item = repeatEventsCache[eventID];
+    repeatEventsCache.forEach((item, eventID) => {
+        repeatEventsCache.delete(eventID);
 
-        delete (repeatEventsCache[eventID]);
         try {
             db.prepare('UPDATE events set data=$data, timestamp=$timestamp, pronunciation=$pronunciation WHERE id=$eventID')
                 .run(item);
@@ -446,8 +440,7 @@ function saveRepeatedEventsToCache() {
                 ' data: ' + item.data + ', timestamp: ' + (new Date(item.timestamp)).toLocaleString() +
                 ' into events table event database: ' + err.message + ' for ' + dbPath);
         }
-
-    }
+    });
 
     if (savedEventsCnt > 2) log.info('Adding ', savedEventsCnt, ' cached repeated events to events table for ', dbPath);
 }

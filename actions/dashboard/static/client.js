@@ -1086,7 +1086,7 @@ var JQueryNamespace = (function ($) {
             });
         });
 
-        $('div.chip[commentIDForEvents]').click(function() {
+        $('div.chip[data-commentIDForEvents]').click(function() {
             bodyElm.css("cursor", "progress");
             $.ajax({
                 type: 'POST',
@@ -1095,7 +1095,7 @@ var JQueryNamespace = (function ($) {
                 data: {
                     func: 'getCommentedEventsList',
                     objectsIDs: objectsIDs.join(','),
-                    commentID: $(this).attr('commentIDForEvents')
+                    commentID: $(this).attr('data-commentIDForEvents')
                 },
                 error: ajaxError,
                 success: function (rows) {
@@ -1464,7 +1464,7 @@ var JQueryNamespace = (function ($) {
                     promise.then(_ => {
                         //console.log('Autoplay started!');
                     }).catch(error => {
-                        //console.log('Autoplay was prevented. Show a "Play" button so that user can start playback.');
+                        console.log('Autoplay was prevented. Show a "Play" button so that user can start playback.');
                     });
                 }
                 if(Date.now() - startTime > updateInterval - 10000) {
@@ -1621,13 +1621,18 @@ var JQueryNamespace = (function ($) {
                 // use bgcolor attribute for instead style for possible to change color of the row on mouse over
                 var color = importance ? importance.color : 'auto';
                 var commentLink = '<div class="chip small-chip" commentID="' + row.id +'">info</div> ';
-                var eventLink = '<div class="chip small-chip" commentIDForEvents="' + row.id +'">events&nbsp;:' + row.eventsCount + '</div> ';
+                var eventLink = '<div class="chip small-chip" data-commentIDForEvents="' + row.id +'">events&nbsp;:' +
+                    row.eventsCount + '</div> ';
 
                 tablePartHTML += '\
 <tr historyCommentedEventsRow importance="' + row.importance + '" bgcolor="' + color +'">\
     <td class="hide">' + row.id + '</td>\
     <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;"><div class="comment-body"><p class="comment-header">' + escapeHtml(row.subject) + '</p>' +
-                    (row.comment ? row.comment.replace(/<ul>/gmi, '<ul class=browser-default>').replace(/<(h\d)>/gmi, '<$1 style="font-size:1em;line-height:2em;margin:0;">') : '') +'</div></td>\
+                    (row.comment ?
+                        row.comment
+                            .replace(/<ul>/gmi, '<ul class=browser-default>')
+                            .replace(/<(h\d)>/gmi, '<$1 style="font-size:1em;line-height:2em;margin:0;">') :
+                        '') +'</div></td>\
     <td>' + escapeHtml(row.user) +'</td>\
     <td>' + escapeHtml(row.recipients || '-') + '</td>\
     <td>' + new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, '') + '</td>\
@@ -1654,6 +1659,7 @@ var JQueryNamespace = (function ($) {
      */
     function getHumanTime ( timestamp ) {
         var seconds = Math.round(timestamp / 1000);
+        if (seconds <= 0) return '0sec';
         return [   [Math.floor(seconds / 31536000), function(y) { return y === 1 ? y + 'year ' : y + 'years ' }],
             [Math.floor((seconds % 31536000) / 86400), function(y) { return y === 1 ? y + 'day ' : y + 'days ' }],
             [Math.floor(((seconds % 31536000) % 86400) / 3600), function(y) { return y + (y === 1 ? 'hour ' : 'hours ' )}],
@@ -1718,8 +1724,10 @@ var JQueryNamespace = (function ($) {
                     objectName: variablesInRow.OBJECT_NAME,
                     counterName: variablesInRow.COUNTER_NAME,
                     eventDescription: [variablesInRow.EVENT_DESCRIPTION],
-                    action: ($(elm).closest('tbody#disabledEventsTable').length ? 'ENABLE' : 'DISABLE'),
-                    disableIntervals: [interval]
+                    //action: ($(elm).closest('tbody#disabledEventsTable').length ? 'ENABLE' : 'DISABLE'),
+                    action: ($('#disableEvents').is(':checked')  ? 'DISABLE' :
+                        ($('#enableEvents').is(':checked') ? 'ENABLE' : '')),
+                    disableIntervals: [interval],
                 };
                 objectsNames[variablesInRow.OBJECT_NAME] = true;
                 countersNames[variablesInRow.COUNTER_NAME] = true;
@@ -1946,9 +1954,6 @@ var JQueryNamespace = (function ($) {
             }
 
             quill.focus();
-            var range = quill.getSelection();
-            //if(!range) var index = 0;
-            //else index = range.index;
 
             if(infoIDs.length > 1) prevCommentDialogElm.open();
             else if(infoIDs.length === 1) {

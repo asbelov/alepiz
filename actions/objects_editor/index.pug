@@ -97,7 +97,11 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                 span.card-title Shared to selected objects linked counters
                                 p You can add a new counter link by entering counter name or remove unnecessary counter links from objects.
                                 p &nbsp;
-                                input(type="hidden")#linkedCountersIDs
+                                // set linkedCountersIDs to 0 in task for disable counter linkage operations
+                                input(type="hidden")#linkedCounterIDs
+                                input(type="hidden")#linkedCounterIDsAdd
+                                input(type="hidden")#linkedCounterIDsDel
+                                input(type="hidden")#linkedCounterNames
                                 div.chips#linkedCounters
                 input(type="hidden")#renamedObjectsNames
 

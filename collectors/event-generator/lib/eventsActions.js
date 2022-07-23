@@ -179,7 +179,7 @@ hint: {
 
 callback(err)
  */
-    function addRemoveHint(db, hint) {
+function addRemoveHint(db, hint) {
 
     if(!hint.subject && !hint.comment) log.info('Delete hints: ', hint);
     else log.info('Add hint: ', hint);
@@ -458,4 +458,3 @@ function deletePreviousCommentAndUpdateEventCommentID(db, eventID, newCommentID)
         log.warn('Can\'t delete previous comment: ', err.message, ': ', row);
     }
 }
-

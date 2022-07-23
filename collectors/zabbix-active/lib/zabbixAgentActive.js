@@ -12,7 +12,6 @@
 const log = require('../../../lib/log')(module);
 const net = require('net');
 const throttling = require('../../../lib/throttling');
-const async = require('async');
 const Conf = require('../../../lib/conf');
 const confCollectors = new Conf('config/collectors.json');
 const confSettings = new Conf(confCollectors.get('dir') + '/zabbix-active/settings.json');
@@ -20,91 +19,97 @@ const confSettings = new Conf(confCollectors.get('dir') + '/zabbix-active/settin
 var collector = {};
 module.exports = collector;
 
-var counters = {};
-var countersIDX = {};
-var countersParameters = {};
-var agentSessions = {};
+var counters = new Map();
+var countersOCID2ZabbixHost = new Map();
+var countersParameters = new Map();
+var agentSessions = new Map();
 var headerLength = String('ZBXD').length + 1 + 8;
 var errorMessage = 'Zabbix agent active check error: ';
 var serverPort = 10051;
 var server;
 var isServerRunning = false;
 var stopServerInProgress = false;
-var countersForRemove = {};
 var logZabbixAgentErrors = confSettings.get('logZabbixAgentErrors');
 var logZabbixAgentErrorObtainPerformanceInformation =
     confSettings.get('logZabbixAgentErrorObtainPerformanceInformation');
+var initializingDelay = Number(confSettings.get('initializingDelay') || 120000);
+var startTime = Date.now();
+var delayedData = new Set();
 
 collector.get = function(param, callback) {
 
     if(!param || !param.zabbixHostname) return callback();
 
     if(!isServerRunning) {
-        log.info('Staring active check server');
+        log.info('Staring active check collector');
         isServerRunning = true;
         createServer();
     }
 
     var zabbixHostname = param.zabbixHostname.toLowerCase();
     var key = param.itemParameters ? param.item+'['+param.itemParameters+']' : param.item;
+    var OCID = Number(param.$id);
 
-    if(!counters[zabbixHostname] || !counters[zabbixHostname].length) counters[zabbixHostname] = [];
+    if(!counters.has(zabbixHostname)) counters.set(zabbixHostname, new Map());
     // update counter parameters for existing OCID
-    else if(Number(param.$id) && countersIDX[param.$id] && countersIDX[param.$id].num !== undefined) {
-        var num = countersIDX[param.$id].num;
-        var oldZabbixHostname = countersIDX[param.$id].zabbixHostname;
+    else if(OCID && countersOCID2ZabbixHost.has(OCID)) {
+        var oldZabbixHostname = countersOCID2ZabbixHost.get(OCID);
 
         // for different old and new zabbixHostnames at first deleting existing counter
-        if (zabbixHostname !== oldZabbixHostname) collector.removeCounters([param.$id]);
-        // for equal zabbixHostnames replace old parameters to the new
-        else if (counters[zabbixHostname][num]) {
-            counters[zabbixHostname][num] = {
+        if (zabbixHostname !== oldZabbixHostname) collector.removeCounters([OCID]);
+        else if (counters.get(zabbixHostname).has(OCID)) { // for equal zabbixHostnames replace old parameters to the new
+            counters.get(zabbixHostname).set(OCID, {
                 key: key,
                 delay: Number(param.pollingFreq),
                 lastlogsize: 0,
                 mtime: 0,
-            };
+            });
 
-            log.info('Replace param for counters with existing OCID ', param.$id, ' and equal hostnames "', zabbixHostname,
-                '": ', counters[zabbixHostname][num]);
+            log.info('Replace param for counters with existing OCID ', OCID, ' and equal hostnames "', zabbixHostname,
+                '": ', counters.get(zabbixHostname).get(OCID));
             var dontCreateNewCounter = true;
         }
     }
 
     // add parameters even if a counter for this OCID exists, because the parameters may have changed
-    var isCounterExist = false;
-    if(!countersParameters[zabbixHostname]) countersParameters[zabbixHostname] = {};
-    if(!countersParameters[zabbixHostname][key.toLowerCase()] ||
-        !countersParameters[zabbixHostname][key.toLowerCase()].callbacks || // typeof null === 'object'
-        typeof countersParameters[zabbixHostname][key.toLowerCase()].callbacks !== 'object'
-    ) {
-        countersParameters[zabbixHostname][key.toLowerCase()] = {
-            callbacks: {},
-        };
-    } else isCounterExist = true;
-    countersParameters[zabbixHostname][key.toLowerCase()].callbacks[param.$id] = callback;
-    countersParameters[zabbixHostname][key.toLowerCase()].onlyNumeric = !!param.onlyNumeric;
+    var isCounterExist = false, lowerCaseKey = key.toLowerCase();
+    var keyCallbacks = countersParameters.get(zabbixHostname);
+    if(!keyCallbacks) {
+        countersParameters.set(zabbixHostname, new Map([[lowerCaseKey, new Map([
+            ['callbacks', new Map([[OCID, callback]])],
+            ['onlyNumeric', Boolean(param.onlyNumeric)],
+        ]) ]]));
+    } else {
+        var keyParam = countersParameters.get(zabbixHostname).get(lowerCaseKey);
+        if(!keyParam) {
+            keyCallbacks.set(lowerCaseKey, new Map([
+                ['callbacks', new Map([[OCID, callback]])],
+                ['onlyNumeric', Boolean(param.onlyNumeric)],
+            ]));
+        } else {
+            isCounterExist = true;
+            countersParameters.get(zabbixHostname).get(lowerCaseKey).get('callbacks').set(OCID, callback);
+            countersParameters.get(zabbixHostname).get(lowerCaseKey).set('onlyNumeric', Boolean(param.onlyNumeric));
+        }
+    }
 
-    throttling.init(zabbixHostname + '-' + key.toLowerCase(), param, collector);
+    throttling.init(zabbixHostname + '-' + lowerCaseKey, param, collector);
 
     if(dontCreateNewCounter) return;
 
-    countersIDX[param.$id] = {
-        num: counters[zabbixHostname].length, // number of the counters with equal zabbixHostname
-        zabbixHostname: zabbixHostname,
-    };
-    counters[zabbixHostname].push({
+    countersOCID2ZabbixHost.set(OCID, zabbixHostname);
+    counters.get(zabbixHostname).set(OCID, {
 		key: key,
 		delay: Number(param.pollingFreq),
         lastlogsize: 0,
         mtime: 0,
     });
     if(isCounterExist) {
-        log.info('Adding another OCID ', param.$id, ' to an existing counter "', zabbixHostname,
-            '": ', counters[zabbixHostname][counters[zabbixHostname].length-1]);
+        log.info('Add another OCID ', OCID, ' to an existing counter "', zabbixHostname,
+            '": ', counters.get(zabbixHostname).get(OCID));
     } else {
-        log.info('Adding a new counter with OCID ', param.$id, ' for hostname   "',
-            zabbixHostname, '": ', counters[zabbixHostname][counters[zabbixHostname].length - 1]);
+        log.info('Add: ', OCID, ': "',
+            zabbixHostname, '": ', counters.get(zabbixHostname).get(OCID));
     }
 };
 
@@ -119,30 +124,30 @@ collector.removeCounters = function(OCIDs, callback) {
 
     var existingOCIDs = [];
     OCIDs.forEach(function(OCID) {
-        if(!countersIDX[OCID]) return;
-        var num = countersIDX[OCID].num;
-        var zabbixHostname = countersIDX[OCID].zabbixHostname;
-        if(num === undefined) return;
+        OCID = Number(OCID);
+        if(!countersOCID2ZabbixHost.has(OCID)) return;
+        var zabbixHostname = countersOCID2ZabbixHost.get(OCID);
 
         // typeof null === 'object'
-        if(counters[zabbixHostname] && counters[zabbixHostname][num] && typeof counters[zabbixHostname][num] === 'object') {
-            var foundCallbackForDelete = false;
-            for(var callbackOCID in countersParameters[zabbixHostname][counters[zabbixHostname][num].key.toLowerCase()].callbacks) {
-                if(Number(OCID) === Number(callbackOCID)) {
-                    delete countersParameters[zabbixHostname][counters[zabbixHostname][num].key.toLowerCase()].callbacks[OCID];
+        if(counters.has(zabbixHostname) && typeof counters.get(zabbixHostname).get(OCID) === 'object') {
+            var foundCallbackForDelete = false, lowerCaseKey = counters.get(zabbixHostname).get(OCID).key.toLowerCase();
+            for(var callbackOCID of countersParameters.get(zabbixHostname).get(lowerCaseKey).get('callbacks').keys()) {
+
+                if(OCID === callbackOCID) {
+                    countersParameters.get(zabbixHostname).get(lowerCaseKey).get('callbacks').delete(OCID);
                     foundCallbackForDelete = true;
-                    existingOCIDs.push(OCID + ':' + zabbixHostname + '(' + counters[zabbixHostname][num].key + ')');
+                    existingOCIDs.push(OCID + ':' + zabbixHostname + '(' + counters.get(zabbixHostname).get(OCID).key + ')');
                 }
             }
             if(foundCallbackForDelete) {
-                if(!Object.keys(countersParameters[zabbixHostname][counters[zabbixHostname][num].key.toLowerCase()].callbacks).length) {
-                    delete countersParameters[zabbixHostname][counters[zabbixHostname][num].key.toLowerCase()];
-                    counters[zabbixHostname][num] = null; // don't delete array item for saving order of 'num'
+                if(!countersParameters.get(zabbixHostname).get(lowerCaseKey).get('callbacks').size) {
+                    countersParameters.get(zabbixHostname).delete(lowerCaseKey);
+                    counters.get(zabbixHostname).delete(OCID);
+                    if(!counters.get(zabbixHostname).size) counters.delete(zabbixHostname);
                 }
             }
         }
-        delete countersIDX[OCID];
-        delete countersForRemove[OCID];
+        countersOCID2ZabbixHost.delete(OCID);
     });
     throttling.remove(OCIDs);
 
@@ -160,9 +165,9 @@ function stopServer(callback){
     log.info('Stopping Zabbix active collector');
     server.close(function(err) {
         server = null;
-        counters = {};
-        countersParameters = {};
-        agentSessions = {};
+        counters.clear();
+        countersParameters.clear();
+        agentSessions.clear();
         isServerRunning = false;
         stopServerInProgress = false;
         throttling.remove();
@@ -171,23 +176,26 @@ function stopServer(callback){
 }
 
 function createServer() {
-    server = net.createServer(function(socket){
+    startTime = Date.now();
+
+    server = net.createServer(function(socket) {
 		// 'connection' listener
 		//log.debug('Client connected: ', socket.remoteAddress, ':', socket.remotePort, '->', socket.localAddress, ':', socket.localPort);
 
-        var data = Buffer.alloc(0);
+        var prevData = Buffer.alloc(0);
         var isHeaderOK = false;
         var dataLength = 0;
 
-        socket.on('data', function(dataPart){
-            data = Buffer.concat([data, Buffer.from(dataPart)]);
+        socket.on('data', function(dataPart) {
+
+            var data = !prevData.length ? dataPart : Buffer.concat([prevData, Buffer.from(dataPart)]);
 
             // checking is header correct or not and get length of received data
             if(!isHeaderOK && data.length >= headerLength) {
                 var header = data.toString('utf8', 0, 4);
 				var version = data.readInt8(4);
 
-				if (header !== "ZBXD" || version !== 1){
+				if (header !== "ZBXD" || version !== 1) {
                     socket.destroy();
 					return log.error(errorMessage + 'incorrect header: ' + header + ':' + version);
                 }
@@ -203,8 +211,8 @@ function createServer() {
                 //log.debug('ZBX: header ok, data length: ', dataLength);
             }
 
-            if(data.length === dataLength+headerLength){
-
+            if(data.length === dataLength + headerLength) {
+                prevData = Buffer.alloc(0);
                 //log.debug('ZBX: header + data length: ', (dataLength + headerLength), ', real data length: ', data.length, ', data: ', data);
 
                 var resultStr = data.toString('utf8', headerLength);
@@ -214,48 +222,47 @@ function createServer() {
                     result = JSON.parse(resultStr);
                 } catch(err) {
                     socket.destroy();
-                    return log.error(errorMessage + 'can\'t parse JSON in response: '+err.message);
+                    return log.error(errorMessage + 'can\'t parse JSON in response: ' + err.message);
                 }
 
-                if(!result || !result.request){
+                if(!result || !result.request) {
                     socket.destroy();
                     return log.error(errorMessage + 'error in request');
                 }
 
-                if(result.request.toLowerCase() === 'active checks'){
-                    reqActiveChecks(result.host, socket, function(err, data) {
-                        sendToZabbix(err, data, socket);
-                        socket.destroy();
-                    });
+                if(result.request.toLowerCase() === 'active checks') {
+                    reqActiveChecks(result.host, socket);
+                    socket.destroy();
                 // "agent data" for zabbix active protocol. "sender data" for zabbix trapper protocol
                 } else if(result.request.toLowerCase() === 'agent data' || result.request.toLowerCase() === 'sender data') {
-                    reqAgentData(result, function(err, data) {
-                        sendToZabbix(err, data, socket);
-                        //socket.destroy();
-                    });
+                    reqAgentData(result, socket);
+                    //socket.destroy();
                 } else {
                     log.error(errorMessage, 'unknown request: ', result.request, ': ', result);
                     socket.destroy();
                 }
-            } else if(data.length > dataLength+headerLength) {
+            } else if(data.length > dataLength + headerLength) {
+                prevData = Buffer.alloc(0);
                 socket.destroy();
-                return log.error(errorMessage + 'received data length (', data.length,') is more than specified in header (',(dataLength+headerLength),')');
-            }
+                log.error(errorMessage + 'received data length (', data.length,
+                    ') is greater than specified in header (', dataLength + headerLength, ')');
+            } else prevData = data;
 
             //log.debug('ZBX rcv ',socket.remoteAddress, ':', socket.remotePort,': length: ',data.length,', data: ', data.toString());
         });
 
-        socket.on('error', function(err){
-            log.warn('Active check socket error: ', err.message, ' for: ', socket.remoteAddress, ':', socket.remotePort, '->', socket.localAddress, ':', socket.localPort);
+        socket.on('error', function(err) {
+            log.warn('Active check socket error: ', err.message, ' for: ', socket.remoteAddress, ':',
+                socket.remotePort, '->', socket.localAddress, ':', socket.localPort);
         });
 	});
 
 	server.on('error', function(err) {
-		log.error('Active check server error: ', err.message, '. Try to restart');
+		log.error('Active check collector error: ', err.message, '. Try to restart');
 
-        setTimeout(function(){
+        setTimeout(function() {
             stopServer(function(err){
-                if(err) log.error('Error while stopping server: ', err.message);
+                if(err) log.error('Error while stopping collector: ', err.message);
                 isServerRunning = true;
                 createServer();
             });
@@ -263,18 +270,24 @@ function createServer() {
 	});
 
     server.listen(serverPort, function() {
-        log.info('Server bound to TCP port: ', serverPort);
+        log.info('Collector bound to TCP port: ', serverPort);
+
+        setTimeout(function () {
+            log.info('Number of data delayed during initialization ', delayedData.size);
+            delayedData.forEach((data) => reqAgentData(data.result, data.socket));
+            delayedData.clear();
+        }, initializingDelay);
     });
 }
 
-function sendToZabbix(err, data, socket){
+function sendToZabbix(err, socket, data) {
     if(err) {
         log.warn(errorMessage, err.message);
         data = JSON.stringify({response: 'error'});
     }
 
     if(!data || typeof data !== 'string') {
-        log.error(errorMessage, 'try to return undefined or not string data');
+        log.error(errorMessage, 'attempt to return undefined or non-string data');
         data = JSON.stringify({response: 'error'});
     }
 
@@ -288,33 +301,41 @@ function sendToZabbix(err, data, socket){
 
     // callback for async sending data
     socket.write(zabbixData, function (err) {
-        if(err) log.info('Ca,\'t send data to zabbix: ', err.message);
+        if(err) log.info('Can\'t send data to zabbix: ', err.message);
     });
 }
 
-function reqActiveChecks(host, socket, callback) {
-    if(!host) return callback(new Error('host not defined for active check request'));
+function reqActiveChecks(zabbixHostname, socket) {
+    if(!zabbixHostname) return sendToZabbix(new Error('zabbixHostname not defined for active check request'), socket);
 
-    host = host.toLowerCase();
+    zabbixHostname = zabbixHostname.toLowerCase();
 
-    if(!counters[host] || !counters[host].length) {
-        return callback(new Error('active check not defined for host ' + host + ': ' +
-            socket.remoteAddress + ':' + socket.remotePort + '->' + socket.localAddress + ':' + socket.localPort));
+    if(!counters.has(zabbixHostname) || !counters.get(zabbixHostname).size) {
+        counters.delete(zabbixHostname);
+        return sendToZabbix(new Error('active check not defined for ' + zabbixHostname + ': ' +
+            socket.remoteAddress + ':' + socket.remotePort + '->' + socket.localAddress + ':' + socket.localPort), socket);
     }
 
-    callback(null, JSON.stringify({
+    // filter Zabbix trappers.
+    var data = [];
+    for(var obj  of counters.get(zabbixHostname).values()) {
+        if(obj.delay) data.push(obj);
+    }
+
+    sendToZabbix(null, socket, JSON.stringify({
         response: 'success',
-        // filter removed counters and Zabbix trappers. We don't splice removed counters array for save order
-        data: counters[host].filter(function(obj) { return obj !== null && obj.delay; } ),
+        data: data,
     }));
 }
 
-function reqAgentData(result, callback){
-    if(!result.data || !result.data.length) return callback(new Error('unknown result for agent data'));
+function reqAgentData(result, socket){
+    if(!Array.isArray(result.data) || !result.data.length) {
+        return sendToZabbix(new Error('unknown result for agent data'), socket);
+    }
 
     var errCnt = 0;
     var timestamp = Date.now();
-    async.each(result.data, function(data, callback){
+    result.data.forEach(function(data) {
 
         if(!data.host || typeof data.host  !== 'string' || !data.key || typeof data.key !== 'string' ||
             data.value === undefined /* || !data.clock || !data.ns */) {
@@ -322,17 +343,17 @@ function reqAgentData(result, callback){
             log.error('Error while received zabbix data, not all required parameters are defined: host: ', data.host,
                     ', key: ', data.key, ', clock: ', data.clock, ', ns: ', data.ns, ', value: ', data.value, ': ', data);
             errCnt++;
-            return callback();
+            return;
         }
 
         if(result.session && data.id !== undefined) {
-            if(!agentSessions[result.session]) agentSessions[result.session] = data.id;
+            if(!agentSessions.has(result.session)) agentSessions.set(result.session, data.id);
             else {
-                if(agentSessions[result.session] < data.id) agentSessions[result.session] = data.id;
+                if(agentSessions.get(result.session) < data.id) agentSessions.set(result.session, data.id);
                 else {
-                    log.warn('Duplicate data received: ', data ,'; received ID (', result.session, ':', data.id,
-                        '), <= previous ID (', result.session , ':', agentSessions[result.session], ')');
-                    return callback();
+                    log.info('Duplicate data received: ', data ,'; received ID (', result.session, ':', data.id,
+                        '), <= previous ID (', result.session , ':', agentSessions.get(result.session), ')');
+                    return;
                 }
             }
         }
@@ -340,14 +361,22 @@ function reqAgentData(result, callback){
         var zabbixHost = data.host.toLowerCase();
         var zabbixKey = data.key.toLowerCase();
         
-        if(!countersParameters[zabbixHost] || !countersParameters[zabbixHost][zabbixKey] ||
-            !countersParameters[zabbixHost][zabbixKey].callbacks ||
-            typeof countersParameters[zabbixHost][zabbixKey].callbacks !== 'object' ||
-            !Object.keys(countersParameters[zabbixHost][zabbixKey].callbacks).length
+        if(!countersParameters.has(zabbixHost) || !countersParameters.get(zabbixHost).has(zabbixKey) ||
+            !countersParameters.get(zabbixHost).get(zabbixKey).has('callbacks') ||
+            !(countersParameters.get(zabbixHost).get(zabbixKey).get('callbacks') instanceof Map) ||
+            !countersParameters.get(zabbixHost).get(zabbixKey).get('callbacks').size
         ) {
-            log.info('Callback not defined or callback type is not a function for ', zabbixHost, '; key ',  zabbixKey);
+            // waiting for all counters to be initialized on collector startup
+            if(Date.now() - startTime <  initializingDelay) {
+                delayedData.add({
+                    result: result,
+                    socket: socket,
+                });
+                return;
+            }
+            log.info('Callback not defined for ', zabbixHost, '; key ',  zabbixKey);
             errCnt++;
-            return callback();
+            return;
         }
 
         if(data.state && logZabbixAgentErrors) {
@@ -359,12 +388,12 @@ function reqAgentData(result, callback){
         }
 
         // return only numeric values
-        if(countersParameters[zabbixHost][zabbixKey].onlyNumeric) {
+        if(countersParameters.get(zabbixHost).get(zabbixKey).get('onlyNumeric')) {
             var value = Number(data.value);
-            if(isNaN(parseFloat(String(value))) || !isFinite(value)) return callback();
+            if(isNaN(parseFloat(String(value))) || !isFinite(value)) return;
         } else value = data.value;
 
-        if(!throttling.check(zabbixHost + '-' + zabbixKey, value)) return callback();
+        if(!throttling.check(zabbixHost + '-' + zabbixKey, value)) return;
 
         if (data.clock && data.ns &&
             Number(data.clock) === parseInt(String(data.clock), 10) &&
@@ -376,23 +405,20 @@ function reqAgentData(result, callback){
             };
         } else res = value;
 
-        for(var OCID in countersParameters[zabbixHost][zabbixKey].callbacks) {
-            if(typeof countersParameters[zabbixHost][zabbixKey].callbacks[OCID] !== 'function') {
-                log.info('Callback not defined or callback type is not a function for ', zabbixHost, '; key ',  zabbixKey, '; OCID: ', OCID);
+        for(var OCID of countersParameters.get(zabbixHost).get(zabbixKey).get('callbacks').keys()) {
+            if(typeof countersParameters.get(zabbixHost).get(zabbixKey).get('callbacks').get(OCID) !== 'function') {
+                log.info('Callback not defined or callback type is not a function for ', zabbixHost, '; key ',
+                    zabbixKey, '; OCID: ', OCID);
                 errCnt++;
                 continue;
             }
-            countersParameters[zabbixHost][zabbixKey].callbacks[OCID](null, res);
+            countersParameters.get(zabbixHost).get(zabbixKey).get('callbacks').get(OCID)(null, res);
         }
-        callback();
-
-    }, function(err){
-        if(err) return callback(err);
-
-        return callback(null, JSON.stringify({
-            response: 'success',
-            info: 'processed: '+(result.data.length - errCnt)+'; failed: '+errCnt+'; total: '+result.data.length+' seconds spent: '+
-                String((Date.now() - timestamp)/1000)
-        }));
     });
+
+    sendToZabbix(null, socket, JSON.stringify({
+        response: 'success',
+        info: 'processed: ' + (result.data.length - errCnt) + '; failed: ' + errCnt + '; total: ' + result.data.length +
+            ' seconds spent: ' + String((Date.now() - timestamp) / 1000)
+    }));
 }

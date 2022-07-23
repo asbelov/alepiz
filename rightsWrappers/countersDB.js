@@ -16,13 +16,28 @@ module.exports = rightsWrapper;
 
 /*
     getting update events for counter
-    user: user name
+    user: username
     counterID: counter ID
     callback(err, updateEvents)
     updateEvents: [{counterID:.., counterName:.., expression:.., mode: <0|1|2>, objectID: parentObjectID, name: <parentObjectName|''>}, ...]
     mode: 0 - update every time when parent counter received a new value and expression is true,
         1 - update once when parent counter received a new value and expression change state to true,
         2 - update once when expression change state to true and once when expression change state to false
+ */
+
+/**
+ * Check user rights for object that linked to the specific counter ID and get update events for counter ID
+ *
+ * @param user - username
+ * @param counterID - counter ID
+ * @param callback callback(err, updateEventsRows) return error or array with
+ * update events like [{counterID:<parentCounterID>, counterName: <counterName>, expression: <updateEventExpression>,
+ * mode: <0|1|2>, objectID: <parentObjectID>, objectFilter: <objectsFilter> , description: <updateEventDescription>,
+ * updateEventOrder: <updateEventOrder>}, ...];
+ *     mode: 0 - update every time when parent counter received a new value and expression is true,
+ *         1 - update once when parent counter received a new value and expression change state to true,
+ *         2 - update once when expression change state to true and once when expression change state to false
+ *         3 - update once when expression value is changed to false
  */
 rightsWrapper.getUpdateEvents = function(user, counterID, callback) {
     checkIDs(counterID, function(err, checkedID) {
@@ -53,6 +68,11 @@ rightsWrapper.getCountersForGroup = function(user, groupID, callback) {
     })
 };
 
+/** SELECT * FROM counters.
+ * @param {String} user - username for check user rights for objects linked to the counters
+ * @param {function} callback callback(err, rows): rows: [{id, name, collectorID, groupID, unitID, sourceMultiplier,
+ *  keepHistory, keepTrends, modifyTime, disabled, debug, taskCondition, created}, ...]
+ */
 rightsWrapper.getAllCounters = function(user, callback) {
     countersDB.getAllCounters(function(err, counters) {
         if(err) return callback(new Error('Can\'t get all counters: ' + err.message));
@@ -64,14 +84,17 @@ rightsWrapper.getAllCounters = function(user, callback) {
     })
 };
 
-/*
- return all counters for specific objects
-
- objectsIDs: array of objects IDs
- groupsIDs: array of counter groups IDs or skip it
- callback(err, counters)
- counters: rows: [{id:.., name:.., unitID:..., collector:..., sourceMultiplier:..., groupID:..., OCID:..., objectID:..., objectName:..., objectDescription:..}, ...]
- counters array sorted by fields name and objectName
+/**
+ * Check user rights for specific object IDs and return all linked counters for specific object IDs and group if set
+ * @param {String} user - username
+ * @param {Array<Number>} objectsIDs - array of object IDs
+ * @param {Array<Number>|null} groupsIDs - array of group IDs or null for return all counter that linked to the
+ * specific object IDs
+ * @param {function} callback - callback(err, rows), where rows: [{id: <counterID>, name: <counterName>,
+ * taskCondition: <counterTaskCondition>, unitID: <counterUnitID>, collectorID: <collectorName>,
+ * debug: <counterDebug>, sourceMultiplier: <counterSourceMultiplier>, groupID: <counterGroupID>, OCID: <objectCounterID>,
+ * objectID:, objectName:, objectDescription: }, ...]
+ * @returns {*}
  */
 rightsWrapper.getCountersForObjects = function(user, objectsIDs, groupsIDs, callback){
     if(!objectsIDs) return callback();
@@ -196,6 +219,7 @@ rightsWrapper.getVariables = function(user, counterID, callback){
             errorOnNoRights: true
         }, function (err, checkedCounterID) {
             if (err) return callback(err);
+            if(!checkedCounterID) return callback();
 
             async.parallel({
                 variables: function(callback) {
@@ -299,7 +323,7 @@ rightsWrapper.getObjectsCountersIDsForCollector = function (user, collector, cal
 /*
     getting groups for specific objects IDs
 
-    user: user name
+    user: username
     IDs - objects IDs
     callback(err, groups)
     groups: [{id:.., name:...}, ...]
@@ -331,7 +355,7 @@ rightsWrapper.getParentCountersVariables = function (user, initCountersIDs, prev
             }, callback);
         }, function(err) {
             if(err) {
-                return callback(new Error('You has no rights for getting parent counters variables: '
+                return callback(new Error('You have no rights for getting parent counters variables: '
                     + err.message));
             }
 
@@ -379,7 +403,7 @@ rightsWrapper.getAllForCounter = function (user, initCountersIDs, callback) {
                 id: counterID,
                 errorOnNoRights: true
             }, function(err) {
-                if(err) return callback(new Error('You has no rights for getting counter data: ' + err.message));
+                if(err) return callback(new Error('You have no rights for getting counter data: ' + err.message));
 
                 countersDB.getAllForCounter(counterID, function(err, rows) {
                     if(err) return callback(new Error('Error getting counter data for counterID: ' + counterID + ': ' + err.message));
@@ -390,7 +414,7 @@ rightsWrapper.getAllForCounter = function (user, initCountersIDs, callback) {
             });
         }, function(err) {
             if (err) {
-                return callback(new Error('You has no rights for getting counter data: '
+                return callback(new Error('You have no rights for getting counter data: '
                     + err.message));
             }
 

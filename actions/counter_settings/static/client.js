@@ -33,11 +33,18 @@ function callbackBeforeExec(callback) {
         return;
     }
 
+    var variableNames = $('input[data-variable-name]').map(function () { return $(this).val()}).get();
+    var duplicates = variableNames.filter(function (item, index) { return variableNames.indexOf(item) !== index});
+
+    if(duplicates.length) {
+        return callback(new Error('Some variables have the same names: ' + duplicates.join(', ')));
+    }
+
     $('[data-variable-name]').each(function() {
         $(this).val($(this).val().replace(/^ *(.+?) *$/, '$1'));
     });
 
-    // Save JS editors content to textareas
+    // Save JS editors content to text areas
     for(var i=0; i<editor.length; i++){
         try{  editor[i].save(); }
         catch(e) {}
@@ -755,6 +762,14 @@ var JQueryNamespace = (function ($) {
             func: 'getCountersForObjects'
         }, function (rows) {
             var countersWithDebug = [], num = 1;
+            var debugCBElm = $('#debug'),
+                showCountersWithDebugElm = $('#showCountersWithDebug'),
+                counterSelectorElm = $('#counterIDSelector'),
+                objectsIDsElm = $('#objectsIDs'),
+                goToDebugLinkElm = $('#goToDebugLink'),
+                objectID = objectsIDsElm.val(),
+                objectName = objectsIDsElm.find('option[value="' + objectID+'"]').text();
+
             rows.forEach(function (row) {
                 if(row.debug) {
                     countersWithDebug.push('<a style="color:yellow" href="/?a=%2Factions%2Fcounter_settings&cid=' +
@@ -762,8 +777,14 @@ var JQueryNamespace = (function ($) {
                 }
             });
 
-            var debugCBElm = $('#debug'), showCountersWithDebugElm = $('#showCountersWithDebug');
             if(countersWithDebug.length > 9 && !debugCBElm.is(':checked')) debugCBElm.prop('disabled', true);
+
+            if(debugCBElm.is(':checked') && objectName) {
+                goToDebugLinkElm.removeClass('hide');
+                var counterID = counterSelectorElm.val();
+                goToDebugLinkElm.html('<a href="/?a=%2Factions%2Fvariables&cid=' +
+                    counterID + '&c=' + objectName + '" target="_blank">' + goToDebugLinkElm.text() + '</a><br>');
+            } else goToDebugLinkElm.addClass('hide');
 
             showCountersWithDebugElm.unbind('click').click(function (e) {
                 e.preventDefault();
@@ -775,7 +796,7 @@ var JQueryNamespace = (function ($) {
     }
 
     /*
-        get array with shared counters for specific objects from all cpounters fro specific objects
+        get array with shared counters for specific objects from all counters for specific objects
 
         objectsCnt: count of objects
         countersArray: [{id: <counterID>, .....}, ]
@@ -813,12 +834,14 @@ var JQueryNamespace = (function ($) {
     }
 
     function fillForm(counterID) {
-        if(typeof counterID !== 'number') counterID = this.value;
+        if(Number(counterID) === parseInt(String(counterID), 10) && Number(counterID) > 0 ) {
+            counterID = Number(counterID);
+        } else counterID = this.value;
         var linkedObjectsIDsElm = $('#linkedObjectsIDs');
         $('#counterID').val(counterID); //set counter ID even if select "New counter" with empty value
         setActionParametersToBrowserURL([{
             key: 'cid',
-            val: counterID
+            val: counterID,
         }]);
 
         if(!counterID) {  // if selected a "New counter", leave counter parameters unchanged and return
@@ -898,10 +921,11 @@ var JQueryNamespace = (function ($) {
                 return 0;
             }).map(function (row) {
                 return '<li><a href="/?a=%2Factions%2Fcounter_settings&cid=' +
-                        row.counterID + '" target="_blank">' + escapeHtml(row.counterName) + ' (#' +  + row.counterID + ')</a>' +
-                    ': ' + escapeHtml((row.variableName ?
-                '<b>' + row.variableName + '</b> [ <i>' + (row.variableExpression || '') + '</i> ]' + (row.variableDescription ?
-                    ' - ' + row.variableDescription : '') : ' NO VARIABLES' )) + '</li>';
+                        row.counterID + '" target="_blank">' + escapeHtml(row.counterName) +
+                    ' (#' +  + row.counterID + ')</a>' + ': ' + (row.variableName ?
+                '<b>' + escapeHtml(row.variableName) + '</b> [ <i>' + escapeHtml(row.variableExpression || '') + '</i> ]' +
+                        (row.variableDescription ?
+                    ' - ' + escapeHtml(row.variableDescription) : '') : ' NO VARIABLES' ) + '</li>';
             });
 
             inheritedVariablesElm.html('<h4>Parent counters and inherited variables</h4><ul>' + htmlArr.join('') + '</ul>');
@@ -1201,7 +1225,7 @@ var JQueryNamespace = (function ($) {
                 collectorsSelectElm.append('<option value="' + collectorID + '"'+selected+'>' + name + '</option>')
             }
 
-            // when change counter and reinit collector selector, this function called and add another
+            // when change counter and reinitializing collector selector, this function called and add another
             // one change event to element. Unbind previous change event.
             // I try to rewrite this code, but unbind is really easy way
             collectorsSelectElm.unbind('change');
@@ -1922,7 +1946,7 @@ var JQueryNamespace = (function ($) {
             reloadCounterListForVariable(variableID, parentCounterName, variableName);
         }
 
-        // remove class 'active' from label elements, which input elements has not value
+        // remove class 'active' from label elements, which input elements has no value
         // add class 'active' to label elements, which input elements has value
         $('input[type=text]').each(function() {
             if(this.value) $(this).next('label').addClass('active');

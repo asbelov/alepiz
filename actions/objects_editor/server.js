@@ -7,6 +7,7 @@
  */
 var objectsDB = require('../../rightsWrappers/objectsDB');
 var countersDB = require('../../rightsWrappers/countersDB');
+var counterDBRaw = require('../../models_db/countersDB');
 var counterSaveDB = require('../../models_db/counterSaveDB');
 var transactionDB = require('../../models_db/transaction');
 var log = require('../../lib/log')(module);
@@ -15,135 +16,177 @@ var server = require('../../server/counterProcessor');
 module.exports = function(args, callback) {
     log.debug('Starting action server \"'+args.actionName+'\" with parameters', args);
 
-    try {
-        editObjects(args.username, args, callback);
-    } catch(err){
-        callback(err);
-    }
+    editObjects(args.username, args, callback);
 };
 
 // edit objects description, order and interactions
 // parameters - parameters, which returned by HTML form
 // callback(err, <success message>)
-function editObjects(user, parameters, callback){
+function editObjects(user, param, callback){
 
-    if(!parameters.o) return callback(new Error('Objects are not selected'));
+    if(!param.o) return callback(new Error('Objects are not selected'));
 
     try {
-        var objects = JSON.parse(parameters.o) // [{"id": "XX", "name": "name1"}, {..}, ...]
+        var objects = JSON.parse(param.o) // [{"id": "XX", "name": "name1"}, {..}, ...]
     } catch(err) {
-        return callback(new Error('Can\'t parse JSON string with a objects parameters "' + parameters.o + '": ' + err.message));
+        return callback(new Error('Can\'t parse JSON string with an object parameters "' + param.o + '": ' +
+            err.message));
     }
 
-    var objectsIDs = objects.map(function(obj) {
-        if(obj.id) return Number(obj.id);
+    var objectID2Name = {};
+    var objectIDs = objects.map(function(obj) {
+        if(obj.id) {
+            objectID2Name[obj.id] = obj.name;
+            return Number(obj.id);
+        }
         else return 0;
     }).filter(function(id) {
-        return (id && id === parseInt(id, 10)); // return only integer objectsIDs > 0
+        return (id === parseInt(id, 10) && id > 0); // return only integer objectIDs > 0
     });
 
-    if(!objectsIDs.length || objectsIDs.length !== objects.length) return callback(new Error('Incorrect object ' + parameters.o));
+    if(!objectIDs.length || objectIDs.length !== objects.length) {
+        return callback(new Error('Incorrect object ' + param.o));
+    }
 
-    if(parameters.rulesForRenameObjects) {
+    if(param.rulesForRenameObjects) {
         try {
-            var newObjects = JSON.parse(parameters.rulesForRenameObjects) // [{"id": "XX", "name": "newObjectName1"}, {..}, ...]
+            // [{"id": "XX", "name": "newObjectName1"}, {..}, ...]
+            var newObjects = JSON.parse(param.rulesForRenameObjects)
         } catch(err) {
-            return callback('Can\'t parse JSON string with a new objects names "' + parameters.rulesForRenameObjects + '": ' + err.message)
+            return callback(new Error('Can\'t parse JSON string with a new objects names "' +
+                param.rulesForRenameObjects + '": ' + err.message))
         }
     }
 
-    if(parameters.rulesForRenameObjects && (!Array.isArray(newObjects) || !newObjects.length))
-        return callback('Error while parse JSON string with a new objects names "' +
-            parameters.rulesForRenameObjects + '": result is not an array: ' + String(newObjects));
+    if(param.rulesForRenameObjects && (!Array.isArray(newObjects) || !newObjects.length))
+        return callback(new Error('Error while parse JSON string with a new objects names "' +
+            param.rulesForRenameObjects + '": result is not an array: ' + String(newObjects)));
 
-    if(parameters.objectsOrder) {
-        var order = Number(parameters.objectsOrder);
-        if(!order) order = undefined; // parameters.order is 0 for set it unchanged, but in updateObjectsInformation() set order unchanged only if order is undefined
-        else if(order !== parseInt(String(order), 10)) return callback(new Error('Incorrect sort order ' + parameters.objectsOrder + '. It can be an integer value'))
+    if(param.objectsOrder) {
+        var order = Number(param.objectsOrder);
+        // parameters.order is 0 for set it unchanged, but in updateObjectsInformation() set order unchanged
+        // only if order is undefined
+        if(!order) order = undefined;
+        else if(order !== parseInt(String(order), 10)) {
+            return callback(new Error('Incorrect sort order ' + param.objectsOrder + '. It can be an integer value'))
+        }
     }
 
-    countersDB.getCountersForObjects(user, objectsIDs, null, function(err, objectsCountersLinkage) {
-        if (err) return callback(err);
+    // Do not check the rights to counters, because otherwise counters that are not linked to any object
+    // will be skipped
+    counterDBRaw.getAllCounters(function (err, counterRows) {
+        if(err) return callback(err);
 
-        var countersObjectsLinkage = {}, OCIDsForDelete = [], OCIDsToInsert = [],
-            newCountersIDs = typeof parameters.linkedCountersIDs === 'string' ? parameters.linkedCountersIDs.split(',') : [];
+        var counterID2Name = {};
+        counterRows.forEach(counter => { counterID2Name[counter.id] = counter.name });
 
-        if(typeof parameters.linkedCountersIDs === 'string' && parameters.linkedCountersIDs.trim() !== '0') {
-            objectsCountersLinkage.forEach(function (counter) {
+        countersDB.getCountersForObjects(user, objectIDs, null, function(err, objectsCountersLinkage) {
+            if (err) return callback(err);
+
+            var countersObjectsLinkage = {};
+            objectsCountersLinkage.forEach(counter => {
                 if (!countersObjectsLinkage[counter.id]) countersObjectsLinkage[counter.id] = {};
                 countersObjectsLinkage[counter.id][counter.objectID] = counter.OCID;
-
-                if (Object.keys(countersObjectsLinkage[counter.id]).length === objectsIDs.length) {
-                    if (newCountersIDs.indexOf(String(counter.id)) === -1) {
-                        for (var objectID in countersObjectsLinkage[counter.id]) {
-                            OCIDsForDelete.push({
-                                objectID: Number(objectID),
-                                counterID: counter.id
-                            });
-                        }
-                    }
-                }
             });
 
-            newCountersIDs.forEach(function (counterID) {
-                if (Number(counterID) !== parseInt(counterID, 10)) return;
+            var OCIDsToInsert = new Set(), OCIDsForDelete = new Set();
+            var OCIDsToInsertHuman = new Set(), OCIDsForDeleteHuman = new Set();
+            // set linkedCountersIDs to 0 in task for disable counter linkage operations
+            if(typeof param.linkedCountersIDs !== 'string' || param.linkedCountersIDs.trim() !== '0') {
 
-                objectsIDs.forEach(function (objectID) {
-                    if (!countersObjectsLinkage[counterID] || !countersObjectsLinkage[counterID][objectID]) {
-                        OCIDsToInsert.push({
-                            objectID: Number(objectID),
-                            counterID: Number(counterID)
+                // check for use in the tasks
+                if(typeof param.linkedCounterIDsAdd === 'string') {
+                    param.linkedCounterIDsAdd.trim().split(',').forEach(counterID => {
+                        objectIDs.forEach(objectID => {
+                            if (Number(counterID) > 0 && Number(objectID) > 0 &&
+                                (!countersObjectsLinkage[counterID] || !countersObjectsLinkage[counterID][objectID])) {
+                                OCIDsToInsert.add({
+                                    objectID: Number(objectID),
+                                    counterID: Number(counterID),
+                                });
+                                OCIDsToInsertHuman.add(objectID2Name[objectID] + ' #' + objectID + ' => ' +
+                                    counterID2Name[counterID] + ' #' + counterID);
+                            }
                         });
-                    }
-                })
-            });
-        }
+                    });
+                }
 
-        transactionDB.begin(function (err) {
-            if (err) return callback(new Error('Error begin transaction for edit objects ' + String(newObjects) + ': ' + err.message));
+                // check for use in the tasks
+                if(typeof param.linkedCounterIDsDel === 'string') {
+                    param.linkedCounterIDsDel.trim().split(',').forEach(counterID => {
+                        objectIDs.forEach(objectID => {
+                            if (countersObjectsLinkage[counterID] && countersObjectsLinkage[counterID][objectID]) {
+                                OCIDsForDelete.add({
+                                    objectID: Number(objectID),
+                                    counterID: Number(counterID),
+                                });
+                                OCIDsForDeleteHuman.add(objectID2Name[objectID] + ' #' + objectID + ' => ' +
+                                    counterID2Name[counterID] + ' #' + counterID);
+                            }
+                        });
+                    });
+                }
+            }
 
-            // [{"id": "XX", "name": "newObjectName1"}, {..}, ...]
-            objectsDB.renameObjects(user, newObjects, function (err) {
-                if (err) return transactionDB.rollback(err, callback);
+            transactionDB.begin(function (err) {
+                if (err) {
+                    return callback(new Error('Error begin transaction for edit objects ' + String(newObjects) +
+                        ': ' + err.message));
+                }
 
-                if(newObjects && newObjects.length) log.info('Rename objects: ', newObjects);
-                // update description and order for all existing objects
-                objectsDB.updateObjectsInformation(user, objectsIDs, parameters.objectsDescription, order, parameters.disabled ? 1 : 0, function (err, isObjectsUpdated) {
+                // [{"id": "XX", "name": "newObjectName1"}, {..}, ...]
+                objectsDB.renameObjects(user, newObjects, function (err) {
                     if (err) return transactionDB.rollback(err, callback);
-                    if(isObjectsUpdated) log.info('Update object information: order: ', order, ', disabled: ', parameters.disabled, ', description: ', parameters.objectsDescription);
-                    if(OCIDsForDelete.length || OCIDsToInsert.length) log.info('Links for delete: ', OCIDsForDelete, '. Links to insert: ', OCIDsToInsert);
 
-                    counterSaveDB.deleteObjectCounterID(OCIDsForDelete, function(err) {
+                    if(newObjects && newObjects.length) log.info('Rename objects: ', newObjects);
+                    // update description and order for all existing objects
+                    objectsDB.updateObjectsInformation(user, objectIDs, param.objectsDescription, order,
+                        param.disabled ? 1 : 0, function (err, isObjectsUpdated) {
                         if (err) return transactionDB.rollback(err, callback);
+                        if(isObjectsUpdated) {
+                            log.info('Update object information: order: ', order,
+                                (param.disabled !== '' ? ', disabled: ' + param.disabled : ''),
+                                (param.objectsDescription !== '' ? ', description: ' + param.objectsDescription : ''),
+                                ', objects: ', objectIDs.map(objectID => objectID2Name[objectID]).join('; '));
+                        }
+                        if(OCIDsForDelete.size || OCIDsToInsert.size) {
+                            log.info('Links for delete: ', Array.from(OCIDsForDeleteHuman).join('; ') || 'none',
+                                '. Links to insert: ', Array.from(OCIDsToInsertHuman).join('; ') || 'none');
+                        }
 
-                        counterSaveDB.saveObjectsCountersIDs(OCIDsToInsert, function(err) {
-                            if(err) return transactionDB.rollback(err, callback);
+                        counterSaveDB.deleteObjectCounterID(Array.from(OCIDsForDelete), function(err) {
+                            if (err) return transactionDB.rollback(err, callback);
 
-                            transactionDB.end(function (err) {
-                                if (err) return callback(err);
+                            counterSaveDB.saveObjectsCountersIDs(Array.from(OCIDsToInsert), function(err) {
+                                if(err) return transactionDB.rollback(err, callback);
 
-                                // send message for updating collected initial data for objects
-                                if (!parameters.disabled) {
-                                    server.sendMsg({
-                                        update: {
-                                            topObjects: true,
-                                            objectsCounters: true
-                                        },
-                                        updateObjectsIDs: objectsIDs
-                                    });
-                                    return callback(null, objectsIDs.join(','));
-                                }
-
-                                // object disabled. remove counters
-                                objectsDB.getObjectsCountersIDs(user, objectsIDs, function (err, rows) {
+                                transactionDB.end(function (err) {
                                     if (err) return callback(err);
 
-                                    var OCIDs = rows.map(row => row.id);
-                                    if (OCIDs.length) server.sendMsg({
-                                        removeCounters: OCIDs,
-                                        description: 'Objects IDs ' + objectsIDs.join(', ') + ' was disabled from "object editor" by user ' + user
+                                    // send message for updating collected initial data for objects
+                                    if (!param.disabled) {
+                                        server.sendMsg({
+                                            update: {
+                                                topObjects: true,
+                                                objectsCounters: true
+                                            },
+                                            updateObjectsIDs: objectIDs
+                                        });
+                                        return callback(null, objectIDs.join(','));
+                                    }
+
+                                    // object disabled. remove counters
+                                    objectsDB.getObjectsCountersIDs(user, objectIDs, function (err, rows) {
+                                        if (err) return callback(err);
+
+                                        var OCIDs = rows.map(row => row.id);
+                                        if (OCIDs.length) server.sendMsg({
+                                            removeCounters: OCIDs,
+                                            description: 'Object IDs ' + objectIDs.join(', ') +
+                                                ' was disabled from "object editor" by user ' + user
+                                        });
+                                        callback(null, objectIDs.join(','));
                                     });
-                                    callback(null, objectsIDs.join(','));
                                 });
                             });
                         });

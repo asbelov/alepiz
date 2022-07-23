@@ -108,10 +108,18 @@ WHERE objectsCounters.counterID=?', counterID, function(err, objects){
     );
 };
 
+/**
+ * SELECT * FROM objectsCounters
+ * @param {function} callback callback(err, rows): rows: [{id, objectID, counterID}, ...]
+ */
 countersDB.getAllObjectsCounters = function(callback) {
     db.all('SELECT * FROM objectsCounters', callback);
 };
 
+/** SELECT * FROM counters.
+ * @param {function} callback callback(err, rows): rows: [{id, name, collectorID, groupID,unitID, sourceMultiplier,
+ *  keepHistory, keepTrends, modifyTime, disabled, debug, taskCondition, created}, ...]
+ */
 countersDB.getAllCounters = function(callback) {
     db.all('SELECT * FROM counters', callback);
 };
@@ -362,6 +370,7 @@ WHERE counters.collectorID = ?', [collectorName], function(err, rows){
     mode: 0 - update every time when parent counter received a new value and expression is true,
         1 - update once when parent counter received a new value and expression change state to true,
         2 - update once when expression change state to true and once when expression change state to false
+        3 - update once when expression value is changed to false
  */
 countersDB.getUpdateEvents = function(counterID, callback) {
     log.debug('Getting update events for counterID: '+counterID);

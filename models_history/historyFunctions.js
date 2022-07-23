@@ -82,8 +82,9 @@ functions.change = function(id, parameters, callback) {
         if(!isNaN(parseFloat(last)) && isFinite(last) && !isNaN(parseFloat(first)) && isFinite(first)) {
             result = isAbs ? Math.abs(last - first) : last - first;
         } else {
-            if(isAbs && last && first) result = last.toUpperCase() === first.toUpperCase() ? 0: 1;
-            else result = last === first ? 0: 1;
+            if(isAbs && typeof last === 'string' && typeof first === 'string') {
+                result = last.toUpperCase() === first.toUpperCase() ? 0: 1;
+            } else result = last === first ? 0: 1;
         }
 
         log.debug('FUNC: [abs]change(', parameters.join(', '), ') = ', result, '; records: ', records);
@@ -112,7 +113,7 @@ functions.change.description = 'The amount of difference between first and last 
     'dataType: [0|1] data type for compare: number(0) - default or string(1)\n' +
     '\n' +
     'if parameters are not specified, then will be comparing last and previous values\n' +
-    'For strings used case sensitive (for case insensitive use absChange) compare and return:\n' +
+    'For strings used case-sensitive (for case-insensitive use absChange) compare and return:\n' +
     ' 0 - values are equal\n' +
     ' 1 - values differ';
 
@@ -139,7 +140,7 @@ functions.absChange.description = 'The amount of absolute difference between fir
     'dataType: [0|1] data type for compare: number(0) - default or string(1)\n' +
     '\n' +
     'if parameters are not specified, then will be comparing last and previous values\n' +
-    'For strings used case insensitive (for case sensitive use change()) compare and return:\n' +
+    'For strings used case-insensitive (for case-sensitive use change()) compare and return:\n' +
     ' 0 - values are equal\n' +
     ' 1 - values differ';
 
@@ -232,8 +233,8 @@ functions.count.description = 'Number of values within the defined evaluation pe
     'ieqstr - strings are equal (case-insensitive)\n' +
     'like - matches if contains pattern (case-sensitive)\n' +
     'ilike - matches if contains pattern (case-insensitive)\n' +
-    'regexp - case sensitive match of regular expression given in pattern\n' +
-    'iregexp - case insensitive match of regular expression given in pattern\n' +
+    'regexp - case-sensitive match of regular expression given in pattern\n' +
+    'iregexp - case-insensitive match of regular expression given in pattern\n' +
     '<number> - return count of values which more then <pattern>-<number> and less then <pattern>+<number>\n';
 
 
@@ -409,7 +410,7 @@ functions.nodata = function(id, parameters, callback, prevResult) {
         var result = records && records[0] ? Date.now() - records[0].timestamp : Date.now();
 
         // it's strange workaround and it tou understand, why sometimes we get
-        // large values as nodata result, but all data is present in history, remove this fucking code
+        // large values as nodata result, but all data is present in history, remove this f...cking code
         if(result > 3600000) { // 1 hour
             // try to get nodata again after 30 sec
             if(!prevResult) return setTimeout(functions.nodata, 30000, id, parameters, callback, result);
@@ -673,7 +674,7 @@ functions.lastRob.description = 'Getting robustness value of an item within the 
     'third quartile Q3 = avg of 2 records or record in position at (recordsLength * 3/4) = (71 + 72) / 2 = 71.5\n' +
     'min outliers border is Q1 - 1.5 * (Q3 - Q1) = 67.75\n' +
     'max outliers border is Q3 + 1.5 * (Q3 - Q1) = 73.75\n' +
-    '3rd record index (first index is 0 and it is the last record) excluding outliers (300) will be 72\n' +
+    '3rd record index (first index is 0, and it is the last record) excluding outliers (300) will be 72\n' +
     '\n' +
     'lastRob(<period>[, <timeShift>[, <recordIdx>]])\n' +
     'period: evaluation period in milliseconds\n'  +
@@ -793,7 +794,7 @@ functions.avgMed = function(id, parameters, callback) {
 
     if(isNaN(parseFloat(String(outliersPercent))) || !isFinite(outliersPercent) || outliersPercent > 99 || outliersPercent < 1)
         return callback(new Error('Error in parameters for "avgMed('+parameters.join(', ')+')" function for objectID: '+
-            id + ': outliersPercent not number or less then 1% or more then 99%'));
+            id + ': outliersPercent not number or less than 1% or more than 99%'));
 
     history.get(id, shift, num,1,function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "avgMed('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
@@ -959,14 +960,14 @@ functions.avgNear.description = 'Average value of an items with values nearest t
     'minimum value 3-2=1; maximum value 3+2=5; result will be (1 + 3 + 4 + 2 + 5) / 5 = 3\n' +
     'ex#2. records:  [31,42,55,61,33,44,55,60,39,44,51,69,34,57,44,62,30,40,50,60]; patternValue=52; outliers=4, num=3, direction=-1\n' +
     'sorted records: [30,31,33,34,39,40,42,44,44,44,50,51,55,55,57,60,60,61,62,69];\n' +
-    'nearest value less then 52 taking into account outliers = 44,\n' +
+    'nearest value less than 52 taking into account outliers = 44,\n' +
     'minimum value 40; maximum value 44; result will be (44 + 44 + 44 + 42 + 40) / 5 = 42.8\n' +
     '\n' +
     'avgNear(<period>, <timeShift>, <patternValue>, <outliers>[, num, [direction]])\n' +
     'period: evaluation period in milliseconds\n'  +
     'timeShift: evaluation point is moved the number of milliseconds\n' +
     'patternValue: around this value we will calculate an average\n' +
-    'outliers: outliers around of nearest value (maximum and minimum values) that is involved in averaging\n' +
+    'outliers: outliers around of the nearest value (maximum and minimum values) that is involved in averaging\n' +
     'num: if specified, then first look for the value closest to the pattern, which repeats the number of times ' +
     'specified here, taking into account outliers, and calculate the average around the value found.\n' +
     'direction: if negative, look for a value less than the pattern. if positive, look for a value greater ' +
@@ -976,7 +977,7 @@ functions.avgNear.description = 'Average value of an items with values nearest t
     'timestampFrom: timestamp in milliseconds from 1970 - begin of time\n' +
     'timestampTo: timestamp in milliseconds from 1970 - end of time\n'  +
     'patternValue: around this value we will calculate an average\n' +
-    'outliers: outliers around of nearest value (maximum and minimum values) that is involved in averaging\n' +
+    'outliers: outliers around of the nearest value (maximum and minimum values) that is involved in averaging\n' +
     'num: if specified, then first look for the value closest to the pattern, which repeats the number of times ' +
     'specified here, taking into account outliers, and calculate the average around the value found.\n' +
     'direction: if negative, look for a value less than the pattern. if positive, look for a value greater ' +
@@ -986,7 +987,7 @@ functions.avgNear.description = 'Average value of an items with values nearest t
     'recordsCnt: count of records from the recordsShift\n' +
     'recordsShift: evaluation point is moved the number of records back\n' +
     'patternValue: around this value we will calculate an average\n' +
-    'outliers: outliers around of nearest value (maximum and minimum values) that is involved in averaging\n' +
+    'outliers: outliers around of the nearest value (maximum and minimum values) that is involved in averaging\n' +
     'num: if specified, then first look for the value closest to the pattern, which repeats the number of times ' +
     'specified here, taking into account outliers, and calculate the average around the value found.\n' +
     'direction: if negative, look for a value less than the pattern. if positive, look for a value greater ' +

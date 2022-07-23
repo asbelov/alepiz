@@ -19,11 +19,14 @@ taskServer.connect = function (callback) {
     if(!cfg) return typeof callback === 'function' ? callback(new Error('Task server is not configured')) : undefined;
 
     cfg.id = 'taskServer';
-    clientIPC = new IPC.client(cfg, function (err, msg, isConnecting) {
+    new IPC.client(cfg, function (err, msg, _clientIPC) {
         if (err) log.error(err.message);
-        else if (isConnecting && typeof callback === 'function') {
-            callback();
-            callback = null; // prevent run callback again on reconnect
+        else if (_clientIPC) {
+            clientIPC = _clientIPC;
+            if(typeof callback === 'function') {
+                callback();
+                callback = null; // prevent run callback again on reconnect
+            }
         }
     });
 };
@@ -32,7 +35,7 @@ taskServer.connect = function (callback) {
 taskServer.checkCondition = function(OCID, result, objectName, counterName) {
     clientIPC.send({
         OCID: OCID, // single object counters ID
-        result: result,
+        result: Boolean(result), // taskServer.js:queueCondition(): if(result) OCIDs.push(OCID);
         objectName: objectName,
         counterName: counterName,
     });

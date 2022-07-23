@@ -227,13 +227,13 @@ function connectToCollector(collectorName, callback) {
     if(collectors[serverAddress + ':' + port].IPC) return callback(null, collectors[serverAddress + ':' + port].IPC);
 
     // run IPC system
-    collectors[serverAddress + ':' + port].IPC = new IPC.client({
+    new IPC.client({
         serverAddress: serverAddress,
         serverPort: port,
         localAddress: localAddress,
         separateStorageByProcess: true,
         id: path.basename(module.parent.filename, '.js') + '=>' + collectors[serverAddress + ':' + port].names.join(','),
-    }, function(err, message, isConnected) {
+    }, function(err, message, clientIPC) {
 
         // prevent to start this function after reconnect
         if (reconnectInProgress) {
@@ -241,10 +241,9 @@ function connectToCollector(collectorName, callback) {
             return;
         } else reconnectInProgress = true;
 
-        if (!isConnected) return log.warn('Receiving unexpected message: ', message);
+        if (!clientIPC) return log.warn('Receiving unexpected message: ', message);
 
-        if(err) collectors[serverAddress + ':' + port].IPC = null;
-        callback(err, collectors[serverAddress + ':' + port].IPC);
+        collectors[serverAddress + ':' + port].IPC = clientIPC;
+        callback(err, clientIPC);
     });
 }
-

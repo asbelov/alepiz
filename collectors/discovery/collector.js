@@ -26,7 +26,7 @@ var stopScanning = false;
 /** scanID[OCID][ID] where ID is a Date.now()
  * @type {Object}
  */
-var scanIDs = {};
+var scanIDs = new Map();
 /** path to the file for save last discovered IP address in the ranges. For continue discovery after stop
  * @type {string}
  */
@@ -46,11 +46,12 @@ var discoveryIPFile = path.join(conf.get('tempDir') || 'temp', confSettings.get(
  * @param {string|Array} param.SNMPOIDs] - comma separated SNMP OIDs. It will be converted to array after
  * @param {boolean} [param.useZabbix] - use zabbix protocol when scanning host
  * @param {string|Array} [param.zabbixItems] - comma separated Zabbix items for scanning. It will be converted to array after
- * @param {string} [param.zabbixPort] - Zabbiz server port for passive check
+ * @param {string} [param.zabbixPort] - Zabbix server port for passive check
  * @param {function(Error)|function(null, result)} callback
  */
 collector.get = function(param, callback) {
     var ID = Date.now();
+    param.$id = Number(param.$id);
 
     log.info('Starting scan hosts for IP ranges ', param.ranges, '; ID: ', param.$id,
         ', starting at ', (new Date(ID).toLocaleString()));
@@ -66,18 +67,18 @@ collector.get = function(param, callback) {
         return callback({ IP: 0 });
     }
 
-    param.SNMPOIDs = param.SNMPOIDs.split(/[ ]*[,;][ ]*/);
-    param.zabbixItems = param.zabbixItems.split(/[ ]*[,;][ ]*/);
+    param.SNMPOIDs = param.SNMPOIDs.split(/ *[,;] */);
+    param.zabbixItems = param.zabbixItems.split(/ *[,;] */);
 
 
-    if (typeof scanIDs[param.$id] !== 'object') scanIDs[param.$id] = {};
+    if (!(scanIDs.get(param.$id) instanceof Map)) scanIDs.set(param.$id, new Map());
     else {
         log.info('Scanning hosts for IP ranges ', param.ranges, ' for ID: ', param.$id,
             ' in progress. Add new scan process and mark other processes (',
-            Object.keys(scanIDs[param.$id]), ') for terminate');
-        for (var oldID in scanIDs[param.$id]) scanIDs[param.$id][oldID] = false;
+            scanIDs.get(param.$id), ') for terminate');
+        for (var oldID of scanIDs.get(param.$id).keys()) scanIDs.get(param.$id).set(oldID, false);
     }
-    scanIDs[param.$id][ID] = true;
+    scanIDs.get(param.$id).set(ID, true);
 
     scan(IPs, param, ID, callback);
 };
@@ -92,9 +93,10 @@ collector.removeCounters = function(OCIDs, callback) {
 
     var findIDs = [];
     OCIDs.forEach(function(OCID) {
-        if (scanIDs[OCID]) {
-            Object.keys(scanIDs[OCID]).forEach(function(ID) {
-                scanIDs[OCID][ID] = false;
+        OCID = Number(OCID);
+        if (scanIDs.has(OCID)) {
+            scanIDs.get(OCID).forEach(function(value, ID) {
+                scanIDs.get(OCID).set(ID, false);
             });
             findIDs.push(OCID);
 
@@ -114,7 +116,7 @@ collector.removeCounters = function(OCIDs, callback) {
     callback();
 };
 
-/** Set stopScanning to true for stop scanning host when destroing collector
+/** Set stopScanning to true for stop scanning host when destroying collector
  * @param {function()} callback - called when set stopScanning = true.
  */
 collector.destroy = function(callback) {
@@ -123,7 +125,7 @@ collector.destroy = function(callback) {
     callback();
 };
 
-/** Converting comma seaprated IPv4 or IPv6 ranges to array of IP addresses
+/** Converting comma separated IPv4 or IPv6 ranges to array of IP addresses
  *
  * @param {string} ranges - comma separated IP rages (f.e. "192.168.1.1-192.168.1.254,172.10.1.1-172.10.5.2")
  * @param {uint} id - OCID
@@ -145,18 +147,18 @@ function prepareIPsForScan(ranges, id, runFromBeginning) {
     }
 
     var IPs = [];
-    ranges.split(/[ ]*[;,][ ]*/).forEach(function(range) { // ranges separator can be a ',' or ';'
-        var firstLastIPs = range.split(/[ ]*-[ ]*/); // IPs separator is a '-'
+    ranges.split(/ *[;,] */).forEach(function(range) { // ranges separator can be a ',' or ';'
+        var firstLastIPs = range.split(/ *- */); // IPs separator is a '-'
         if (firstLastIPs.length === 2) {
             var firstIP = firstLastIPs[0];
             var lastIP = firstLastIPs[1];
         } else firstIP = lastIP = range; // range is a single IP address
 
-        if (/^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/.test(firstIP) &&
-            /^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/.test(lastIP)) { // IPv4
+        if (/^((\d|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])\.){3}(\d|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])$/.test(firstIP) &&
+            /^((\d|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])\.){3}(\d|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])$/.test(lastIP)) { // IPv4
             var family = 4;
-        } else if (/^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/.test(firstIP) &&
-            /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/.test(lastIP)) { // IPv6)
+        } else if (/^(([\da-fA-F]{1,4}:){7}[\da-fA-F]{1,4}|([\da-fA-F]{1,4}:){1,7}:|([\da-fA-F]{1,4}:){1,6}:[\da-fA-F]{1,4}|([\da-fA-F]{1,4}:){1,5}(:[\da-fA-F]{1,4}){1,2}|([\da-fA-F]{1,4}:){1,4}(:[\da-fA-F]{1,4}){1,3}|([\da-fA-F]{1,4}:){1,3}(:[\da-fA-F]{1,4}){1,4}|([\da-fA-F]{1,4}:){1,2}(:[\da-fA-F]{1,4}){1,5}|[\da-fA-F]{1,4}:((:[\da-fA-F]{1,4}){1,6})|:((:[\da-fA-F]{1,4}){1,7}|:)|fe80:(:[\da-fA-F]{0,4}){0,4}%[\da-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?\d)?\d)\.){3}(25[0-5]|(2[0-4]|1?\d)?\d)|([\da-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?\d)?\d)\.){3}(25[0-5]|(2[0-4]|1?\d)?\d))$/.test(firstIP) &&
+            /^(([\da-fA-F]{1,4}:){7}[\da-fA-F]{1,4}|([\da-fA-F]{1,4}:){1,7}:|([\da-fA-F]{1,4}:){1,6}:[\da-fA-F]{1,4}|([\da-fA-F]{1,4}:){1,5}(:[\da-fA-F]{1,4}){1,2}|([\da-fA-F]{1,4}:){1,4}(:[\da-fA-F]{1,4}){1,3}|([\da-fA-F]{1,4}:){1,3}(:[\da-fA-F]{1,4}){1,4}|([\da-fA-F]{1,4}:){1,2}(:[\da-fA-F]{1,4}){1,5}|[\da-fA-F]{1,4}:((:[\da-fA-F]{1,4}){1,6})|:((:[\da-fA-F]{1,4}){1,7}|:)|fe80:(:[\da-fA-F]{0,4}){0,4}%[\da-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?\d)?\d)\.){3}(25[0-5]|(2[0-4]|1?\d)?\d)|([\da-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?\d)?\d)\.){3}(25[0-5]|(2[0-4]|1?\d)?\d))$/.test(lastIP)) { // IPv6)
             family = 6;
         } else return log.error('Incorrect IP addresses for make scan range: ', firstIP,
             (firstIP !== lastIP ? ':' + lastIP : ''), ' (', range, ') form IP ranges: ', ranges);
@@ -181,7 +183,7 @@ function prepareIPsForScan(ranges, id, runFromBeginning) {
  *
  * @param {Array} IPs - array of IP addresses
  * @param {Object} param - parameters from collector.get() function
- * @param {uint} ID - scan ID - tomestamp (Date.now()) when range add to scan
+ * @param {uint} ID - scan ID - timestamp (Date.now()) when range add to scan
  * @param {function(Error)|function(null, string)} callback - called when done. Return error or
  * stringified object with data of scan for every founded object
  * or string like '{"scanTime": ' + (Date.now() - startTime)+ '}' when scanning ranges is done
@@ -203,12 +205,12 @@ function scan(IPs, param, ID, callback) {
     var myDiscoveryFile = discoveryIPFile + '-' + param.$id;
 
     async.eachSeries(IPs, function(IP, asyncCallback) {
-        if (stopScanning || (scanIDs[param.$id] && scanIDs[param.$id][ID] === false)) return asyncCallback(true);
+        if (stopScanning || (scanIDs.has(param.$id) && scanIDs.get(param.$id).get(ID) === false)) return asyncCallback(true);
 
         log.info('Scanning host ', IP, ' from IP ranges ', param.ranges, '; ID: ', param.$id,
             ', scan was started at ', (new Date(ID).toLocaleString()));
         scanHost(IP, param, function(err, result) {
-            if (stopScanning || (scanIDs[param.$id] && scanIDs[param.$id][ID] === false)) return asyncCallback(true);
+            if (stopScanning || (scanIDs.has(param.$id) && scanIDs.get(param.$id).get(ID) === false)) return asyncCallback(true);
 
             if (myDiscoveryFile) {
                 try {
@@ -228,9 +230,9 @@ function scan(IPs, param, ID, callback) {
         });
     }, function(stop) {
         if (stop) {
-            delete scanIDs[param.$id][ID];
-            if (!Object.keys(scanIDs[param.$id]).length) {
-                delete scanIDs[param.$id];
+            scanIDs.get(param.$id).delete(ID);
+            if (!scanIDs.get(param.$id).size) {
+                scanIDs.delete(param.$id);
                 log.info('Stopping all processes for scan hosts for IP ranges ', param.ranges,
                     ', ID: ', param.$id, ', last process was started at ', (new Date(ID).toLocaleString()),
                     ', scan time: ', Math.round((Date.now() - startTime) / 1000), 'sec');
@@ -241,7 +243,7 @@ function scan(IPs, param, ID, callback) {
                     ', scan time: ', Math.round((Date.now() - startTime) / 1000), 'sec')
             }
 
-            if (!Object.keys(scanIDs).length) {
+            if (!scanIDs.size) {
                 log.info('All scan processes was stopped');
                 stopScanning = false;
             }
@@ -259,8 +261,8 @@ function scan(IPs, param, ID, callback) {
             IPs = prepareIPsForScan(param.ranges, param.$id, true);
             setTimeout(scan, Number(param.scanRepetitionTime) * 1000, IPs, param, ID, callback).unref();
         } else {
-            delete scanIDs[param.$id][ID];
-            if (!Object.keys(scanIDs[param.$id]).length) delete scanIDs[param.$id];
+            scanIDs.get(param.$id).delete(ID);
+            if (!scanIDs.get(param.$id).size) scanIDs.delete(param.$id);
 
             log.info('Scanning hosts for IP ranges ', param.ranges, ' is done, ID: ', param.$id,
                 ', scan was started at ', (new Date(ID).toLocaleString()), ', scanning time: ',
@@ -320,7 +322,7 @@ function createIPsList(firstIP, lastIP, family) {
     }
 }
 
-/** Scan speceific host for ping, DNS name lookup, SNMP and zabbix
+/** Scan specific host for ping, DNS name lookup, SNMP and zabbix
  *
  * @param {string} IP - host IP address
  * @param {Object} param - parameters from {@member collector.get} function
@@ -432,7 +434,7 @@ function ping(IP, packetsCnt, callback) {
         externalProgramArguments = ['-n', packetsCnt, '-w', timeout, IP],
         // for debugging
         //externalProgramArguments = ['-t', '-l', target.packetSize, '-w', target.timeout, '193.178.135.25'],
-        regExpForExtractRTT = /^.*[=<]([\d]+)[^ \s\d][\s\S]*$/;
+        regExpForExtractRTT = /^.*[=<](\d+)[^ \s\d][\s\S]*$/;
 
     // forking and remember child object to global variable for kill it, if needed
     var child = spawn(externalProgram, externalProgramArguments);

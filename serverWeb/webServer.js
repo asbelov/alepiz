@@ -120,8 +120,10 @@ webSecrets.get(function (err, web) {
     var port = Number(process.env["app_port"] || process.env.PORT || confWebServer.get('httpsPort'));
     try {
         var sslOptions = {
+            // private key
             key:  fs.readFileSync(path.join(__dirname, '..', confWebServer.get('privatePath') ||
                 'private', confWebServer.get('httpsKeyFile') || 'key.pem')),
+            // certificate, root certificate, intermediate certificate
             cert: fs.readFileSync(path.join(__dirname, '..', confWebServer.get('privatePath') ||
                 'private', confWebServer.get('httpsCertFile') || 'cert.pem')),
         }

@@ -61,11 +61,14 @@ history.connect = function(id, callback) {
             parameters.suffix = '-' + id;
         }
 
-        clientIPC = new IPC.client(parameters, function (err, msg, isConnecting) {
+        new IPC.client(parameters, function (err, msg, _clientIPC) {
             if (err) log.error(err.message);
-            else if (isConnecting && typeof callback === 'function') {
-                callback();
-                callback = null; // prevent run callback again on reconnect
+            else if (_clientIPC) {
+                clientIPC = _clientIPC;
+                if(typeof callback === 'function') {
+                    callback();
+                    callback = null; // prevent run callback again on reconnect
+                }
             }
         });
     } else if(typeof callback === 'function') {

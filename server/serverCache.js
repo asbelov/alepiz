@@ -7,13 +7,9 @@ const objectsPropertiesDB = require("../models_db/objectsPropertiesDB");
 const objectsDB = require("../models_db/objectsDB");
 const checkIDs = require("../lib/utils/checkIDs");
 
-var serverCache = {
-    createCache: createCache,
-    recordsFromDBCnt: recordsFromDBCnt,
-};
-module.exports = serverCache;
-
 var recordsFromDBCnt = 0;
+
+module.exports = createCache;
 
 
 function createCache(updateMode, callback) {
@@ -21,14 +17,17 @@ function createCache(updateMode, callback) {
         !updateMode.getVariablesExpressions.length && !updateMode.geObjectsProperties.length)) return callback();
 
     async.parallel({
+        recordsFromDBCnt: function(callback) { callback(null, recordsFromDBCnt) },
         countersObjects: function(callback) {
             if(updateMode  && !updateMode.updateObjectsCounters) return callback();
 
-            getDataForCheckDependencies(function(err, counters, objects, objectName2OCID) {
+            getDataForCheckDependencies(function(err, counters, objects, objectName2OCID, OCIDs, counterObjectNames) {
                 callback(err, {
                     counters: counters,
                     objects: objects,
-                    objectName2OCID: objectName2OCID
+                    objectName2OCID: objectName2OCID,
+                    OCIDs: OCIDs,
+                    names: counterObjectNames,
                 });
             });
         },
@@ -48,7 +47,8 @@ function createCache(updateMode, callback) {
 }
 
 function getDataForCheckDependencies(callback) {
-    var counters = {}, objects = {}, allObjects = {}, countersParams = {}, objectName2OCID = {};
+    var counters = {}, objects = {}, allObjects = {}, countersParams = {}, objectName2OCID = {}, OCIDs = {},
+        counterObjectNames = new Map();
 
     countersDB.getAllObjectsCounters(function(err, rowsOCIDs) {
         if (err) return callback(err);
@@ -87,12 +87,12 @@ function getDataForCheckDependencies(callback) {
                             counters[row.id] = {
                                 objectsIDs: {},
                                 dependedUpdateEvents: {}, // {parentCounterID1: { expression, mode, parentObjectID, counterID}, ... }
-                                counterID: row.id,
+                                //counterID: row.id,
                                 collector: row.collectorID,
                                 counterName: row.name,
                                 debug: row.debug,
                                 taskCondition: row.taskCondition,
-                                groupID: row.groupID,
+                                //groupID: row.groupID,
                                 counterParams: countersParams[row.id],
                             };
                         });
@@ -106,13 +106,23 @@ function getDataForCheckDependencies(callback) {
                                 expression: row.expression,
                                 mode: row.mode,
                                 objectFilter: row.objectFilter,
-                                parentObjectID: row.parentObjectID
+                                parentObjectID: row.parentObjectID,
                             };
                         });
 
                         rowsOCIDs.forEach(function (row) {
                             if(!counters[row.counterID] || !objects[row.objectID]) return;
                             counters[row.counterID].objectsIDs[row.objectID] = row.id;
+
+                            OCIDs[row.id] = {
+                                objectID: row.objectID,
+                                counterID: row.counterID,
+                            }
+
+                            counterObjectNames.set(row.id, {
+                                objectName: allObjects[row.objectID],
+                                counterName: counters[row.counterID].counterName,
+                            });
 
                             var objectNameInUpperCase = objects[row.objectID].toUpperCase();
                             if(!objectName2OCID[objectNameInUpperCase]) objectName2OCID[objectNameInUpperCase] = {};
@@ -121,7 +131,7 @@ function getDataForCheckDependencies(callback) {
 
                         //console.log(counters);
 
-                        callback(null, counters, allObjects, objectName2OCID);
+                        callback(null, counters, allObjects, objectName2OCID, OCIDs, counterObjectNames);
                     });
                 });
             });

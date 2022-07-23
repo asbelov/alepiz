@@ -25,6 +25,7 @@ var JQueryNamespace = (function ($) {
         autoUpdateElm = $('#auto-update');
         messageElm = $('#message-area');
         fullScreenGraphBtnElm = $('#fullScreenGraphBtn');
+        graphSettingsBtnElm = $('#graphSettingsBtn');
         fullScreenCountersBtnElm = $('#fullScreenCountersBtn');
         checkAllGroupsAndCountersBtnElm = $('#checkAllGroupsAndCountersBtn');
         leftDivElm = $('#leftDiv');
@@ -64,7 +65,7 @@ var JQueryNamespace = (function ($) {
                 },
                 onCloseEnd: function() {
                     if(!timePickerTo.time) return;
-                    var timePair = timePickerTo.time.split(/[^0-9]/);
+                    var timePair = timePickerTo.time.split(/\D/); // \D = [^0-9]
                     if(!Array.isArray(timePair) || timePair.length !== 2) return;
                     var newDateTo = getTimestampFromStr(dateToElm.val()) + Number(timePair[0]) * 3600000 + Number(timePair[1]) * 60000;
                     dateTo = newDateTo < dateFrom ? dateFrom + 3600000 : newDateTo;
@@ -88,7 +89,7 @@ var JQueryNamespace = (function ($) {
                 },
                 onCloseEnd: function() {
                     if(!timePickerFrom.time) return;
-                    var timePair = timePickerFrom.time.split(/[^0-9]/);
+                    var timePair = timePickerFrom.time.split(/\D/); // \D = [^0-9]
                     // to not show timePickerTo when cancel click on timePickerFrom after successfully set time before on timePickerFrom
                     timePickerFrom.time = undefined;
                     if(!Array.isArray(timePair) || timePair.length !== 2) return
@@ -181,6 +182,7 @@ var JQueryNamespace = (function ($) {
         autoUpdateElm,
         messageElm,
         fullScreenGraphBtnElm,
+        graphSettingsBtnElm,
         fullScreenCountersBtnElm,
         checkAllGroupsAndCountersBtnElm,
         leftDivElm,
@@ -200,7 +202,10 @@ var JQueryNamespace = (function ($) {
         historyHeaderTooltipsInstances,
         dataViewHumanMode = {},
         drawingLatestDataInProgress = 0,
-        drawingHistoryInProgress = 0;
+        drawingHistoryInProgress = 0,
+        noDataInCache = 'waiting for data...',
+        loadingDataFromCache = 'loading...';
+
 
     var monthNames = ["January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
@@ -216,7 +221,7 @@ var JQueryNamespace = (function ($) {
      */
     function init(_objects, callback) {
         // !!! onScrollIframe init in parent init.js
-        onScrollIframe = scrollIframe;
+        //onScrollIframe = scrollIframe;
         if(_objects) objects = _objects;
 
         // parse parameters from browser URL
@@ -304,7 +309,7 @@ var JQueryNamespace = (function ($) {
         });
     }
 
-    function scrollIframe(e) {
+    function scrollIframe() {
         if(!historyTHeadElm) return;
         var scrollPos = $(window).scrollTop();
         var tableTopPos = historyDataElm.offset().top;
@@ -654,7 +659,7 @@ var JQueryNamespace = (function ($) {
     }
 
     /*
-        draw latest data tables without data
+        draw the latest data tables without data
 
         callback()
      */
@@ -716,10 +721,16 @@ var JQueryNamespace = (function ($) {
                     '<span></span></label></td>' +
                     (multipleObjects ? '<td class="no-padding"><div class="truncate no-padding tooltipped" data-position="top" data-tooltip="' +
                         escapeHtml(counter.objectName + (counter.objectDescription ? ': ' + counter.objectDescription : '')) + '">' +
-                        escapeHtml(counter.objectName) + '</div></td>' : '') +
-                    '<td class="no-padding"><div class="truncate no-padding tooltipped" data-position="top" data-tooltip="' + escapeHtml(counter.name) + '">' + escapeHtml(counter.name) + '</div></td>' +
-                    '<td class="no-padding"><div class="truncate no-padding" id="OCID-time-' + counter.OCID + '" timestampForLastValue>loading...</div></td>' +
-                    '<td class="right-align no-padding"><div class="truncate no-padding tooltipped" latestData data-position="top" data-tooltip="undefined" id="OCID-' + counter.OCID + '" lastValue>loading...</div></td>'
+                        '<a href="/?a=%2Factions%2Fobjects_editor&cid=' + counter.id +
+                        '&c=' + counter.objectName + '" target="_blank">' + escapeHtml(counter.objectName) + '</a></div></td>' : '') +
+                    '<td class="no-padding"><div class="truncate no-padding tooltipped" data-position="top" data-tooltip="' +
+                        escapeHtml(counter.name) + '"><a href="/?a=%2Factions%2Fcounter_settings&cid=' + counter.id +
+                        '&c=' + counter.objectName + '" target="_blank">' + escapeHtml(counter.name) + '</a></div></td>' +
+                    '<td class="no-padding"><div class="truncate no-padding" id="OCID-time-' + counter.OCID +
+                        '" timestampForLastValue>' + loadingDataFromCache + '</div></td>' +
+                    '<td class="right-align no-padding"><div class="truncate no-padding tooltipped" ' +
+                        'latestData data-position="top" data-tooltip="undefined" id="OCID-' + counter.OCID +
+                        '" lastValue>' + loadingDataFromCache + '</div></td>'
             });
             html += htmlGroupTail;
         }
@@ -762,14 +773,14 @@ var JQueryNamespace = (function ($) {
             var month = t.getMonth() + 1;
             var date = t.getDate();
             var dateStr = String(date < 10 ? '0' + date : date) + '.' +
-                String(month < 10 ? '0' + month : month) + '.' + String((t.getYear() - 100) + ' ');
+                String(month < 10 ? '0' + month : month) /*+ '.' + String((t.getYear() - 100))*/  + ' ';
         } else dateStr = '';
         return dateStr + String('0' + t.getHours() + ':0' + t.getMinutes() + ':0' + t.getSeconds()).replace(/0(\d\d)/g, '$1');
     }
 
 
     /*
-     getting counters values and fill Latest Data tables
+     getting counters values and fill The Latest Data tables
 
      callback(): may be skipped
      */
@@ -778,8 +789,8 @@ var JQueryNamespace = (function ($) {
             if (typeof(callback) === 'function') callback();
             return;
         }
-        $("[timestampForLastValue]:contains('no data')").text('loading...');
-        $("[lastValue]:contains('no data')").text('loading...');
+        $("[timestampForLastValue]:contains(' + noDataInCache + ')").text(loadingDataFromCache);
+        $("[lastValue]:contains(' + noDataInCache + ')").text(loadingDataFromCache);
         bodyElm.css("cursor", "wait");
         $.post(serverURL, {func: 'getObjectsCountersValues', IDs: OCIDs.join(',')}, function (records) {
             bodyElm.css("cursor", "auto");
@@ -800,15 +811,15 @@ var JQueryNamespace = (function ($) {
 
                     if(record.data === undefined) {
                         if(record.err && record.err.message) value = record.err.message;
-                        else value = 'no data';
+                        else value = noDataInCache;
                     }
                     else if (counterObj[id]) value = formatValue(value, unitsObj[counterObj[id].unitID]);
 
                     $('#OCID-' + id).html(value).attr('data-tooltip', value);
                 });
             }
-            $("[timestampForLastValue]:contains('loading...')").text('no data');
-            $("[lastValue]:contains('loading...')").text('no data');
+            $("[timestampForLastValue]:contains(' + loadingDataFromCache + ')").text(noDataInCache);
+            $("[lastValue]:contains(' + loadingDataFromCache + ')").text(noDataInCache);
             M.Tooltip.init(document.querySelectorAll('div[latestData]'), {
                 enterDelay: 1000
             });
@@ -817,7 +828,7 @@ var JQueryNamespace = (function ($) {
     }
 
     /*
-        Return array of objectsCountersIDs with Number type of elements for selected checkbox in Latest Data table
+        Return array of objectsCountersIDs with Number type of elements for selected checkbox in The Latest Data table
      */
     function getOCIDFromSelectedLatestDataCheckBoxes() {
         var checkBoxElms = $('input[latest-data-cb]:checked:enabled');
@@ -857,7 +868,8 @@ var JQueryNamespace = (function ($) {
              sorted by timestamps from older (smaller) to newer (larger)
              */
             bodyElm.css("cursor", "wait");
-            var timestampWithDate = (new Date(dateFrom).getDate() !== (new Date(dateTo)).getDate());
+            //var timestampWithDate = (new Date(dateFrom).getDate() !== (new Date(dateTo)).getDate());
+            var timestampWithDate = dateTo - dateFrom > 86400000 || Date.now() - dateTo > 86400000;
             $.ajax({
                 type: 'POST',
                 timeout: 10000,
@@ -982,8 +994,14 @@ var JQueryNamespace = (function ($) {
 
                     if(hasNumericData) {
                         graphAreaElm.removeClass('hide');
+                        fullScreenGraphBtnElm.removeClass('hide');
+                        graphSettingsBtnElm.removeClass('hide');
                         prepareDataForGraph(objectsCountersValues);
-                    } else graphAreaElm.addClass('hide');
+                    } else {
+                        graphAreaElm.addClass('hide');
+                        fullScreenGraphBtnElm.addClass('hide');
+                        graphSettingsBtnElm.addClass('hide');
+                    }
 
                     /*
                     if(drawingHistoryInProgress > 1) {
@@ -1053,8 +1071,10 @@ var JQueryNamespace = (function ($) {
             });
 
             HTML.push('<tr><td>' +
-                (from !== null && from + 1000 < to ? timestampToTimeStr(from, timestampWithDate) + '-': '') +
-                timestampToTimeStr(to) + '</td>' +
+                (from !== null && from + 1000 < to ?
+                    timestampToTimeStr(from, timestampWithDate) + '-' + timestampToTimeStr(to) :
+                    timestampToTimeStr(to, timestampWithDate)) +
+                '</td>' +
                 row.join('')+ '</tr>');
             if(minTimestamp === null || !hasDataInRow) break;
         }
@@ -1164,7 +1184,7 @@ var JQueryNamespace = (function ($) {
         // Hook into the 'flotr:click' event. Return to day view on graph
         Flotr.EventAdapter.observe(graphAreaDomElm, 'flotr:click', function() {
 
-            if(dateTo - dateFrom < 86400000) {// less then one day (< 24 hours)
+            if(dateTo - dateFrom < 86400000) {// less than one day (< 24 hours)
                 dateFrom = dateFrom + (Math.round((dateTo - dateFrom) / 2)) - 43200000; // 86400000 / 2
                 dateTo = dateFrom + 86400000;
                 dateFrom = new Date(new Date(dateFrom).setHours(0,0,0,0)).getTime();
@@ -1173,7 +1193,7 @@ var JQueryNamespace = (function ($) {
                     dateTo = Date.now();
                     dateFrom = dateTo - 86400000;
                 }
-            } else { // more then one day (> 24 hours)
+            } else { // more than one day (> 24 hours)
                 dateFrom = dateTo - 86400000;
             }
 
@@ -1423,7 +1443,7 @@ var JQueryNamespace = (function ($) {
             xaxis : {
                 mode : 'time',
                 timeMode: 'local',
-                noTicks: 15, // ticks count (timestamps) on the x axis
+                noTicks: 15, // ticks count (timestamps) on the x-axis
                 min: dateFrom,
                 max: dateTo
             },

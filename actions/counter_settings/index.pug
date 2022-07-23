@@ -95,6 +95,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                             input(type='checkbox')#debug
                                             span(data-position='top' data-tooltip='Log debug information for this counter for the "Variables" action.').tooltipped
                                                 a(href="#!")#showCountersWithDebug Enable debug
+                                                span#goToDebugLink &nbsp;(go to debug)
                                     div.col.s3
                                         label
                                             input(type='checkbox')#taskCondition
@@ -365,5 +366,3 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
 
     footer
         input(type="hidden" name="actionName" value= action.name)
-
-

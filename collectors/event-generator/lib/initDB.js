@@ -216,11 +216,10 @@ function createDisabledEventsTable(db) {
     }
 }
 
-/** Removes disabled events for which the disable time has passed.
- * Load events and disabledEvents to the cache from database.
+/** Load events and disabledEvents to the cache from database.
  *
  * @param db {Object} better-sqlite db object
- * @returns {{db: {}, disabledEventsCache: {}, eventsCache: {}}}
+ * @returns {{db: {}, disabledEventsCache: Map<Number, Object>, eventsCache: Map<Number, Number>}}
  */
 function loadDataToCache(db) {
     try {
@@ -229,9 +228,9 @@ function loadDataToCache(db) {
         throw(new Error('Can\'t load events data to cache: ' + err.message));
     }
 
-    var eventsCache = {};
+    var eventsCache = new Map();
     rows.forEach(function (row) {
-        eventsCache[row.OCID] = row.id;
+        eventsCache.set(row.OCID, row.id);
     });
 
     try {
@@ -246,9 +245,9 @@ function loadDataToCache(db) {
         throw(new Error('Can\'t load disabled events data to cache: ' + err.message));
     }
 
-    var disabledEventsCache = {};
+    var disabledEventsCache = new Map();
     rows.forEach(function (row) {
-        disabledEventsCache[row.OCID] = row;
+        disabledEventsCache.set(row.OCID, row);
     });
 
     return({

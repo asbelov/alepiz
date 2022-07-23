@@ -15,7 +15,7 @@ const confObjectFilters = new Conf('config/objectFilters.json');
 /** Object for convert counter names to counter IDs {<counterName1>: <counterID1>, <counterName2>: <counterID2>, ...}
  * @type {Object}
  */
-var counterNames2IDs = {};
+var counterNames2IDs = new Map();
 var objectsFilter = {
     getObjectsFilterNames: getObjectsFilterNames,
     applyFilterToObjects: applyFilterToObjects,
@@ -40,7 +40,7 @@ function getObjectsFilterNames(callback) {
     return callback(null, filterNames);
 }
 
-/** Initialized global counterNames2IDs object for convert counter names to counter IDs
+/** Initialized global counterNames2IDs Map for convert counter names to counter IDs
  * {<counterName1>: <counterID1>, <counterName2>: <counterID2>, ...}
  *
  * @param {Object} cfg - config/objectFilters.json
@@ -53,7 +53,7 @@ function initCounterNames2IDs(cfg, callback) {
     for(var variableName in cfg.variables) {
         var variable = cfg.variables[variableName];
         if (variable.expiration) variable.expiration = fromHuman(variable.expiration);
-        if (variable.counter && !counterNames2IDs[variable.counter]) newCounters[variable.counter] = 0;
+        if (variable.counter && !counterNames2IDs.has(variable.counter)) newCounters[variable.counter] = 0;
     }
 
     if(!Object.keys(newCounters).length) return callback();
@@ -63,7 +63,7 @@ function initCounterNames2IDs(cfg, callback) {
             return callback(new Error('Can\'t get counterIDs for counters ' + Object.keys(newCounters) +
                 ': ' + err.message));
         }
-        rows.forEach(row => counterNames2IDs[row.name] = row.id);
+        rows.forEach(row => counterNames2IDs.set(row.name, row.id));
         //log.info('counterNames2IDs: ', counterNames2IDs);
         callback();
     });
@@ -82,14 +82,14 @@ function getHistoryResult(variable, objects, callback) {
         return callback(new Error('Unknown counter name for filter ' + filterObj.name + ': ' + JSON.stringify(variable)));
     }
 
-    if(!counterNames2IDs[variable.counter]) return callback();
+    if(!counterNames2IDs.has(variable.counter)) return callback();
 
     var OCID2ObjectID = {};
     async.each(objects, function (obj, callback) {
-        countersDB.getObjectCounterID(obj.id, counterNames2IDs[variable.counter], function (err, row) {
+        countersDB.getObjectCounterID(obj.id, counterNames2IDs.get(variable.counter), function (err, row) {
             if(err) {
                 return callback(new Error('Can\'t get OCID for object ' + obj.name + '(' + obj.id + ') and counter ' +
-                    variable.counter + '(' + counterNames2IDs[variable.counter] + '): ' + err.message));
+                    variable.counter + '(' + counterNames2IDs.get(variable.counter) + '): ' + err.message));
             }
 
             if(!row) return callback();
