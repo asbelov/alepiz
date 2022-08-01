@@ -46,7 +46,7 @@ function startServer(message, callback) {
             log.warn('A request was received to start the server, but a server stop operation is in progress. ' +
                 'Start the server later for "', message, '"');
             if (startServerDelayTimer) clearTimeout(startServerDelayTimer);
-            startServerDelayTimer = setTimeout(startServer, 15000, message, callback);
+            startServerDelayTimer = setTimeout(startServer, 15000, message, callback).unref();
             return;
         }
     }
@@ -75,7 +75,7 @@ function startServer(message, callback) {
             startServerDelayTimer = null;
             if (typeof callback === "function") callback(err);
         });
-    }, startTimeout);
+    }, startTimeout).unref();
 }
 
 function stopServer(message, callback, isQuiet) {
@@ -94,7 +94,7 @@ function stopServer(message, callback, isQuiet) {
             log.warn('A request was received to stop the server, but a server start operation is in progress. ' +
                 'Stop the server later for "', message, '"');
             if (stopServerDelayTimer) clearTimeout(stopServerDelayTimer);
-            stopServerDelayTimer = setTimeout(stopServer, 10000, message, callback);
+            stopServerDelayTimer = setTimeout(stopServer, 10000, message, callback).unref();
             return;
         }
     }

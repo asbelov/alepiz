@@ -24,14 +24,14 @@ collector.get = function(param, callback) {
 
     var addressPrepareDst;
     // checking for Internet domain name
-    if(/^(([a-zA-Z]|[a-zA-Z][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9])$/.test(param.host)) {
+    if(/^(([a-zA-Z]|[a-zA-Z][a-zA-Z\d\-]*[a-zA-Z\d])\.)*([A-Za-z]|[A-Za-z][A-Za-z\d\-]*[A-Za-z\d])$/.test(param.host)) {
         addressPrepareDst = dns.lookup; // dns.lookup(param.host, function (err, IP, family) {}) // address: 192.168.0.1; family: 4|6
 
         // checking for IPv4 address family
-    } else if(/^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/.test(param.host)) { // IPv4
+    } else if(/^((\d|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])\.){3}(\d|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])$/.test(param.host)) { // IPv4
         addressPrepareDst = function(IPv4, callback) { callback(null, IPv4, 4); };
         // checking for IPv6 address family
-    } else if(/^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/.test(param.host)) { // IPv6
+    } else if(/^(([\da-fA-F]{1,4}:){7}[\da-fA-F]{1,4}|([\da-fA-F]{1,4}:){1,7}:|([\da-fA-F]{1,4}:){1,6}:[\da-fA-F]{1,4}|([\da-fA-F]{1,4}:){1,5}(:[\da-fA-F]{1,4}){1,2}|([\da-fA-F]{1,4}:){1,4}(:[\da-fA-F]{1,4}){1,3}|([\da-fA-F]{1,4}:){1,3}(:[\da-fA-F]{1,4}){1,4}|([\da-fA-F]{1,4}:){1,2}(:[\da-fA-F]{1,4}){1,5}|[\da-fA-F]{1,4}:((:[\da-fA-F]{1,4}){1,6})|:((:[\da-fA-F]{1,4}){1,7}|:)|fe80:(:[\da-fA-F]{0,4}){0,4}%[\da-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?\d)?\d)\.){3}(25[0-5]|(2[0-4]|1?\d)?\d)|([\da-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?\d)?\d)\.){3}(25[0-5]|(2[0-4]|1?\d)?\d))$/.test(param.host)) { // IPv6
         addressPrepareDst = function(IPv6, callback) { callback(null, IPv6, 6); };
     } else {
         log.error('Incorrect host name or IP address: ' + param.host);
@@ -41,14 +41,14 @@ collector.get = function(param, callback) {
     var addressPrepareSrc;
     if(!param.localAddress) {
         addressPrepareSrc = function(noAddress, callback) { callback(null, noAddress); };
-    } else if(/^(([a-zA-Z]|[a-zA-Z][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9])$/.test(param.localAddress)) {
+    } else if(/^(([a-zA-Z]|[a-zA-Z][a-zA-Z\d\-]*[a-zA-Z\d])\.)*([A-Za-z]|[A-Za-z][A-Za-z\d\-]*[A-Za-z\d])$/.test(param.localAddress)) {
         addressPrepareSrc = dns.lookup; // dns.lookup(param.host, function (err, IP, family) {}) // address: 192.168.0.1; family: 4|6
 
         // checking for IPv4 address family
-    } else if(/^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/.test(param.localAddress)) { // IPv4
+    } else if(/^((\d|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])\.){3}(\d|[1-9]\d|1\d{2}|2[0-4]\d|25[0-5])$/.test(param.localAddress)) { // IPv4
         addressPrepareSrc = function(IPv4, callback) { callback(null, IPv4, 4); };
         // checking for IPv6 address family
-    } else if(/^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9]))$/.test(param.localAddress)) { // IPv6
+    } else if(/^(([\da-fA-F]{1,4}:){7}[\da-fA-F]{1,4}|([\da-fA-F]{1,4}:){1,7}:|([\da-fA-F]{1,4}:){1,6}:[\da-fA-F]{1,4}|([\da-fA-F]{1,4}:){1,5}(:[\da-fA-F]{1,4}){1,2}|([\da-fA-F]{1,4}:){1,4}(:[\da-fA-F]{1,4}){1,3}|([\da-fA-F]{1,4}:){1,3}(:[\da-fA-F]{1,4}){1,4}|([\da-fA-F]{1,4}:){1,2}(:[\da-fA-F]{1,4}){1,5}|[\da-fA-F]{1,4}:((:[\da-fA-F]{1,4}){1,6})|:((:[\da-fA-F]{1,4}){1,7}|:)|fe80:(:[\da-fA-F]{0,4}){0,4}%[\da-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?\d)?\d)\.){3}(25[0-5]|(2[0-4]|1?\d)?\d)|([\da-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?\d)?\d)\.){3}(25[0-5]|(2[0-4]|1?\d)?\d))$/.test(param.localAddress)) { // IPv6
         addressPrepareSrc = function(IPv6, callback) { callback(null, IPv6, 6); };
     } else {
         log.error('Incorrect host name or IP address: ' + param.host);
@@ -72,7 +72,8 @@ collector.get = function(param, callback) {
             var socket = net.connect({
                 host: addressDst,
                 port: param.port,
-                localAddress: addressSrc
+                localAddress: addressSrc,
+                timeout: param.socketTimeout || 180000,
             }, function () {
                 var zabbixData = Buffer.from('ZBXDVLLLLLLLL');
                 zabbixData.writeInt8(1, 4);
@@ -95,12 +96,14 @@ collector.get = function(param, callback) {
                 //console.log('Zabbix agent received: ', dataPart);
             });
 
-            socket.on('end', function(){
+            socket.on('end', function() {
                 var header, version, length;
+                socket.destroy();
 
                 //console.log('Zabbix agent received at the end: ', data);
 
                 if (data.length < minResponseLength) {
+                    data = Buffer.alloc(0);
                     log.error(errorMessage + 'response size too low');
                     return callback();
                 }
@@ -108,24 +111,25 @@ collector.get = function(param, callback) {
                 version = data.readInt8(4);
 
                 if (header !== "ZBXD" || version !== 1) {
+                    data = Buffer.alloc(0);
                     log.error(errorMessage + 'incorrect header: ' + header + ':' + version);
                     return callback();
                 }
 
                 length = data.readUInt32LE(5);
                 if (data.length !== (4 + 1 + 8 + length)) {
+                    data = Buffer.alloc(0);
                     log.error(errorMessage + 'incorrect data length: ' + length);
                     return callback();
                 }
                 var result = data.toString('utf8', data.length - length);
+                data = Buffer.alloc(0);
 
                 if(result.indexOf('ZBX_NOTSUPPORTED') === 0) {
                     log.warn(errorMessage + data.toString('utf8', data.length - length + zbx_notsupportedLength + 1));
                     result = null;
                 }
                 
-                socket.end();
-
                 // return only numeric values
                 if(param.onlyNumeric) {
                     result = Number(result);
@@ -142,6 +146,11 @@ collector.get = function(param, callback) {
                 // use log.info() so that problems with host unavailability do not clog up the errors.log
                 log.info(errorMessage, err.message);
                 callback();
+            });
+
+            socket.on('timeout', function () {
+                log.warn(errorMessage, 'socket timeout occurred: ', socket.timeout);
+                socket.end();
             });
         });
     });

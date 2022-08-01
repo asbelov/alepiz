@@ -23,6 +23,18 @@ collector.get = function (param, callback) {
 
     commonEventGenerator.get(param, callback);
     eventGenerators.forEach(eventGenerator => eventGenerator.get(param));
+
+    if(Number(param.eventDuration) === parseInt(String(param.eventDuration), 10)) {
+        param.eventDuration = Number(param.eventDuration);
+
+        setTimeout(function(param, callback) {
+                param.$variables.UPDATE_EVENT_STATE = 0;
+                param.$variables.UPDATE_EVENT_TIMESTAMP = Date.now();
+                commonEventGenerator.get(param, callback);
+                eventGenerators.forEach(eventGenerator => eventGenerator.get(param));
+            }, (!param.eventDuration || param.eventDuration < 1 ? 0 : param.eventDuration * 1000),
+            param, callback);
+    }
 }
 
 // for dashboard server function
@@ -67,10 +79,10 @@ function init() {
     }
 
     async.each(dbPaths, function (dbPath, callback) {
-        runInThread(path.join(__dirname, 'lib', 'eventGenerator.js'), {
+        runInThread(path.join(__dirname, 'lib', 'eventGenerator.js'), {/*
             get: {
                 permanentCallback: true,
-            }},function (err, eventGenerator) {
+            }*/},function (err, eventGenerator) {
             eventGenerators.push(eventGenerator.func);
             eventGenerator.func.init(dbPath, callback);
         });

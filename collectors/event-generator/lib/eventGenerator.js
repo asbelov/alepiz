@@ -170,11 +170,13 @@ function eventGeneratorGet(param, callback) {
                 if(err) log.error(err.message, ' for ', dbPath);
             });
         }
-
+/*
+// !!! moved to collector.js
         if(Number(param.eventDuration) === parseInt(String(param.eventDuration), 10)) {
             param.eventDuration = Number(param.eventDuration);
 
             setTimeout(function(newEventID, param, callback) {
+            /// ??? solveEvent(param, eventTimestamp)
                 callback(solveEvent(param, eventTimestamp), newEventID ? 1 : undefined);
                 param.$variables.UPDATE_EVENT_STATE = 0;
                 eventGenerator.get(param, callback);
@@ -182,7 +184,7 @@ function eventGeneratorGet(param, callback) {
                 newEventID, param, callback);
             return;
         }
-
+*/
         // save new event to history database too
         if(newEventID) callback(null, 1);
         else callback();

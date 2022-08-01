@@ -26,8 +26,9 @@ var collectorsObj = {};
 
 var cache = {
     countersObjects: {},
-    objectsPropertiesDBCache: new Map(),
-    variablesDBCache: new Map(),
+    objectsProperties: new Map(),
+    variablesExpressions: new Map(),
+    variablesHistory: new Map(),
 };
 
 // init history and debugCounters communication
@@ -56,12 +57,12 @@ function processMessage(message, callback) {
     }
 
     // init cache
-    if (message.countersObjects || message.variables || message.variablesExpressions || message.objectsProperties) {
+    if (message.countersObjects || message.variablesHistory || message.variablesExpressions || message.objectsProperties) {
         cache = initCache(message, cache);
 
         calc.initCache({
             countersObjects: cache.countersObjects,
-            objectsProperties: cache.objectsPropertiesDBCache,
+            objectsProperties: cache.objectsProperties,
         });
 
         connectingCollectors(function (err, _collectors) {
@@ -106,11 +107,11 @@ function processMessage(message, callback) {
     if (message.removeCounters && message.removeCounters.length) {
         var OCIDs = message.removeCounters; // array of OCIDs
 
-        async.each(Object.keys(collectorsObj), function (name, callback) {
-            if (typeof collectorsObj[name].removeCounters !== 'function') return callback();
+        async.eachOf(collectorsObj, function (collector, name, callback) {
+            if (typeof collector.removeCounters !== 'function') return callback();
 
             log.debug('Collector ', name, ' has a removeCounters method, executing removeCounters for OCIDs: ', OCIDs);
-            collectorsObj[name].removeCounters(OCIDs, function (err) {
+            collector.removeCounters(OCIDs, function (err) {
                 if (err) return log.error('Error executing ', name, '.removeCounters method for OCIDs ', OCIDs, ': ', err.message);
                 callback();
                 //log.debug('Counters with OCID ', OCIDs, ' are removed for collector ', name);
@@ -143,14 +144,14 @@ function destroyCollectors(callback) {
     log.warn('Destroying child with PID: ', process.pid);
 
     // destroy collectors, with 'destroy' function
-    async.each(Object.keys(collectorsObj), function (name, callback) {
+    async.eachOf(collectorsObj, function (collector, name, callback) {
 
         // don\'t destroy active and separate collectors. it destroyed from server
-        if (collectorsObj[name].active || collectorsObj[name].separate ||
-            !collectorsObj[name].destroy || typeof collectorsObj[name].destroy !== 'function') return callback();
+        if (collector.active || collector.separate ||
+            !collector.destroy || typeof collector.destroy !== 'function') return callback();
 
-        log.debug('Collector ', name, ' has a destroy method, destroying collector: ', collectorsObj[name]);
-        collectorsObj[name].destroy(function (err) {
+        log.debug('Collector ', name, ' has a destroy method, destroying collector: ', collector);
+        collector.destroy(function (err) {
             if (err) log.warn('Error destroying collector ', name, ': ', err.message);
             else log.warn('Collector ', name, ' was destroyed');
 
@@ -172,7 +173,7 @@ function getVariablesAndCheckUpdateEvents(message) {
         var counterID = OCIDObj.counterID;
         var counter = countersObjects.counters.get(counterID);
     } catch (e) {
-        log.error('Can\'t get variables: ', e.message, ': ', message);
+        log.error('Can\'t get counter data: ', e.message, ', msg: ', message);
         return;
     }
 
@@ -233,14 +234,16 @@ function getVariablesAndCheckUpdateEvents(message) {
         taskCondition: counter.taskCondition,
         debug: counter.debug,
         cache: {
-            variables: cache.variablesDBCache.get(counterID) || new Map(),
-            properties: cache.objectsPropertiesDBCache.get(objectID) || new Map(),
+            variablesHistory: cache.variablesHistory.get(counterID) || new Map(),
+            variablesExpressions: cache.variablesExpressions.get(counterID) || new Map(),
+            objectsProperties: cache.objectsProperties.get(objectID) || new Map(),
         },
     };
 
     //profiling.start('1. get variables values', message);
-    //log.info(cache.variablesDBCache.get(Number(counter.counterID)))
-    //log.info(cache.objectsPropertiesDBCache.get(Number(counter.objectID)))
+    //log.info(cache.variablesHistory.get(Number(counter.counterID)))
+    //log.info(cache.variablesExpressions.get(Number(counter.counterID)))
+    //log.info(cache.objectsProperties.get(Number(counter.objectID)))
     /*
     message = {
         parentVariables

@@ -8,7 +8,9 @@ const processUpdateEventExpressionResult = require('./processUpdateEventExpressi
 const variablesReplace = require("../../lib/utils/variablesReplace");
 const fromHuman = require("../../lib/utils/fromHuman");
 
-const getVarFromExpressions = require("./getVarFromExpression");
+const getVarFromHistory = require("./getVarFromHistory");
+const getVarFromProperty = require("./getVarFromProperty");
+const getVarFromExpression = require("./getVarFromExpression");
 
 module.exports = getVars;
 
@@ -26,7 +28,7 @@ const maxVarCalcDepth = 20;
  * @param param {{
  *      parentCounterName: ({string}|*),
  *      updateEventMode,
- *      cache: {variables: unknown, properties: unknown},
+ *      cache: {variablesExpressions: unknown, variablesHistory: unknown, objectsProperties: unknown},
  *      parentVariables: (*|{"<var1>": "<value1>"}),
  *      updateEventExpression,
  *      variablesDebugInfo: {},
@@ -51,13 +53,16 @@ function getVars(param, callback) {
     // !!! Don't set variables = parentVariables for save parent variables
     var variables = {};
 
-    //console.log((param.objectName + ' (' + param.counterName + ' #' + param.counterID + '). Cache: ' + JSON.stringify(param.cache)))
+    //console.log((param.objectName + ' (' + param.counterName + ' #' + param.counterID + '). Cache: ', param.cache))
 
     // !!! Don't set variables = parentVariables. It will be a reference.
     // Need to save parentVariables unchanged after add new values to variables
     if (typeof param.parentVariables === 'object') {
         for (var variableName in param.parentVariables) {
-            if(!param.cache.properties.has(variableName) && !param.cache.variables.has(variableName)) {
+            if(!param.cache.objectsProperties.has(variableName) &&
+                !param.cache.variablesHistory.has(variableName) &&
+                !param.cache.variablesExpressions.has(variableName)
+            ) {
                 variables[variableName] = param.parentVariables[variableName];
             }
         }
@@ -101,7 +106,7 @@ function getVars(param, callback) {
             used eachSeries to avoid calculating the same variable multiple times when it is present in an expression in the
             list of variables to calculate
              */
-            async.eachSeries(Array.from(param.cache.properties.keys()), function (variableName, callback) {
+            async.eachSeries(Array.from(param.cache.objectsProperties.keys()), function (variableName, callback) {
                 if (variables[variableName] !== undefined) return callback();
                 getVar(variableName, variables, param, function(err) {
                     // it is necessary to calculate all variables even if errors occurred during the calculation of some variables
@@ -110,7 +115,7 @@ function getVars(param, callback) {
                 });
             }, function () {
 
-                async.eachSeries(Array.from(param.cache.variables.keys()), function (variableName, callback) {
+                async.eachSeries(Array.from(param.cache.variablesExpressions.keys()), function (variableName, callback) {
                     if (variables[variableName] !== undefined) return callback();
                     getVar(variableName, variables, param, function(err) {
                         // it is necessary to calculate all variables even if errors occurred during the calculation of some variables
@@ -118,10 +123,19 @@ function getVars(param, callback) {
                         callback();
                     });
                 }, function () {
-                    if(errors.length) {
-                        var err = errors.length === 1 ? errors[0] : new Error(errors.map(error => error.message).join('; '));
-                    }
-                    return callback(err, null, variables, param.variablesDebugInfo, counterParameters);
+                    async.eachSeries(Array.from(param.cache.variablesHistory.keys()), function (variableName, callback) {
+                        if (variables[variableName] !== undefined) return callback();
+                        getVar(variableName, variables, param, function(err) {
+                            // it is necessary to calculate all variables even if errors occurred during the calculation of some variables
+                            if(err) errors.push(err);
+                            callback();
+                        });
+                    }, function () {
+                        if(errors.length) {
+                            var err = errors.length === 1 ? errors[0] : new Error(errors.map(error => error.message).join('; '));
+                        }
+                        return callback(err, null, variables, param.variablesDebugInfo, counterParameters);
+                    });
                 });
             });
         });
@@ -166,7 +180,7 @@ function getUpdateEventState(variables, param, callback) {
             '; processUpdateEventExpressionResult', whyNotNeedToCalculateCounter);
          */
 
-        if (param.prevUpdateEventState === undefined || Boolean(param.prevUpdateEventState) !== updateEventResult) {
+        if (param.prevUpdateEventState === undefined || Boolean(param.prevUpdateEventState) !== Boolean(updateEventResult)) {
             variables.UPDATE_EVENT_TIMESTAMP = Date.now();
         }
 
@@ -283,27 +297,36 @@ function getVar(initVariableName, variables, param, callback) {
 
         // get variable properties from cache for calculate variable value
         if(variableName) {
-            var variable = param.cache.properties.get(variableName);
-            if(!variable) variable = param.cache.variables.get(variableName);
+            var variable = param.cache.objectsProperties.get(variableName);
+            var getVariableFunc = getVarFromProperty;
+            if(!variable) {
+                variable = param.cache.variablesExpressions.get(variableName);
+                getVariableFunc = getVarFromExpression;
+            }
+            if(!variable) {
+                variable = param.cache.variablesHistory.get(variableName);
+                getVariableFunc = getVarFromHistory;
+            }
             if(!variable) {
                 return callback(new Error( + variableName + ' is not defined. Cache props: ' +
-                    [...param.cache.properties.keys()] + '; vars: ' + [...param.cache.variables.keys()]));
+                    [...param.cache.objectsProperties.keys()].join(', ') +
+                    '; vars expr: ' + [...param.cache.variablesExpressions.keys()].join(', ') +
+                    '; vars hist: ' + [...param.cache.variablesHistory.keys()].join(', ')
+                ));
             }
         } else {
             variableName = 'UPDATE_EVENT_STATE';
             variable = {
-                func: getVarFromExpressions,
-                prop: {
                     id: 0,
                     name: variableName,
                     counterID: param.counterID,
                     expression: param.updateEventExpression
-                },
             };
+            getVariableFunc = getVarFromExpression;
         }
-        //if(param.counterID === 243) console.log('!!getVariableValue init: ', variableName, variable, ';Cache props: ' + [...param.cache.properties.keys()] + '; vars: ' + [...param.cache.variables.keys()]);
+        //if(param.counterID === 243) console.log('!!getVariableValue init: ', variableName, variable, ';Cache props: ' + [...param.cache.objectsProperties.keys()] + '; vars: ' + [...param.cache.variablesExpressions.keys()] + [...param.cache.variablesHistory.keys()]);
 
-        variable.func(variable.prop, variables, getVariableValue, {
+        getVariableFunc(variable, variables, getVariableValue, {
             countersObjects: param.countersObjects,
             objectName: param.objectName,
             objectID: param.objectID,
@@ -311,7 +334,7 @@ function getVar(initVariableName, variables, param, callback) {
             counterID: param.counterID,
         }, function(err, result, variablesDebugInfo) {
 
-            //if(param.counterID === 243) console.log('!!getVariableValue: ', variableName, '=', result, variable, '; debug:', variablesDebugInfo, ';Cache props: ' + [...param.cache.properties.keys()] + '; vars: ' + [...param.cache.variables.keys()]);
+            //if(param.counterID === 243) console.log('!!getVariableValue: ', variableName, '=', result, variable, '; debug:', variablesDebugInfo, ';Cache props: ' + [...param.cache.objectsProperties.keys()] + '; vars: ' + [...param.cache.variablesExpressions.keys()] + [...param.cache.variablesHistory.keys()]);
             if(variablesDebugInfo) param.variablesDebugInfo[variableName] = variablesDebugInfo;
             if(result === undefined) result = null;
 

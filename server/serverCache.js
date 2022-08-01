@@ -16,38 +16,55 @@ function createCache(updateMode, callback) {
     if(updateMode && (!updateMode.updateObjectsCounters && !updateMode.getHistoryVariables.length &&
         !updateMode.getVariablesExpressions.length && !updateMode.geObjectsProperties.length)) return callback();
 
-    async.parallel({
-        recordsFromDBCnt: function(callback) { callback(null, recordsFromDBCnt) },
-        countersObjects: function(callback) {
+    var cache = {
+        countersObjects: {},
+        variablesHistory: new Map(),
+        variablesExpressions: new Map(),
+        objectsProperties: new Map(),
+    };
+    var counterObjectNames = new Map();
+
+    async.parallel([
+        // countersObjects and counterObjectNames
+        function(callback) {
             if(updateMode  && !updateMode.updateObjectsCounters) return callback();
 
-            getDataForCheckDependencies(function(err, counters, objects, objectName2OCID, OCIDs, counterObjectNames) {
-                callback(err, {
-                    counters: counters,
-                    objects: objects,
-                    objectName2OCID: objectName2OCID,
-                    OCIDs: OCIDs,
-                    names: counterObjectNames,
-                });
+            getDataForCheckDependencies(function(err, _counterObjectNames, countersObjects) {
+                counterObjectNames = _counterObjectNames;
+                cache.countersObjects = countersObjects;
+                callback(err);
             });
         },
-        variables: function(callback) {
+        // variablesHistory
+        function(callback) {
             if(updateMode && !updateMode.getHistoryVariables.length) return callback();
-            getVariables(null, countersDB.getVariables, 'counterID', callback);
+            getVariables(null, countersDB.getVariables, 'counterID', cache.variablesHistory, callback);
         },
-        variablesExpressions: function(callback) {
+
+        // variablesExpressions
+        function(callback) {
             if(updateMode && !updateMode.getVariablesExpressions.length) return callback();
-            getVariables(null, countersDB.getVariablesExpressions, 'counterID', callback);
+            getVariables(null, countersDB.getVariablesExpressions, 'counterID',
+                cache.variablesExpressions, callback);
         },
-        objectsProperties: function(callback) {
+        // objectsProperties
+        function(callback) {
             if(updateMode && !updateMode.geObjectsProperties.length) return callback();
-            getVariables(updateMode ? updateMode.geObjectsProperties : null, objectsPropertiesDB.getProperties, 'objectID', callback);
+            getVariables(updateMode ? updateMode.geObjectsProperties : null, objectsPropertiesDB.getProperties,
+                'objectID', cache.objectsProperties, callback);
         }
-    }, callback); // function(err, cache){}
+    ], function(err) {
+        return callback(err, cache, counterObjectNames, recordsFromDBCnt);
+    });
 }
 
 function getDataForCheckDependencies(callback) {
-    var counters = {}, objects = {}, allObjects = {}, countersParams = {}, objectName2OCID = {}, OCIDs = {},
+    var counters = new Map(),
+        objects = new Map(),
+        allObjects = new Map(),
+        countersParams = new Map(),
+        objectName2OCID = new Map(),
+        OCIDs = new Map(),
         counterObjectNames = new Map();
 
     countersDB.getAllObjectsCounters(function(err, rowsOCIDs) {
@@ -69,13 +86,13 @@ function getDataForCheckDependencies(callback) {
 
                         rowsObjects.forEach(function (row) {
                             // All available hosts needs for calcFunction.js: findObjectsLike()
-                            allObjects[row.id] = row.name;
-                            if(!row.disabled) objects[row.id] = row.name;
+                            allObjects.set(row.id, row.name);
+                            if(!row.disabled) objects.set(row.id, row.name);
                         });
 
                         rowsCountersParams.forEach(function (row) {
-                            if(!countersParams[row.counterID]) countersParams[row.counterID] = [];
-                            countersParams[row.counterID].push({
+                            if(!countersParams.has(row.counterID)) countersParams.set(row.counterID, []);
+                            countersParams.get(row.counterID).push({
                                 name: row.name,
                                 value: row.value,
                             });
@@ -84,54 +101,66 @@ function getDataForCheckDependencies(callback) {
                         rowsCounters.forEach(function (row) {
                             if(row.disabled) return;
 
-                            counters[row.id] = {
-                                objectsIDs: {},
-                                dependedUpdateEvents: {}, // {parentCounterID1: { expression, mode, parentObjectID, counterID}, ... }
+                            counters.set(row.id, {
+                                objectsIDs: new Map(),
+                                dependedUpdateEvents: new Map(), // {parentCounterID1: { expression, mode, parentObjectID, counterID}, ... }
                                 //counterID: row.id,
                                 collector: row.collectorID,
                                 counterName: row.name,
                                 debug: row.debug,
                                 taskCondition: row.taskCondition,
                                 //groupID: row.groupID,
-                                counterParams: countersParams[row.id],
-                            };
+                                counterParams: countersParams.get(row.id),
+                            });
                         });
 
                         rowsUpdateEvents.forEach(function (row) {
-                            if(!counters[row.parentCounterID] || !counters[row.counterID] ||
-                                (row.parentObjectID && !objects[row.parentObjectID])) return;
+                            if(!counters.has(row.parentCounterID) || !counters.has(row.counterID) ||
+                                (row.parentObjectID && !objects.has(row.parentObjectID)) ) return;
 
-                            counters[row.parentCounterID].dependedUpdateEvents[row.counterID] = {
+                            counters.get(row.parentCounterID).dependedUpdateEvents.set(row.counterID, {
                                 counterID: row.counterID,
                                 expression: row.expression,
                                 mode: row.mode,
                                 objectFilter: row.objectFilter,
                                 parentObjectID: row.parentObjectID,
-                            };
+                            });
                         });
 
                         rowsOCIDs.forEach(function (row) {
-                            if(!counters[row.counterID] || !objects[row.objectID]) return;
-                            counters[row.counterID].objectsIDs[row.objectID] = row.id;
+                            if(!counters.has(row.counterID) || !objects.has(row.objectID)) return;
+                            counters.get(row.counterID).objectsIDs.set(row.objectID, row.id);
 
-                            OCIDs[row.id] = {
+                            OCIDs.set(row.id, {
                                 objectID: row.objectID,
                                 counterID: row.counterID,
-                            }
-
-                            counterObjectNames.set(row.id, {
-                                objectName: allObjects[row.objectID],
-                                counterName: counters[row.counterID].counterName,
                             });
 
-                            var objectNameInUpperCase = objects[row.objectID].toUpperCase();
-                            if(!objectName2OCID[objectNameInUpperCase]) objectName2OCID[objectNameInUpperCase] = {};
-                            objectName2OCID[objectNameInUpperCase][row.counterID] = row.id;
+                            counterObjectNames.set(row.id, {
+                                objectName: allObjects.get(row.objectID),
+                                counterName: counters.get(row.counterID).counterName,
+                            });
+
+                            var objectNameInUpperCase = objects.get(row.objectID).toUpperCase();
+                            if(!objectName2OCID.has(objectNameInUpperCase)) {
+                                objectName2OCID.set(objectNameInUpperCase, new Map());
+                            }
+                            objectName2OCID.get(objectNameInUpperCase).set(row.counterID, row.id);
                         });
 
                         //console.log(counters);
 
-                        callback(null, counters, allObjects, objectName2OCID, OCIDs, counterObjectNames);
+                        callback(null, counterObjectNames, {
+                            // Map(<OCID>, <Map(<objectID>, <counterID>)>
+                            OCIDs: OCIDs,
+                            // Map(<objectID, objectName>)
+                            objects: allObjects,
+                            // Map(<objectNameInUpperCase>, <Map(<counterID>, <OCID>)>)
+                            objectName2OCID: objectName2OCID,
+                            // Map(<counterID>, <{objectsIDs, dependedUpdateEvents, collector, counterName, debug, taskCondition,
+                            // groupID, counterParams}>)
+                            counters: counters,
+                        });
                     });
                 });
             });
@@ -139,8 +168,7 @@ function getDataForCheckDependencies(callback) {
     });
 }
 
-function getVariables(initIDs, func, key, callback) {
-    var variables = {};
+function getVariables(initIDs, func, key, variables, callback) {
 
     checkIDs(initIDs, function (err, IDs) {
         //if(err) log.error(err.message);
@@ -153,11 +181,11 @@ function getVariables(initIDs, func, key, callback) {
 
             rows.forEach(function (row) {
                 var id = row[key];
-                if(!variables[id]) variables[id] = [row];
-                else variables[id].push(row);
+                if(!variables.has(id)) variables.set(id, new Map());
+                variables.get(id).set(row.name, row);
             });
 
-            callback(null, variables);
+            callback();
         });
     })
 }

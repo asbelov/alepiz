@@ -164,7 +164,7 @@ activeCollector.connect = function (collectorName, callback) {
 
 function Collector(collectorName, clientIPC) {
     this.get = function (param, callback) {
-        clientIPC.sendAndPermanentReceive({
+        clientIPC.send({
             name: collectorName,
             type: 'get',
             data: param,
@@ -172,7 +172,7 @@ function Collector(collectorName, clientIPC) {
     };
 
     this.getOnce = function (param, callback) {
-        clientIPC.sendAndReceive({
+        clientIPC.send({
             name: collectorName,
             type: 'getOnce',
             data: param,

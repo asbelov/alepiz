@@ -993,14 +993,21 @@ var JQueryNamespace = (function ($) {
                     });
 
                     if(hasNumericData) {
+                        graphAreaElm.height('300px');
+                        /*
                         graphAreaElm.removeClass('hide');
                         fullScreenGraphBtnElm.removeClass('hide');
                         graphSettingsBtnElm.removeClass('hide');
+                         */
                         prepareDataForGraph(objectsCountersValues);
                     } else {
+                        graphAreaElm.height('100px');
+                        /*
                         graphAreaElm.addClass('hide');
                         fullScreenGraphBtnElm.addClass('hide');
                         graphSettingsBtnElm.addClass('hide');
+                         */
+                        prepareDataForGraph(objectsCountersValues);
                     }
 
                     /*

@@ -4,7 +4,7 @@
 
 var log = require('../../../lib/log')(module);
 
-var eventsCache = {}, repeatEventsCache = {}, disabledEventsCache = {};
+var eventsCache = new Map(), disabledEventsCache = new Map();
 var enableEvents, onSolvedEvent, onEvent;
 
 var eventActions = {};
@@ -16,11 +16,10 @@ eventActions.eventEditor = eventEditor;
 
 function init(cache, _enableEvents, _onSolvedEvent, _onEvent) {
     eventsCache = cache.eventsCache;
-    repeatEventsCache = cache.repeatEventsCache;
     disabledEventsCache = cache.disabledEventsCache;
-    enableEvents = _enableEvents;
-    onSolvedEvent = _onSolvedEvent;
-    onEvent = _onEvent;
+    enableEvents = _enableEvents; // function
+    onSolvedEvent = _onSolvedEvent; // function
+    onEvent = _onEvent; // function
 }
 
 function dashboard(db, param) {
@@ -69,9 +68,9 @@ function dashboard(db, param) {
         log.info('Mark ', param.events.length ,' events as solved: ', param.subject);
 
         param.events.forEach(event => {
-            if(!eventsCache[event.OCID]) {
-                eventsCache[event.OCID] = event.id;
-                log.error('Event is not present in a events cache. Forced solve event: ', event);
+            if(!eventsCache.has(event.OCID)) {
+                eventsCache.set(event.OCID, event.id);
+                log.error('Event is not present in an events cache. Forced solve event: ', event);
             }
             onSolvedEvent(db, event.OCID, timestamp);
         });
@@ -258,7 +257,7 @@ function removeTimeIntervals(db, timeIntervals) {
                 timeIntervals.timeIntervalsForRemove + ': ' + err.message));
         }
         rows[0].intervals = newTimeIntervals;
-        disabledEventsCache[event.OCID] = rows[0];
+        disabledEventsCache.set(Number(event.OCID), rows[0]);
         log.info('New disabled event: ', rows[0]);
     });
 }
@@ -338,20 +337,17 @@ function addCommentsOrDisableEvents(db, param) {
     var sameEventOCIDs = {};
     for(i = 0; i < param.events.length; i++) {
         var event = param.events[i];
+        var eventOCID = Number(event.OCID);
 
-        // !sameEventOCIDs[event.OCID]: do not disable event disabled in previous iteration
-        if(param.action === 'disableEvents' && !sameEventOCIDs[event.OCID]) {
-            sameEventOCIDs[event.OCID] = true;
+        // !sameEventOCIDs[eventOCID]: do not disable event disabled in previous iteration
+        if(param.action === 'disableEvents' && !sameEventOCIDs[eventOCID]) {
+            sameEventOCIDs[eventOCID] = true;
             var query;
-            if (disabledEventsCache[event.OCID]) {
-                if (disabledEventsCache[event.OCID].intervals && !param.replaceIntervals) {
-                    /*
+            if (disabledEventsCache.has(eventOCID)) {
+                var cachedDisabledEvent = disabledEventsCache.get(eventOCID);
+                if (cachedDisabledEvent.intervals && !param.replaceIntervals) {
                     param.intervals = param.intervals ?
-                        disabledEventsCache[event.OCID].intervals + ';' + param.intervals :
-                        disabledEventsCache[event.OCID].intervals;
-                     */
-                    param.intervals = param.intervals ?
-                        disabledEventsCache[event.OCID].intervals + ';' + param.intervals :
+                        cachedDisabledEvent.intervals + ';' + param.intervals :
                         null;
                 }
 
@@ -364,7 +360,7 @@ function addCommentsOrDisableEvents(db, param) {
             try {
                 db.prepare(query).run({
                     eventID: event.id,
-                    OCID: event.OCID,
+                    OCID: eventOCID,
                     timestamp: timestamp,
                     user: param.user,
                     disableUntil: Number(param.disableUntil),
@@ -375,7 +371,7 @@ function addCommentsOrDisableEvents(db, param) {
                 throw(new Error('Can\'t disable event: ' + err.message + ': ' + JSON.stringify(param)));
             }
 
-            disabledEventsCache[event.OCID] = param;
+            disabledEventsCache.set(eventOCID, param);
         }
 
         deletePreviousCommentAndUpdateEventCommentID(db, event.id, param.commentID);

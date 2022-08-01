@@ -145,12 +145,11 @@ function runChildren(callback) {
     var cfg = confServer.get('servers')[serverID];
     var childrenNumber = cfg.childrenNumber || Math.floor(os.cpus().length);
     processedOCIDs.clear();
-
-    serverCache(null, function(err, cache) {
+    serverCache(null, function(err, cache, _counterObjectNames, _recordsFromDBCnt) {
         if(err) return callback(new Error('Error when loading data to cache: ' + err.message));
 
-        counterObjectNamesCache = cache.countersObjects.names;
-        recordsFromDBCnt = cache.recordsFromDBCnt;
+        counterObjectNamesCache = _counterObjectNames;
+        recordsFromDBCnt = _recordsFromDBCnt;
         log.info('Starting ', childrenNumber, ' children for server: ', serverName,
             '. CPU cores number: ', os.cpus().length);
         childrenThreads = new threads.parent({
@@ -171,12 +170,13 @@ function runChildren(callback) {
                 if(err) return callback(err);
 
                 log.info('Sending cache data first time:',
-                    (cache.variables ? ' history for counters: ' + Object.keys(cache.variables).length : ''),
-                    (cache.variablesExpressions ? ' expressions for counters: ' + Object.keys(cache.variablesExpressions).length : ''),
-                    (cache.objectsProperties ? ' properties for objects: ' + Object.keys(cache.objectsProperties).length : ''),
-                    (cache.countersObjects ? ' objects: ' + Object.keys(cache.countersObjects.objects).length +
-                        ', counters: ' + Object.keys(cache.countersObjects.counters).length +
-                        ', objectName2OCID: ' + Object.keys(cache.countersObjects.objectName2OCID).length : ''));
+                    (cache.variablesHistory.size ? ' history for counters: ' + cache.variablesHistory.size : ''),
+                    (cache.variablesExpressions.size ? ' expressions for counters: ' + cache.variablesExpressions.size : ''),
+                    (cache.objectsProperties.size ? ' properties for objects: ' + cache.objectsProperties.size : ''),
+                    (cache.countersObjects.objects ? ' objects: ' + cache.countersObjects.objects.size : ''),
+                    (cache.countersObjects.counters ? ', counters: ' + cache.countersObjects.counters.size : ''),
+                    (cache.countersObjects.objectName2OCID ?
+                        ', objectName2OCID: ' + cache.countersObjects.objectName2OCID.size : ''));
 
                 childrenProcesses.sendToAll(cache, function (err) {
                     if(err) {
@@ -264,26 +264,27 @@ function updateCache() {
         '; counters for remove: ', countersForRemove.size, '; update mode: ', updateMode);
 
      */
-    serverCache(updateMode, function(err, cache) {
+    serverCache(updateMode, function(err, cache, __counterObjectNames, _recordsFromDBCnt) {
         if(err) {
             updateCacheInProgress = 0;
             return log.error('Error when loading data to cache: ', err.message);
         }
 
-        counterObjectNamesCache = cache.countersObjects.names;
-        recordsFromDBCnt = cache.recordsFromDBCnt;
+        counterObjectNamesCache = __counterObjectNames;
+        recordsFromDBCnt = _recordsFromDBCnt;
         removeCounters(function () {
             if(cache) {
                 cache.fullUpdate = !updateMode;
 
                 /*
-                log.info('Sending cache data:',
-                    (cache.variables ? ' history for counters: ' + Object.keys(cache.variables).length : ''),
-                    (cache.variablesExpressions ? ' expressions for counters: ' + Object.keys(cache.variablesExpressions).length : ''),
-                    (cache.objectsProperties ? ' properties for objects: ' + Object.keys(cache.objectsProperties).length : ''),
-                    (cache.countersObjects ? ' objects: ' + Object.keys(cache.countersObjects.objects).length +
-                        ', counters: ' + Object.keys(cache.countersObjects.counters).length +
-                        ', objectName2OCID: ' + Object.keys(cache.countersObjects.objectName2OCID).length : ''));
+                 log.info('Sending cache data first time:',
+                    (cache.variablesHistory.size ? ' history for counters: ' + cache.variablesHistory.size : ''),
+                    (cache.variablesExpressions.size ? ' expressions for counters: ' + cache.variablesExpressions.size : ''),
+                    (cache.objectsProperties.size ? ' properties for objects: ' + cache.objectsProperties.size : ''),
+                    (cache.countersObjects.objects ? ' objects: ' + cache.countersObjects.objects.size : ''),
+                    (cache.countersObjects.counters ? ', counters: ' + cache.countersObjects.counters.size : ''),
+                    (cache.countersObjects.objectName2OCID ?
+                        ', objectName2OCID: ' + cache.countersObjects.objectName2OCID.size : ''));
                  */
 
                 childrenThreads.sendToAll(cache, function (err) {
