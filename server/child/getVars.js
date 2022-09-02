@@ -25,8 +25,6 @@ const updateEventsMode = {
     '3': 'Update each time when expression value is changed to true and once when changed to false'
 };
 
-const maxVarCalcDepth = 20;
-
 /**
  *
  * @param param {{
@@ -256,7 +254,7 @@ function getCounterParameters(param, variables, callback) {
 
             var res = variablesReplace(value, variables);
             if(!res || res.unresolvedVariables.length) {
-                return callback(new Error(param.objectName, '(', param.counterName,
+                return callback(new Error(param.objectName + '(' + param.counterName +
                     '): Counter parameter ' + parameter.name + ': ' + counter + ' (' +
                     parameter.value + ') ' +
                     (!res ? 'not a string' : 'has unresolved variables: ' + (res.unresolvedVariables.join(',')))));

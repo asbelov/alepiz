@@ -189,7 +189,7 @@ history.cacheServiceIsRunning = cache.cacheServiceIsRunning;
  * @param {number} data.timestamp - timestamp of the value
  * @param {object|number|string|boolean} data.value - value. the JSON.stringify(value) will be applied if the value
  * type is object
- * @returns {{value: number|string|boolean, timestamp: number}|undefined} - will return the stored value
+ * @returns {{value: number|string|boolean|undefined|null, timestamp: number}|undefined} - will return the stored value
  * {timestamp:…, value:…} or undefined on error
  */
 history.add = function(initID, data) {

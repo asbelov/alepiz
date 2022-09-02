@@ -841,11 +841,11 @@ var JQueryNamespace = (function ($) {
                 var timeIntervalTo = getTimeFromStr(timeStrTo);
 
                 if(timeIntervalFrom !== 0 && timeIntervalTo !== 0) {
-                    if (timeIntervalTo > timeIntervalFrom)
+                    if (timeIntervalTo > timeIntervalFrom) {
                         $('#disableTimeInterval').val(String(timeIntervalFrom) + '-' + String(timeIntervalTo));
-                    else {
-                        return callback(new Error('Please set correct time interval: last time less than first time: ' +
-                            timeStrFrom + ' - ' + timeStrTo));
+                    } else {
+                        $('#disableTimeInterval').val(String(timeIntervalFrom) + '-' + getTimeFromStr('23:59') +
+                            ';' + getTimeFromStr('00:00') + '-' + String(timeIntervalTo));
                     }
                 } else {
                     if(timeStrFrom || timeStrTo) {

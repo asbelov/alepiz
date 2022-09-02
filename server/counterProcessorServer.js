@@ -453,10 +453,11 @@ function processServerMessage(message) {
 function processChildMessage(message) {
     if(!message) return;
 
-    if(message.updateEventState) {
+    if(message.updateEventState !== undefined) {
         let updateEventKey = message.parentOCID + '-' + message.OCID;
         updateEventsStatus.set(updateEventKey, message.updateEventState);
-        return;
+            //if(updateEventKey === '155273-155407' || updateEventKey === '155273-155287') log.warn('!!updateEvent: ', updateEventKey, ': ', message.updateEventState)
+            return;
     }
 
     var OCID = message.completeExecutionOCID || message.OCID;
@@ -573,6 +574,6 @@ function getCounterValue(counter, parentVariables) {
     var updateEventKey = counter.parentOCID + '-' + OCID;
     counter.parentVariables = parentVariables;
     counter.updateEventState = updateEventsStatus.get(updateEventKey);
-
+    //if(updateEventKey === '155273-155407' || updateEventKey === '155273-155287') log.warn(updateEventKey, ': ', counter)
     childrenThreads.send(counter);
 }

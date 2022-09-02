@@ -267,17 +267,18 @@ function getVariablesAndCheckUpdateEvents(message) {
 
         // send UPDATE_EVENT_STATE anyway if previous updateEventState is not equal to new updateEventState,
         // because after the child may have nothing to send to the server
-        //if (variables && param.parentOCID && param.updateEventExpression &&
-        //    updateEventState !== variables.UPDATE_EVENT_STATE &&
-        //    variables.UPDATE_EVENT_STATE !== undefined) {
-        if (param.parentOCID && param.updateEventExpression && variables.UPDATE_EVENT_STATE !== undefined) {
+        if (param.parentOCID && param.updateEventExpression &&
+            updateEventState !== variables.UPDATE_EVENT_STATE &&
+            variables.UPDATE_EVENT_STATE !== undefined) {
+        //if (param.parentOCID && param.updateEventExpression && variables.UPDATE_EVENT_STATE !== undefined) {
             childThread.send({
                 parentOCID: param.parentOCID,
                 OCID: param.OCID,
                 updateEventState: variables.UPDATE_EVENT_STATE,
             });
+            //if(counterID === 211 || counterID === 257) log.warn(param.counterName, ' send: updateEventState: ', updateEventState ,'=>', variables.UPDATE_EVENT_STATE, ': ', noNeedToCalculateCounter, ': ', param.parentOCID, '-', param.OCID, ': ', param.updateEventExpression);
         }
-
+        //if(counterID === 211 || counterID === 257) log.warn(param.counterName, ': updateEventState: ', updateEventState ,'=>', variables.UPDATE_EVENT_STATE, ': ', noNeedToCalculateCounter, ': ', param.parentOCID, '-', param.OCID, ': ', param.updateEventExpression);
         if (err) {
             log.options(err.message, {
                 filenames: ['counters/' + param.counterID, 'counters.log'],
@@ -313,9 +314,6 @@ function getVariablesAndCheckUpdateEvents(message) {
                     }
                 }
             }
-
-
-            //if (variablesDebugInfo.UPDATE_EVENT_STATE && variablesDebugInfo.UPDATE_EVENT_STATE.important) var important = true;
         }
 
         param.collectorParameters = preparedCollectorParameters;
@@ -325,7 +323,7 @@ function getVariablesAndCheckUpdateEvents(message) {
 
 function getValue(param) {
     if (!param.collector || !collectorsObj[param.collector]) {
-        return log.options('Try to get value for unknown collector for ',
+        return log.options('Try to get value for an unknown collector for ',
             param.objectName,
             '(', param.counterName, '): collector: "', param.collector,
             '"; param: ', param, {
@@ -338,7 +336,7 @@ function getValue(param) {
 
     //log.debug('Try to get value for ', param.objectName , '(', param.counterName, '): ', param);
 
-    //try to catch errors in collector code
+    //Try to catch errors in collector code
     //profiling.stop('2. prepare to get counter value', param);
     //profiling.start('2. get counter value', param);
     try {
@@ -374,6 +372,13 @@ function getValue(param) {
     }
 }
 
+/**
+ * Process collector result
+ * @param {Error} err - collector error
+ * @param {{value: number|string|boolean|undefined|null, timestamp: number}|?number|string|boolean|undefined} result - collector result
+ * @param {Object} param - initial parameters for get collector result
+ * @param {string} collectorName collector name
+ */
 function processCollectorResult(err, result, param, collectorName) {
     if (!param.collector) {
         try {
@@ -493,6 +498,10 @@ function processCollectorResult(err, result, param, collectorName) {
         removeCounter
     }
      */
+/*
+    // !!!!!
+    // Need to get previous updateEventState from the server. Here you can only get updateEventState of the parent counter
+    // and checking that the collection for this OCID is no longer running or it does not have a parameter runCollectorSeparately
 
     if(dependedCounters.length === 1 && (!Array.isArray(preparedResult.value) || preparedResult.value.length === 1)) {
         var parentValue = Array.isArray(preparedResult.value) ? preparedResult.value[0] : preparedResult.value;
@@ -503,12 +512,13 @@ function processCollectorResult(err, result, param, collectorName) {
         else if(parentValue instanceof Map) parentValue = JSON.stringify(Object.fromEntries(parentValue));
 
         var message = dependedCounters[0];
-        message.updateEventState = 1;
+        message.updateEventState = ???
         message.parentVariables = param.collectorParameters.$variables;
         message.parentObjectValue = parentValue;
-
+if(param.OCID === 155273) log.warn(param.counterName, ' recalculate: updateEventState: ', param.collectorParameters.$variables.UPDATE_EVENT_STATE);
         return getVariablesAndCheckUpdateEvents(message);
     }
+ */
 
     var returnedMessage = {
         parentOCID: param.parentOCID ? param.parentOCID : undefined,
