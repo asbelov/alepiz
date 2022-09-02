@@ -76,7 +76,7 @@ var alepizActionsNamespace = (function($) {
             if (!searchActionStr.length) searchIconElm.removeClass('hide');
             else searchIconElm.addClass('hide');
 
-            // when pressed not character key and string lenght not increased
+            // when pressed not character key and string length not increased
             if(prevSearchActionStr.length >= searchActionStr.length) {
                 prevSearchActionStr = searchActionStr;
                 return;

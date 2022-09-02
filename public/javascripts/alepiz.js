@@ -21,20 +21,20 @@ alepizMainNamespace = (function($) {
         initEvents();
         initMaterializeElements();
 
-        $.post('/mainMenu', {f: 'getDefaultInterfaceConfiguration'}, function(_defailtInterfaceConfiguration) {
-            configID = '/' + _defailtInterfaceConfiguration.actionDir + '/__AlepizMainMenuConfiguration';
+        $.post('/mainMenu', {f: 'getDefaultInterfaceConfiguration'}, function(_defaultInterfaceConfiguration) {
+            configID = '/' + _defaultInterfaceConfiguration.actionDir + '/__AlepizMainMenuConfiguration';
             $.post(configID, { func: 'getActionConfig' }, function(_config) {
                 config = _config
-                defailtInterfaceConfiguration = _defailtInterfaceConfiguration || {};
+                defaultInterfaceConfiguration = _defaultInterfaceConfiguration || {};
 
                 var navBarLinksArray = typeof config.navbarLinks === 'object' ? config.navbarLinks :
-                    defailtInterfaceConfiguration.navbarLinks;
+                    defaultInterfaceConfiguration.navbarLinks;
                 createNavBarLinks(navBarLinksArray);
 
                 var unlockSideNav = config.unlockSideNav !== undefined ?
-                    config.unlockSideNav : defailtInterfaceConfiguration.unlockSideNav;
+                    config.unlockSideNav : defaultInterfaceConfiguration.unlockSideNav;
                 var maximizeSideNav = config.maximizeSideNav !== undefined ?
-                    config.maximizeSideNav : defailtInterfaceConfiguration.maximizeSideNav;
+                    config.maximizeSideNav : defaultInterfaceConfiguration.maximizeSideNav;
 
                 // required for pad and more screen size
                 $('header').css('padding-left', currentMenuWidth);
@@ -43,7 +43,7 @@ alepizMainNamespace = (function($) {
                 if(unlockSideNav || isMobile) sideNavLockIconElm.trigger('click');
                 if(maximizeSideNav && !isMobile) sideNavResizeIconElm.trigger('click');
 
-                var tabItem = config.tabItem || defailtInterfaceConfiguration.tabItem;
+                var tabItem = config.tabItem || defaultInterfaceConfiguration.tabItem;
                 if(tabItem === 'OBJECTS') tabInstance.select('objectsList');
                 else if(tabItem === 'ACTIONS') tabInstance.select('actionsList');
                 else if(tabItem === 'FILTERS') tabInstance.select('objectsFilterTab');
@@ -113,7 +113,7 @@ alepizMainNamespace = (function($) {
 
     var
         config = {},
-        defailtInterfaceConfiguration = {},
+        defaultInterfaceConfiguration = {},
         configID = '',
         // Mobile Devices <= 600px (.s)
         // Tablet Devices > 600px (.m)

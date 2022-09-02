@@ -92,7 +92,7 @@ function makeTableOfContents(divElm) {
 
 
 
-    var html = '<div class="col hide-on-small-only m1 l1" style="position: fixed; bottom: 0;">' +
+    var html = '<div class="col hide-on-small-only m1 l1" style="position: fixed; bottom: 0; width:96px">' +
         '<ul class="section table-of-contents">' +
             '<li><a href="#top"><i class="material-icons skiptranslate">publish</i></a></li>' +
         '</ul></div>';

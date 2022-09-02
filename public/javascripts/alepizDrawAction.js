@@ -189,7 +189,7 @@ callback(html), where html is a string with HTML page for active action
                 console.error('Can\'t add event handler to onScrollIframe() function for catch the scroll action page ' +
                     'event inside the iframe to', activeActionLink, ':', err.message)
             }
-            addCtrlEnterEventHendler();
+            addCtrlEnterEventHandler();
         }
 
         try {
@@ -214,11 +214,11 @@ callback(html), where html is a string with HTML page for active action
 
         iframeDOMElm.contentWindow.log = log;
 
-        setTimeout(addCtrlEnterEventHendler, 60000);
+        setTimeout(addCtrlEnterEventHandler, 60000);
         bodyElm.css("cursor", "auto");
 
         // run task on Ctrl + Enter
-        function addCtrlEnterEventHendler() {
+        function addCtrlEnterEventHandler() {
             try {
                 var iframeContentWindowElm = $(iframeDOMElm.contentWindow);
                 iframeContentWindowElm.unbind('keydown', keyDown).keydown(keyDown);
