@@ -17,7 +17,7 @@
     "outputFormat": "text",
     "icon": "style",
     "canAddParametersToAction": true,
-    "descriptionTemplate": "New properties will be set for \"%:o:%\". All other properties will {{%:deleteOtherProperties:% ==  ?? not ::}} be deleted. New properties: {{name: \"%:property*name:%\", value: \"%:property*value:%\", description: \"%:property*description:%\", mode \"%:property*mode:%\":: and ::\"\"}}. Hint for the modes: 0 - not calculated text field, 1 - checkbox, 2 - not calculated text area, 3 - calculated expression",
+    "descriptionTemplate": "New properties will be set for \"%:o:%\". All other properties will {{%:deleteOtherProperties:% == 0 ?? not ::}} be deleted. New properties: {{name: \"%:property*name:%\", value: \"%:property*value:%\", description: \"%:property*description:%\", mode \"%:property*mode:%\":: and ::\"\"}}. Hint for the modes: 0 - not calculated text field, 1 - checkbox, 2 - not calculated text area, 3 - calculated expression",
     "parameters": {
         "o": {
             "description": "Edited objects"

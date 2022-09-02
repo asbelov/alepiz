@@ -19,7 +19,7 @@ init();
 collector.get = function (param, callback) {
     if(typeof param !== 'object') return callback(new Error('Parameters are not set or error'));
 
-    if(!commonEventGenerator) return log.error('Event generator was not initialized');
+    if(!commonEventGenerator) return log.error('Event generator was not initialized: ', param);
 
     commonEventGenerator.get(param, callback);
     eventGenerators.forEach(eventGenerator => eventGenerator.get(param));
@@ -30,6 +30,7 @@ collector.get = function (param, callback) {
         setTimeout(function(param, callback) {
                 param.$variables.UPDATE_EVENT_STATE = 0;
                 param.$variables.UPDATE_EVENT_TIMESTAMP = Date.now();
+                if(!commonEventGenerator) return log.error('Event generator was not initialized: ', param);
                 commonEventGenerator.get(param, callback);
                 eventGenerators.forEach(eventGenerator => eventGenerator.get(param));
             }, (!param.eventDuration || param.eventDuration < 1 ? 0 : param.eventDuration * 1000),

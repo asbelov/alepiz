@@ -5,16 +5,19 @@
 /**
  * Created by Alexander Belov on 11.05.2015.
  */
+var log = require('../lib/log')(module);
 var express = require('express');
 var router = express.Router();
-var log = require('../lib/log')(module);
-var ObjectFilterDB = require('../models_db/objectsFilterDB');
+var objectFilterDB = require('../models_db/objectsFilterDB');
 var rightsObjectsDB = require('../rightsWrappers/objectsDB');
 var actions = require('./../lib/actionsConf');
 var objectsFilter = require('./objectsFilter');
 var user = require('../lib/user');
 var logRecords = require('../lib/logRecords');
 var prepareUser = require('../lib/utils/prepareUser');
+const Conf = require("../lib/conf");
+const confActions = new Conf('config/actions.json');
+const confInterfaceDefault = new Conf('config/interface.json');
 
 module.exports = router;
 
@@ -24,11 +27,12 @@ router.post('/mainMenu', function(req, res/*, next*/) {
     var functionName = req.body.f;
 
     if(functionName === 'getActions') actions.getConfigurationForAll(prepareUser(req.session.username), req.body.o, sendBackResult);
+    else if(functionName === 'getDefaultInterfaceConfiguration') getDefaultInterfaceConfiguration(sendBackResult);
     else if(functionName === 'login') user.login(req.body.user, req.body.pass, req.body.newPass, req.session, sendBackResult);
     else if(functionName === 'logout') user.logout(req.session, sendBackResult);
     else if(functionName === 'getCurrentUserName') user.getFullName(req.session, sendBackResult);
     else if(functionName === 'filterObjectsByInteractions') filterObjectsByInteractions(req.body.name, req.session.username, req.body.filterNames, req.body.filterExpression, sendBackResult);
-    else if(functionName === 'getObjectsFilterNames') objectsFilter.getObjectsFilterNames(sendBackResult);
+    else if(functionName === 'getObjectsFilterNames') objectsFilter.getObjectsFilterNames(req.session.username, sendBackResult);
     else if(functionName === 'getObjectsByName') getObjectsByNames(req.body.name, req.session.username, req.body.filterNames, req.body.filterExpression, sendBackResult);
     else if(functionName === 'searchObjects') searchObjects(req.body.searchStr, req.session.username, req.body.filterNames, req.body.filterExpression, sendBackResult);
     else if(functionName === 'getLogRecords') logRecords.getRecords(req.session.username, req.body.lastID, req.body.sessionsIDs, sendBackResult);
@@ -49,11 +53,19 @@ router.post('/mainMenu', function(req, res/*, next*/) {
     }
 });
 
+function getDefaultInterfaceConfiguration(callback) {
+    var interfaceDefault = confInterfaceDefault.get() || {};
+
+    interfaceDefault.actionDir = confActions.get('dir');
+
+    callback(null, interfaceDefault);
+}
+
 
 /** Get filter objects using objects interactions rules and get objects parameters
  * @param {string} objectsNamesStr - comma separated string with objects names, which used as objects interactions rules for filter
  * @param {string} user - username
- * @param {Array} filterNames - array of object filter names
+ * @param {Array|String} filterNames - array of object filter names
  * @param {string} filterExpression - filters logical expression like "%:filter1:% && %:filter2:% || %:filter3:%"
  * @param {function(Error)|function(null, Array): void} callback - called when done. Return error or array of
  * objects like [{name: ..., id: ..., description: ..., sortPosition:...}, {...}, ...]
@@ -63,7 +75,7 @@ function filterObjectsByInteractions(objectsNamesStr, user, filterNames, filterE
     else objectsNames = objectsNamesStr.split(',');
 
     user = prepareUser(user);
-    ObjectFilterDB.filterObjectsByInteractions(objectsNames, user, function(err, objects) {
+    objectFilterDB.filterObjectsByInteractions(objectsNames, user, function(err, objects) {
         if(err) return callback(err);
         objectsFilter.applyFilterToObjects(filterNames, filterExpression, objects, callback);
     });
@@ -74,7 +86,7 @@ function filterObjectsByInteractions(objectsNamesStr, user, filterNames, filterE
  * @param {string} initSearchStr - search string. Wildcards: "*" - one or more characters, "_" - one character.
  * logical operators "&" - logical AND, "|" or line break - logical OR
  * @param {string} user - username
- * @param {Array} filterNames - array of object filter names
+ * @param {Array|String} filterNames - array of object filter names
  * @param {string} filterExpression - filters logical expression like "%:filter1:% && %:filter2:% || %:filter3:%"
  * @param {function(Error)|function(null, Array): void} callback - called when done. Return error or array of
  * objects like [{name: ..., id: ..., description: ..., sortPosition:...}, {...}, ...]
@@ -106,7 +118,7 @@ function searchObjects(initSearchStr, user, filterNames, filterExpression, callb
     log.debug('Run search: "', initSearchStr, '" -> "', searchStr, '": length: ', searchStr.length);
 
     user = prepareUser(user);
-    ObjectFilterDB.searchObjects(searchStr, user, function(err, objects) {
+    objectFilterDB.searchObjects(searchStr, user, function(err, objects) {
         if(err) return callback(err);
         objectsFilter.applyFilterToObjects(filterNames, filterExpression, objects, callback);
     });
@@ -116,7 +128,7 @@ function searchObjects(initSearchStr, user, filterNames, filterExpression, callb
  *
  * @param {string} objectsNamesStr - comma separated string with objects names
  * @param {string} user - username for check objects rights
- * @param {Array} filterNames - array of object filter names
+ * @param {Array|String} filterNames - array of object filter names
  * @param {string} filterExpression - filters logical expression like "%:filter1:% && %:filter2:% || %:filter3:%"
  * @param {function(Error)|function(null, objects: Array)} callback - return Error or array of
  * objects like [{name: ..., id: ..., description: ..., sortPosition:...}, {...}, ...]
@@ -124,7 +136,7 @@ function searchObjects(initSearchStr, user, filterNames, filterExpression, callb
 function getObjectsByNames(objectsNamesStr, user, filterNames, filterExpression, callback) {
     if(!objectsNamesStr || typeof(objectsNamesStr) !== 'string') return callback(null, []);
 
-    ObjectFilterDB.getObjectsByNames(objectsNamesStr.split(','), prepareUser(user), function(err, objects) {
+    objectFilterDB.getObjectsByNames(objectsNamesStr.split(','), prepareUser(user), function(err, objects) {
         if(err) return callback(err);
         objectsFilter.applyFilterToObjects(filterNames, filterExpression, objects, callback);
     });
@@ -134,7 +146,7 @@ function getObjectsByNames(objectsNamesStr, user, filterNames, filterExpression,
  *
  * @param {Array} objectIDs - array of object IDs
  * @param {string} user - username for check objects rights
- * @param {Array} filterNames - array of object filter names
+ * @param {Array|String} filterNames - array of object filter names
  * @param {string} filterExpression - filters logical expression like "%:filter1:% && %:filter2:% || %:filter3:%"
  * @param {function(Error)|function(null, objects: Array)} callback - return Error or array of
  * objects like [{name: ..., id: ..., description: ..., sortPosition:...}, {...}, ...]

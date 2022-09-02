@@ -93,6 +93,8 @@ webSecrets.get(function (err, web) {
 // catch 404 and forward to error handler
     app.use(function(req, res, next) {
         var err = new Error('Not Found');
+        var str = req.protocol + '://' + req.hostname + req.originalUrl + ', IP: ' + req.ip + ', method: ' + req.method + ', param: ' + JSON.stringify(req.body)
+        log.error('Not found: ', str);
         err.status = 404;
         next(err);
     });

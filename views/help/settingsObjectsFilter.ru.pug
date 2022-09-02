@@ -48,7 +48,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                         },
                                         "SERVICE_TYPE": {
                                             "source": "upLevelProperty",
-                                            "name": "SERVICE_TYPE"
+                                            "name": "SERVICE_TYPE",
                                         },
                                         "SERVICE_STATE": {
                                             "source": "history",
@@ -113,6 +113,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                             "name": "Production servers",
                                             "description": "Alepiz servers used for production",
                                             "expression": "%:HOST_TYPE:% == 'prod' && testRE(%:OBJECT_NAME:%, '\\.alepiz\\.com$', 'i')"
+                                            "checkedForRoles": ["Administrators", "Business"]
                                         },
                                         {
                                             "name": "Development servers",
@@ -161,9 +162,12 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                             преобразование типов), объект
                             будет отображаться. Если false (или может быть приведено к false через преобразование типов),
                             объект будет скрыт. Логическое выражение может использовать переменные, описанные в
-                            variables и предопределенную переменную OBJECT_NAME, значение которой является имя объекта.
+                            variables и предопределенную переменную OBJECT_NAME, значением которой является имя объекта.
                             Логическое выражение формируется по правилам формирования выражений для счетчиков и
                             описано в "#[a(href="/help/lessonVariables.pug#bookmark4") Примеры использования вычислений]".
+                        li.
+                            checkedForRoles - массив с перечнем ролей, для которых этот фильтр будет включен по
+                            умолчанию при обновлении страницы или списка фильтров.
                     h2 Пример файла настроек conf/objectFilters.json
                     ul.collapsible
                         li
@@ -244,7 +248,3 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                             }
                                         ]
                                     }
-
-
-
-

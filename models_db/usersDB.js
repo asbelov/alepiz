@@ -22,8 +22,9 @@ usersDB.getFullUserName = function(userName, callback) {
 
 
 /*
-    get userID for specific user name
-    userName: user name, prepared by lib/utils/preparedUser function
+    get userID for specific username
+
+    username: username, prepared by lib/utils/preparedUser function
     callback(err, userID);
  */
 usersDB.getID = function(userName, callback) {
@@ -32,7 +33,7 @@ usersDB.getID = function(userName, callback) {
     db.get('SELECT id FROM users WHERE name=?', [userName], function(err, data) {
         if(err) return callback(err);
 
-        if(!data || !data.id) return callback(new Error('Unknown user name "' + userName + '"'));
+        if(!data || !data.id) return callback(new Error('Unknown username "' + userName + '"'));
         callback(null, data.id);
     });
 };

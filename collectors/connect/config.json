@@ -18,6 +18,12 @@
             "description": "Source  IPv4 or IPv6 address or host name",
             "canBeEmpty": "on",
             "checkAs": "hostOrIP"
+        },
+        "socketTimeout": {
+            "description": "Socket timeout in millisecond",
+            "canBeEmpty": "on",
+            "checkAs": "UInteger",
+            "default": 10000
         }
     }
 }

@@ -8,18 +8,28 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
         link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
         link(rel='stylesheet', href='/material-design-icons/material-icons.css')
         link(rel='stylesheet', href='/stylesheets/index.css')
-        script(src='/jquery/jquery.min.js')
         script(src='/materialize-css/dist/js/materialize.js')
-        script(src='/javascripts/init.js')
-    //meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/javascripts/alepizUtils.js')
+        script(src='/javascripts/alepizAuth.js')
+        script(src='/javascripts/alepizLog.js')
+        script(src='/javascripts/alepizHelp.js')
+        script(src='/javascripts/alepizAudit.js')
+        script(src='/javascripts/alepizObjects.js')
+        script(src='/javascripts/alepizActions.js')
+        script(src='/javascripts/alepizFilters.js')
+        script(src='/javascripts/alepizDrawAction.js')
+        script(src='/javascripts/alepizProcessAction.js')
+        script(src='/javascripts/alepiz.js')
     meta(name="viewport" content='width=480, user-scalable=no')
     body
         header.main
             nav
                 div.nav-wrapper
                     ul.left
-                        li: a(href='#' data-target='slide-out').sidenav-trigger: i.material-icons menu
+                        li: a(href='#' data-target='slide-out').sidenav-trigger#sidenav-menu: i.material-icons menu
                         //li: div.row: a(style="padding-left:20px")#brand-logo.brand-logo.truncate.col.s10
+                        span#navBarLinks
                     ul.right
                         li: a(href='/' target="_blank" data-tooltip='Open a new tab or window for ALEPIZ')#openInNewWindow.tooltipped
                             i.material-icons open_in_new
@@ -32,37 +42,65 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
                         li: a(href='https://alepiz.com' data-tooltip='Web site alepiz.com' target="__blank").tooltipped
                             i.material-icons home
 
-                    div.fixed-action-btn#actionButton
-                        a.btn-floating.btn-large.waves-effect.waves-circle.waves-light.orange.darken-1: i.material-icons.large more_horiz
+                    div.fixed-action-btn#runActionBtn
+                        a.btn-floating.btn-large.waves-effect.waves-circle.waves-light.red: i.material-icons.large play_arrow
                         ul
-                            li: a#walletBtn.btn-floating.waves-effect.waves-light.blue.hide: i.material-icons card_travel
-                            li: a#selectAllObjBtn.btn-floating.waves-effect.waves-light.purple.darken-1.hide: i.material-icons done_all
-                            li: a#reloadBtn.btn-floating.waves-effect.waves-light.green: i.material-icons cached
                             li: a#makeTaskBtn.btn-floating.waves-effect.waves-light.yellow.darken-2: i.material-icons playlist_add
-                            li: a#runActionBtn.btn-floating.waves-effect.waves-light.red: i.material-icons play_arrow
+                    div.fixed-action-btn.hide#makeTaskBtnAdd
+                        a.btn-floating.btn-large.waves-effect.waves-circle.waves-light.yellow: i.material-icons.large playlist_add
 
             //ul(style="overflow-y:hidden;display:flex;flex-direction:column")#slide-out.side-nav.fixed
-            ul(style="overflow-y:hidden;display:flex;flex-direction:column")#slide-out.sidenav.sidenav-fixed.width-400
+            ul(style="overflow-y:hidden;display:flex;flex-direction:column")#slide-out.sidenav.sidenav-fixed
                 li
-                    div.user-view.row
+                    div(style="padding:32px 16px 0 16px;").user-view.row.no-margin
                         div.background
-                            img(src="images/background.jpg" width="100%")
-                        div.col.s10.input-field
-                            textarea(style="height: 20px")#searchObjects.search-textarea.materialize-textarea.black-text.hide
-                            textarea(style="height: 20px")#searchActions.search-textarea.materialize-textarea.autocomplete.black-text
-                            label
-                        div.col.s1.input-field
-                            i(style="cursor: pointer")#searchTip.material-icons search
-                    ul(style="overflow-x: hidden;-webkit-user-select: none;-moz-user-select: none;-ms-user-select: none;")#tabs.tabs.tabs-fixed-width
-                        li.tab.col.s6.truncate: a(href="#actionsList").tab-padding#actionsTabSwitch ACTIONS
-                        li.tab.col.s6.truncate: a(href="#objectsList").tab-padding#objectsTabSwitch OBJECTS
-                        li.tab.col.s6.truncate.hide: a(href="#objectsList").tab-padding#additionalObjectsTabSwitch OBJECTS
-                        li.tab.col.s6.truncate: a(href="#objectsFilter").tab-padding#filterTabSwitch FILTERS
-                li(style="overflow-y:auto;position:relative;-webkit-user-select: none;-moz-user-select: none;-ms-user-select: none;").no-padding
-                    ul#objectsList
-                    ul#actionsList.collapsible.collapsible-accordion
-                    ul#objectsFilter
+                            img(src="images/background.jpg" width="100%")#backgroundImg
+                        div(style="position:relative;width:100%;").col.no-margin.hide-on-med-and-down
+                            i.material-icons.side-nav-control-lock#sideNavLockIcon code_off
+                            i.material-icons.side-nav-control-max#sideNavResizeIcon keyboard_arrow_right
+                        div(style="position:relative;").row.no-margin.no-padding
+                            i(style="position:absolute;left:8px").material-icons.grey-text#searchIcon search
+                            div.input-field.row.no-margin.no-padding.col.s12
+                                textarea(style="height:20px;")#searchObjects.search-textarea.materialize-textarea.black-text
+                            // !!! class .input-field required for Autocomplete function !!!
+                            div.input-field.row.no-margin.no-padding.col.s12.hide
+                                textarea(style="height:20px;")#searchActions.search-textarea.materialize-textarea.autocomplete.black-text
+                            div.input-field.row.no-margin.no-padding.col.s12.hide
+                                textarea(style="height:20px;")#searchFilters.search-textarea.materialize-textarea.black-text
 
+                    div.row.no-margin
+                        div(style="width:48px;height:48px;padding:8px 0 0 16px;").col.s1#selectAllObjects
+                            label
+                                input(type="checkbox" data-tooltip="Select/unselect all objects")#selectAllObjBtn
+                                span
+                        div(style="width:48px;padding:0 0 0 6px").col.s1.hide#actionReloadBtn
+                            a.btn-floating.waves-effect.waves-red.waves-light.btn-flat.white: i.material-icons.red-text.text-lighten-3 cached
+                        div(style="width:48px;padding:0 0 0 6px;").col.s1.hide#resetFiltersBtn
+                            a.btn-floating.waves-effect.waves-red.waves-light.btn-flat.white: i.material-icons.red-text.text-lighten-3 bookmark_border
+                        div(style="border-style:solid;border-width:0 0 2px 2px;border-color:#ffeeee;cursor:pointer;color:#ee6e73;font-weight:500;").hide.col.s6.no-padding.center-align#objectsLabel TO TOP
+                        div(style="border-style:solid;border-width:0 0 2px 2px;border-color:#ffeeee;")#tabContainer.col.s10.no-padding
+                            ul(style="overflow-x: hidden;-webkit-user-select: none;-moz-user-select: none;-ms-user-select: none;")#tabs.tabs.tabs-fixed-width
+                                li.tab.col.s4.truncate#objectsTab: a(href="#objectsListTab").tab-padding#objectsTabSwitch TO TOP
+                                li.tab.col.s4.truncate: a(href="#actionsList").tab-padding#actionsTabSwitch ACTIONS
+                                li.tab.col.s4.truncate: a(href="#objectsFilterTab").tab-padding#filterTabSwitch FILTERS
+
+
+                div(style="overflow-y:auto;height:100%;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;").row.no-padding.no-margin
+                    div.list.col.s12.no-padding.no-margin#objectsListTab
+                        div.list.col.s12.no-padding.no-margin#objectsList
+                        div(style="position:relative;").col.no-margin.no-padding
+                            span.objectsNum.waves-effect.blue.white-text.hide#objectCounter
+                            div#wallet.hide
+                                span.walletNum.white-text#walletCounter
+                                i.walletIcon.waves-effect.red-text.material-icons#walletIcon folder
+                    div.list.col.s12.no-padding.no-margin#actionsList.collapsible.collapsible-accordion
+                    div.list.col.s12.no-padding.no-margin#objectsFilterTab
+                        div(style="padding:8px 16px 0 16px;").input-field.no-margin.col.s12
+                            textarea(style="height:20px;" placeholder="Object search")#searchObjectsAdd.search-textarea.materialize-textarea
+                        div.col.s12.no-padding.no-margin#objectsFilter
+                        div(style="position:relative;").hide.col.no-margin.no-padding#filterCounterContainer
+                            span.filterssNum.waves-effect.green.white-text#filterCounter
+                            i.filterEditIcon.waves-effect.red-text.material-icons#filterEditIcon edit
 
         main.main
             div(style="height: 93vh")
@@ -86,7 +124,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
                         input(type="password")#userPass
                         label(for="userPass") Password
                     div.col.l4.m8.s8.offset-l8.offset-m8.offset-s8
-                        a(href="#!")#changePasswordBtn Change password
+                        a(href="#")#changePasswordBtn Change password
                 div#changePasswordForm.hide
                     div.row
                         div.col.s0.m1.l1.input-field
@@ -101,8 +139,8 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
                             input(type="password")#newUserPass2
                             label(for="newUserPass2") Confirm Password
             div.modal-footer
-                a(href="#!")#login.modal-action.modal-close.waves-effect.waves-green.btn-flat Login
-                a(href="#!")#logout.modal-action.modal-close.waves-effect.waves-green.btn-flat Logout
+                a(href="#")#login.modal-action.modal-close.waves-effect.waves-green.btn-flat Login
+                a(href="#")#logout.modal-action.modal-close.waves-effect.waves-green.btn-flat Logout
 
         div#modal-log-window.bottom-sheet.modal
             div.modal-content
@@ -117,7 +155,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
                 h4#modalLogHeader
                 p#modalLogMessage
             div.modal-footer
-                a(href="#!").modal-action.modal-close.waves-effect.waves-green.btn-flat Close
+                a(href="#").modal-action.modal-close.waves-effect.waves-green.btn-flat Close
 
         div#modal-change-objects-filter-expr.modal
             div.modal-content
@@ -125,4 +163,4 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
                 p#filterExpressionEditor
 
             div.modal-footer
-                a(href="#!").modal-action.modal-close.waves-effect.waves-green.btn-flat Close
+                a(href="#").modal-action.modal-close.waves-effect.waves-green.btn-flat Close

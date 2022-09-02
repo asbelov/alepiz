@@ -292,12 +292,7 @@ var JQueryNamespace = (function ($) {
         }
 
         function checkCounterData(counterDataStr) {
-            try {
-                var counterData = JSON.parse(counterDataStr);
-            } catch (e) {
-                log.error('Can\'t parse counter data: ', e.message);
-                return;
-            }
+            var counterData = JSON.parse(counterDataStr);
             if(!counterData) throw new Error('Counter data is empty');
             //if(!counterData.name) throw new Error('Counter name is not set');
 

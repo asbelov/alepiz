@@ -1,11 +1,12 @@
 /*
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
-//var log = require('../lib/log')(module);
+var log = require('../lib/log')(module);
 var async = require('async');
 var countersDB = require('../models_db/countersDB');
 var objectsDB = require('../models_db/objectsDB');
 var objectPropertiesDB = require('../models_db/objectsPropertiesDB');
+var userDB = require('../models_db/usersDB');
 var history = require('../models_history/history');
 const fromHuman = require('../lib/utils/fromHuman');
 var calc = require('../lib/calc');
@@ -25,19 +26,35 @@ module.exports = objectsFilter;
 
 /** Return array with objects with filter names and descriptions for init FIULTERS menu
  *
+ * @param {string} userName - username
  * @param {function(null, Array)|function()} callback - callback(null, filterNames) or callback() when filters are undefined
  * filterNames is [{name:..., description:...}, {}, ...]
  */
-function getObjectsFilterNames(callback) {
+function getObjectsFilterNames(userName, callback) {
     confObjectFilters.reload();
     var cfg = confObjectFilters.get();
     if(typeof cfg !== 'object' || !Array.isArray(cfg.filters)) return callback();
 
-    var filterNames = cfg.filters
-        .filter(f => typeof f.name === 'string' && typeof f.expression === 'string' && f.name && f.expression)
-        .map((f) => { return { name: f.name, description: f.description } });
+    userDB.getUsersInformation(userName, function(err, rows) {
+        var userRoles = rows.map(row => row.roleName.toUpperCase());
+        var filterNames = cfg.filters
+            .filter(f => typeof f.name === 'string' && typeof f.expression === 'string' && f.name && f.expression)
+            .map((f) => {
+                var filterObj = {
+                    name: f.name,
+                    description: f.description
+                };
 
-    return callback(null, filterNames);
+                if(Array.isArray(f.checkedForRoles)) {
+                    filterObj.checked = !f.checkedForRoles.every(role => {
+                        return userRoles.indexOf(role.toUpperCase()) === -1;
+                    });
+                }
+                return filterObj;
+            });
+
+        return callback(null, filterNames);
+    })
 }
 
 /** Initialized global counterNames2IDs Map for convert counter names to counter IDs
@@ -197,7 +214,7 @@ function getUplevelObjectPropertiesResult(variable, objects, callback) {
 
 /** Filter objects and return new objects list with filtered objects
  *
- * @param {string} filterNamesStr - comma separated filer names for filotering objects
+ * @param {Array|String} filterNamesStr - comma separated filer names for filotering objects
  * @param {string} filterExpression - filters logical expression if selected some filters
  * @param {Array} objects - array of objects [{name: <objectName> id: <objectID>}, {...}, ...]
  * @param {function(Error)|function(null, Array)} callback - callback(err, newObjects) - newObjects
@@ -250,7 +267,7 @@ function applyFilterToObjects(filterNamesStr, filterExpression, objects, callbac
                                 ' for object filter ' + filterObj.name + ': ' + err.message));
                         }
 
-                        //log.info('filterObj.expression: ', filterObj.expression, ' = ', result, '; unresolvedVariables: ', unresolvedVariables, '; initVars: ', initVariables)
+                        //log.warn('obj: ', obj.name, ': filterObj.expression: ', filterObj.expression, ' = ', result, '; unresolvedVariables: ', unresolvedVariables, '; initVars: ', initVariables)
                         //if unresolved variables are present, the result is always true.
                         //This will allow not to hide objects that are not related to the filter.
                         filterObj.results[obj.id] = unresolvedVariables && unresolvedVariables.length ? undefined : result;
@@ -272,14 +289,14 @@ function applyFilterToObjects(filterNamesStr, filterExpression, objects, callbac
                             return callback(new Error('Can\'t calculate ' + filterExpression +
                                 ' for object filters : ' + err.message));
                         }
-
-                        //log.info('filterExpression: ', filterExpression, ' = ', result, '; unresolvedVariables: ', unresolvedVariables, '; initVars: ', initVariables)
+                        //log.warn('obj: ', obj.name, ': filterExpression: ', filterExpression, ' = ', result, '; unresolvedVariables: ', unresolvedVariables, '; initVars: ', initVariables)
                         //if unresolved variables are present, the object is always added to show.
                         //This will allow not to hide objects that are not related to the filter.
                         if(result || (unresolvedVariables && unresolvedVariables.length)) newObjects.push(obj);
                         callback();
                     });
                 }, function(err) {
+                    //log.warn('objects: ', objects, '; new obj: ', newObjects)
                     callback(err, newObjects);
                 });
             });

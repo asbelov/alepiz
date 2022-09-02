@@ -16,6 +16,7 @@ var browserLog = require('../lib/browserLog'); // used for delete messages count
 var userDB = require('../models_db/usersDB');
 
 var actionClient = require('../serverActions/actionClient');
+const objectFilterDB = require("../models_db/objectsFilterDB");
 //var actionServer = require('../lib/actionServer');
 
 var router = express.Router();
@@ -31,14 +32,12 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
     var actionID = req.params.action;
     var user = prepareUser(req.session.username);
     var func = req.body.func;
-
     actions.getConfiguration(actionID, function(err, actionCfg) {
-        if (err) {
+        if (err && actionID  !== '__AlepizMainMenuConfiguration') {
             log.error('Error while getting action configuration for "', actionID, '", user: ', user,
                 ': ', err.message, ': param: ', req.body);
             return next(err);
         }
-
         if(func === 'setActionConfig' || func === 'getActionConfig') {
             actionClient.actionConfig(user, func, actionID, req.body.config, function (err, row) {
                 if (err) {
@@ -76,62 +75,69 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
             module.sessionID = sessionID;
             log.debug('Creating new session for user: "', user, '",  action: "', actionCfg.name, '", sessionID: ', sessionID);
 
-            async.parallel([
-                function(callback){
-                    if (!'o' in req.body) return callback(new Error('Error in parameter specification for initialising action: parameter "o" is not present'));
-                    try{
-                        var objects = JSON.parse(req.body.o);
-                    } catch(err){
-                        return callback(new Error('Error while parse JSON objects "o" parameter for initialising action'));
+            if (!'o' in req.body) {
+                return callback(new Error('Error while initialisation action "' + actionID + '": ' +
+                    'parameter "o" with object names is not present'));
+            }
+            objectFilterDB.getObjectsByNames(req.body.o.split(','), user, function(err, objectsFull) {
+                if(err) {
+                    return callback(new Error('Error getting object information action "' + actionID + '": ' +
+                        err.message + '. Objects: ' + req.body.o));
+                }
+                var objects = objectsFull.map((obj) => {
+                    return {
+                        name: obj.name,
+                        id: obj.id,
                     }
-                    return callback(null, objects)
-                },
-                // get action configuration and check for objects compatibility
-                function(callback){
-                    rightsWrapper.checkForObjectsCompatibility(actionCfg, req.body.o, callback);
-                },
-                // check user rights for view this action
-                function(callback){
-                    rightsWrapper.checkActionRights(user, actionID, 'ajax', callback);
-                }
-                //data[0] - objects list [{id: ID1. name: name1}, ....]
-            ], function(err, data){
-                if(err){
-                    log.error('Error while initialisation action "', actionID, '": ', err.message);
-                    return next(err);
-                }
-
-                var result = {};
-                result.action = actionCfg;
-                result.objects = data[0];
-
-                var actionLink = result.action.link;
-                result.action.link += '_' + String(sessionID);
-                result.action.sessionID = sessionID;
-
-                log.info('Init a new action ' + (req.body.actionUpdate === '1' ? 'with full reload' : '' ) + '. Parameters: ', result);
-
-                var actionHomePage = path.join(__dirname, '..', actionLink, result.action.homePage);
-
-                if(req.body.actionUpdate === '1') {
-                    actionsForUpdate.set(actionID, {
-                        ajax: true,
-                        server: true
-                    });
-                }
-
-                //res.render(actionHomePage, result);
-                res.render(actionHomePage, result, function(err, html) {
+                });
+                async.parallel([
+                    // get action configuration and check for objects compatibility
+                    function(callback){
+                        rightsWrapper.checkForObjectsCompatibility(actionCfg, objects, callback);
+                    },
+                    // check user rights for view this action
+                    function(callback){
+                        rightsWrapper.checkActionRights(user, actionID, 'ajax', callback);
+                    }
+                ], function(err){
                     if(err) {
-                        log.error('Can\'t render action html page "', actionHomePage, '": ', err.message);
+                        log.error('Error while checking rights for action "', actionID, '": ', err.message);
                         return next(err);
                     }
 
-                    res.json({
-                        html: html,
-                        params: result.action
-                    });
-                })
+                    var result = {};
+                    result.action = actionCfg;
+                    result.objects = objects;
+
+                    var actionLink = result.action.link;
+                    result.action.link += '_' + String(sessionID);
+                    result.action.sessionID = sessionID;
+
+                    log.info('Init a new action ' + (req.body.actionUpdate === '1' ? 'with full reload' : '' ) +
+                        '. Parameters: ', result);
+
+                    var actionHomePage = path.join(__dirname, '..', actionLink, result.action.homePage);
+
+                    if(req.body.actionUpdate === '1') {
+                        actionsForUpdate.set(actionID, {
+                            ajax: true,
+                            server: true
+                        });
+                    }
+
+                    //res.render(actionHomePage, result);
+                    res.render(actionHomePage, result, function(err, html) {
+                        if(err) {
+                            log.error('Can\'t render action html page "', actionHomePage, '": ', err.message);
+                            return next(err);
+                        }
+
+                        res.json({
+                            html: html,
+                            params: result.action
+                        });
+                    })
+                });
             });
         });
     });

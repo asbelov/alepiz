@@ -63,29 +63,36 @@ functions.change = function(id, parameters, callback) {
     var recordsType = parameters[2] ? 2: 1;
     var isAbs = parameters[3];
 
-    if(String(num).charAt(0) === '#' && Number(num.slice(1)) < 2) return callback(null, {records: 'require only one record: ' + num});
+    if(String(num).charAt(0) === '#' && Number(num.slice(1)) < 2) {
+        return callback(null, {records: 'require only one record: ' + num});
+    }
 
     history.get(id, shift, num, recordsType, function(err, records, rawRecords) {
-        if(err) return callback(new Error('Error occurred while getting data from history for "change('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if(err) {
+            return callback(new Error('Error occurred while getting data from history for "change(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records) return callback(null, {records: rawRecords});
 
-        if(records.length < 2 || !records[0] || !records[records.length-1] || records[0].data === undefined || records[records.length-1].data === undefined)
-            //return callback(new Error('No first or last records returned for "change('+parameters.join(', ')+')" function for objectID: '+ id));
+        if(records.length < 2 || !records[0] || !records[records.length - 1] ||
+            records[0].data === undefined || records[records.length - 1].data === undefined) {
+            /*
+            return callback(new Error('No first or last records returned for "change(' + parameters.join(', ') +
+            ')" function for objectID: ' + id), {records: rawRecords});
+             */
             return callback(null, {records: rawRecords});
+        }
 
         var first = records[0].data;
-        var last = records[records.length-1].data;
+        var last = records[records.length - 1].data;
 
-        // check for numeric: http://stackoverflow.com/questions/18082/validate-decimal-numbers-in-javascript-isnumeric
         var result;
-        if(!isNaN(parseFloat(last)) && isFinite(last) && !isNaN(parseFloat(first)) && isFinite(first)) {
+        if(typeof first === 'number' && typeof last === 'number') {
             result = isAbs ? Math.abs(last - first) : last - first;
-        } else {
-            if(isAbs && typeof last === 'string' && typeof first === 'string') {
+        } else if(isAbs && typeof last === 'string' && typeof first === 'string') {
                 result = last.toUpperCase() === first.toUpperCase() ? 0: 1;
-            } else result = last === first ? 0: 1;
-        }
+        } else result = last === first ? 0: 1;
 
         log.debug('FUNC: [abs]change(', parameters.join(', '), ') = ', result, '; records: ', records);
         callback(null, {

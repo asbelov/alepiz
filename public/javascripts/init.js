@@ -7,7 +7,7 @@
  */
 
 
-var initJQueryNamespace = (function($){
+(function($){
 
     // run on document ready
     $(function() {
@@ -17,7 +17,7 @@ var initJQueryNamespace = (function($){
         initVariablesElm();
         initMaterializeElements();
         initEvents();
-        initAuthorisationSystem();
+        alepizAuditNamespace.setSessionIDs(sessionsIDs);
 
         getParametersFromURL(function(parametersFromURL) {
 
@@ -85,7 +85,7 @@ var initJQueryNamespace = (function($){
         URL Length (https://chromium.googlesource.com/chromium/src/+/master/docs/security/url_display_guidelines/url_display_guidelines.md)
         In general, the web platform does not have limits on the length of URLs (although 2^31 is a common limit).
         Chrome limits URLs to a maximum length of 2MB for practical reasons and to avoid causing denial-of-service problems in inter-process communication.
-        On most platforms, Chrome’s omnibox limits URL display to 32kB (kMaxURLDisplayChars) although a 1kB limit is used on VR platforms.
+        On most platforms, Chrome’s omnibox limits URL displays to 32kB (kMaxURLDisplayChars) although a 1kB limit is used on VR platforms.
         Ensure that the client behaves reasonably if the length of the URL exceeds any limits:
         Origin information appears at the start of the URL, so truncating the end is typically harmless.
         Rendering a URL as an empty string in edge cases is not ideal, but truncating poorly
@@ -111,14 +111,8 @@ var initJQueryNamespace = (function($){
         searchValForAdditionalObjectsTab = '',
         additionalObjectsTabName = 'OBJECTS',
 
-        // JQuery HTML DOM elements will defined at initVariablesElm() function
+        // JQuery HTML DOM elements will be defined at initVariablesElm() function
         bodyElm,
-        logBodyElm,
-        logLastUpdateElm,
-        modalLogWindowsInstance,
-        modalLogMessageElm,
-        modalLogHeaderElm,
-        loginBtnElm,
         objectsTabSwitchElm,
         additionalObjectsTabSwitchElm,
         actionsTabSwitchElm,
@@ -131,7 +125,6 @@ var initJQueryNamespace = (function($){
         searchActionsElm,
         searchActionsAutocompleteInstance,
         useGlobalSearch = false,
-        canSetFocusToSearchBar = true,
         minSearchStrLength = 2,
         prevSearchStrLength = 0,
         timeWhenNoObjectsWereFound = 0,
@@ -146,8 +139,6 @@ var initJQueryNamespace = (function($){
         objectsTooltipInstances,
         filterTooltipInstances,
         sideNavInstance,
-        modalLoginInstance,
-        modalLogInstance,
         modalChangeObjectsFilterInstance,
 
         iframeDOMElm,
@@ -157,32 +148,9 @@ var initJQueryNamespace = (function($){
 
         URL = '';
 
-    var entityMap = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;',
-        '/': '&#x2F;',
-        '`': '&#x60;',
-        '=': '&#x3D;'
-    };
-
-    function escapeHtml (string) {
-        return String(string).replace(/[&<>"'`=\/]/g, function (s) {
-            return entityMap[s];
-        });
-    }
-
     // set variables to JQuery HTML DOM elements
     function initVariablesElm() {
         bodyElm = $("body");
-        logBodyElm = $('#collapsible-log-body');
-        logLastUpdateElm = $('#last-update');
-        modalLogMessageElm = $('#modalLogMessage');
-        modalLogHeaderElm = $('#modalLogHeader');
-
-        loginBtnElm = $('#loginBtn');
 
         objectsTabSwitchElm = $('#objectsTabSwitch');
         additionalObjectsTabSwitchElm = $('#additionalObjectsTabSwitch');
@@ -205,7 +173,7 @@ var initJQueryNamespace = (function($){
     }
 
     /*
-        Initialising all Materialize JavaScript elements when rendering page
+        Initializing all Materialize JavaScript elements when rendering page
      */
     function initMaterializeElements(){
         // fix error, when overlay hide part of sideNav menu on mobile devices with a small width screens
@@ -219,25 +187,6 @@ var initJQueryNamespace = (function($){
             edge: 'left', // Choose the horizontal origin
             closeOnClick: false, // Closes side-nav on <a> clicks, useful for Angular/Meteor
             draggable: true // Choose whether you can drag to open on touch screens
-        });
-
-        modalLoginInstance = M.Modal.init(document.getElementById('modal-login'), {
-            onOpenStart: function () {
-                $('#changePasswordForm').addClass('hide');
-                $('#newUserPass1').val('');
-                $('#newUserPass2').val('');
-                canSetFocusToSearchBar = false;
-            },
-            onCloseEnd: function () {
-                canSetFocusToSearchBar = true;
-                setFocusToSearchBar();
-            }
-        });
-
-        modalLogInstance = M.Modal.init(document.getElementById('modal-log'), {});
-
-        modalLogWindowsInstance = M.Modal.init(document.getElementById('modal-log-window'), {
-            onCloseEnd: stoppingRetrievingLog
         });
 
         modalChangeObjectsFilterInstance = M.Modal.init(document.getElementById('modal-change-objects-filter-expr'), {});
@@ -259,7 +208,7 @@ var initJQueryNamespace = (function($){
             if(actionBtnInstance.isOpen) actionBtnInstance.close();
         });
 
-        actionBtnElm.click(function (e) {
+        actionBtnElm.click(function () {
             setTimeout(function() { actionBtnInstance.open(); }, 300);
         });
 
@@ -301,7 +250,7 @@ var initJQueryNamespace = (function($){
 
         createObjectsList(objectsInObjectsTab.unchecked, objectsInObjectsTab.checked);
 
-        objectsTabSwitchElm.text('').text('TO TOP');
+        objectsTabSwitchElm.text('TO TOP');
         additionalObjectsTabSwitchElm.text(additionalObjectsTabName);
         searchActionsElm.addClass('hide');
         searchObjectsElm.removeClass('hide');
@@ -428,7 +377,7 @@ var initJQueryNamespace = (function($){
     }
 
     function setFocusToSearchBar() {
-        if(!isMobile && canSetFocusToSearchBar) {
+        if(!isMobile && !alepizAuthSystem.authorizationInProgress()) {
             setTimeout( function() {
                 if(!searchActionsElm.hasClass('hide')) {
                     return searchActionsElm.focus();
@@ -455,8 +404,6 @@ var initJQueryNamespace = (function($){
         setFocusToSearchBar();
         // after every mouse click set focus to the search bar
         bodyElm.click(setFocusToSearchBar);
-
-        $('#logWindowBtn').click(openLogWindow);
 
         objectsTabSwitchElm.click(function(){
             if($(this).hasClass('active')) { // if pressed "to top"
@@ -530,22 +477,6 @@ var initJQueryNamespace = (function($){
             } else searchObjects();
         });
 
-        // help button click
-        $('#helpBtn').click(function (e) {
-            e.preventDefault();  // prevent default
-
-            var activeActionLink = $('li[action_link].active').attr('action_link');
-
-            var helpWindowWidth = Math.floor(screen.width - screen.width / 3);
-            var helpWindowsHeight = Math.floor(screen.height - screen.height / 3);
-            var helpWindowLeft = (screen.width - helpWindowWidth) / 2;
-            var helpWindowTop = (screen.height - helpWindowsHeight) / 2;
-            var url = activeActionLink ? (activeActionLink + '/help/') : '/help/contents.pug';
-            window.open(url, 'ALEPIZ help window',
-        'toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width=' +
-                helpWindowWidth + ', height=' + helpWindowsHeight + ', top=' + helpWindowTop + ', left=' + helpWindowLeft);
-        });
-
         // reload button click
         $('#reloadBtn').click(reload);
 
@@ -583,7 +514,7 @@ var initJQueryNamespace = (function($){
         // wallet button click event processor
         walletBtnElm.click(function(){
 
-            // create list of checked objects checkbox elements
+            // create list of checked objects' checkbox elements
             var checkedObjects = $('input[objectName]:checked');
 
             // if any of objects is checked, create array on checked object names
@@ -614,7 +545,7 @@ var initJQueryNamespace = (function($){
                 return;
             }
 
-            // when nothing found in actions switch to objects tab and try to search objects
+            // when nothing found in actions switch to object tab and try to search objects
             var val = searchActionsElm.val();
             if(searchActionsAutocompleteInstance && val.length > searchActionsAutocompleteInstance.options.minLength + 1 &&
                 !searchActionsAutocompleteInstance.count) {
@@ -803,7 +734,7 @@ var initJQueryNamespace = (function($){
                 parameters.push('a='+encodeURIComponent(activeActionLink))
             }
 
-            // use array because we don't known about existence of each URL parameter and if we concat strings
+            // use array because we don't know about existence of each URL parameter and if we concat strings
             // we can get strange result f.e.'http://localhost:3000/?&a=%2Factions%2Fobjects_creator&u=Servers%2CSystem%20objects'
             var URLArray = [];
             Array.prototype.push.apply(URLArray, parameters); // copy parameters array to URLArray
@@ -812,7 +743,7 @@ var initJQueryNamespace = (function($){
 
             URL = (URLArray.length ? URLArray.join('&') : '');
 
-            // if length of URL more then some browsers are support, make URL from prev checked objects
+            // if length of URL more than some browsers are support, make URL from prev checked objects
             if(prevCheckedObjectsNames.length && document.title.length + URL.length > maxUrlLength) {
                 URLArray = [];
                 Array.prototype.push.apply(URLArray, parameters); // copy parameters array to URLArray
@@ -822,7 +753,7 @@ var initJQueryNamespace = (function($){
                 } else if(objectsNames.checked.length) URLArray.push('c='+encodeURIComponent(objectsNames.checked.join(',')));
                 URL = (URLArray.length ? URLArray.join('&') : '');
 
-                // if length of URL again more then some browsers are support, make URL from prev checked objects
+                // if length of URL again more than some browsers are support, make URL from prev checked objects
                 if(document.title.length + URL.length > maxUrlLength) {
                     URLArray = [];
                     Array.prototype.push.apply(URLArray, parameters); // copy parameters array to URLArray
@@ -832,7 +763,7 @@ var initJQueryNamespace = (function($){
             }
 
             if(document.title.length + URL.length >= maxUrlLength) {
-                console.log('URL length more then ',  maxUrlLength, ': ', document.title + '?' + URL);
+                console.log('URL length more than ',  maxUrlLength, ': ', document.title + '?' + URL);
             }
             // replace last record in history if action and list of objects are not changed.
             // may be change only checked and unchecked objects in the list
@@ -1418,7 +1349,7 @@ var initJQueryNamespace = (function($){
 
                 if('hideObjectsList' in action) attributes += ' hide_objects_list="' + action.hideObjectsList + '"';
 
-                // if onChangeAdditionalObjectMenuEvent is enabled, then action developer can creating depend from additional objects list changing
+                // if onChangeAdditionalObjectMenuEvent is enabled, then action developer can create depend on from additional objects list changing
                 // and action can't work properly when init from browser URL, because list of additional objects don't save into the URL
                 // it's switched off also at redrawIFrameDataOnChangeAdditionalObjectsList function
                 //if('onChangeAdditionalObjectMenuEvent' in action) attributes += ' on_change_additional_object_menu_event="' + action.onChangeAdditionalObjectMenuEvent + '"';
@@ -1540,6 +1471,7 @@ var initJQueryNamespace = (function($){
                     }
 
                     sessionID = action.params.sessionID;
+                    log.setSessionID(sessionID);
                     sessionsIDs[sessionID] = true;
 
                     if(typeof callback === 'function') callback(action.html);
@@ -1602,9 +1534,10 @@ var initJQueryNamespace = (function($){
                 '        \'toolbar=no, location=no, directories=no, status=no, menubar=no, scrollbars=no, resizable=no, copyhistory=no, width=\' +\n' +
                 '                helpWindowWidth + \', height=\' + helpWindowsHeight + \', top=\' + helpWindowTop + \', left=\' + helpWindowLeft);\n' +
             '        }' +
-                '</script>'
+                '</script>' +
                 '</body></html>';
             sessionID = undefined;
+            log.setSessionID(sessionID);
         }
 
         try {
@@ -1623,7 +1556,7 @@ var initJQueryNamespace = (function($){
         } catch (err) { }
 
         // make possible to get action parameters from the URL for the action
-        // function getActionParameters()
+        // function onScrollIframegetActionParameters()
         // return action parameters as array [{key: <key1>, val:<val1>}, {..}, ...]
         try {
             iframeDOMElm.contentWindow.getActionParametersFromBrowserURL = function(callback) {
@@ -1860,7 +1793,7 @@ var initJQueryNamespace = (function($){
                 else valueList = [{name: 'o', value: JSON.stringify(objects)}];
 
                 // Only this way can show, is createResultValuesList() return error or not
-                // don't touch it, even if you understand, what are you do
+                // don't touch it, even if you understand, what are you doing
                 var errorOnCreateValueList = false;
                 $(iframeDOMElm).contents().find('input').each(createResultValuesList);
                 $(iframeDOMElm).contents().find('select').each(createResultValuesList);
@@ -1873,7 +1806,7 @@ var initJQueryNamespace = (function($){
                 var ajaxUrl = activeActionElm.attr('action_link') + '_' + sessionID + '/'+execMode;
                 var timeout = Number(activeActionElm.attr('action_timeout')) * 1000;
                 $("body").css("cursor", "progress");
-                if(dontOpenLogWindows !== true) openLogWindow('force');
+                if(dontOpenLogWindows !== true) alepizAuditNamespace.openLogWindow('force');
                 else M.toast({html: 'Executing action "' + activeActionElm.attr('action_name') + '"... Open log window for details', displayLength: 6000});
 
                 $.ajax(ajaxUrl, {
@@ -1923,7 +1856,7 @@ var initJQueryNamespace = (function($){
                             if(!validationResult)
                                 errorMessage = 'Error in parameter "'+name+'": "'+value+'" not matched with "'+validator+'"';
                             else
-                                errorMessage = 'Error in parameter "'+name+'": length of "'+value+'" more then '+parameterLength;
+                                errorMessage = 'Error in parameter "'+name+'": length of "'+value+'" more than '+parameterLength;
                         }
 
                         log.error(errorMessage);
@@ -1949,6 +1882,7 @@ var initJQueryNamespace = (function($){
         function processingResult(returnObj) {
             if(returnObj.sessionID) {
                 sessionID = returnObj.sessionID;
+                log.setSessionID(sessionID);
                 sessionsIDs[sessionID] = true;
             }
 
@@ -2112,474 +2046,4 @@ var initJQueryNamespace = (function($){
         }
 
 
-//====================================================================================================================
-//============================================== AUTHORISATION SYSTEM ================================================
-//====================================================================================================================
-    function initAuthorisationSystem() {
-
-        var userNameElm = $('#userName'),
-            userPassElm = $('#userPass'),
-            newPass1Elm = $('#newUserPass1'),
-            newPass2Elm = $('#newUserPass2');
-        // set focus on a login field after login dialog initialize
-        loginBtnElm.click(function(){ setTimeout(function(){ userNameElm.focus() }, 500 ) });
-
-        // set focus to password field on press enter or tab on a user field
-        // or close modal for esc
-        userNameElm.keypress(function(e) {
-            if(e.which === 13 || e.which === 9) userPassElm.focus();
-            if(e.which === 27) modalLoginInstance.close();
-        });
-        // try to login in when press enter on a password field
-        // or close modal for esc
-        userPassElm.keypress(function(e) {
-            if($('#changePasswordForm').hasClass('hide')) {
-                if(e.which === 13) {
-                    login();
-                    modalLoginInstance.close();
-                }
-            } else if(e.which === 13 || e.which === 9) newPass1Elm.focus();
-
-            if(e.which === 27) modalLoginInstance.close();
-        });
-
-        newPass1Elm.keypress(function(e) {
-            if(e.which === 13 || e.which === 9) newPass2Elm.focus();
-            if(e.which === 27) modalLoginInstance.close();
-        });
-
-        newPass2Elm.keypress(function(e) {
-            if(e.which === 13) {
-                login();
-                modalLoginInstance.close();
-            }
-            if(e.which === 27) modalLoginInstance.close();
-            var newPass = newPass1Elm.val();
-            if(!newPass) return false;
-        });
-
-        newPass2Elm.keyup(function () {
-            var newPass = newPass1Elm.val();
-            if(newPass !== newPass2Elm.val()) newPass2Elm.addClass('red-text');
-            else newPass2Elm.removeClass('red-text');
-        });
-
-        $('#changePasswordBtn').click(function () {
-            $('#changePasswordForm').toggleClass('hide');
-        });
-
-        // try to login in when click on LOGIN button
-        $('#login').click(function(eventObject){
-            eventObject.preventDefault();
-            login();
-        });
-        // logout when pressed LOGOUT button
-        $('#logout').click(function(eventObject){
-            eventObject.preventDefault();
-            logout();
-        });
-
-        $.post('/mainMenu', {f: 'getCurrentUserName'}, function(userName) {
-            if(userName && userName.length) { // userName is a string or empty array [], when login as guest
-
-                M.toast({html: 'Entering as "'+userName+'"', displayLength: 3000});
-                loginBtnElm.removeClass('grey-text').attr('data-tooltip', 'Login as '+userName);
-                M.Tooltip.init(loginBtnElm[0], {
-                    enterDelay: 2000
-                });
-
-            } else M.toast({html: 'Entering as "GUEST", please login first', displayLength: 3000});
-        });
-
-        function login() {
-            var user = userNameElm.val(), pass = userPassElm.val(), newPass = newPass1Elm.val();
-            if(newPass !== newPass2Elm.val()) {
-                M.toast({html: 'New entered passwords don\'t match', displayLength: 5000});
-                return;
-            }
-
-            if(newPass && !pass) {
-                M.toast({html: 'Please enter your old password before changing', displayLength: 5000});
-                return;
-            }
-
-            if(!user || !pass) {
-                M.toast({html: 'Please enter your user name and password for login', displayLength: 5000});
-                return;
-            }
-
-            $.post('/mainMenu', {
-                f: 'login', user: user,
-                pass: pass,
-                newPass: newPass,
-            }, function(userName) {
-
-                if(!userName){
-                    M.toast({html: 'User name or password are incorrect', displayLength: 4000});
-                    setTimeout(function () { location.reload() }, 4000);
-                    return;
-                }
-
-                if (newPass) M.toast({
-                    html: 'Password successfully changed for user ' + userName,
-                    displayLength: 5000,
-                });
-
-                loginBtnElm.removeClass('grey-text').attr('data-tooltip', 'Login as '+userName);
-                M.Tooltip.init(loginBtnElm[0], {
-                    enterDelay: 500
-                });
-
-                userPassElm.val('');
-                setTimeout(function () { location.reload(); }, 3000);
-            });
-        }
-
-        // send logout command to server, clear User name and password field, set grey color for login icon
-        // and set tooltip for it as 'login as guest'
-        function logout(){
-            $.post('/mainMenu', {f: 'logout'}, function() {
-                userPassElm.val('');
-                userNameElm.val('');
-                loginBtnElm.addClass('grey-text').attr('data-tooltip', 'Login as GUEST');
-                M.Tooltip.init(loginBtnElm[0], {
-                    enterDelay: 2000
-                });
-
-                setTimeout(function () { location.reload() }, 2000);
-            });
-        }
-    }
-
-//====================================================================================================================
-//=================================================== LOG PROCESSOR ==================================================
-//====================================================================================================================
-    var continueRetrievingLog = 0;
-    var logTimer;
-    var retrievingLogRecordsInProgress = 0;
-    var closeLogWindowsTimeout = 30; // close log window after 30 minutes
-    var maxLogRecords = 200;
-    //  Open log window, start retrieving log, auto close log window after 30 minutes
-    function openLogWindow(force) {
-        if(!Object.keys(sessionsIDs).length) {
-            M.toast({html: 'No actions are running in this window. Please run any action before', displayLength: 5000});
-            return;
-        }
-        // this flag locked exit from getLastLogRecords()
-        continueRetrievingLog = Date.now();
-        // Auto close log window after 30 min after  last show log window
-        autoCloseLogWindow(closeLogWindowsTimeout);
-        // Run getLastLogRecords() only if it is not running or not updated more then 1 minutes
-        //if(retrievingLogRecordsInProgress === 0 || (Date.now() - retrievingLogRecordsInProgress) > 60000) {
-            //getLastLogRecords(force);
-        //}
-        clearInterval(logTimer);
-        logTimer = setInterval(getLastLogRecords, 1000, force);
-        modalLogWindowsInstance.open();
-    }
-
-    // Close log window, and set flag for stopping retrieving log records
-    function closeLogWindow() {
-        stoppingRetrievingLog();
-        modalLogWindowsInstance.close();
-        clearInterval(logTimer);
-    }
-
-    // used for set variables, for stopping retrieving log from server
-    // it used in two places of the code, don't remove this function
-    function stoppingRetrievingLog() {
-        continueRetrievingLog = 0;
-        //clearTimeout(logTimer);
-    }
-
-    // Auto close log window after timeout, which set at the last time when calling this function
-    var autoCloseTimeout;
-    function autoCloseLogWindow(timeout) {
-        if(!autoCloseTimeout) {
-            autoCloseTimeout = timeout;
-            autoCloseWaiter();
-        } else autoCloseTimeout = timeout;
-
-        function autoCloseWaiter() {
-            setTimeout(function () {
-                if (--autoCloseTimeout) autoCloseWaiter();
-                else closeLogWindow();
-            }, 60000);
-        }
-    }
-
-    // start retrieving last log records, until continueRetrievingLog set to true
-    var lastLorRecordID = 0, timeout = 60000;
-    function getLastLogRecords(force, callback) {
-        if(!continueRetrievingLog || Date.now() - retrievingLogRecordsInProgress < timeout) return;
-
-        retrievingLogRecordsInProgress = Date.now();
-
-        logLastUpdateElm.text('Starting update: ' + (new Date()).toLocaleString() + '; records: ' + logBodyElm.find('div.logRecord').length + '...');
-        $.ajax('/mainMenu', {
-            type: 'POST',
-            data: $.param({f: 'getLogRecords', lastID: lastLorRecordID, sessionsIDs: Object.keys(sessionsIDs).join(',')}),
-            success: processLogRecords,
-            error: ajaxError,
-            timeout: timeout - 10,
-            cache: false
-        });
-
-        function ajaxError(/*jqXHR, exception*/) {
-            /*
-            bodyElm.css("cursor", "auto");
-            var msg;
-            if (jqXHR.status === 404) {
-                msg = 'Requested page not found. [404]';
-            } else if (jqXHR.status === 500) {
-                msg = 'Internal Server Error [500].';
-            } else if (exception === 'parsererror') {
-                msg = 'Requested JSON parse failed.';
-            } else if (exception === 'timeout') {
-                msg = 'Time out error.';
-            } else if (exception === 'abort') {
-                msg = 'Ajax request aborted.';
-            } else if (jqXHR.status === 0) {
-                msg = 'Not connect. Verify Network.';
-            } else {
-                msg = 'Uncaught Error.\n' + jqXHR.responseText;
-            }
-            M.toast({
-                html: 'Web server error: ' + msg + ' [status: ' + jqXHR.status +
-                    (exception ? '; exception: ' + exception : '')+ ']',
-                displayLength: 5000
-            });
-
-             */
-            retrievingLogRecordsInProgress = 0;
-        }
-
-        //$.post('/mainMenu', {f: 'getLogRecords', lastID: lastLorRecordID, sessionsIDs: Object.keys(sessionsIDs).join(',')}, function(records){
-        function processLogRecords(records) {
-            if(records && $.isArray(records) && records.length) {
-
-                if (records[0] && records[0].lastID) {
-                    lastLorRecordID = Number(records[0].lastID);
-                    records.splice(0, 1); // remove first element with lastLogRecordID information
-
-                    // we got unsorted array of records
-                    records.sort(function (a, b) {
-                        if (a.timestamp > b.timestamp) return 1;
-                        if (a.timestamp < b.timestamp) return -1;
-                        return 0;
-                    });
-
-                    printLogRecords(records);
-
-                    var recordsElms = logBodyElm.find('div.logRecord');
-                    var recordsCnt = recordsElms.length;
-                    if(recordsCnt > maxLogRecords) {
-                        for(var i = recordsCnt; i > maxLogRecords - 1; i--) {
-                            var currentLogRecordElm = recordsElms.eq(i);
-                            if(currentLogRecordElm.parent().children('div.logRecord').length !== 1) currentLogRecordElm.remove();
-                            else currentLogRecordElm.parent().parent().remove();
-                        }
-                    }
-
-                }
-                M.Collapsible.init(logBodyElm[0], {});
-            } else if(lastLorRecordID === 0 && !force) {
-                M.toast({html: 'Log records not found. Please run any action before', displayLength: 5000});
-                retrievingLogRecordsInProgress = 0;
-                closeLogWindow();
-            }
-
-            logLastUpdateElm.text('Last update: ' + (new Date()).toLocaleString() + '; records: ' + logBodyElm.find('div.logRecord').length);
-
-            /*
-            if(continueRetrievingLog) {
-                clearTimeout(logTimer);
-                logTimer = setTimeout(getLastLogRecords, 1000);
-            } else retrievingLogRecordsInProgress = 0;
-             */
-
-            retrievingLogRecordsInProgress = 0;
-            if(typeof callback === 'function') callback();
-        }
-    }
-
-    var logLevels = {S: 0, D: 1, I: 2, W: 3, E: 4};
-    var logIcons = {S: 'book', D: 'bug_report', I: 'info', W: 'warning', E: 'explicit'};
-
-    // Formatting and print log records to the log window
-    //
-    // records can be an array of objects:
-    // {timestamp: <unix timestamp>, sessionID: xxx, level: S|D|I|W|E, actionName: <full action name>,
-    // message: <message, coloring using console color escape codes>}
-    //
-    function printLogRecords(records) {
-
-        var recordsSortedBySessions = {}, sessionsOrder = [];
-
-        records.forEach(function(record) {
-            var now = new Date(Number(record.timestamp));
-            var month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            var dateString =
-                [month[now.getMonth()],String(now.getDate()).replace(/^(\d)$/, '0$1'),[
-                    String(now.getHours()).replace(/^(\d)$/, '0$1'),
-                    String(now.getMinutes()).replace(/^(\d)$/, '0$1'),
-                    String(now.getSeconds()).replace(/^(\d)$/, '0$1')
-                ].join(':')].join(' ')+'.' + String('00'+now.getMilliseconds()).replace(/^0*?(\d\d\d)$/, '$1');
-
-            var sessionID = record.sessionID;
-            var icon = logIcons[record.level];
-
-            if(recordsSortedBySessions[sessionID] === undefined) {
-
-                sessionsOrder.push(sessionID);
-                var sessionContainerElm = $('li[sessionID=' + sessionID + ']');
-
-                if(sessionContainerElm.length) {
-                    recordsSortedBySessions[sessionID] = {
-                        actionName: record.actionName,
-                        html: sessionContainerElm.find('div[id=' +sessionID+ ']').html(),
-                        logLevel: sessionContainerElm.attr('max-log-level'),
-                        lines: 0,
-                        firstTimeStr: sessionContainerElm.find('span[sessionID=' + sessionID + ']').text()
-                    };
-                    sessionContainerElm.remove();
-                } else {
-                    recordsSortedBySessions[sessionID] = {
-                        actionName: record.actionName,
-                        html: '',
-                        logLevel: record.level,
-                        lines: 0,
-                        firstTimeStr: dateString
-                    };
-                }
-            }
-
-            var msgHtml = coloringLogMessage(record.message).split('\r').map(function (msgPart, idx) {
-                if(!idx) return msgPart;
-                var spacesCnt = msgPart.search(/\S/) + 1; // index of first non whitespace char
-                return '<div style="padding:0 0 0 ' + spacesCnt + 'em;">' + msgPart + '</div>';
-            }).join('\n');
-
-            recordsSortedBySessions[sessionID].html = '<div class="logRecord">' +
-                '<div class="logIcon"><i class="material-icons">' + icon + '</i></div>' +
-                '<div class="logDateStr"> ' + dateString +
-                //                    '['+sessionID+']'+
-                ':</div><span>' + msgHtml + '</span></div>' + recordsSortedBySessions[sessionID].html;
-
-            recordsSortedBySessions[sessionID].lines++;
-            if (logLevels[record.level] > logLevels[recordsSortedBySessions[sessionID].logLevel])
-                recordsSortedBySessions[sessionID].logLevel = record.level;
-
-            recordsSortedBySessions[sessionID].lastTimeStr = dateString;
-        });
-
-        var html = '';
-        sessionsOrder.reverse().forEach(function(sessionID){
-
-            var logLevel = recordsSortedBySessions[sessionID].logLevel;
-            var icon = logIcons[logLevel];
-            var actionName = recordsSortedBySessions[sessionID].actionName;
-            var firstTimeStr = recordsSortedBySessions[sessionID].firstTimeStr;
-            var lastTimeStr = recordsSortedBySessions[sessionID].lastTimeStr;
-
-            html += '<li sessionID="' + sessionID + '" max-log-level="' + logLevel + '" class="active">' +
-                '<div class="collapsible-header">' +
-                '<i class="material-icons" sessionID="' + sessionID + '">' + icon + '</i><b>' + actionName + '</b>' +
-                '. Session starting at&nbsp;<span sessionID="' + sessionID + '">' + firstTimeStr +
-                '</span>, finished at&nbsp;' + lastTimeStr +
-                ', new records: ' + recordsSortedBySessions[sessionID].lines +
-                //                    '['+sessionID+']' +
-                '</div><div class="collapsible-body" id="' + sessionID + '">' +
-                recordsSortedBySessions[sessionID].html + '</div></li>';
-        });
-
-        logBodyElm.prepend(html);
-    }
-
-    // this classes set in index.jade
-    var colorCodes = {
-        '': 'logColorDefault',
-        '01m': 'logColor01m',
-        '30m': 'logColor30m',
-        '31m': 'logColor31m',
-        '32m': 'logColor32m',
-        '33m': 'logColor33m',
-        '34m': 'logColor34m',
-        '35m': 'logColor35m',
-        '36m': 'logColor36m',
-        '37m': 'logColor37m',
-        '38m': 'logColor38m'
-    };
-    function coloringLogMessage(message) {
-        //console.log('Message: ', message);
-        var messageParts = message
-            .replace(/.\[\d\d?m(.\[\d\d?m)/gm, '$1')
-            .replace(/.\[(\dm)/gm, '<clrd>0$1')
-            .replace(/.\[(\d\dm)/gm, '<clrd>$1')
-            .split('<clrd>'); // 0x1b = 27 = ←: Esc character
-        //console.log('Message parts: ', messageParts.length);
-        return  messageParts.map(function(data){
-            var colorClass = colorCodes[data.slice(0, 3)];
-            var part = data.slice(3);
-                //console.log('colorCode: "'+colorCode+'"='+colorCodes[colorCode]+', part: "'+ part+'"\n');
-            if(!part) return '';
-            part = part.replace(/</gm, '&lt;').replace(/>/gm, '&gt;');
-            if(!colorClass) return '<span>'+part+'</span>';
-            return '<span class="'+colorClass+'">'+part+'</span>';
-        }).join('');
-    }
-
-
-    // it must be at the end, because before we initialising variables and execute commands
-    return {
-        log: function (level, args) {
-            if(!args) return;
-
-            //$.post('/log' + (sessionID ? '/' + String(sessionID) : '/0'), {level: level, args: JSON.stringify(args)}, openLogWindow);
-            $.post('/log' + (sessionID ? '/' + String(sessionID) : '/0'), {level: level, args: JSON.stringify(args)}, function() {
-
-                var header = getHumanLogLevel(level);
-                modalLogHeaderElm.text(header.text).removeClass().addClass(header.color + '-text');
-
-                if(level === 'E') {
-                    var actionName = $('li[action_link].active').attr('action_name') || '';
-                    if(actionName) actionName = 'An error occurred while executing action ' + actionName + ': ';
-                    var message = actionName + '<span class="red-text">' +
-                        escapeHtml(JSON.stringify(args).replace(/^\["Error: (.*?)\\n.*$/i, '$1')) +
-                        '</span>';
-                }
-                else message = JSON.stringify(args);
-                modalLogMessageElm.html(message);
-
-                modalLogInstance.open();
-
-                //want to close modal when press to Esc, but this not working with overlay and with modal too
-                // only work after mouse click on overlay
-                $('div.modal-overlay').keypress(function(e) {
-                    if(e.which === 27) modalLogInstance.close();
-                });
-            });
-        }
-    };
 })(jQuery); // end of jQuery name space
-
-function getHumanLogLevel(level) {
-    var humanLevel = '';
-    if(level === 'S') humanLevel = { text: 'Silly', color: 'grey'};
-    else if(level === 'D') humanLevel = { text: 'Debug', color: 'green'};
-    else if(level === 'I') humanLevel = { text: 'Information', color: 'black'};
-    else if(level === 'W') humanLevel = { text: 'Warning', color: 'blue'};
-    else if(level === 'E') humanLevel = { text: 'Error', color: 'red'};
-    else humanLevel = { text: 'Unknown', color: 'yellow'};
-
-    return humanLevel;
-}
-
-var log = {
-    silly:  function(){initJQueryNamespace.log('S', Array.prototype.slice.call(arguments))},
-    debug:  function(){initJQueryNamespace.log('D', Array.prototype.slice.call(arguments))},
-    info:   function(){initJQueryNamespace.log('I', Array.prototype.slice.call(arguments))},
-    warn:   function(){initJQueryNamespace.log('W', Array.prototype.slice.call(arguments))},
-    warning:function(){initJQueryNamespace.log('W', Array.prototype.slice.call(arguments))},
-    error:  function(){initJQueryNamespace.log('E', Array.prototype.slice.call(arguments))}
-};

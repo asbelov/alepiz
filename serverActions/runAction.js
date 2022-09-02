@@ -253,5 +253,3 @@ function waitingForUpdateAjax(ajaxSource, callback) {
         setTimeout(waitingForUpdateAjax, 100, ajaxSource, callback);
     } else callback();
 }
-
-

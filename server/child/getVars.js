@@ -12,6 +12,10 @@ const getVarFromHistory = require("./getVarFromHistory");
 const getVarFromProperty = require("./getVarFromProperty");
 const getVarFromExpression = require("./getVarFromExpression");
 
+const Conf = require('../../lib/conf');
+const conf = new Conf('config/common.json');
+
+
 module.exports = getVars;
 
 const updateEventsMode = {
@@ -103,8 +107,8 @@ function getVars(param, callback) {
 
             var errors = [];
             /*
-            used eachSeries to avoid calculating the same variable multiple times when it is present in an expression in the
-            list of variables to calculate
+            used eachSeries to avoid calculating the same variable multiple times when it is present in an expression
+            in the list of variables to calculate.
              */
             async.eachSeries(Array.from(param.cache.objectsProperties.keys()), function (variableName, callback) {
                 if (variables[variableName] !== undefined) return callback();
@@ -132,7 +136,8 @@ function getVars(param, callback) {
                         });
                     }, function () {
                         if(errors.length) {
-                            var err = errors.length === 1 ? errors[0] : new Error(errors.map(error => error.message).join('; '));
+                            var err = new Error(param.objectName + '(' + param.counterName + '): ' +
+                                    errors.map(error => error.message).join('; '));
                         }
                         return callback(err, null, variables, param.variablesDebugInfo, counterParameters);
                     });
@@ -186,11 +191,12 @@ function getUpdateEventState(variables, param, callback) {
 
         if (param.variablesDebugInfo.UPDATE_EVENT_STATE) {
             if (whyNotNeedToCalculateCounter) {
-                param.variablesDebugInfo.UPDATE_EVENT_STATE.result = updateEventResult + ' (raw: ' + result +
-                    ') no calculation required: ' + whyNotNeedToCalculateCounter;
+                param.variablesDebugInfo.UPDATE_EVENT_STATE.result = param.prevUpdateEventState + '->' +
+                    updateEventResult + ' (raw: ' + result + ') no calculation required: ' +
+                    whyNotNeedToCalculateCounter;
             } else {
-                param.variablesDebugInfo.UPDATE_EVENT_STATE.result = updateEventResult + ' (raw: ' + result +
-                    ') calculation required';
+                param.variablesDebugInfo.UPDATE_EVENT_STATE.result = param.prevUpdateEventState + '->' +
+                    updateEventResult + ' (raw: ' + result + ') calculation required';
                 param.variablesDebugInfo.UPDATE_EVENT_STATE.important = true;
             }
 
@@ -250,7 +256,8 @@ function getCounterParameters(param, variables, callback) {
 
             var res = variablesReplace(value, variables);
             if(!res || res.unresolvedVariables.length) {
-                return callback(new Error('Counter parameter ' + parameter.name + ': ' + counter + ' (' +
+                return callback(new Error(param.objectName, '(', param.counterName,
+                    '): Counter parameter ' + parameter.name + ': ' + counter + ' (' +
                     parameter.value + ') ' +
                     (!res ? 'not a string' : 'has unresolved variables: ' + (res.unresolvedVariables.join(',')))));
             }
@@ -276,6 +283,7 @@ function getVar(initVariableName, variables, param, callback) {
         if(variables[variableName] !== undefined) return callback(null, variables[variableName]);
 
         // too mach depth for variable calculation
+        var maxVarCalcDepth = conf.get('maxVarCalcDepth') || 20;
         if(++varCalcDepth > maxVarCalcDepth) {
             return callback(new Error('The maximum calculation depth (' + maxVarCalcDepth +
                 ') of the variable ' + variableName +
@@ -308,7 +316,7 @@ function getVar(initVariableName, variables, param, callback) {
                 getVariableFunc = getVarFromHistory;
             }
             if(!variable) {
-                return callback(new Error( + variableName + ' is not defined. Cache props: ' +
+                return callback(new Error('Variable name ' + variableName + ' is not defined. Cache props: ' +
                     [...param.cache.objectsProperties.keys()].join(', ') +
                     '; vars expr: ' + [...param.cache.variablesExpressions.keys()].join(', ') +
                     '; vars hist: ' + [...param.cache.variablesHistory.keys()].join(', ')

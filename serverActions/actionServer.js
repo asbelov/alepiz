@@ -68,7 +68,7 @@ attachRunAction(cfg.serverNumber || 5, function (err, _runActionSystem) {
                 actionClient.connect(function () {
                     new proc.child({
                         module: 'actionServer',
-                        onDisconnect: function () {  // exit on disconnect from parent (then server will be restarted)
+                        onDisconnect: function () {  // exit on a disconnect from parent (then server will be restarted)
                             if (runActionProcess) runActionProcess.stop();
                             log.exit('Action server was disconnected from parent unexpectedly. Exiting');
                             log.disconnect(function () {
@@ -137,7 +137,7 @@ function attachRunAction(serverNumber, callback) {
 
 /*
   Create new session ID for each running actions or if no action running
-  return sessionID
+  return sessionID.
 */
 function createSession(param, callback) {
 
@@ -149,7 +149,7 @@ function createSession(param, callback) {
     userDB.getID(user, function(err, userID) {
         if (err) return callback(new Error('Can\'t get user ID for user ' + user + ': ' + err.message));
 
-        // use transaction for prevent locking database when inserting action data and session parameters
+        // use transaction for prevent locking database when inserting action data and session parameters.
         transaction.begin(function (err) {
             if(err) return callback(err);
 
@@ -194,7 +194,7 @@ function addActionToQueue(param, callback) {
                 conf: actionConf,
             });
         } else { // add system action to the system queue
-            // drop action if action queue too big
+            // drop action if action queue too big.
             if(actionsQueueSystem.size > maxQueueLength) {
                 ++droppedAction;
                 return callback(new Error('Action queue length too big ' + actionsQueueSystem.size + '/' + maxQueueLength +

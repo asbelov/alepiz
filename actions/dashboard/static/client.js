@@ -1588,6 +1588,7 @@ var JQueryNamespace = (function ($) {
     <td class="hide">' + importanceText + '</td>\
     <td>' + (row.startTime ? new Date(row.startTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
     <td>' + (row.endTime ? new Date(row.endTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
+    <td>' + (row.startTime ? getHumanTime((row.endTime ? row.endTime : Date.now()) - row.startTime) : '-') + '</td>\
     <td>' + new Date(row.disableUntil).toLocaleString().replace(/\.\d\d(\d\d),/, '.$1') + '</td>\
     <td>' + disableIntervals + '</td>\
     <td>' +  escapeHtml(row.disableUser) + '</td>\
@@ -1716,7 +1717,7 @@ var JQueryNamespace = (function ($) {
                 var name = $(thElm).attr('var');
                 if(name) variablesInRow[name] = $(tdElements[idx]).text();
             });
-            if(!variablesInRow.END_TIME) variablesInRow.END_TIME = 'NOW';
+            if(!variablesInRow.END_TIME || variablesInRow.END_TIME === '-') variablesInRow.END_TIME = 'NOW';
             var interval = variablesInRow.START_TIME + ' - ' + variablesInRow.END_TIME + ' (' + variablesInRow.DURATION + ')';
 
             if(!variables[variablesInRow.OCID]) {

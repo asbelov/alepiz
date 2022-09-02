@@ -18,7 +18,7 @@ var rightsWrapper = {};
 module.exports = rightsWrapper;
 /*
 Checking user rights for specific action
-  initUser - unchecked user name from req.session.username
+  initUser - unchecked username from req.session.username
   actionID - action ID (directory name for action) or actions folder from Actions menu
   executionMode - one of:
      null - don't check, only return rights
@@ -99,7 +99,7 @@ rightsWrapper.checkActionRights = function (initUser, actionID, executionMode, c
  checking action for compatibility with selected objects according action configuration parameters:
  dontShowForObjects, dontShowForObjectsInGroups, showOnlyForObjects, showOnlyForObjectsInGroups
 
- checking is case insensitive
+ checking is case-insensitive
 
  cfg: action configuration
  objectsNames - array of objects names for checking compatibility
@@ -133,23 +133,22 @@ rightsWrapper.checkForObjectsCompatibility = function (cfg, objectsNames, callba
                 var objects = JSON.parse(objectsNames);
             }
             catch (err) {
-                return callback(new Error('Error in parameter specification for action: can\'t convert string ' +
-                    objectsNames + ' to JSON: ' + err.message));
+                objects = objectsNames.split(',');
             }
-        } else objects = [];
-
-        if(objects.length) {
-            objectsNames = objects.map(function (object) {
-                return (object.name)
-            });
         } else objectsNames = [];
+        objectsNames = objects;
     }
+
+    if(Array.isArray(objectsNames)) {
+        objectsNames = objectsNames.map(function (object) {
+            return typeof object === 'string' ? object : object.name
+        });
+    } else objectsNames = [];
 
     // filter undefined, null or "" objects names from array
     objectsNames = objectsNames.filter(function(objectName) {
         return objectName;
     });
-
     if(!objectsNames || !objectsNames.length) {
         if (cfg.showWhenNoObjectsSelected) return callback();
         return callback(new Error('Action "' + actionID + '" don\'t showing while no one objects are selected according to showWhenNoObjectsSelected parameter'));

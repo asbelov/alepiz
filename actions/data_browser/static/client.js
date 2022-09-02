@@ -6,6 +6,10 @@
  * Created by Alexander Belov on 12.02.2017.
  */
 
+function onScrollIframe() {
+    JQueryNamespace.onScrollIframe();
+}
+
 var JQueryNamespace = (function ($) {
     $(function () {
 
@@ -211,8 +215,6 @@ var JQueryNamespace = (function ($) {
         "July", "August", "September", "October", "November", "December"
     ];
 
-    return { init: init };
-
     /*
         init and run all of this
 
@@ -220,8 +222,7 @@ var JQueryNamespace = (function ($) {
         callback(): may be skipped
      */
     function init(_objects, callback) {
-        // !!! onScrollIframe init in parent init.js
-        //onScrollIframe = scrollIframe;
+        // !!! bind 'scroll' event for the iframe to the onScrollIframe function in alepizDrawAction.js
         if(_objects) objects = _objects;
 
         // parse parameters from browser URL
@@ -1524,4 +1525,9 @@ var JQueryNamespace = (function ($) {
 
         animate(start);
     }
+    return {
+        init: init,
+        onScrollIframe: scrollIframe,
+    };
+
 })(jQuery); // end of jQuery name space

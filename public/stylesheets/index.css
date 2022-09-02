@@ -2,10 +2,6 @@
  * Copyright © 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-header, main, footer {
-    padding-left: 400px;
-}
-
 @media only screen and (max-width : 992px) {
     header, main, footer {
         padding-left: 0;
@@ -18,33 +14,146 @@ fix error, when overlay closing sideNav menu
     left: 300px !important;
 }
 
-.width-400 {
-    width: 400px !important;
-}
-
 .tab-padding {
     padding: 0 12px 0 12px !important;
 }
 
+.side-nav-control-lock {
+    position:absolute !important;
+    top:-24px !important;
+    right:0 !important;
+    cursor:pointer !important;
+    text-align:center;
+    color: grey !important;
+}
+
+.side-nav-control-max {
+    position:absolute !important;
+    top:-24px !important;
+    right:28px !important;
+    cursor:pointer !important;
+    text-align:center  !important;
+    color: grey !important;
+}
+
+.objectsNum {
+    position:absolute;
+    top:24px;
+    right:16px;
+    border-radius:50%;
+    height:28px;
+    min-width:28px;
+    line-height:28px;
+    text-align:center;
+    box-shadow: 2px 2px lightgrey;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.walletIcon {
+    position:absolute;
+    top:56px;
+    right:12px;
+    font-size: 36px;
+    text-align:center;
+    text-shadow: 2px 2px lightgrey;
+    cursor: pointer;
+}
+
+.walletNum {
+    position:absolute;
+    top:62px;
+    right:14px;
+    height:24px;
+    min-width:32px;
+    line-height:24px;
+    font-size: 14px;
+    text-align:center;
+    cursor: pointer;
+    z-index: 100;
+}
+
+.filterssNum {
+    position:absolute;
+    top:-20px;
+    right:16px;
+    border-radius:50%;
+    height:28px;
+    min-width:28px;
+    line-height:28px;
+    text-align:center;
+    box-shadow: 2px 2px lightgrey;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.filterEditIcon {
+    position: absolute;
+    top: -8px;
+    right: 4px;
+    font-size: 24px;
+    text-align: center;
+    text-shadow: 2px 2px lightgrey;
+    cursor: pointer;
+}
+
 a.object {
     margin: 0 0 2px 0 !important;
-    padding: 10px 0 0 24px !important;
-    height: 48px !important;
+    padding: 0 0 0 0 !important;
+    height: 36px !important;
     cursor: pointer !important;
+    font-weight: 480 !important;
+    font-size: 14px !important;
 }
 
 div.object-checkbox {
     height: 32px !important;
-    padding: 0 !important;
+    padding: 0 0 0 16px !important;
+    width: 48px !important;
+}
+
+.border-right {
+    height:100%;
+    border-width: 0 2px 0 0;
+    border-color: #e0e0e0; /*#ffeeee;*/
+    border-style: solid;
 }
 
 div.object-label {
     height: 32px !important;
     line-height: 32px !important;
+    padding: 0 0 0 0 !important;
+}
+
+li.action-group {
+    line-height: 32px !important;
+    padding: 0 0 0 0 !important;
+}
+
+i.action-group-icon {
+    padding: 0 0 0 14px !important;
+}
+
+div.action-group {
+    font-weight: 480 !important;
+    padding: 0 0 0 16px !important;
 }
 
 li.action {
     cursor: pointer !important;
+    line-height: 32px !important;
+}
+
+a.action {
+    font-weight: 480 !important;
+    line-height: 32px !important;
+    height: 36px !important;
+    padding-left: 54px !important;
+}
+
+.list {
+    overflow-y:auto !important;
+    height:100% !important;
 }
 
 .italic {
@@ -56,15 +165,10 @@ li.action {
     margin: 0 !important;
 }
 
-div.user-view {
-    padding-top: 1em !important;
-    padding-bottom: 0 !important;
-}
-
 .search-textarea {
     padding: 0 0 0 0 !important;
     margin: 0 0 0 0 !important;
-    min-height: 2.4em !important;
+    min-height: 2em !important;
 }
 .logWindowController-btn {
     position:fixed;

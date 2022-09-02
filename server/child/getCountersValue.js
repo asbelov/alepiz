@@ -267,10 +267,10 @@ function getVariablesAndCheckUpdateEvents(message) {
 
         // send UPDATE_EVENT_STATE anyway if previous updateEventState is not equal to new updateEventState,
         // because after the child may have nothing to send to the server
-        if (variables && param.parentOCID && param.updateEventExpression &&
-            updateEventState !== variables.UPDATE_EVENT_STATE &&
-            variables.UPDATE_EVENT_STATE !== undefined) {
-//        if (param.parentOCID && param.updateEventExpression && variables.UPDATE_EVENT_STATE !== undefined) {
+        //if (variables && param.parentOCID && param.updateEventExpression &&
+        //    updateEventState !== variables.UPDATE_EVENT_STATE &&
+        //    variables.UPDATE_EVENT_STATE !== undefined) {
+        if (param.parentOCID && param.updateEventExpression && variables.UPDATE_EVENT_STATE !== undefined) {
             childThread.send({
                 parentOCID: param.parentOCID,
                 OCID: param.OCID,

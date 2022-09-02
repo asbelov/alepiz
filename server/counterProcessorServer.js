@@ -453,7 +453,7 @@ function processServerMessage(message) {
 function processChildMessage(message) {
     if(!message) return;
 
-    if(message.updateEventKey) {
+    if(message.updateEventState) {
         let updateEventKey = message.parentOCID + '-' + message.OCID;
         updateEventsStatus.set(updateEventKey, message.updateEventState);
         return;
