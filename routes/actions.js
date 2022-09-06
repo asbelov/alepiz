@@ -33,7 +33,7 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
     var user = prepareUser(req.session.username);
     var func = req.body.func;
     actions.getConfiguration(actionID, function(err, actionCfg) {
-        if (err && actionID  !== '__AlepizMainMenuConfiguration') {
+        if (err && actionID  !== '__AlepizMainMenuConfiguration' && actionID  !== '__AlepizMainMenuCustomization') {
             log.error('Error while getting action configuration for "', actionID, '", user: ', user,
                 ': ', err.message, ': param: ', req.body);
             return next(err);

@@ -1,0 +1,87 @@
+//
+    Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Настройки ссылок navBarLinks.json
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Описание настроек ссылок navBarLinks.json
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    ul.browser-default
+                        li navbarLinks - объект, содержащий массив с объектами - описаниями ссылок:
+                        ul.browser-default
+
+                            li name - название ссылки, которое будет отображаться
+                            li.
+                                filters - массив со списком имен фильтров и логическими условиями, которые будут
+                                автоматически включены при нажатии на ссылку в виде
+                                ["filterName1", "AND|OR", "filterName2", ....]
+                            li.
+                                parentObjects - массив с перечнем объектов верхнего уровня. При нажатии на ссылку будут
+                                показаны объекты, у которых настроено взаимодействие с объектами верхнего уровня, как
+                                если бы в списке объектов выделить несколько объектов и нажать на один из них.
+                                Не совместимо с параметрами searchStr, checkedObjectNames, uncheckedObjectNames, URL.
+                            li.
+                                searchStr - поисковая строка для объектов. При нажатии на ссылку будут показаны объекты,
+                                соответствующие поисковой строке, как ели бы названия объектов было введено в поисковую
+                                строку объектов в списке FILTERS.
+                                Не совместимо с параметрами parentObjects, checkedObjectNames, uncheckedObjectNames, URL.
+                            li.
+                                checkedObjectNames, uncheckedObjectNames - массивы с перечнем объектов. которые будут
+                                отображаться. Если объекты включить в массив checkedObjectNames, то эти объекты будут
+                                выбраны.
+                                Не совместимо с параметрами parentObjects, searchStr, URL.
+                            li.
+                                URL - web ссылка для перехода. Будет осуществлен переход на страницу,
+                                указанную в этой ссылке.
+                                Не совместимо с параметрами parentObjects, searchStr, checkedObjectNames,
+                                uncheckedObjectNames.
+                            li.
+                                openInNewWindow - (true|false) Используется только совместно c URL. В случае true
+                                открывает ссылку в новом окне. В случае false ссылка будет открыта в текущем окне.
+                                По умолчанию false
+
+                    ul.collapsible
+                        li
+                            div.collapsible-header #[i.material-icons settings] Пример navBarLinks.json (нажмите для того, чтобы развернуть)
+                            div.collapsible-body
+                                pre.
+                                    {
+                                        "navbarLinks":
+                                            [
+                                                {
+                                                    "name": "Servers",
+                                                    "parentObjects": ["Servers"]
+                                                },
+                                                {
+                                                    "name": "ALEPIZ",
+                                                    "searchStr": "SYSTEM [ALEPIZ] | CPU [ALEPIZ]"
+                                                },
+                                                {
+                                                    "name": "Services",
+                                                    "checkedObjectNames": ["ALEPIZ"],
+                                                    "uncheckedObjectNames": ["Netlogon", "Local Session Manager"]
+                                                    "filters": ["Not executable", "AND" ,"Not scripts"]
+                                                },
+                                                {
+                                                    "name": "Alepiz Utilization",
+                                                    "URL": "/?c=SYSTEM%20%5BALEPIZ%5D&a=%2Factions%2Fdata_browser&y=0--0-100&l=155096&r=155078-155080-155362&n=1"
+                                                },
+                                                {
+                                                    "name": "Download Alepiz",
+                                                    "URL": "https://alepiz.com/help/download.pug"
+                                                    "openInNewWindow": true
+                                                }
+                                            ]
+                                    }

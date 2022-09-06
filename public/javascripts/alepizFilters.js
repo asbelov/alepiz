@@ -81,14 +81,14 @@ alepizFiltersNamespace = (function($) {
 
     function createObjectsFiltersTab(filter, callback) {
         // filterNames: [{name:..., description:...}, {}...]
-        $.post('/mainMenu', {f: 'getObjectsFilterNames'}, function(filterNames) {
-            if(!filterNames || !filterNames.length) {
+        $.post('/mainMenu', {f: 'getObjectsFiltersConfig'}, function(filterConfig) {
+            if(!filterConfig || !filterConfig.length) {
                 objectsFilterElm.empty();
                 if(typeof callback === 'function') callback();
                 return;
             }
             var checkedFilterNames = filter || getCheckedFilterNames();
-            var html = filterNames.map(function (filterObj) {
+            var html = filterConfig.map(function (filterObj) {
                 var filterName = filterObj.name;
                 var filterDescription = filterObj.description || '';
                 var checked = checkedFilterNames.indexOf(filterName) !== -1 ||

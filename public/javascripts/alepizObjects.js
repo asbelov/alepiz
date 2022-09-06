@@ -21,12 +21,36 @@ var alepizObjectsNamespace = (function($) {
         walletElm,
         walletCounterElm,
         walletIconElm,
+        objectGroupIconCrossOutElm,
         searchIconElm,
+
         objectsTooltipInstances,
+
         useGlobalSearch = false,
         minSearchStrLength = 2,
         timeWhenNoObjectsWereFound = 0,
         redrawObjectsInProgress = false,
+        /** used for get data about objects when used object grouping
+         * @type {Object.<objectID: Object>}
+         * @example
+         * {
+         *      <id1>: {id, name, description, sortPosition, color, disabled, created},
+         *      <id2>: {id, name, description, ...},
+         *      ...
+         * }
+         */
+        currentObjects = {},
+
+        /** used for saving to the wallet (when pressed to the object counter) selected objects
+         * @type {Object.<objectID: objectName>}
+         * @example
+         * {
+         *      <id1>: <name1>,
+         *      <id2>: <name2>,
+         *      ...
+         * }
+         */
+        walletObjectsList = {},
         lastObjectDrawFunction = {
             func: createObjectsListByInteractions,
             search: false,
@@ -60,6 +84,7 @@ var alepizObjectsNamespace = (function($) {
         walletElm = $('#wallet');
         walletCounterElm = $('#walletCounter');
         walletIconElm = $('#walletIcon');
+        objectGroupIconCrossOutElm = $('#objectGroupIconCrossOut');
         searchIconElm = $('#searchIcon');
     }
 
@@ -135,12 +160,10 @@ var alepizObjectsNamespace = (function($) {
 
         selectAllObjBtnElm.change(function() {
             //e.preventDefault();
-            var objectNum = 0;
             if($(this).is(':checked')) {
                 $('input[data-object-name]').each(function () {
                     if(!$(this).parent().parent().parent().parent().hasClass('hide')) {
                         $(this).prop('checked', true);
-                        ++objectNum;
                     }
                 });
             } else {
@@ -152,23 +175,27 @@ var alepizObjectsNamespace = (function($) {
                     }
                 });
             }
-            setCheckedObjectCounter(objectNum);
+            setCheckedObjectCounter();
             alepizActionsNamespace.createActionsList(null, function () {
                 alepizMainNamespace.setBrowserHistory();
                 alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
             });
         });
 
-        var walletObjectsList = {};
         objectCounterElm.click(function () {
             walletCounterElm.text('');
             walletIconElm.text('download');
             walletElm.removeClass('hide');
 
             $('input[data-object-name]:checked').each(function() {
-                walletObjectsList[$(this).attr('id')] = $(this).attr('data-object-name');
+                var objectIDs = $(this).attr('id').split('-');
+                objectIDs.forEach(id => {
+                    if(currentObjects[id]) walletObjectsList[id] = currentObjects[id].name;
+                    else walletObjectsList[id] = $(this).attr('data-object-name');
+                });
             });
 
+            // setTimeout is used for animation
             setTimeout(function () {
                 walletIconElm.text('folder');
                 walletCounterElm.text(Object.keys(walletObjectsList).length);
@@ -178,6 +205,8 @@ var alepizObjectsNamespace = (function($) {
         walletElm.click(function () {
             walletCounterElm.text('');
             walletIconElm.text('drive_file_move_rtl');
+
+            // setTimeout is used for animation
             setTimeout(function() {
                 createObjectsList(null, Object.values(walletObjectsList),
                     function (isDrawObjects) {
@@ -189,6 +218,7 @@ var alepizObjectsNamespace = (function($) {
                     });
                 });
                 walletObjectsList = {};
+                // setTimeout is used for animation
                 setTimeout(function () {
                     walletElm.addClass('hide');
                 }, 300);
@@ -206,16 +236,18 @@ var alepizObjectsNamespace = (function($) {
             return;
         }
         redrawObjectsInProgress = true;
-        var checkedObjectNames = objectDrawFunction.checkedObjecNames;
+        // !!!! there are not objects names when used object grouping
+        var checkedElementNames = $('input[data-object-name]:checked').get().map(function (elm) {
+            return $(elm).attr('data-object-name');
+        });
+
         var param = objectDrawFunction.param.slice();
         param.push(function(isDrawObjects) {
-            if(isDrawObjects && Array.isArray(checkedObjectNames) && checkedObjectNames.length) {
-                $('input[data-object-name]').map(function () {
-                    var objectName = $(this).attr('data-object-name');
-                    if (checkedObjectNames.indexOf(objectName) !== -1) {
-                        $(this).prop('checked', true);
-                    }
+            if(isDrawObjects && checkedElementNames.length) {
+                checkedElementNames.forEach(function (name) {
+                    $('input[data-object-name="' + name + '"]').prop('checked', true);
                 });
+
                 alepizActionsNamespace.createActionsList(null, function () {
                     alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
                     alepizMainNamespace.setBrowserHistory();
@@ -351,6 +383,13 @@ var alepizObjectsNamespace = (function($) {
     // callback()
     function createObjectsList(uncheckedObjectNames, checkedObjectNames, callback) {
 
+        // if parameters were not set, get checked and unchecked object lists from the URL
+        if(!uncheckedObjectNames && !checkedObjectNames) {
+            var parametersFromURL = getParametersFromURL();
+            checkedObjectNames = parametersFromURL.checkedObjectsNames;
+            uncheckedObjectNames = parametersFromURL.uncheckedObjectsNames;
+        }
+
         // create object list without duplicates
         var objectNames = {};
         if(Array.isArray(uncheckedObjectNames)) uncheckedObjectNames.forEach(function (o) { objectNames[o] = false; });
@@ -371,9 +410,9 @@ var alepizObjectsNamespace = (function($) {
                 if(objects && objects.length) {
                     if (Array.isArray(checkedObjectNames) && checkedObjectNames.length) {
                         /*
-                         Add to all objects of "objects" array property "selected": true if object name is present in
-                         checkedObjectNames array or
-                         "selected": false if not present
+                         Add to all objects of "objects" array property "selected":
+                         true if object name is present in checkedObjectNames array or "selected":
+                         false if not present
                          */
                         objects.forEach(function (obj) {
                             obj.selected = checkedObjectNames.indexOf(obj.name) !== -1;
@@ -388,7 +427,7 @@ var alepizObjectsNamespace = (function($) {
                 lastObjectDrawFunction = {
                     func: createObjectsList,
                     search: false,
-                    param: [uncheckedObjectNames, checkedObjectNames],
+                    param: [null, null],
                 };
 
                 setCheckedObjectCounter();
@@ -415,19 +454,8 @@ var alepizObjectsNamespace = (function($) {
             },
             // objects: [{id:.., name:.., description:..}, {..}, ...]
             function(objects) {
-
                 if(!isClearObjectListWhenObjectNotFound && (!objects || !objects.length)) {
-                    if(objectsNamesStr) {
-                        /*
-                        M.toast({
-                            html: 'Not found interactions with another objects for object[s]: ' + objectsNamesStr +
-                                ' or objects were filtered out',
-                            displayLength: 3000
-                        });
-                        */
-                    }
-
-                    if(typeof(callback) === 'function') return callback();
+                    if(typeof(callback) === 'function') callback();
                     return;
                 }
 
@@ -458,27 +486,31 @@ var alepizObjectsNamespace = (function($) {
         var html = '';
 
         if(objects && objects.length) {
-            html = objects.sort(function(a,b) {
+            var elements = groupingObjects(objects);
+            html = elements.sort(function(a,b) {
                 if(a.sortPosition > b.sortPosition) return 1;
                 if(a.sortPosition < b.sortPosition) return -1;
                 if(a.name.toUpperCase() > b.name.toUpperCase()) return 1;
                 if(a.name.toUpperCase() < b.name.toUpperCase()) return -1;
                 return 0;
             }).map(function (obj) {
+                var id = Array.isArray(obj.id) ? obj.id.join('-') : obj.id;
                 return ('\
 <li>\
-        <a class="tooltipped row object" data-object-list data-position="right" data-tooltip="' +
+        <a class="tooltipped row ' + (obj.cnt ? 'group' : 'object') +
+                    '" data-object-list data-position="right" data-tooltip="' +
                     escapeHtml(obj.description ? obj.name + ': ' + obj.description : obj.name) + '">\
             <div class="col s2 object-checkbox">\
                 <label>\
-                    <input type="checkbox" id="' + obj.id + '" data-object-name="' + obj.name +
-                    '" data-object-description="' + escapeHtml(obj.description) + '" ' +
-                    (obj.selected ? 'checked' : '') + '/>\
+                    <input type="checkbox" id="' + id + '" data-object-name="' + obj.name + '"' +
+                    (obj.selected || (obj.cnt && obj.cnt === obj.selectedObjects) ? ' checked' : '') +
+                    ' data-object-type="' + (obj.cnt ? 'group' : 'object') + '"/>\
                     <span></span>\
                 </label>\
             </div>\n\
             <div class="col s9 truncate object-label' + (obj.disabled ? ' italic' : '') +
-                    getCSSClassForObjectColor(obj) + '" data-object-id="' + obj.id + '">' + escapeHtml(obj.name) + '</div>\
+                    getCSSClassForObjectColor(obj) + '" data-object-id="' + id + '">' + escapeHtml(obj.name) +
+                    (obj.cnt ? ' [' + obj.cnt + ']' : '') + '</div>\
         </a>\
 </li>');
             }).join('');
@@ -509,12 +541,6 @@ var alepizObjectsNamespace = (function($) {
                 alepizMainNamespace.setBrowserHistory();
                 alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
             });
-
-            /*
-            var objectNames = getSelectedObjectNames().join(', ');
-            if(objectNames.length > 200) objectNames = objectNames.substring(0, 200) + '...';
-            $('#brand-logo').text(objectNames);
-             */
         });
 
         // click at an object
@@ -538,6 +564,50 @@ var alepizObjectsNamespace = (function($) {
         });
 
         return true;
+    }
+
+    function groupingObjects(objects) {
+        currentObjects = {};
+        objects.forEach(obj => { currentObjects[obj.id] = obj });
+        if(!objectGroupIconCrossOutElm.hasClass('hide')) return objects;
+
+        var groups = alepizMainNamespace.getObjectGroups();
+
+        var objectGroups = {};
+        objects.forEach(obj => {
+            var isObjectInGroup = false;
+            for(var i = 0; i < groups.length; i++) {
+                groups[i].RE.lastIndex = 0;
+                if(groups[i].RE.test(obj.name)) {
+                    isObjectInGroup = true;
+                    var groupName = groups[i].name;
+                    if(!objectGroups[groupName]) {
+                        objectGroups[groupName] = {
+                            name: groupName,
+                            cnt: 1,
+                            selectedObjects: obj.selected ? 1: 0,
+                            objects: [obj],
+                            sortPosition: groups[i].sortPosition || obj.sortPosition,
+                            description: groups[i].description,
+                            color: groups[i].color,
+                            id: [obj.id],
+                        }
+                    } else {
+                        objectGroups[groupName].cnt++;
+                        if(obj.selected) objectGroups[groupName].selectedObjects++;
+                        objectGroups[groupName].objects.push(obj);
+                        objectGroups[groupName].id.push(obj.id);
+                        if(!groups[i].sortPosition && obj.sortPosition < objectGroups[groupName].sortPosition) {
+                            objectGroups[groupName].sortPosition = obj.sortPosition;
+                        }
+                    }
+                    break;
+                }
+            }
+            if(!isObjectInGroup) objectGroups[obj.name] = obj;
+        });
+
+        return Object.values(objectGroups);
     }
 
     /*
@@ -592,24 +662,36 @@ var alepizObjectsNamespace = (function($) {
     }
 
     function getSelectedObjectNames() {
-        return $('input[data-object-name]:checked').map(function() {
-            return $(this).attr('data-object-name');
-        }).get();
+        var objectNames = [];
+        $('input[data-object-name]:checked').each(function() {
+            $(this).attr('id').split('-').forEach(id => {
+                objectNames.push(currentObjects[id].name)
+            });
+        });
+        return objectNames;
     }
 
     function getSelectedObjects() {
-        return $('input[data-object-name]:checked').map(function() {
-            return {
-                name: $(this).attr('data-object-name'),
-                id: Number($(this).attr('id')),
-            };
-        }).get();
+        var objects = [];
+        $('input[data-object-name]:checked').each(function() {
+            $(this).attr('id').split('-').forEach(id => {
+                objects.push({
+                    id: Number(id),
+                    name: currentObjects[id].name,
+                });
+            });
+        });
+        return objects;
     }
 
     function getUnselectedObjectNames() {
-        return $('input[data-object-name]:not(:checked)').map(function() {
-            return $(this).attr('data-object-name');
-        }).get();
+        var objectNames = [];
+        $('input[data-object-name]:not(:checked)').each(function() {
+            $(this).attr('id').split('-').forEach(id => {
+                objectNames.push(currentObjects[id].name)
+            });
+        });
+        return objectNames;
     }
 
     function setCheckedObjectCounter(objectNames) {

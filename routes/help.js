@@ -207,10 +207,16 @@ function getTableOfContents(req, res, callback) {
                     getContentsFromDir(commonDir, 'settingsWebServer.pug', req, callback);
                 },
                 function(callback) {
+                    getContentsFromDir(commonDir, 'settingsInterface.pug', req, callback);
+                },
+                function(callback) {
+                    getContentsFromDir(commonDir, 'settingsNavBarLinks.ru.pug', req, callback);
+                },
+                function(callback) {
                     getContentsFromDir(commonDir, 'settingsObjectsFilter.pug', req, callback);
                 },
                 function(callback) {
-                    getContentsFromDir(commonDir, 'settingsInterface.pug', req, callback);
+                    getContentsFromDir(commonDir, 'settingsObjectGroups.pug', req, callback);
                 },
                 function(callback) {
                     getContentsFromDir(commonDir, 'settingsLog.pug', req, callback);

@@ -43,11 +43,11 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
                             i.material-icons home
 
                     div.fixed-action-btn#runActionBtn
-                        a.btn-floating.btn-large.waves-effect.waves-circle.waves-light.red: i.material-icons.large play_arrow
+                        a.btn-floating.btn-large.waves-effect.waves-circle.waves-light.run-action.btn: i.material-icons.large play_arrow
                         ul
-                            li: a#makeTaskBtn.btn-floating.waves-effect.waves-light.yellow.darken-2: i.material-icons playlist_add
+                            li: a#makeTaskBtn.btn-floating.waves-effect.waves-light.make-task.btn: i.material-icons playlist_add
                     div.fixed-action-btn.hide#makeTaskBtnAdd
-                        a.btn-floating.btn-large.waves-effect.waves-circle.waves-light.yellow: i.material-icons.large playlist_add
+                        a.btn-floating.btn-large.waves-effect.waves-circle.waves-light.make-task.btn: i.material-icons.large playlist_add
 
             //ul(style="overflow-y:hidden;display:flex;flex-direction:column")#slide-out.side-nav.fixed
             ul(style="overflow-y:hidden;display:flex;flex-direction:column")#slide-out.sidenav.sidenav-fixed
@@ -74,9 +74,9 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
                                 input(type="checkbox" data-tooltip="Select/unselect all objects")#selectAllObjBtn
                                 span
                         div(style="width:48px;padding:0 0 0 6px").col.s1.hide#actionReloadBtn
-                            a.btn-floating.waves-effect.waves-red.waves-light.btn-flat.white: i.material-icons.red-text.text-lighten-3 cached
+                            a.btn-floating.waves-effect.waves-light.btn-flat.white: i.material-icons.btn-list-control cached
                         div(style="width:48px;padding:0 0 0 6px;").col.s1.hide#resetFiltersBtn
-                            a.btn-floating.waves-effect.waves-red.waves-light.btn-flat.white: i.material-icons.red-text.text-lighten-3 bookmark_border
+                            a.btn-floating.waves-effect.waves-light.btn-flat.white: i.material-icons.btn-list-control bookmark_border
                         div(style="border-style:solid;border-width:0 0 2px 2px;border-color:#ffeeee;cursor:pointer;color:#ee6e73;font-weight:500;").hide.col.s6.no-padding.center-align#objectsLabel TO TOP
                         div(style="border-style:solid;border-width:0 0 2px 2px;border-color:#ffeeee;")#tabContainer.col.s10.no-padding
                             ul(style="overflow-x: hidden;-webkit-user-select: none;-moz-user-select: none;-ms-user-select: none;")#tabs.tabs.tabs-fixed-width
@@ -84,26 +84,27 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
                                 li.tab.col.s4.truncate: a(href="#actionsList").tab-padding#actionsTabSwitch ACTIONS
                                 li.tab.col.s4.truncate: a(href="#objectsFilterTab").tab-padding#filterTabSwitch FILTERS
 
-
                 div(style="overflow-y:auto;height:100%;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;").row.no-padding.no-margin
                     div.list.col.s12.no-padding.no-margin#objectsListTab
-                        div.list.col.s12.no-padding.no-margin#objectsList
+                        div(style="padding:8px 0 0 0").list.col.s12.no-margin#objectsList
                         div(style="position:relative;").col.no-margin.no-padding
+                            i.objectGroupIcon.blue-text.material-icons.small#objectGroupIcon group
+                            span.objectGroupIconCrossOut.red#objectGroupIconCrossOut
                             span.objectsNum.waves-effect.blue.white-text.hide#objectCounter
                             div#wallet.hide
                                 span.walletNum.white-text#walletCounter
                                 i.walletIcon.waves-effect.red-text.material-icons#walletIcon folder
-                    div.list.col.s12.no-padding.no-margin#actionsList.collapsible.collapsible-accordion
+                    div(style="padding:8px 0 0 0").list.col.s12.no-margin#actionsList.collapsible.collapsible-accordion
                     div.list.col.s12.no-padding.no-margin#objectsFilterTab
                         div(style="padding:8px 16px 0 16px;").input-field.no-margin.col.s12
                             textarea(style="height:20px;" placeholder="Object search")#searchObjectsAdd.search-textarea.materialize-textarea
                         div.col.s12.no-padding.no-margin#objectsFilter
                         div(style="position:relative;").hide.col.no-margin.no-padding#filterCounterContainer
-                            span.filterssNum.waves-effect.green.white-text#filterCounter
+                            span.filtersNum.waves-effect.green.white-text#filterCounter
                             i.filterEditIcon.waves-effect.red-text.material-icons#filterEditIcon edit
 
         main.main
-            div(style="height: 93vh")
+            div#iframeContainer
                 iframe(id="actionObject" style='width:100%; height:100%; border:none' allow="autoplay")
 
         //footer.main

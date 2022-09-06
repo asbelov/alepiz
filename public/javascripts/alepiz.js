@@ -20,68 +20,13 @@ alepizMainNamespace = (function($) {
         initJQueryElements();
         initEvents();
         initMaterializeElements();
-
-        $.post('/mainMenu', {f: 'getDefaultInterfaceConfiguration'}, function(_defaultInterfaceConfiguration) {
-            configID = '/' + _defaultInterfaceConfiguration.actionDir + '/__AlepizMainMenuConfiguration';
-            $.post(configID, { func: 'getActionConfig' }, function(_config) {
-                config = _config
-                defaultInterfaceConfiguration = _defaultInterfaceConfiguration || {};
-
-                var navBarLinksArray = typeof config.navbarLinks === 'object' ? config.navbarLinks :
-                    defaultInterfaceConfiguration.navbarLinks;
-                createNavBarLinks(navBarLinksArray);
-
-                var unlockSideNav = config.unlockSideNav !== undefined ?
-                    config.unlockSideNav : defaultInterfaceConfiguration.unlockSideNav;
-                var maximizeSideNav = config.maximizeSideNav !== undefined ?
-                    config.maximizeSideNav : defaultInterfaceConfiguration.maximizeSideNav;
-
-                // required for pad and more screen size
-                $('header').css('padding-left', currentMenuWidth);
-                $('main').css('padding-left', currentMenuWidth);
-                $('footer').css('padding-left', currentMenuWidth);
-                if(unlockSideNav || isMobile) sideNavLockIconElm.trigger('click');
-                if(maximizeSideNav && !isMobile) sideNavResizeIconElm.trigger('click');
-
-                var tabItem = config.tabItem || defaultInterfaceConfiguration.tabItem;
-                if(tabItem === 'OBJECTS') tabInstance.select('objectsList');
-                else if(tabItem === 'ACTIONS') tabInstance.select('actionsList');
-                else if(tabItem === 'FILTERS') tabInstance.select('objectsFilterTab');
-
-                alepizFiltersNamespace.createObjectsFiltersTab(config.objectFilter || [], function () {
-
-                    var parametersFromURL = getParametersFromURL();
-                    alepizObjectsNamespace.createObjectsList(parametersFromURL.uncheckedObjectsNames,
-                        parametersFromURL.checkedObjectsNames, function () {
-
-                        if(tabItem !== 'OBJECTS') {
-                            var checkedObjectsNum = alepizObjectsNamespace.getSelectedObjectNames().length;
-                            objectsTabSwitchElm.text('OBJECTS' + (checkedObjectsNum ? ' [' + checkedObjectsNum + ']' : ''));
-                        }
-                        alepizActionsNamespace.createActionsList(parametersFromURL.activeActionLink,
-                            function () {
-
-                            alepizDrawActionNamespace.getActionHTMLAndShowActionButtons(false,
-                                function (html) {
-
-                                alepizDrawActionNamespace.drawAction(html);
-                                setBrowserHistory();
-
-                                setTimeout(setFocusToSearchBar, 1000);
-
-                                // reload object list and draw object
-                                setInterval(alepizObjectsNamespace.reDrawObjects, 60000);
-                            });
-                        });
-                    });
-                });
-            });
-        });
+        init();
     }); // end of document ready
 
     var // JQuery HTML DOM elements will be defined at initJQueryElements() function
 
         bodyElm,
+        iframeContainerElm,
         sideNavLockIconElm,
         sideNavResizeIconElm,
         slideOutElm,
@@ -105,7 +50,9 @@ alepizMainNamespace = (function($) {
         searchObjectsAddElm,
         selectAllObjectsElm,
         actionReloadBtnElm,
-        resetFiltersBtnElm;
+        resetFiltersBtnElm,
+        objectGroupIconElm,
+        objectGroupIconCrossOutElm;
 
     var
         tabInstance,
@@ -113,7 +60,9 @@ alepizMainNamespace = (function($) {
 
     var
         config = {},
-        defaultInterfaceConfiguration = {},
+        defaultConfig = {},
+        themeColor,
+        objectGroups = [],
         configID = '',
         // Mobile Devices <= 600px (.s)
         // Tablet Devices > 600px (.m)
@@ -127,10 +76,88 @@ alepizMainNamespace = (function($) {
         lastFocusedSearchStringElm,
         maxMenuWidth = '600px',
         minMenuWidth = '400px',
+        navBarHeight = 0,
         currentMenuWidth = minMenuWidth;
+
+    function init() {
+        $.post('/mainMenu', {f: 'getDefaultInterfaceConfiguration'}, function(_defaultInterfaceConfiguration) {
+            defaultConfig = _defaultInterfaceConfiguration || {};
+
+            configID = '/' + _defaultInterfaceConfiguration.actionDir + '/__AlepizMainMenuConfiguration';
+            $.post(configID, { func: 'getActionConfig' }, function(_config) {
+                config = _config;
+
+                var customConfigID = '/' + _defaultInterfaceConfiguration.actionDir + '/__AlepizMainMenuCustomization';
+                $.post(customConfigID, {func: 'getActionConfig'}, function (_customConfig) {
+                    var customConfig = _customConfig;
+
+
+                    var navBarLinksArray = typeof customConfig.navbarLinks === 'object' ? customConfig.navbarLinks :
+                        defaultConfig.navbarLinks;
+                    createNavBarLinks(navBarLinksArray);
+
+                    // required for pad and more screen size
+                    $('header').css('padding-left', currentMenuWidth);
+                    $('main').css('padding-left', currentMenuWidth);
+                    $('footer').css('padding-left', currentMenuWidth);
+
+                    var unlockSideNav = config.unlockSideNav !== undefined ?
+                        config.unlockSideNav : defaultConfig.unlockSideNav;
+                    var maximizeSideNav = config.maximizeSideNav !== undefined ?
+                        config.maximizeSideNav : defaultConfig.maximizeSideNav;
+                    var groupingObjects = config.groupingObjects !== undefined ?
+                        config.groupingObjects : defaultConfig.groupingObjects;
+                    themeColor = customConfig.themeColor || defaultConfig.themeColor;
+                    if(themeColor === 'random') themeColor = getRandomColor();
+
+                    objectGroups = mergeGroups(customConfig, defaultConfig);
+
+                    if (unlockSideNav || isMobile) sideNavLockIconElm.trigger('click');
+                    if (maximizeSideNav && !isMobile) sideNavResizeIconElm.trigger('click');
+                    if (groupingObjects || !objectGroups.length) objectGroupIconCrossOutElm.addClass('hide');
+                    if (!objectGroups.length) objectGroupIconElm.addClass('hide');
+
+                    var tabItem = config.tabItem || defaultConfig.tabItem;
+                    if (tabItem === 'OBJECTS') tabInstance.select('objectsList');
+                    else if (tabItem === 'ACTIONS') tabInstance.select('actionsList');
+                    else if (tabItem === 'FILTERS') tabInstance.select('objectsFilterTab');
+
+                    alepizFiltersNamespace.createObjectsFiltersTab(customConfig.objectFilter || [], function () {
+
+                        var parametersFromURL = getParametersFromURL();
+                        alepizObjectsNamespace.createObjectsList(parametersFromURL.uncheckedObjectsNames,
+                            parametersFromURL.checkedObjectsNames, function () {
+
+                                if (tabItem !== 'OBJECTS') {
+                                    var checkedObjectsNum = alepizObjectsNamespace.getSelectedObjectNames().length;
+                                    objectsTabSwitchElm.text('OBJECTS' + (checkedObjectsNum ? ' [' + checkedObjectsNum + ']' : ''));
+                                }
+                                alepizActionsNamespace.createActionsList(parametersFromURL.activeActionLink,
+                                    function () {
+
+                                        alepizDrawActionNamespace.getActionHTMLAndShowActionButtons(false,
+                                            function (html) {
+
+                                                alepizDrawActionNamespace.drawAction(html);
+                                                setBrowserHistory();
+
+                                                setTimeout(setFocusToSearchBar, 1000);
+
+
+                                                // reload object list and draw object
+                                                setInterval(alepizObjectsNamespace.reDrawObjects, 60000);
+                                            });
+                                    });
+                            });
+                    });
+                });
+            });
+        });
+    }
 
     function initJQueryElements() {
         bodyElm = $("body");
+        iframeContainerElm = $('#iframeContainer');
 
         slideOutElm = $('#slide-out');
         sideNavMenuElm = $('#sidenav-menu');
@@ -161,6 +188,9 @@ alepizMainNamespace = (function($) {
         selectAllObjectsElm = $('#selectAllObjects');
         actionReloadBtnElm = $('#actionReloadBtn');
         resetFiltersBtnElm = $('#resetFiltersBtn');
+
+        objectGroupIconElm = $('#objectGroupIcon');
+        objectGroupIconCrossOutElm = $('#objectGroupIconCrossOut');
     }
 
     /*
@@ -173,6 +203,9 @@ alepizMainNamespace = (function($) {
             closeOnClick: false, // Closes side-nav on <a> clicks, useful for Angular/Meteor
             draggable: true // Choose whether you can drag to open on touch screens
         });
+
+        navBarHeight = $('.nav-wrapper').height();
+        setIframeHeight();
 
         tabInstance = M.Tabs.init(document.getElementById('tabs'), {});
 
@@ -207,6 +240,14 @@ alepizMainNamespace = (function($) {
                 $('main').css('padding-left', currentMenuWidth);
                 $('footer').css('padding-left', currentMenuWidth);
             }
+
+            setIframeHeight();
+        });
+
+        $('#openInNewWindow').click(function (e) {
+            e.preventDefault();  // prevent default
+            var url = '/?' + window.location.search.substring(1);
+            window.open(url, '_blank').focus();
         });
 
         sideNavLockIconElm.click(function () {
@@ -388,7 +429,7 @@ alepizMainNamespace = (function($) {
                     config.tabItem = 'OBJECTS';
                     saveConfig()
                 }
-                searchObjectsElm.trigger('keyup');
+                searchObjectsElm.trigger('keydown');
 
                 selectAllObjectsElm.removeClass('hide');
                 actionReloadBtnElm.addClass('hide');
@@ -450,6 +491,35 @@ alepizMainNamespace = (function($) {
         });
 
         actionReloadBtnElm.click(reload);
+
+
+        objectGroupIconElm.click(function () {
+            objectGroupIconCrossOutElm.toggleClass('hide');
+            var selectedObjectIDs = alepizObjectsNamespace.getSelectedObjects().map(function (obj) { return String(obj.id); });
+            config.groupingObjects = objectGroupIconCrossOutElm.hasClass('hide');
+            saveConfig();
+            alepizObjectsNamespace.reDrawObjects(null, function () {
+                if(config.groupingObjects) {
+                    $('input[data-object-type="group"]').each(function () {
+                        var objectIDs = $(this).attr('id').split('-');
+                        var isAllObjectsSelectedItGroup = true;
+                        for(var i = 0; i < objectIDs.length; i++) {
+                            if(selectedObjectIDs.indexOf(objectIDs[i]) === -1) isAllObjectsSelectedItGroup = false;
+                        }
+                        if(isAllObjectsSelectedItGroup) $(this).prop('checked', true);
+                        else $(this).prop('checked', false);
+                    });
+                } else {
+                    $('input[data-object-name]').each(function () {
+                        var objectIDs = $(this).attr('id');
+                        if(selectedObjectIDs.indexOf(objectIDs) !== -1) $(this).prop('checked', true);
+                    });
+                }
+            });
+        });
+        objectGroupIconCrossOutElm.click(function () {
+            objectGroupIconElm.trigger('click');
+        });
     }
 
     function setFocusToSearchBar() {
@@ -481,6 +551,7 @@ alepizMainNamespace = (function($) {
     // setParametersToUrl - for simple search this function
     function setBrowserHistory() {
         setDocumentTitle();
+        setThemeColor(document, themeColor);
 
         var activeActionLink = $('li[data-action-link].active').attr('data-action-link');
         if(!activeActionLink) activeActionLink = '';
@@ -559,18 +630,6 @@ alepizMainNamespace = (function($) {
         });
     }
 
-    /*
-    function mergeObjects(target, source) {
-        if(typeof target !== typeof source || typeof source !== 'object') return source;
-        for(var key in source) {
-            if(typeof source[key] === 'object') target[key] = mergeObjects(target[key], source[key]);
-            else target[key] = source[key];
-        }
-
-        return target;
-    }
-    */
-
     function createNavBarLinks(navBarLinksArray) {
         if(!Array.isArray(navBarLinksArray)) return;
         var navbarLinks = {};
@@ -578,8 +637,10 @@ alepizMainNamespace = (function($) {
             if(!link.name || typeof link.name !== 'string') return '';
 
             var url = typeof link.URL === 'string' ? link.URL : '#';
+            var target = link.openInNewWindow ? ' target="_blank"' : ''
             navbarLinks[link.name] = link;
-            return '<li class="hide-on-med-and-down"><a href="' + url + '" data-navbar-link="' + link.name + '">' +
+            return '<li class="hide-on-med-and-down"><a href="' + url + '" data-navbar-link="' + link.name +
+                '"' + target + '>' +
             escapeHtml(link.name) + '</a></li>';
         });
 
@@ -622,14 +683,59 @@ alepizMainNamespace = (function($) {
         });
     }
 
+    function setIframeHeight() {
+        var windowHeight = window.innerHeight;
+        iframeContainerElm.height(windowHeight - navBarHeight);
+    }
+
+    function mergeGroups(config, defaultConfig) {
+        var objectGroups = [], objectNames = {};
+        if(!Array.isArray(config.objectGroups)) config.objectGroups = [];
+        if(!Array.isArray(defaultConfig.objectGroups)) defaultConfig.objectGroups = [];
+
+        config.objectGroups.forEach(mergeGroup);
+        defaultConfig.objectGroups.forEach(mergeGroup);
+
+        return objectGroups;
+
+        function mergeGroup(group) {
+            var newGroupObj = {};
+            if(typeof group.name !== 'string' || !group.name || typeof group.re !== 'string' || !group.re) {
+                return console.error('Error in parameters for grouping objects (name or re):', group);
+            }
+            if(objectNames[group.name.toUpperCase()]) return;
+
+            try {
+                newGroupObj.RE = new RegExp(group.re, "gi");
+            } catch (err) {
+                console.error('Can\'t compile RegExp for grouping objects', group, ':', err.message);
+                return;
+            }
+            for(var key in group) newGroupObj[key] = group[key];
+            objectGroups.push(newGroupObj);
+            objectNames[group.name.toUpperCase()] = true;
+        }
+    }
+
+    function getRandomColor() {
+        var letters = '0123456789ABCDEF'.split('');
+        var color = '#';
+        for (var i = 0; i < 6; i++ ) {
+            color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+    }
+
     return {
         setBrowserHistory: setBrowserHistory,
         reload: reload,
         getConfig: function () { return config; },
+        getObjectGroups: function () { return objectGroups; },
         saveConfig: saveConfig,
         getSessionID: function () { return sessionID; },
         setSessionID: function (_sessionID) { sessionsIDs[_sessionID] = true; sessionID = _sessionID},
         getSessionIDs: function () { return Object.keys(sessionsIDs); },
+        getThemeColor: function () { return themeColor; },
     }
 
 })(jQuery); // end of jQuery name space

@@ -116,3 +116,93 @@ function setActionParametersToBrowserURL(actionParameters) {
 
     window.history.pushState(null, document.title, '?' + URL);
 }
+
+function setThemeColor(target, themeColor) {
+    if(!themeColor || typeof themeColor !== 'string') return;
+
+    //console.log(document.title);
+
+    try {
+        [
+            {
+                selector: '.secondary-content>.material-icons',
+                name: 'color',
+                val: themeColor,
+            }, {
+            selector: '.input-field>.material-icons',
+            name: 'color',
+            val: themeColor,
+        }, {
+            selector: '.input-field',
+            name: 'color',
+            val: themeColor,
+        }, {
+            selector: '.input-field>label',
+            name: 'color',
+            val: themeColor,
+        }, {
+            selector: '.dropdown-content>li>a',
+            name: 'color',
+            val: themeColor,
+        }, {
+            selector: 'i.btn-list-control',
+            name: 'color',
+            val: themeColor,
+        }, {
+            selector: '.run-action.btn',
+            name: 'color',
+            val: themeColor,
+        }, {
+            selector: '.make-task.btn',
+            name: 'color',
+            val: themeColor,
+        }, {
+            selector: '.tab>a',
+            name: 'color',
+            val: themeColor,
+        }, {
+            selector: '.tabs',
+            name: 'color',
+            val: themeColor,
+        }, {
+            selector: '.nav-wrapper',
+            name: 'background',
+            val: themeColor,
+        }, {
+            selector: '.btn',
+            name: 'background',
+            val: themeColor,
+        }, {
+            selector: '.btn-floating',
+            name: 'background',
+            val: themeColor,
+        }, {
+            selector: '.page-footer',
+            name: 'background',
+            val: themeColor,
+        }, {
+            selector: '.sidenav .collapsible-body > ul:not(.collapsible) > li.active, .sidenav.sidenav-fixed .collapsible-body > ul:not(.collapsible) > li.active',
+            name: 'background',
+            val: themeColor,
+        }, {
+            selector: 'li.action.active',
+            name: 'background',
+            val: themeColor,
+        }, {
+            selector: 'li.action:not(.active)',
+            name: 'background',
+            val: '',
+        }, {
+            selector: '.indicator',
+            name: 'background',
+            val: themeColor,
+        }
+        ].forEach(function (style) {
+            target.querySelectorAll(style.selector).forEach(function (elm) {
+                elm.style[style.name] = style.val;
+            });
+        });
+    } catch (e) {
+        console.error('Can\'t set theme color to', themeColor, 'to', document.title, ':', err);
+    }
+}

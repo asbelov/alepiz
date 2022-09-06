@@ -18,7 +18,7 @@ const confObjectFilters = new Conf('config/objectFilters.json');
  */
 var counterNames2IDs = new Map();
 var objectsFilter = {
-    getObjectsFilterNames: getObjectsFilterNames,
+    getObjectsFilterConfig: getObjectsFilterConfig,
     applyFilterToObjects: applyFilterToObjects,
 }
 
@@ -30,14 +30,14 @@ module.exports = objectsFilter;
  * @param {function(null, Array)|function()} callback - callback(null, filterNames) or callback() when filters are undefined
  * filterNames is [{name:..., description:...}, {}, ...]
  */
-function getObjectsFilterNames(userName, callback) {
+function getObjectsFilterConfig(userName, callback) {
     confObjectFilters.reload();
     var cfg = confObjectFilters.get();
     if(typeof cfg !== 'object' || !Array.isArray(cfg.filters)) return callback();
 
     userDB.getUsersInformation(userName, function(err, rows) {
         var userRoles = rows.map(row => row.roleName.toUpperCase());
-        var filterNames = cfg.filters
+        var filterConfig = cfg.filters
             .filter(f => typeof f.name === 'string' && typeof f.expression === 'string' && f.name && f.expression)
             .map((f) => {
                 var filterObj = {
@@ -53,7 +53,7 @@ function getObjectsFilterNames(userName, callback) {
                 return filterObj;
             });
 
-        return callback(null, filterNames);
+        return callback(null, filterConfig);
     })
 }
 

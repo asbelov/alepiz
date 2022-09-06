@@ -1,0 +1,51 @@
+//
+    Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
+doctype
+html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title Настройки группировки objectGroup.json
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        meta(name="author" content="Alexander Belov &lt;asbel@alepiz.com&gt")
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/help.js')
+    body
+        header
+            div.row
+                div.col.s12.m10.offset-m1
+                    h1 Описание настроек интерфейса objectGroup.json
+        main
+            div.row
+                div.col.s12.m10.offset-m1
+                    ul.browser-default
+                        li objectGroups - объект, содержащий массив с объектами - описаниями алгоритмов группировки объектов:
+                        ul.browser-default
+                            li name - Имя группы
+                            li description - Описание группы, которое будет появляться при наведении на группу мышкой
+                            li color - цвет для группы
+                            li.
+                                sortPosition - позиция сортировки для группы в списке объектов. Если не указать,
+                                группа будет отсортирована в зависимости от минимальной позиции сортировки включенных
+                                в нее объектов
+                            li.
+                                re - строка с регулярным выражением, с которой производится сравнение имен объектов
+                                для группировки
+
+                    ul.collapsible
+                        li
+                            div.collapsible-header #[i.material-icons settings] Пример objectGroup.json (нажмите для того, чтобы развернуть)
+                            div.collapsible-body
+                                pre.
+                                    {
+                                        "objectGroups":
+                                            [
+                                                {
+                                                    "name": "ALEPIZ",
+                                                    "re": "\\[ALEPIZ\\]",
+                                                    "description": "Objects containing ALEPIZ in the name",
+                                                    "color": "red",
+                                                    "sortPosition": 20
+                                                }
+                                            ]
+                                    }

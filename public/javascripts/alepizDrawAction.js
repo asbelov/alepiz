@@ -189,6 +189,21 @@ callback(html), where html is a string with HTML page for active action
                 console.error('Can\'t add event handler to onScrollIframe() function for catch the scroll action page ' +
                     'event inside the iframe to', activeActionLink, ':', err.message)
             }
+
+            setThemeColor(iframeDOMElm.contentDocument, alepizMainNamespace.getThemeColor());
+            /*
+            try {
+                iframeDOMElm.contentWindow.setThemeColor = setThemeColor;
+                setTimeout(function() {
+                    iframeDOMElm.contentWindow.setThemeColor(iframeDOMElm.contentDocument);
+                }, 5000)
+
+            } catch (err) {
+                console.error('Can\'t set theme color to the action', activeActionLink, ':', err)
+            }
+
+             */
+
             addCtrlEnterEventHandler();
         }
 
@@ -235,7 +250,7 @@ callback(html), where html is a string with HTML page for active action
         }
 
         function keyDown(e) {
-            if (!activeAction.rights.run) return;
+            if (!activeAction || !activeAction.rights.run) return;
             if (e.keyCode === 13 && e.ctrlKey) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -246,7 +261,7 @@ callback(html), where html is a string with HTML page for active action
         }
 
         function keyPressAndKeyUp(e) { // prevent submit event generation
-            if (!activeAction.rights.run) return;
+            if (!activeAction || !activeAction.rights.run) return;
             if (e.keyCode === 13 && e.ctrlKey) {
                 e.preventDefault();
                 e.stopPropagation();

@@ -36,10 +36,22 @@ fix error, when overlay closing sideNav menu
     color: grey !important;
 }
 
+.btn-list-control {
+    color: #ee6e73;
+}
+
+.run-action.btn {
+    background-color: red;
+}
+
+.make-task.btn {
+    background-color: #ffd600;
+}
+
 .objectsNum {
     position:absolute;
-    top:24px;
-    right:16px;
+    top:72px;
+    right:20px;
     border-radius:50%;
     height:28px;
     min-width:28px;
@@ -50,10 +62,35 @@ fix error, when overlay closing sideNav menu
     cursor: pointer;
 }
 
+.objectGroupIcon {
+    position:absolute;
+    top:30px;
+    right:18px;
+    font-size: 36px;
+    text-align:center;
+    text-shadow: 2px 2px lightgrey;
+    cursor: pointer;
+}
+
+.objectGroupIconCrossOut {
+    position:absolute;
+    top:52px;
+    right:24px;
+    border-top: 1px solid white;
+    cursor: pointer;
+    width: 28px;
+    height: 4px;
+    transform: rotate(45deg);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-transform-origin: 100% 100%;
+    transform-origin: 100% 100%;
+}
+
 .walletIcon {
     position:absolute;
-    top:56px;
-    right:12px;
+    top:110px;
+    right:16px;
     font-size: 36px;
     text-align:center;
     text-shadow: 2px 2px lightgrey;
@@ -62,8 +99,8 @@ fix error, when overlay closing sideNav menu
 
 .walletNum {
     position:absolute;
-    top:62px;
-    right:14px;
+    top:116px;
+    right:18px;
     height:24px;
     min-width:32px;
     line-height:24px;
@@ -73,10 +110,10 @@ fix error, when overlay closing sideNav menu
     z-index: 100;
 }
 
-.filterssNum {
+.filtersNum {
     position:absolute;
-    top:-20px;
-    right:16px;
+    top:28px;
+    right:20px;
     border-radius:50%;
     height:28px;
     min-width:28px;
@@ -89,8 +126,8 @@ fix error, when overlay closing sideNav menu
 
 .filterEditIcon {
     position: absolute;
-    top: -8px;
-    right: 4px;
+    top: 40px;
+    right: 8px;
     font-size: 24px;
     text-align: center;
     text-shadow: 2px 2px lightgrey;
@@ -103,6 +140,15 @@ a.object {
     height: 36px !important;
     cursor: pointer !important;
     font-weight: 480 !important;
+    font-size: 14px !important;
+}
+
+a.group {
+    margin: 0 0 2px 0 !important;
+    padding: 0 0 0 0 !important;
+    height: 36px !important;
+    cursor: pointer !important;
+    font-weight: 600 !important;
     font-size: 14px !important;
 }
 

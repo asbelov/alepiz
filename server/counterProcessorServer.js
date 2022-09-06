@@ -203,7 +203,7 @@ function runChildren(callback) {
  */
 // message = {err, result, parameters, collectorName}
 function processCounterResult (message) {
-    var OCID = message.parameters.$id;
+    var OCID = Number(message.parameters.$id);
     if(!processedOCIDs.has(OCID)) processedOCIDs.set(OCID, true); // active collector
     childrenThreads.send(message);
 }
@@ -453,27 +453,35 @@ function processServerMessage(message) {
 function processChildMessage(message) {
     if(!message) return;
 
+    /*
+    Message without counter result:
+    {
+        parentOCID: param.parentOCID,
+        completeExecutionOCID: param.OCID,
+        updateEventState: param.updateEventState, // can be undefined
+    }
+     */
     if(message.updateEventState !== undefined) {
         let updateEventKey = message.parentOCID + '-' + message.OCID;
         updateEventsStatus.set(updateEventKey, message.updateEventState);
             //if(updateEventKey === '155273-155407' || updateEventKey === '155273-155287') log.warn('!!updateEvent: ', updateEventKey, ': ', message.updateEventState)
-            return;
     }
 
-    var OCID = message.completeExecutionOCID || message.OCID;
-
-    if(OCID) {
-        // delete processedOCIDs when finished getting data from not active collector (processedOCIDs.get(OCID) === false)
-        if(processedOCIDs.get(OCID) === false) processedOCIDs.delete(OCID);
+    if(message.OCID) {
+        // delete processedOCIDs when finished getting data from not active collector
+        // (processedOCIDs.set(OCID, isActive);  =>   processedOCIDs.get(OCID) === false)
+        if(processedOCIDs.get(Number(message.OCID)) === false) processedOCIDs.delete(Number(message.OCID));
         ++processedCounters;
     }
 
     if (message.value === undefined) return;
 
+    /*
     if(message.variables.UPDATE_EVENT_STATE !== undefined) {
         let updateEventKey = message.parentOCID + '-' + message.OCID;
         updateEventsStatus.set(updateEventKey, message.variables.UPDATE_EVENT_STATE);
     }
+     */
 
     var values = Array.isArray(message.value) ? message.value : [message.value];
 

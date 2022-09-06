@@ -1,0 +1,23 @@
+{
+    "name": "Interface editor",
+    "description": "Interface customization editor",
+    "homePage": "index",
+    "ajaxServer": "ajax.js",
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "launcherPrms": { "javaScript": "server.js" },
+    "staticDir": "static",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": true,
+	"callbackBeforeExec": "callbackBeforeExec",
+    "onChangeObjectMenuEvent": "nothing",
+    "outputFormat": "text",
+    "descriptionTemplate": "Create a new interface %:config:%",
+    "icon": "settings",
+    "canAddParametersToAction": true,
+    "parameters": {
+        "config": {
+            "description": "JSON with interface configuration"
+        }
+    }
+}

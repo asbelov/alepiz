@@ -9,7 +9,8 @@
         $('#helpBtn').click(function (e) {
             e.preventDefault();  // prevent default
 
-            var activeActionLink = $('li[action_link].active').attr('action_link');
+            var activeAction = alepizActionsNamespace.getActiveActionsConf();
+            if(activeAction) var activeActionLink = activeAction.link;
 
             var helpWindowWidth = Math.floor(screen.width - screen.width / 3);
             var helpWindowsHeight = Math.floor(screen.height - screen.height / 3);

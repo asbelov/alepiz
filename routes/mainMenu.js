@@ -17,7 +17,9 @@ var logRecords = require('../lib/logRecords');
 var prepareUser = require('../lib/utils/prepareUser');
 const Conf = require("../lib/conf");
 const confActions = new Conf('config/actions.json');
-const confInterfaceDefault = new Conf('config/interface.json');
+const confInterface = new Conf('config/interface.json');
+const confNavBarLinks = new Conf('config/navBarLinks.json');
+const confObjectGroups = new Conf('config/objectGroups.json');
 
 module.exports = router;
 
@@ -32,7 +34,7 @@ router.post('/mainMenu', function(req, res/*, next*/) {
     else if(functionName === 'logout') user.logout(req.session, sendBackResult);
     else if(functionName === 'getCurrentUserName') user.getFullName(req.session, sendBackResult);
     else if(functionName === 'filterObjectsByInteractions') filterObjectsByInteractions(req.body.name, req.session.username, req.body.filterNames, req.body.filterExpression, sendBackResult);
-    else if(functionName === 'getObjectsFilterNames') objectsFilter.getObjectsFilterNames(req.session.username, sendBackResult);
+    else if(functionName === 'getObjectsFiltersConfig') objectsFilter.getObjectsFilterConfig(req.session.username, sendBackResult);
     else if(functionName === 'getObjectsByName') getObjectsByNames(req.body.name, req.session.username, req.body.filterNames, req.body.filterExpression, sendBackResult);
     else if(functionName === 'searchObjects') searchObjects(req.body.searchStr, req.session.username, req.body.filterNames, req.body.filterExpression, sendBackResult);
     else if(functionName === 'getLogRecords') logRecords.getRecords(req.session.username, req.body.lastID, req.body.sessionsIDs, sendBackResult);
@@ -54,8 +56,9 @@ router.post('/mainMenu', function(req, res/*, next*/) {
 });
 
 function getDefaultInterfaceConfiguration(callback) {
-    var interfaceDefault = confInterfaceDefault.get() || {};
-
+    var interfaceDefault = confInterface.get() || {};
+    interfaceDefault.navbarLinks = confNavBarLinks.get('navbarLinks') || [];
+    interfaceDefault.objectGroups = confObjectGroups.get('objectGroups') || [];
     interfaceDefault.actionDir = confActions.get('dir');
 
     callback(null, interfaceDefault);

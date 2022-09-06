@@ -159,6 +159,14 @@ function destroyCollectors(callback) {
         });
     }, callback); // error is not returned
 }
+// dont return without sending execution result to the parent
+function sendCompleteExecutionResult(param) {
+    childThread.send({
+        parentOCID: param.parentOCID,
+        OCID: param.OCID,
+        updateEventState: param.updateEventState,
+    });
+}
 
 function getVariablesAndCheckUpdateEvents(message) {
 
@@ -174,7 +182,10 @@ function getVariablesAndCheckUpdateEvents(message) {
         var counter = countersObjects.counters.get(counterID);
     } catch (e) {
         log.error('Can\'t get counter data: ', e.message, ', msg: ', message);
-        return;
+        return sendCompleteExecutionResult({
+            parentOCID: message.parentOCID,
+            OCID: message.OCID,
+        });
     }
 
     // make full independent copy of counter parameters for make possible to modifying it in the future
@@ -208,7 +219,10 @@ function getVariablesAndCheckUpdateEvents(message) {
                 });
             });
         }
-        return;
+        return sendCompleteExecutionResult({
+            parentOCID: message.parentOCID,
+            OCID: message.OCID,
+        });
     }
 
     var param = {
@@ -262,11 +276,14 @@ function getVariablesAndCheckUpdateEvents(message) {
             debugCounters.add('v', param.OCID, variablesDebugInfo,
                 variablesDebugInfo.UPDATE_EVENT_STATE && variablesDebugInfo.UPDATE_EVENT_STATE.important);
         }
+
+        param.updateEventState = variables.UPDATE_EVENT_STATE;
         //profiling.stop('1. get variables values', message);
         //profiling.start('2. prepare to get counter value', message);
 
         // send UPDATE_EVENT_STATE anyway if previous updateEventState is not equal to new updateEventState,
         // because after the child may have nothing to send to the server
+        /*
         if (param.parentOCID && param.updateEventExpression &&
             updateEventState !== variables.UPDATE_EVENT_STATE &&
             variables.UPDATE_EVENT_STATE !== undefined) {
@@ -278,6 +295,7 @@ function getVariablesAndCheckUpdateEvents(message) {
             });
             //if(counterID === 211 || counterID === 257) log.warn(param.counterName, ' send: updateEventState: ', updateEventState ,'=>', variables.UPDATE_EVENT_STATE, ': ', noNeedToCalculateCounter, ': ', param.parentOCID, '-', param.OCID, ': ', param.updateEventExpression);
         }
+        */
         //if(counterID === 211 || counterID === 257) log.warn(param.counterName, ': updateEventState: ', updateEventState ,'=>', variables.UPDATE_EVENT_STATE, ': ', noNeedToCalculateCounter, ': ', param.parentOCID, '-', param.OCID, ': ', param.updateEventExpression);
         if (err) {
             log.options(err.message, {
@@ -286,9 +304,9 @@ function getVariablesAndCheckUpdateEvents(message) {
                 noPID: true,
                 level: 'I'
             });
-            return;
+            return sendCompleteExecutionResult(param);
         }
-        if(noNeedToCalculateCounter) return
+        if(noNeedToCalculateCounter) return sendCompleteExecutionResult(param);
 
         if (variables && Object.keys(variables).length) {
 
@@ -310,7 +328,7 @@ function getVariablesAndCheckUpdateEvents(message) {
                                 level: 'I'
                             });
 
-                        return;
+                        return sendCompleteExecutionResult(param);
                     }
                 }
             }
@@ -323,7 +341,7 @@ function getVariablesAndCheckUpdateEvents(message) {
 
 function getValue(param) {
     if (!param.collector || !collectorsObj[param.collector]) {
-        return log.options('Try to get value for an unknown collector for ',
+        log.options('Try to get value for an unknown collector for ',
             param.objectName,
             '(', param.counterName, '): collector: "', param.collector,
             '"; param: ', param, {
@@ -332,6 +350,7 @@ function getValue(param) {
                 noPID: true,
                 level: 'E'
             });
+        return sendCompleteExecutionResult(param);
     }
 
     //log.debug('Try to get value for ', param.objectName , '(', param.counterName, '): ', param);
@@ -369,6 +388,7 @@ function getValue(param) {
                 noPID: true,
                 level: 'E'
             });
+        return sendCompleteExecutionResult(param);
     }
 }
 
@@ -391,10 +411,11 @@ function processCollectorResult(err, result, param, collectorName) {
                 objectName: param.$variables.OBJECT_NAME,
                 counterID: param.$counterID,
                 objectID: param.$objectID,
+                updateEventState: param.updateEventState,
             }
         } catch (err) {
             log.error('Can\'t init param: ' + err.message + '; ' + JSON.stringify(param))
-            return;
+            return sendCompleteExecutionResult(param);
         }
     }
 
@@ -443,7 +464,7 @@ function processCollectorResult(err, result, param, collectorName) {
                     level: 'E'
                 });
         } // else return nothing, skip it
-        return;
+        return sendCompleteExecutionResult(param);
     } else if (err) {
         log.options('Collector ', param.collector, ' return error for OCID: ', param.OCID, ': ',
             param.objectName,
@@ -469,9 +490,7 @@ function processCollectorResult(err, result, param, collectorName) {
 
     if (!dependedCounters || !dependedCounters.length) {
         // send process ID to server
-        childThread.send({
-            completeExecutionOCID: param.OCID,
-        });
+
 
         /*
         log.options('Received value[s] ', preparedResult.value, ' from: ',
@@ -483,7 +502,7 @@ function processCollectorResult(err, result, param, collectorName) {
                 level: 'D'
         });
          */
-        return;
+        return sendCompleteExecutionResult(param);
     }
 
     /*
@@ -526,6 +545,7 @@ if(param.OCID === 155273) log.warn(param.counterName, ' recalculate: updateEvent
         variables: param.collectorParameters.$variables,
         dependedCounters: dependedCounters,
         value: preparedResult.value,
+        updateEventState: param.updateEventState,
     };
 
     //profiling.stop('3. get depended counters', param);

@@ -1,0 +1,42 @@
+//
+    Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 04.09.2022, 22:55:38
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/javaScriptEditor.js')
+        script(src='/javascripts/escapeHTML.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+    body
+        script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+        main
+            div.row
+                div.col.s12
+                    ul#mainTabs.tabs
+                        li.tab.col.s2: a(href='#tabConfig')#tabSwitchConfig Config
+                        li.tab.col.s2: a(href='#tabActions')#tabSwitchActions Actions
+                        li.tab.col.s3: a(href='#tabNavBarLinks')#tabSwitchNavBarLinks Quik Links
+                        li.tab.col.s3: a(href='#tabGroups')#tabSwitchGroups Object groups
+            div#tabConfig
+                div.col.s12
+                    textarea#config
+            div#tabActions
+                div.col.s12
+                    textarea#actionEditor
+            div#tabNavBarLinks
+                div.col.s12
+                    textarea#navBarLinksEditor
+            div#tabGroups
+                div.col.s12
+                    textarea#groupEditor
