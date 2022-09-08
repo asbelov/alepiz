@@ -42,9 +42,9 @@ var startMemUsageTime = 0,
     stopServerInProgress = 0,
     childrenThreads,
     activeCollectors = new Set(),
-    runCollectorSeparately = new Set(),
-    /** What OCIDs is being processed now: Map[OCID: isActiveCollector (true|false)]
-     * @type {Map<Number, Boolean>}
+    runCollectorSeparately = new Map(),
+    /** What OCIDs is being processed now: Map[OCID: { isActiveCollector (true|false), timestamp: <startProcessingTime>}]
+     * @type {Map<Number, {Boolean, Number}>}
      */
     processedOCIDs = new Map(),
     updateEventsStatus = new Map(),
@@ -93,7 +93,19 @@ function initBuildInServer(collectorsNamesStr, _serverID, callback) {
             for (var name in collectorsObj) {
                 if (collectorsObj[name].active) activeCollectors.add(name);
                 //else if (collectorsObj[name].separate) separateCollectors.set(name);
-                else if (collectorsObj[name].runCollectorSeparately) runCollectorSeparately.add(name);
+                /*
+                collectorsObj[name].runCollectorSeparately may contain the maximum time (ms) during which data collection
+                can be performed. If the time is exceeded, it is considered that the data collection is completed,
+                but the server has not received a message about this
+                 */
+                else if (collectorsObj[name].runCollectorSeparately) {
+                    var maxTimeToProcessCounter = parseInt(collectorsObj[name].runCollectorSeparately);
+                    if(isNaN(maxTimeToProcessCounter)) {
+                        maxTimeToProcessCounter = parseInt(confServer.maxTimeToProcessCounter)
+                    }
+                    if(isNaN(maxTimeToProcessCounter)) maxTimeToProcessCounter = 30000;
+                    runCollectorSeparately.set(name, maxTimeToProcessCounter);
+                }
             }
 
             runChildren(function (err) {
@@ -204,7 +216,10 @@ function runChildren(callback) {
 // message = {err, result, parameters, collectorName}
 function processCounterResult (message) {
     var OCID = Number(message.parameters.$id);
-    if(!processedOCIDs.has(OCID)) processedOCIDs.set(OCID, true); // active collector
+    if(!processedOCIDs.has(OCID)) processedOCIDs.set(OCID, {
+        isActive: true,
+        timestamp: Date.now(),
+    }); // active collector
     childrenThreads.send(message);
 }
 
@@ -457,20 +472,22 @@ function processChildMessage(message) {
     Message without counter result:
     {
         parentOCID: param.parentOCID,
-        completeExecutionOCID: param.OCID,
-        updateEventState: param.updateEventState, // can be undefined
+        OCID: param.OCID,
+        updateEventState: param.updateEventState,
     }
      */
     if(message.updateEventState !== undefined) {
         let updateEventKey = message.parentOCID + '-' + message.OCID;
         updateEventsStatus.set(updateEventKey, message.updateEventState);
             //if(updateEventKey === '155273-155407' || updateEventKey === '155273-155287') log.warn('!!updateEvent: ', updateEventKey, ': ', message.updateEventState)
+        return;
     }
 
     if(message.OCID) {
         // delete processedOCIDs when finished getting data from not active collector
-        // (processedOCIDs.set(OCID, isActive);  =>   processedOCIDs.get(OCID) === false)
-        if(processedOCIDs.get(Number(message.OCID)) === false) processedOCIDs.delete(Number(message.OCID));
+        if(processedOCIDs.has(message.OCID) && processedOCIDs.get(message.OCID).isActive === false) {
+            processedOCIDs.delete(Number(message.OCID));
+        }
         ++processedCounters;
     }
 
@@ -537,22 +554,27 @@ function getCountersValues(counters, parentVariables, forceToGetValueAgain, cfg)
         var OCID = counter.OCID;
         if(processedOCIDs.has(OCID)) {
             // if active collector
-            if (processedOCIDs.get(OCID)) {
+            var processedOCID = processedOCIDs.get(OCID);
+            if (processedOCID.isActive) {
                 if (forceToGetValueAgain) {
                     counter.removeCounter = true;
                     activeCounters.push(getCounterAndObjectName(OCID));
                 } else {
                     log.info('Counter ', getCounterAndObjectName(OCID),
-                        ' is processed to receive data by active collector "', counter.collector,
-                        '". Skipping add same counter');
+                        ' is processed to receive data by active collector ', counter.collector,
+                        ' from ', (new Date(processedOCID.timestamp)).toLocaleString(),'. Skipping add same counter');
                     return;
                 }
             }
             if (runCollectorSeparately.has(counter.collector)) {
-                log.info('Skipping getting a value for the ', getCounterAndObjectName(OCID),
-                    ' another counter is running and the "runCollectorSeparately" option is set for the collector ',
-                    counter.collector);
-                return;
+                var processingTime = Date.now() - processedOCID.timestamp;
+                if(processingTime < runCollectorSeparately.get(counter.collector)) {
+                    log.info('Skipping getting a value for the ', getCounterAndObjectName(OCID),
+                        '. Another counter is processed ', processingTime, 'ms and max processing time set to ',
+                        runCollectorSeparately.get(counter.collector),
+                        'ms by the "runCollectorSeparately" option for the collector ', counter.collector);
+                    return;
+                }
             }
         }
 
@@ -577,7 +599,10 @@ function getCounterValue(counter, parentVariables) {
     var OCID = counter.OCID;
     var isActive = activeCollectors.has(counter.collector);
 
-    processedOCIDs.set(OCID, isActive);
+    processedOCIDs.set(OCID, {
+        isActive: isActive,
+        timestamp: Date.now(),
+    });
 
     var updateEventKey = counter.parentOCID + '-' + OCID;
     counter.parentVariables = parentVariables;

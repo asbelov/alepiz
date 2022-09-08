@@ -9,6 +9,8 @@ var log = require('../../lib/log')(module);
 var collectors = require('../../lib/collectors');
 var help = require('../../lib/help');
 var server = require('../../server/counterProcessor');
+const Conf = require("../../lib/conf");
+const confServer = new Conf('config/server.json');
 
 module.exports = function(args, callback) {
     log.debug('Starting action server "', args.actionName, '" with parameters', args);
@@ -36,8 +38,17 @@ module.exports = function(args, callback) {
     collector.description = args.description;
     collector.active = args.activeCollector;
     collector.separate = args.activeCollector ? '' : args.separateCollector;
-    collector.runCollectorSeparately = args.runCollectorSeparately;
     collector.runCollectorAsThread = args.runCollectorAsThread;
+
+
+    collector.runCollectorSeparately = args.runCollectorSeparately;
+    var maxTimeToProcessCounter = confServer.maxTimeToProcessCounter;
+    if(confServer.maxTimeToProcessCounter !== parseInt(confServer.maxTimeToProcessCounter)) {
+        maxTimeToProcessCounter = 30000;
+    }
+    if(args.runCollectorSeparately && Number(args.runCollectorSeparately) !== parseInt(args.runCollectorSeparately)) {
+        collector.runCollectorAsThread = maxTimeToProcessCounter;
+    }
 
     var parameters = {};
     for(var inputID in args) {

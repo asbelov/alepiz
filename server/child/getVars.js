@@ -175,6 +175,7 @@ function getUpdateEventState(variables, param, callback) {
             processUpdateEventExpressionResult(updateEventResult, param.updateEventMode, param.prevUpdateEventState);
 
         variables.UPDATE_EVENT_STATE = updateEventResult;
+        variables.UPDATE_EVENT_TIMESTAMP = Date.now();
 
         /*
         log.info('!!!!', param.objectName + ' (' + param.counterName + ' #' + param.counterID +

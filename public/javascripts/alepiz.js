@@ -703,7 +703,7 @@ alepizMainNamespace = (function($) {
             if(typeof group.name !== 'string' || !group.name || typeof group.re !== 'string' || !group.re) {
                 return console.error('Error in parameters for grouping objects (name or re):', group);
             }
-            if(objectNames[group.name.toUpperCase()]) return;
+            if(objectNames[group.re.toUpperCase()]) return;
 
             try {
                 newGroupObj.RE = new RegExp(group.re, "gi");
@@ -713,7 +713,7 @@ alepizMainNamespace = (function($) {
             }
             for(var key in group) newGroupObj[key] = group[key];
             objectGroups.push(newGroupObj);
-            objectNames[group.name.toUpperCase()] = true;
+            objectNames[group.re.toUpperCase()] = true;
         }
     }
 

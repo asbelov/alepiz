@@ -200,7 +200,7 @@ function checkParametersAndRights(args, callback) {
 
                 if(args.keepHistory && isInt(args.keepHistory) === null) return er('Incorrect keep history value ' + args.keepHistory);
 
-                if(args['event-duration'] && isInt(args['event-duration']) === null) {
+                if (args['event-duration'] && isInt(args['event-duration']) === null && !args['event-duration'].match(/^%:.*:%$/)) {
                     return er('Incorrect event duration ' + args['event-duration']);
                 }
                 countersParameters.eventDuration = args['event-duration'] ? Number(args['event-duration']) : '';
@@ -278,5 +278,3 @@ function getImportance(callback) {
         callback(null, cfg.importance);
     });
 }
-
-

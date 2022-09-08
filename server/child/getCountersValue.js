@@ -164,7 +164,6 @@ function sendCompleteExecutionResult(param) {
     childThread.send({
         parentOCID: param.parentOCID,
         OCID: param.OCID,
-        updateEventState: param.updateEventState,
     });
 }
 
@@ -277,17 +276,15 @@ function getVariablesAndCheckUpdateEvents(message) {
                 variablesDebugInfo.UPDATE_EVENT_STATE && variablesDebugInfo.UPDATE_EVENT_STATE.important);
         }
 
-        param.updateEventState = variables.UPDATE_EVENT_STATE;
         //profiling.stop('1. get variables values', message);
         //profiling.start('2. prepare to get counter value', message);
 
         // send UPDATE_EVENT_STATE anyway if previous updateEventState is not equal to new updateEventState,
         // because after the child may have nothing to send to the server
-        /*
+        //was if (param.parentOCID && param.updateEventExpression && variables.UPDATE_EVENT_STATE !== undefined) {
         if (param.parentOCID && param.updateEventExpression &&
             updateEventState !== variables.UPDATE_EVENT_STATE &&
             variables.UPDATE_EVENT_STATE !== undefined) {
-        //if (param.parentOCID && param.updateEventExpression && variables.UPDATE_EVENT_STATE !== undefined) {
             childThread.send({
                 parentOCID: param.parentOCID,
                 OCID: param.OCID,
@@ -295,7 +292,7 @@ function getVariablesAndCheckUpdateEvents(message) {
             });
             //if(counterID === 211 || counterID === 257) log.warn(param.counterName, ' send: updateEventState: ', updateEventState ,'=>', variables.UPDATE_EVENT_STATE, ': ', noNeedToCalculateCounter, ': ', param.parentOCID, '-', param.OCID, ': ', param.updateEventExpression);
         }
-        */
+
         //if(counterID === 211 || counterID === 257) log.warn(param.counterName, ': updateEventState: ', updateEventState ,'=>', variables.UPDATE_EVENT_STATE, ': ', noNeedToCalculateCounter, ': ', param.parentOCID, '-', param.OCID, ': ', param.updateEventExpression);
         if (err) {
             log.options(err.message, {
@@ -411,7 +408,6 @@ function processCollectorResult(err, result, param, collectorName) {
                 objectName: param.$variables.OBJECT_NAME,
                 counterID: param.$counterID,
                 objectID: param.$objectID,
-                updateEventState: param.updateEventState,
             }
         } catch (err) {
             log.error('Can\'t init param: ' + err.message + '; ' + JSON.stringify(param))
@@ -545,7 +541,6 @@ if(param.OCID === 155273) log.warn(param.counterName, ' recalculate: updateEvent
         variables: param.collectorParameters.$variables,
         dependedCounters: dependedCounters,
         value: preparedResult.value,
-        updateEventState: param.updateEventState,
     };
 
     //profiling.stop('3. get depended counters', param);

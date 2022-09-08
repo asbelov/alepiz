@@ -241,8 +241,12 @@ var JQueryNamespace = (function ($) {
               if(collector.runCollectorAsThread) $('#runCollectorAsThread').prop("checked", true).prop("disabled", false);
               else $('#runCollectorAsThread').prop("checked", false);
 
-              if(collector.runCollectorSeparately) $('#runCollectorSeparately').prop("checked", true);
-              else $('#runCollectorSeparately').prop("checked", false);
+              if(collector.runCollectorSeparately) {
+                  if(Number(collector.runCollectorSeparately) === parseInt(collector.runCollectorSeparately)) {
+                      $('#runCollectorSeparately').val(parseInt(collector.runCollectorSeparately));
+                  } else $('#runCollectorSeparately').val('on');
+              } else $('#runCollectorSeparately').val(0);
+
 
               parametersElm.empty();
 
@@ -374,4 +378,3 @@ var JQueryNamespace = (function ($) {
   }
 
 })(jQuery); // end of jQuery name space
-

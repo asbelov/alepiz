@@ -12,7 +12,7 @@
 
 /* used for remove strong definition in materialize.css (font-weight: 500) for enable bold text in quill editor*/
 strong {
-    font-weight: bold !important;;
+    font-weight: bold !important;
 }
 
 .margin-0 {

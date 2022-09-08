@@ -3,8 +3,8 @@
     "description": "Calculate size of selected directories",
     "active": "",
     "separate": "",
-    "runCollectorSeparately": "on",
     "runCollectorAsThread": "on",
+    "runCollectorSeparately": "180000",
     "parameters": {
         "dirNames": {
             "description": "Directory names (comma separated)",
