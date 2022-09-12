@@ -27,6 +27,7 @@ var alepizObjectsNamespace = (function($) {
         objectsTooltipInstances,
 
         useGlobalSearch = false,
+        prevSearchStrLength = 0,
         minSearchStrLength = 2,
         timeWhenNoObjectsWereFound = 0,
         redrawObjectsInProgress = false,
@@ -91,11 +92,13 @@ var alepizObjectsNamespace = (function($) {
     function initEvents() {
 
         // Search objects when enter something in search string
-        searchObjectsElm.keyup(function(e){
+        searchObjectsElm.keyup(function(e) {
             // When pressing Esc, clear search field ang go to the top of the object list
             var searchStr = searchObjectsElm.val();
             var searchStrAdd = searchObjectsAddElm.val();
-            if(e.which === 27 || !searchStr.trim().length) { // Esc pressed in search string or search string is empty
+
+            // Esc pressed in search string or search string is empty
+            if(e.which === 27 || !searchStr.trim().length) {
                 // if not empty, make it empty
                 searchObjectsElm.val('');
                 searchIconElm.removeClass('hide');
@@ -122,16 +125,37 @@ var alepizObjectsNamespace = (function($) {
                             alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
                         });
                     });
-                } else if(!filterObject(searchStr)) {
-                    globalSearchObjects(searchStr,function (isDrawObjects) {
-                        if(!isDrawObjects) return;
-                        alepizActionsNamespace.createActionsList(null, function () {
-                            alepizMainNamespace.setBrowserHistory();
-                            alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
+                } else {
+                    // switch form global search mode to filter mode
+                    // if search string length < minSearchStrLength or < prevSearchStrLength
+                    if(useGlobalSearch === true &&
+                        (searchStr.length < minSearchStrLength || searchStr.length < prevSearchStrLength)) {
+                        useGlobalSearch = false;
+                        reDrawObjects(objectDrawFunctionBeforeSearch, function () {
+                            // when find nothing, try to use globalSearch again
+                            if(!filterObject() && searchStr.length >= minSearchStrLength) {
+                                globalSearchObjects(searchStr,function (isDrawObjects) {
+                                    if(!isDrawObjects) return;
+                                    alepizActionsNamespace.createActionsList(null, function () {
+                                        alepizMainNamespace.setBrowserHistory();
+                                        alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
+                                    });
+                                });
+                            }
                         });
-                    });
+                    } if(useGlobalSearch === true || !filterObject()) {
+                        globalSearchObjects(searchStr,function (isDrawObjects) {
+                            if(!isDrawObjects) return;
+                            alepizActionsNamespace.createActionsList(null, function () {
+                                alepizMainNamespace.setBrowserHistory();
+                                alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
+                            });
+                        });
+                    }
                 }
             }
+
+            prevSearchStrLength = searchStr.length;
         });
 
         searchObjectsAddElm.keyup(function (e) {
@@ -249,8 +273,8 @@ var alepizObjectsNamespace = (function($) {
                 });
 
                 alepizActionsNamespace.createActionsList(null, function () {
-                    alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
                     alepizMainNamespace.setBrowserHistory();
+                    alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
                 });
             }
             setCheckedObjectCounter();
@@ -277,15 +301,8 @@ var alepizObjectsNamespace = (function($) {
         }
     }
 
-    function filterObject(initSearchStr) {
-        if (!initSearchStr) initSearchStr = searchObjectsElm.val();
-        else searchObjectsElm.val(initSearchStr);
-
-        // do this before starting local search
-        if (initSearchStr.length < minSearchStrLength) useGlobalSearch = false;
-        if (useGlobalSearch) return;
-
-        return filterList(initSearchStr, objectsListElm, 'data-object-name');
+    function filterObject() {
+        return filterList(searchObjectsElm.val(), objectsListElm, 'data-object-name');
     }
 
     function filterList(initSearchStr, listElm, objectNameAttr) {
@@ -362,7 +379,7 @@ var alepizObjectsNamespace = (function($) {
                 //M.toast({html: 'No objects found or too many objects found', displayLength: 3000});
             }
             var isDrawObjects = drawObjectsList(objects);
-            if(searchStrAdd.length) filterObject(searchObjectsElm.val());
+            if(searchStrAdd.length) filterObject();
 
             if(!lastObjectDrawFunction.search) objectDrawFunctionBeforeSearch = lastObjectDrawFunction;
             lastObjectDrawFunction = {
@@ -548,6 +565,8 @@ var alepizObjectsNamespace = (function($) {
             // set checkbox of current object checked
             var currentObjectID = $(eventObject.target).attr('data-object-id');
             $('#'+currentObjectID).prop('checked', true);
+
+            if(!useGlobalSearch) searchObjectsElm.val('');
 
             // create new objects list
             createObjectsListByInteractions(getSelectedObjectNames(), false,

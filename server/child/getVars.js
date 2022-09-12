@@ -120,7 +120,8 @@ function getVars(param, callback) {
                 async.eachSeries(Array.from(param.cache.variablesExpressions.keys()), function (variableName, callback) {
                     if (variables[variableName] !== undefined) return callback();
                     getVar(variableName, variables, param, function(err) {
-                        // it is necessary to calculate all variables even if errors occurred during the calculation of some variables
+                        // it is necessary to calculate all variables even if errors occurred during the calculation
+                        // of some variables
                         if(err) errors.push(err);
                         callback();
                     });
@@ -128,7 +129,8 @@ function getVars(param, callback) {
                     async.eachSeries(Array.from(param.cache.variablesHistory.keys()), function (variableName, callback) {
                         if (variables[variableName] !== undefined) return callback();
                         getVar(variableName, variables, param, function(err) {
-                            // it is necessary to calculate all variables even if errors occurred during the calculation of some variables
+                            // it is necessary to calculate all variables even if errors occurred during the
+                            // calculation of some variables
                             if(err) errors.push(err);
                             callback();
                         });
