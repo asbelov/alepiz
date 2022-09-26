@@ -134,7 +134,7 @@ function __initJavaScriptEditor() {
         for(var j=0; j<linkElms.length; j++) {
             if(linkElms[j].getAttribute('href') && linkElms[j].getAttribute('href').toLowerCase() === cssFile[i].toLowerCase()) {
                 isHasThisStylesheet = true;
-                //console.log('skipe '+cssFile[i]);
+                //console.log('skip '+cssFile[i]);
                 break;
             }
         }
@@ -154,7 +154,7 @@ function __initJavaScriptEditor() {
         for(j=0; j<jsElms.length; j++) {
             if(jsElms[j].getAttribute('src') && jsElms[j].getAttribute('src').toLowerCase() === jsFile[i].toLowerCase()) {
                 isHasThisJS = true;
-                //console.log('skipe '+jsFile[i]);
+                //console.log('skip '+jsFile[i]);
                 break;
             }
         }

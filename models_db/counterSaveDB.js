@@ -235,11 +235,12 @@ counterSaveDB.saveObjectsCountersIDs = function(objectsCountersIDs, callback) {
     });
 };
 
-/*
-    Delete objects counters relations
-
-    OCID = [{objectID:...,  counterID:...}, ... ]
-    callback(err)
+/**
+ * Delete objects counters relations
+ * @param {Array} objectsCountersIDs is not an OCID, there is an array of object IDs and counter IDs
+ * [{objectID:...,  counterID:...}, ... ]
+ * @param {function} callback - callback(err)
+ * @returns {*}
  */
 counterSaveDB.deleteObjectCounterID = function(objectsCountersIDs, callback) {
     if(!objectsCountersIDs.length) return callback();
@@ -262,7 +263,6 @@ counterSaveDB.deleteObjectCounterID = function(objectsCountersIDs, callback) {
             callback(err);
         });
     });
-
 };
 
 /*

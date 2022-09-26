@@ -8,98 +8,149 @@ var counterSaveDB = require('../../rightsWrappers/counterSaveDB');
 var objectsPropertiesDB = require('../../rightsWrappers/objectsPropertiesDB');
 var transactionDB = require('../../models_db/transaction');
 var server = require('../../server/counterProcessor');
+const rawObjectsDB = require("../../models_db/objectsDB");
+const Conf = require("../../lib/conf");
+const confServer = new Conf('config/server.json');
 
 module.exports = function(args, callback) {
 
-    parseArgs(args, function(err, parameters) {
+    parseArgs(args, function(err, param) {
         if(err) return callback(err);
 
         var user = args.username;
-        if(parameters.objectsIDs.length && (
-            parameters.description && // '' - save old description
-            parameters.order && // 0 - Current order will be unchanged
-            (parameters.disabled === 1 || parameters.disabled === 0) // can be an undefined (if unchanged) or 1 or 0
+        if(param.objectsIDs.length && (
+            param.description && // '' - save old description
+            param.order && // 0 - Current order will be unchanged
+            (param.disabled === 1 || param.disabled === 0) // can be an undefined (if unchanged) or 1 or 0
         )) {
-            log.info('Update objects parameters: ', parameters.objectsIDs, ': description: ', parameters.description,
-                '; order: ', parameters.order, '; disabled: ', parameters.disabled);
+            log.info('Update objects parameters: ', param.objectsIDs, ': description: ', param.description,
+                '; order: ', param.order, '; disabled: ', param.disabled);
             var updateObjects = objectsDB.updateObjectsInformation;
         } else updateObjects = nop;
 
-        var addNewObjects = parameters.newObjectsNames.length ? objectsDB.addObjects : nop;
+        var addNewObjects = param.newObjectsNames.length ? objectsDB.addObjects : nop;
         var _saveProperties = args.isCloneProperties ? saveProperties : nop;
         var _saveCounters = args.isCloneCounters ? saveCounters : nop;
-        var _saveInteractions = args.isCloneInteractions ? saveInteractions : (parameters.interactions.length ? addUpLevelObjectsInteractions : nop);
+        var _saveInteractions = args.isCloneInteractions ?
+            saveInteractions : (param.interactions.length ? addUpLevelObjectsInteractions : nop);
 
         transactionDB.begin(function(err) {
             if (err) return callback(err);
 
-            updateObjects(user,  parameters.objectsIDs, parameters.description, parameters.order, parameters.disabled, function(err, isObjectsUpdated) {
+            updateObjects(user,  param.objectsIDs, param.description, param.order, param.disabled, param.color,
+                function(err, isObjectsUpdated) {
                 if(err) return transactionDB.rollback(err, callback);
 
-                if(parameters.newObjectsNames.length) log.info('Add a new objects: ', parameters.newObjectsNames);
-                addNewObjects(user, parameters.newObjectsNames, parameters.description, parameters.order, parameters.disabled, function(err, newObjectsIDs) {
+                if(param.newObjectsNames.length) log.info('Add a new objects: ', param.newObjectsNames);
+                addNewObjects(user, param.newObjectsNames, param.description, param.order, param.disabled, param.color,
+                    function(err, newObjectsIDs) {
                     if(err) return transactionDB.rollback(err, callback);
 
-                    if(newObjectsIDs) Array.prototype.push.apply(parameters.objectsIDs, newObjectsIDs);
+                    if(newObjectsIDs) Array.prototype.push.apply(param.objectsIDs, newObjectsIDs);
 
-                    _saveProperties(user, parameters, args.cloneAllProperties, function(err, updatedObjectsIDs/*, propertiesDebugInfo*/) {
+                    _saveProperties(user, param, args.cloneAllProperties, function(err, updatedObjectsIDs/*, propertiesDebugInfo*/) {
                         if(err) return transactionDB.rollback(err, callback);
 
                         // callback(err, [<OCID1>, <OCID2>, ...]): array of updated objectsCountersIDs
-                        _saveCounters(user, parameters, args.cloneAllCounters, function(err, updatedOCIDs) {
+                        _saveCounters(user, param, args.cloneAllCounters, function(err, updatedOCIDs) {
                             if(err) return transactionDB.rollback(err, callback);
 
-                            _saveInteractions(user, parameters, args.cloneAllInteractions, function(err, isUpdatedInteractions) {
-                                if(err) return transactionDB.rollback(err, callback);
+                            _saveInteractions(user, param, args.cloneAllInteractions,
+                                function(err, isUpdatedInteractions) {
+                                if (err) return transactionDB.rollback(err, callback);
 
-                                transactionDB.end(function(err) {
-                                    if(err) return callback(err);
+                                // param.alepizIDs === '' - remove alepizIDs
+                                // param.alepizIDs === '-1' - save alepizIDs unchanged
+                                var objectIDsForRelationships = args.alepizIDs !== '-1' ? param.objectsIDs : [];
+                                rawObjectsDB.deleteObjectsAlepizRelation(objectIDsForRelationships,
+                                    function (err) {
+                                    if (err) return transactionDB.rollback(err, callback);
 
-                                    // send message for updating collected initial data for objects
-                                    // parameters.disabled can be undefined (if unchanged), 0 or 1
-                                    if(!parameters.disabled && (!isObjectsUpdated && !newObjectsIDs && (updatedObjectsIDs && updatedObjectsIDs.length) && !updatedOCIDs && !isUpdatedInteractions)) {
+                                    var alepizIDs = param.alepizIDs && param.alepizIDs !== '-1' ?
+                                        args.alepizIDs.split(',').map(id => parseInt(id, 10)) : [];
 
-                                        server.sendMsg({
-                                            update: {
-                                                topObjects: true,
-                                                objectsProperties: true,
-                                            },
-                                            updateObjectsIDs: updatedObjectsIDs
-                                        });
+                                    rawObjectsDB.addObjectsAlepizRelation(objectIDsForRelationships, alepizIDs,
+                                        function (err) {
+                                        if (err) return transactionDB.rollback(err, callback);
 
-                                        return callback(null, updatedObjectsIDs.join(','));
-                                    } else if(!parameters.disabled && (isObjectsUpdated || newObjectsIDs || (updatedObjectsIDs && updatedObjectsIDs.length) || updatedOCIDs || isUpdatedInteractions)) {
-
-                                       server.sendMsg({
-                                           update: {
-                                               topObjects: true,
-                                               objectsProperties: updatedObjectsIDs && updatedObjectsIDs.length ? updatedObjectsIDs : undefined,
-                                               objectsCounters: updatedOCIDs || isObjectsUpdated || newObjectsIDs
-                                           },
-                                           updateObjectsIDs: parameters.objectsIDs,
-                                           updateCountersIDs: updatedOCIDs ? updatedOCIDs.map(function (obj) {
-                                                return obj.counterID
-                                           }) : undefined
-                                        });
-
-                                        return callback(null, parameters.objectsIDs.join(','));
-                                    } else if(parameters.disabled !== 1) log.debug('Nothing to update for objects: ', parameters.objectsIDs);
-
-                                    // object state changed to disabled. remove counters
-                                    if(parameters.disabled === 1) {
-                                        objectsDB.getObjectsCountersIDs(user, parameters.objectsIDs, function (err, rows) {
+                                        transactionDB.end(function (err) {
                                             if (err) return callback(err);
 
-                                            var OCIDs = rows.map(row => row.id);
-                                            if (OCIDs.length) server.sendMsg({
-                                                removeCounters: OCIDs,
-                                                description: 'Objects IDs ' + parameters.objectsIDs.join(', ') + ' was disabled from "object clone" by user ' + user
+                                            rawObjectsDB.getAlepizIDs(function (err, alepizIDsObj) {
+                                                if (err) return callback(err);
+
+                                                var alepizID2Name = {};
+                                                alepizIDsObj.forEach(row => {
+                                                    alepizID2Name[row.id] = row.name
+                                                });
+
+                                                var alepizNames = confServer.get('alepizNames');
+                                                var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== 1;
+                                                var ownerOfSpecifiedAlepizIDs = alepizIDs.some(alepizID => {
+                                                    return alepizNames.indexOf(alepizID2Name[alepizID]) !== -1;
+                                                });
+                                                var objectsAreEnabled = !param.disabled &&
+                                                    ((!alepizIDs.length && ownerOfUnspecifiedAlepizIDs) ||
+                                                        ownerOfSpecifiedAlepizIDs);
+
+                                                // send message for updating collected initial data for objects
+                                                // parameters.disabled can be undefined (if unchanged), 0 or 1
+                                                if (objectsAreEnabled && (!isObjectsUpdated && !newObjectsIDs &&
+                                                    (updatedObjectsIDs && updatedObjectsIDs.length) &&
+                                                    !updatedOCIDs && !isUpdatedInteractions)) {
+
+                                                    server.sendMsg({
+                                                        update: {
+                                                            topObjects: true,
+                                                            objectsProperties: true,
+                                                        },
+                                                        updateObjectsIDs: updatedObjectsIDs
+                                                    });
+
+                                                    return callback(null, updatedObjectsIDs.join(','));
+                                                } else if (objectsAreEnabled && (isObjectsUpdated || newObjectsIDs ||
+                                                    (updatedObjectsIDs && updatedObjectsIDs.length) || updatedOCIDs ||
+                                                    isUpdatedInteractions)) {
+
+                                                    server.sendMsg({
+                                                        update: {
+                                                            topObjects: true,
+                                                            objectsProperties: updatedObjectsIDs && updatedObjectsIDs.length ?
+                                                                updatedObjectsIDs : undefined,
+                                                            objectsCounters: updatedOCIDs || isObjectsUpdated || newObjectsIDs
+                                                        },
+                                                        updateObjectsIDs: param.objectsIDs,
+                                                        updateCountersIDs: updatedOCIDs ? updatedOCIDs.map(function (obj) {
+                                                            return obj.counterID
+                                                        }) : undefined
+                                                    });
+
+                                                    return callback(null, param.objectsIDs.join(','));
+                                                } else if (param.disabled !== 1) {
+                                                    log.debug('Nothing to update for objects: ', param.objectsIDs);
+                                                }
+
+                                                // object state changed to disabled. remove counters
+                                                if (param.disabled === 1 && !objectsAreEnabled) {
+                                                    objectsDB.getObjectsCountersIDs(user, param.objectsIDs,
+                                                        function (err, rows) {
+                                                            if (err) return callback(err);
+
+                                                            var OCIDs = rows.map(row => row.id);
+                                                            if (OCIDs.length) server.sendMsg({
+                                                                removeCounters: OCIDs,
+                                                                description: 'Objects was disabled from "object clone" ' +
+                                                                    'by user ' + user +
+                                                                    '. Object names: ' + param.cloneToObjectNames
+                                                            });
+                                                            callback(null, param.objectsIDs.join(','));
+                                                        })
+                                                } else callback(null, param.objectsIDs.join(','));
                                             });
-                                            callback(null, parameters.objectsIDs.join(','));
-                                        })
-                                    } else callback(null, parameters.objectsIDs.join(','));
+                                        });
+                                    });
                                 });
-                            })
+                            });
                         })
                     })
                 })
@@ -120,10 +171,22 @@ function parseArgs(args, callback) {
     if(!args.cloneToObjectsIDs) return callback(new Error('Destination objects for clone are not specified'));
 
     if(!Array.isArray(args.cloneToObjectsIDs)) {
-        if (Number(args.cloneToObjectsIDs) === parseInt(String(args.cloneToObjectsIDs), 10)) args.cloneToObjectsIDs = [Number(args.cloneToObjectsIDs)];
-        else if(typeof args.cloneToObjectsIDs === 'string') args.cloneToObjectsIDs = args.cloneToObjectsIDs.split(/\s*[,;]\s*/);
-        else return callback(new Error('Error in format of destination objects ID. Waiting for array of objects IDs: ' + JSON.stringify(args.cloneToObjectsIDs)));
+        if (Number(args.cloneToObjectsIDs) === parseInt(String(args.cloneToObjectsIDs), 10)) {
+            args.cloneToObjectsIDs = [Number(args.cloneToObjectsIDs)];
+        } else if(typeof args.cloneToObjectsIDs === 'string') {
+            args.cloneToObjectsIDs = args.cloneToObjectsIDs.split(/\s*[,;]\s*/);
+        } else {
+            return callback(new Error('Error in format of destination objects ID. Waiting for array of objects IDs: ' +
+                JSON.stringify(args.cloneToObjectsIDs)));
+        }
     }
+
+    var color = ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue', 'light-blue', 'cyan', 'teal',
+        'green', 'light-green', 'lime', 'yellow', 'amber', 'orange', 'deep-orange', 'brown', 'grey', 'blue-grey',
+        'black', 'white', 'transparent'].indexOf((args.objectsColor || '').toLowerCase()) !== -1 ?
+        args.objectsColor + ':' +
+        (/^(lighten)|(darken)|(accent)-[1-4]$/.test((args.objectsShade || '').toLowerCase()) ? args.objectsShade : '') :
+        null;
 
     // you can use as source objects args.o (in tasks) or from objects selector
     if(!args.sourceObjectsIDs) {
@@ -131,7 +194,8 @@ function parseArgs(args, callback) {
         try {
             var templateObjects = JSON.parse(args.o) // [{"id": "XX", "name": "name1"}, {..}, ...]
         } catch (err) {
-            return callback(new Error('Can\'t parse JSON string with a templates objects parameters "' + args.o + '": ' + err.message));
+            return callback(new Error('Can\'t parse JSON string with a templates objects parameters ' + args.o +
+                ': ' + err.message));
         }
 
         templateObjects.forEach(function (obj) {
@@ -141,18 +205,26 @@ function parseArgs(args, callback) {
             }
         });
 
-        if (!Array.isArray(templatesObjectsIDs) || !templatesObjectsIDs.length || templatesObjectsIDs.length !== templateObjects.length)
-            return callback(new Error('Incorrect templates objects "' + JSON.stringify(args.o) + '"'));
+        if (!Array.isArray(templatesObjectsIDs) || !templatesObjectsIDs.length ||
+            templatesObjectsIDs.length !== templateObjects.length) {
+            return callback(new Error('Incorrect templates objects ' + args.o));
+        }
     } else {
 
-        templatesObjectsIDs = args.sourceObjectsIDs;
-        if(!Array.isArray(templatesObjectsIDs) && Number(templatesObjectsIDs) === parseInt(String(templatesObjectsIDs), 10) ) templatesObjectsIDs = [Number(templatesObjectsIDs)];
-        if (!Array.isArray(templatesObjectsIDs) || !templatesObjectsIDs.length)
-            return callback(new Error('Incorrect templates objects IDs"' + JSON.stringify(args.sourceObjectsIDs) + '"'));
+        templatesObjectsIDs = args.sourceObjectsIDs.split(',');
+        if(!Array.isArray(templatesObjectsIDs) &&
+            Number(templatesObjectsIDs) === parseInt(String(templatesObjectsIDs), 10) ) {
+            templatesObjectsIDs = [Number(templatesObjectsIDs)];
+        }
+
+        if (!Array.isArray(templatesObjectsIDs) || !templatesObjectsIDs.length) {
+            return callback(new Error('Incorrect templates objects IDs ' + args.sourceObjectsIDs));
+        }
 
         for(var i = 0; i < templatesObjectsIDs.length; i++) {
             if(Number(templatesObjectsIDs[i]) !== parseInt(String(templatesObjectsIDs[i]), 10)) {
-                return callback(new Error('Incorrect template object ID ' + templatesObjectsIDs[i] + ' in "' + JSON.stringify(args.sourceObjectsIDs) + '"'));
+                return callback(new Error('Incorrect template object ID ' + templatesObjectsIDs[i] + ' in ' +
+                    JSON.stringify(args.sourceObjectsIDs)));
             } else templatesObjectsIDs[i] = Number(templatesObjectsIDs[i]);
         }
     }
@@ -191,9 +263,14 @@ function parseArgs(args, callback) {
     var countersIDs = [], propertiesIDs = [], interactionsObjectsIDs = [], num;
     Object.keys(args).forEach(function (arg) {
         if(args[arg]) {
-            if (arg.indexOf('counterID-') === 0 && (num = parseInt(arg.substr('counterID-'.length), 10))) countersIDs.push(num);
-            else if (arg.indexOf('propertyID-') === 0 && (num = parseInt(arg.substr('propertyID-'.length), 10))) propertiesIDs.push(num);
-            else if (arg.indexOf('interactionID-') === 0 && (num = parseInt(arg.substr('interactionID-'.length), 10))) interactionsObjectsIDs.push(num);
+            if (arg.indexOf('counterID-') === 0 && (num = parseInt(arg.substring('counterID-'.length), 10))) {
+                countersIDs.push(num);
+            } else if (arg.indexOf('propertyID-') === 0 && (num = parseInt(arg.substring('propertyID-'.length), 10))) {
+                propertiesIDs.push(num);
+            } else if (arg.indexOf('interactionID-') === 0 &&
+                (num = parseInt(arg.substring('interactionID-'.length), 10))) {
+                interactionsObjectsIDs.push(num);
+            }
         }
     });
 
@@ -205,6 +282,7 @@ function parseArgs(args, callback) {
         description: description,
         order: order,
         disabled: Number(disabled),
+        color: color,
         countersIDs: countersIDs,
         propertiesIDs: propertiesIDs,
         interactionsObjectsIDs: interactionsObjectsIDs
@@ -241,7 +319,9 @@ function saveCounters(user, parameters, cloneAllCounters, callback) {
 
         // callback(err, [{objectID:.., counterID:..}, {..}, ...]): array of updated objectsCountersIDs
         counterSaveDB.saveObjectsCountersIDs(user, parameters.objectsIDs, countersIDs, function(err, updatedOCIDs) {
-            if(updatedOCIDs && updatedOCIDs.length) log.info('Updating objects to counters relations for: ', updatedOCIDs);
+            if(updatedOCIDs && updatedOCIDs.length) {
+                log.info('Updating objects to counters relations for: ', updatedOCIDs);
+            }
             callback(err, updatedOCIDs);
         });
     });
@@ -278,7 +358,8 @@ function saveProperties(user, parameters, cloneAllProperties, callback) {
                 return propertiesObj[key];
             });
 
-        objectsPropertiesDB.saveObjectsProperties(user, parameters.objectsIDs, properties,true, function(err, updatedObjectsIDs, properties) {
+        objectsPropertiesDB.saveObjectsProperties(user, parameters.objectsIDs, properties,true,
+            function(err, updatedObjectsIDs, properties) {
             if(updatedObjectsIDs.length) log.info('Changes in properties: ', properties);
             callback(err, updatedObjectsIDs)
         });

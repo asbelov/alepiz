@@ -8,7 +8,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         title= action.name
         link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
         link(rel='stylesheet', href='/material-design-icons/material-icons.css')
-        //link(rel='stylesheet', href='/stylesheets/actions.css')
+        link(rel='stylesheet', href='/stylesheets/actions.css')
         style.
             /* default width for chips with autocomplete is 120px */
             .autocomplete-content {
@@ -18,28 +18,14 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         script(src='/jquery/jquery.min.js')
         script(src='/jquery-ui/jquery-ui.min.js')
         script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/escapeHTML.js')
+        script(src='/javascripts/colorPicker.js')
+        script(src='/javascripts/alepizIDPicker.js')
         script.
             var parameters = {
                 action: !{JSON.stringify(action)},
                 objects: !{JSON.stringify(objects)}
             };
-
-            var entityMap = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;',
-                '/': '&#x2F;',
-                '`': '&#x60;',
-                '=': '&#x3D;'
-            };
-
-            function escapeHtml(string) {
-                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
-                    return entityMap[s];
-                });
-            }
     body
     main
         div.row
@@ -54,33 +40,27 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                     div.col.s12
                         div.card
                             div.card-content
-                                span.card-title Objects list to edit
-                                p Select objects to edit. For all of this objects you can change names, descriptions and sort order by feeling appropriated fields
-                                p Objects list:&nbsp;
-                                    span#objectsNames
+                                span.card-title Object list
+                                h6#objectsNames
                         div.card
                             div.card-content
-                                span.card-title Objects parameters
-                                p Set objects disabled for prevent collecting data from objects counters
-                                p#batchRenameHelp For batch renaming objects you can set case insensitive regular expression with global searching (//ig) for describe current names for selected objects and new objects names with regular expression variables, like $1,$2 etc. For example for rename single any object name to other name you can set as regular expression ".*" and as object name a new object name, which you want. For rename "server1, server2, server3" to "host1, host2, host3" you can set as regular expression "server(\d)" and as object name "host$1". Before execute renaming you will see confirmation dialog with old and new objects names and can refuse renaming. Please read about Javascript replace function for more information
-                                p If you feel object description field, then all selected objects take a new equal description. If description field is empty, the objects description will be unchanged.
-                                p If you select a sort order, then all of objects take a new sort order. For set sort order unchanged, select "Current objects order will be unchanged".
+                                span.card-title Object parameters
                                 div.row
-                                    div#objectsREField.input-field.col.s12.m6.l3
-                                        input(type='text' data-tooltip="Regular expression for setting rename rules for selected objects" value="^(.*)$")#objectsRE.tooltipped
-                                        label(for='objectsRE') Regular expression for objects batch rename
-                                    div.input-field.col.s12.m12.l7
+                                    div#objectsREField.input-field.col.s12.m5.l3
+                                        input(type='text' data-tooltip="Rename all selected objects according to the regular expression" value="^(.*)$")#objectsRE.tooltipped
+                                        label(for='objectsRE') RegExp for batch rename
+                                    div.input-field.col.s12.m5.l7
                                         input(type='hidden')#rulesForRenameObjects
-                                        input(type='text' data-tooltip="Feeling this field will rename all selected objects according regular expression or set a new name")#newObjectsNames.tooltipped
+                                        input(type='text' data-tooltip="The second part of the regular expression for batch renaming of objects or a new object name")#newObjectsNames.tooltipped
                                         label(for='newObjectsNames') New object name
-                                    div.input-field.col.s12.m6.l2
+                                    div.input-field.col.s12.m2.l2
                                         label
                                             input(type='checkbox' value="1")#disabled
-                                            span(data-tooltip="Prevent to collect data by object counters").tooltipped Disable objects
-                                    div.input-field.col.s12.m6.l8
-                                        input(type='text' length="256" data-tooltip="Feeling this field will set equal description for all selected objects")#objectsDescription.validate.tooltipped
-                                        label(for='objectsDescription') Description for objects
-                                    div.input-field.col.s12.m6.l4
+                                            span(data-tooltip="Prohibit data collection for objects").tooltipped Disable
+                                    div.input-field.col.s12.m8.l8
+                                        input(type='text' length="256" data-tooltip="Description for all selected objects")#objectsDescription.validate.tooltipped
+                                        label(for='objectsDescription') Description
+                                    div.input-field.col.s12.m4.l4
                                         select#objectsOrder
                                             option(value="10") On top of the list
                                             option(value="30") Between middle and top
@@ -91,12 +71,21 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                             option(value="5") At the middle and at up level
                                             option(value="9") At the end and at up level
                                             option(value="0" selected) Current objects order will be unchanged
-                                        label Order in a objects menu for all selected objects
+                                        label Order in a objects list
+                                div.no-margin.no-padding.row
+                                    div.input-field.col.s12.m6.l3#colorPickerParent
+                                    div.input-field.col.s12.m6.l3#shadePickerParent
+                                    div(style="position:relative").input-field.col.s12.m6.l3
+                                        label.drop-down-label Example of object coloring
+                                        label
+                                            input(type='checkbox')
+                                            span
+                                        div(style="padding: 12px 0 4px 32px" data-tooltip="This is how the color of the object in the list of objects will look like").tooltipped.black-text.col.s11.truncate#colorSample OBJECT NAME
+                                    div.input-field.col.s12.m6.l3#alepizIDPickerParent
+
                         div.card
                             div.card-content
-                                span.card-title Shared to selected objects linked counters
-                                p You can add a new counter link by entering counter name or remove unnecessary counter links from objects.
-                                p &nbsp;
+                                span.card-title Shared counters for selected objects
                                 // set linkedCountersIDs to 0 in task for disable counter linkage operations
                                 input(type="hidden")#linkedCounterIDs
                                 input(type="hidden")#linkedCounterIDsAdd

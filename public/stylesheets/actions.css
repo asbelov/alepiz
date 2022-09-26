@@ -40,3 +40,30 @@ strong {
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none;  /* IE 10+ */
 }
+
+div.drop-down-btn {
+    width:100%;
+    border-bottom:1px solid #9e9e9e;
+    height: 3rem;
+    line-height: 3rem;
+    font-size:16px;
+    margin: 0 0 8px 0;
+    padding: 0 0 0 0;
+    position: relative;
+}
+i.drop-down-icon {
+    height: 3rem;
+    line-height: 3rem;
+    font-size:24px;
+}
+label.drop-down-label {
+    position: absolute;
+    left: 0.75rem;
+    top: -26px;
+    font-size: 0.8rem;
+    color: #9e9e9e;
+    cursor: text;
+}
+.input-text-color {
+    color:#26a69a;
+}

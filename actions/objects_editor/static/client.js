@@ -64,9 +64,13 @@ var JQueryNamespace = (function ($) {
         objectsDescriptionElm = $('#objectsDescription');
         objectsOrderElm = $('#objectsOrder');
         objectsREField = $('#objectsREField');
-        batchRenameHelpElm = $('#batchRenameHelp');
         newObjectsNamesElm = $('#newObjectsNames');
+        colorSampleElm = $('#colorSample');
+
+
         init(parameters.objects);
+        colorPicker.init($('#colorPickerParent'), $('#shadePickerParent'), colorSampleElm);
+        alepizIDPicker.init($('#alepizIDPickerParent'));
     });
 
     var serverURL = parameters.action.link+'/ajax',
@@ -74,8 +78,9 @@ var JQueryNamespace = (function ($) {
         objectsDescriptionElm,
         objectsOrderElm,
         objectsREField,
-        batchRenameHelpElm,
-        newObjectsNamesElm;
+        newObjectsNamesElm,
+        colorSampleElm;
+
 
     return { init: init };
 
@@ -86,11 +91,9 @@ var JQueryNamespace = (function ($) {
 
         if(objects.length === 1) {
             objectsREField.addClass('hide');
-            batchRenameHelpElm.addClass('hide');
             newObjectsNamesElm.val(objects[0].name);
         } else {
             objectsREField.removeClass('hide');
-            batchRenameHelpElm.removeClass('hide');
             newObjectsNamesElm.val('');
         }
 
@@ -103,19 +106,26 @@ var JQueryNamespace = (function ($) {
 
             var disabled = objectsParameters[0].disabled,
                 sortPosition = objectsParameters[0].sortPosition,
-                description = objectsParameters[0].description;
+                description = objectsParameters[0].description,
+                colorShade = objectsParameters[0].color;
 
-            $('#objectsNames').text(objectsParameters.map(function(obj) {
-                return obj.name + (obj.created ? ' (created: ' + new Date(Number(obj.created)).toLocaleString() + ')' : '');
-            }).join(', '));
+            $('#objectsNames').html(objectsParameters.map(function(obj) {
+                return '<b>' + obj.name + '</b>' +
+                    (obj.created ? ': created ' + new Date(Number(obj.created)).toLocaleString() : '');
+            }).join('<br/>'));
+
+            colorSampleElm.text(objectsParameters.map(function(obj) { return obj.name; }).join(', ') || 'OBJECT NAME');
 
             for(var i = 1; i < objectsParameters.length; i++) {
                 var obj = objectsParameters[i];
                 if(disabled !== obj.disabled) disabled = undefined;
                 if(sortPosition !== obj.sortPosition) sortPosition = undefined;
                 if(description !== obj.description) description = undefined;
-                if(description === undefined && sortPosition === undefined && disabled === undefined) break;
+                if(colorShade !== obj.color) colorShade = undefined; // save unchanged
+                if(description === undefined && sortPosition === undefined &&
+                    disabled === undefined && colorShade === undefined) break;
             }
+
 
             if(disabled === 1) disabledElm.prop('checked', "1");
             else disabledElm.prop('checked', "");
@@ -125,6 +135,13 @@ var JQueryNamespace = (function ($) {
 
             if(description) objectsDescriptionElm.val(description);
             else objectsDescriptionElm.val('');
+
+            var [color, shade] = colorShade ? colorShade.split(':') : ['', ''];
+
+            if(colorShade === undefined && objectsParameters.length) var addSaveUnchanged = true
+            colorPicker.setColorAndShade(color, shade, addSaveUnchanged);
+
+            alepizIDPicker.seObjectServerRelation(data.alepizIDs, data.objectsAlepizRelations, objectsParameters.length);
 
             M.updateTextFields();
             M.FormSelect.init(objectsOrderElm[0], {});

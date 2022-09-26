@@ -65,6 +65,8 @@ function processMessage(message, callback) {
             objectsProperties: cache.objectsProperties,
         });
 
+        if(cacheAndCollectorsInitialized) return;
+
         connectingCollectors(function (err, _collectors) {
             if (err) {
                 destroyCollectors(function() {
@@ -171,7 +173,6 @@ function getVariablesAndCheckUpdateEvents(message) {
 
     var counterParameters = [],
         updateEventState = message.updateEventState;
-
     try {
         var countersObjects = cache.countersObjects;
         var parentOCIDObj = countersObjects.OCIDs.get(message.parentOCID);
@@ -415,27 +416,6 @@ function processCollectorResult(err, result, param, collectorName) {
         }
     }
 
-    /*
-    if(!param.collector || !collectorsObj[param.collector]) {
-        console.log('err, result, param, collectorName: ',
-            err, '; ', result, '; ', param, '; ', collectorName, '; ', Object.keys(collectorsObj))
-    }
-    */
-
-
-    /*
-    log.options('Receiving value from OCID ', param.OCID, ': ',
-        param.objectName,
-        '(', param.counterName, '): ', result, '; err: ',
-        (err && err.stack ? err.stack : err), ', task condition: ', param.taskCondition,
-        ', collector: ', param.collector, '(', param.collectorParameters, ')', {
-            filenames: ['counters/' + param.counterID, 'counters.log'],
-            emptyLabel: true,
-            noPID: true,
-            level: 'D'
-        });
-     */
-
     //if(Number(param.OCID) === 3428) log.warn('Getting record ', result, ': ', param);
 
     // result was saved to the history in activeCollector.js for active and separate collectors
@@ -484,7 +464,7 @@ function processCollectorResult(err, result, param, collectorName) {
     var dependedCounters = getCountersForDependedCounters(param.counterID, param.objectID, param.OCID,
         param.collectorParameters.$variables);
 
-    if (!dependedCounters || !dependedCounters.length) {
+    if (!dependedCounters || !dependedCounters.size) {
         // send process ID to server
 
 
@@ -559,7 +539,7 @@ function getCountersForDependedCounters(parentCounterID, parentObjectID, parentO
     var parentCounter = cache.countersObjects.counters.get(parentCounterID);
     if (!parentCounter || !parentCounter.dependedUpdateEvents.size) return;
 
-    var dependedCounters = [], updateEvents = parentCounter.dependedUpdateEvents;
+    var dependedCounters = new Set(), updateEvents = parentCounter.dependedUpdateEvents;
     for (var [counterID, updateEvent] of updateEvents) {
         var counter = cache.countersObjects.counters.get(counterID);
         if (!counter || (updateEvent.parentObjectID && updateEvent.parentObjectID !== parentObjectID)) continue;
@@ -599,9 +579,11 @@ function getCountersForDependedCounters(parentCounterID, parentObjectID, parentO
         var objectsIDs = updateEvent.parentObjectID ? counter.objectsIDs : new Map([[parentObjectID, 0]]);
         for (var objectID of objectsIDs.keys()) {
             var objectName = cache.countersObjects.objects.get(objectID);
-            if (!objectName || !counter.objectsIDs.has(objectID) || (objectFilter && !objectFilterRE.test(objectName))) continue;
+            if (!objectName || !counter.objectsIDs.has(objectID) || (objectFilter && !objectFilterRE.test(objectName))) {
+                continue;
+            }
 
-            dependedCounters.push({
+            dependedCounters.add({
                 parentOCID: parentOCID,
                 OCID: counter.objectsIDs.get(objectID),
                 collector: counter.collector, // required for check for runCollectorSeparately

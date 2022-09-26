@@ -20,7 +20,7 @@ const conf = new Conf('config/common.json');
 var log = require('../lib/log')(module);
 const proc = require("../lib/proc");
 
-console.log('Starting ALEPIZ... (', process.pid, ')');
+console.log((new Date()).toLocaleString(), 'Starting ALEPIZ... (', process.pid, ')');
 
 new proc.parent({
     childrenNumber: 1,
@@ -40,6 +40,6 @@ new proc.parent({
     alepizProcess.start(function (err) {
         if(err) return log.throw('Can\'t initializing Alepiz: ' + err.message);
 
-        console.log('Alepiz started successfully (', process.pid, ')');
+        console.log((new Date()).toLocaleString(), 'Alepiz started successfully (', process.pid, ')');
     });
 });

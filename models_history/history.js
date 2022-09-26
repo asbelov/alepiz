@@ -51,7 +51,7 @@ function getHouseKeeperData() {
 
 /** Connect to history. If already connected, callback will be called without connection procedure
  *
- * @param {string} id - name of connecting service for print name to the log file
+ * @param {string|null} id - name of connecting service for print name to the log file
  * @param {function(void)} callback - on connect return callback(). Error is not returned.
  */
 history.connect = function(id, callback) {
@@ -189,7 +189,7 @@ history.cacheServiceIsRunning = cache.cacheServiceIsRunning;
  * @param {number} data.timestamp - timestamp of the value
  * @param {object|number|string|boolean} data.value - value. the JSON.stringify(value) will be applied if the value
  * type is object
- * @returns {{value: number|string|boolean|undefined|null, timestamp: number}|undefined} - will return the stored value
+ * @returns {{value: null|number|string|boolean|undefined, timestamp: number}|undefined} - will return the stored value
  * {timestamp:…, value:…} or undefined on error
  */
 history.add = function(initID, data) {

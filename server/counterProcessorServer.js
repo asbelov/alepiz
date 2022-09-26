@@ -49,9 +49,10 @@ var startMemUsageTime = 0,
     processedOCIDs = new Map(),
     updateEventsStatus = new Map(),
     updateEventsStatusFilePath,
-    countersForRemove = new Set(),
     needToUpdateCache = new Set(),
     counterObjectNamesCache = new Map(),
+    objectAlepizRelation = new Map(),
+    prevTopCounters = new Set(),
     recordsFromDBCnt = 0,
     lastFullUpdateTime = Date.now(),
     updateCacheInProgress = 0,
@@ -87,7 +88,7 @@ function initBuildInServer(collectorsNamesStr, _serverID, callback) {
         function (err, _updateEventsStatus) {
         updateEventsStatus = _updateEventsStatus;
 
-        collectors.get(null, function (err, collectorsObj) {
+        collectors.getConfiguration(null, function (err, collectorsObj) {
             if (err) return callback(err);
 
             for (var name in collectorsObj) {
@@ -157,10 +158,12 @@ function runChildren(callback) {
     var cfg = confServer.get('servers')[serverID];
     var childrenNumber = cfg.childrenNumber || Math.floor(os.cpus().length);
     processedOCIDs.clear();
-    serverCache(null, function(err, cache, _counterObjectNames, _recordsFromDBCnt) {
+    serverCache(null, confServer.get('alepizNames'),
+        function(err, cache, _counterObjectNames, _objectAlepizRelation, _recordsFromDBCnt) {
         if(err) return callback(new Error('Error when loading data to cache: ' + err.message));
 
         counterObjectNamesCache = _counterObjectNames;
+        objectAlepizRelation = _objectAlepizRelation;
         recordsFromDBCnt = _recordsFromDBCnt;
         log.info('Starting ', childrenNumber, ' children for server: ', serverName,
             '. CPU cores number: ', os.cpus().length);
@@ -209,11 +212,10 @@ function runChildren(callback) {
     });
 }
 
-/** Process result from parent active collector
+/** Process result from parent active or separate collector
  *
- * @param message
+ * @param message - message = {err, result, parameters, collectorName}
  */
-// message = {err, result, parameters, collectorName}
 function processCounterResult (message) {
     var OCID = Number(message.parameters.$id);
     if(!processedOCIDs.has(OCID)) processedOCIDs.set(OCID, {
@@ -260,11 +262,14 @@ function updateCache() {
                 // remove equals counters IDs. Use Object.values for save Number type for counterID
                 var countersIDs = {};
                 message.updateCountersIDs.forEach(counterID => countersIDs[counterID] = counterID);
-                if (message.update.historyVariables) Array.prototype.push.apply(updateMode.getHistoryVariables, Object.values(countersIDs));
-                if (message.update.variablesExpressions) Array.prototype.push.apply(updateMode.getVariablesExpressions, Object.values(countersIDs));
+                if (message.update.historyVariables) {
+                    Array.prototype.push.apply(updateMode.getHistoryVariables, Object.values(countersIDs));
+                }
+                if (message.update.variablesExpressions) {
+                    Array.prototype.push.apply(updateMode.getVariablesExpressions, Object.values(countersIDs));
+                }
             }
             if (message.updateObjectsIDs && message.updateObjectsIDs.length && message.update.objectsProperties) {
-
                 // remove equals objects IDs. Use Object.values for save Number type for objectID
                 var objectsIDs = {};
                 message.updateObjectsIDs.forEach(objectID => objectsIDs[objectID] = objectID);
@@ -279,81 +284,79 @@ function updateCache() {
         '; counters for remove: ', countersForRemove.size, '; update mode: ', updateMode);
 
      */
-    serverCache(updateMode, function(err, cache, __counterObjectNames, _recordsFromDBCnt) {
+    var alepizNames = confServer.get('alepizNames');
+    serverCache(updateMode, alepizNames,
+        function(err, cache, __counterObjectNames, _objectAlepizRelation, _recordsFromDBCnt) {
         if(err) {
             updateCacheInProgress = 0;
             return log.error('Error when loading data to cache: ', err.message);
         }
 
         counterObjectNamesCache = __counterObjectNames;
+        if(_objectAlepizRelation) objectAlepizRelation = _objectAlepizRelation;
         recordsFromDBCnt = _recordsFromDBCnt;
-        removeCounters(function () {
-            if(cache) {
-                cache.fullUpdate = !updateMode;
+        if(cache) {
+            cache.fullUpdate = !updateMode;
 
-                /*
-                 log.info('Sending cache data first time:',
-                    (cache.variablesHistory.size ? ' history for counters: ' + cache.variablesHistory.size : ''),
-                    (cache.variablesExpressions.size ? ' expressions for counters: ' + cache.variablesExpressions.size : ''),
-                    (cache.objectsProperties.size ? ' properties for objects: ' + cache.objectsProperties.size : ''),
-                    (cache.countersObjects.objects ? ' objects: ' + cache.countersObjects.objects.size : ''),
-                    (cache.countersObjects.counters ? ', counters: ' + cache.countersObjects.counters.size : ''),
-                    (cache.countersObjects.objectName2OCID ?
-                        ', objectName2OCID: ' + cache.countersObjects.objectName2OCID.size : ''));
-                 */
+            /*
+             log.info('Sending cache data first time:',
+                (cache.variablesHistory.size ? ' history for counters: ' + cache.variablesHistory.size : ''),
+                (cache.variablesExpressions.size ? ' expressions for counters: ' + cache.variablesExpressions.size : ''),
+                (cache.objectsProperties.size ? ' properties for objects: ' + cache.objectsProperties.size : ''),
+                (cache.countersObjects.objects ? ' objects: ' + cache.countersObjects.objects.size : ''),
+                (cache.countersObjects.counters ? ', counters: ' + cache.countersObjects.counters.size : ''),
+                (cache.countersObjects.objectName2OCID ?
+                    ', objectName2OCID: ' + cache.countersObjects.objectName2OCID.size : ''));
+             */
 
-                childrenThreads.sendToAll(cache, function (err) {
-                    if (err) log.error('Error sending cache: ', err.message);
-                });
-
-            } else log.info('Creating empty cache. Nothing to send to children');
-
-            // getting data again from updated top level counters (f.e. with active collectors)
-            var topCounters = new Set();
-            async.eachLimit(objectsAndCountersForUpdate, 10000, function (message, callback) {
-                if ((message.update && !message.update.topObjects) ||
-                    ((!message.updateObjectsIDs || !message.updateObjectsIDs.length) &&
-                        (!message.updateCountersIDs || !message.updateCountersIDs.length))) return callback();
-
-                countersDB.getCountersForFirstCalculation(collectorsNames, message.updateObjectsIDs, message.updateCountersIDs,
-                    function (err, counters) {
-                        if (err) {
-                            callback();
-                            return log.error(err.message);
-                        }
-                        recordsFromDBCnt += counters.length;
-
-                        counters.forEach(function (property) {
-                            topCounters.add(property);
-                        });
-                        callback();
-                    });
-            }, function () {
-                var counters = Array.from(topCounters);
-                if (!counters.length) {
-                    updateCacheInProgress = 0;
-                    if(needToUpdateCache.size) updateCache();
-                    return;
-                }
-
-                getCountersValues(counters, undefined,true);
-                updateCacheInProgress = 0;
-                if(needToUpdateCache.size) updateCache();
+            childrenThreads.sendToAll(cache, function (err) {
+                if (err) log.error('Error sending cache: ', err.message);
             });
+
+        } else log.info('Creating empty cache. Nothing to send to children');
+
+        // getting data again from updated top level counters (f.e. with active collectors)
+        var topCounters = new Set(), topOCIDs = new Set();
+        async.eachLimit(objectsAndCountersForUpdate, 10000, function (message, callback) {
+            if ((message.update && !message.update.topObjects) ||
+                ((!message.updateObjectsIDs || !message.updateObjectsIDs.length) &&
+                    (!message.updateCountersIDs || !message.updateCountersIDs.length))) return callback();
+
+            countersDB.getCountersForFirstCalculation(collectorsNames,
+                message.updateObjectsIDs, message.updateCountersIDs,function (err, counters) {
+                    if (err) {
+                        callback();
+                        return log.error(err.message);
+                    }
+                    recordsFromDBCnt += counters.length;
+
+                    var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== 1;
+                    counters.forEach(function (property) {
+                        var objectsAlepizNames = objectAlepizRelation.get(property.objectID);
+                        //if(property.objectName === 'ALEPIZ') console.log('!!!', alepizNames, objectsAlepizNames, ownerOfUnspecifiedAlepizIDs, objectAlepizRelation)
+                        if ((objectsAlepizNames === undefined && ownerOfUnspecifiedAlepizIDs) ||
+                            objectsAlepizNames.some(name => alepizNames.indexOf(name) !== -1)
+                        ) {
+                            topCounters.add(property);
+                            topOCIDs.add(property.OCID);
+                            //if(property.objectName === 'ALEPIZ') console.log('!!!! add ALEPIZ')
+                        }
+                    });
+                    callback();
+                });
+        }, function () {
+            if (topCounters.size) getCountersValues(topCounters, undefined,true);
+            updateCacheInProgress = 0;
+            if(needToUpdateCache.size) updateCache();
         });
     });
 }
 
-function removeCounters(callback) {
-    if(!countersForRemove.size) return callback();
+function removeCounters(countersForRemove, callback) {
+    if(!countersForRemove) return typeof callback === 'function' && callback();
 
-    var copyCountersForRemove = Array.from(countersForRemove.values());
-    countersForRemove.clear();
-
-    var OCIDs = copyCountersForRemove.map(function (message) {
-        log.info('Remove counters reason: ', message.description, ': ', message.removeCounters);
-        return message.removeCounters;
-    });
+    log.info('Remove counters reason: ', countersForRemove.description, '. OCIDs: ', countersForRemove.removeCounters);
+    var OCIDs = countersForRemove.removeCounters;
 
     childrenThreads.sendAndReceive({removeCounters: OCIDs}, function() {
         // remove OCIDs from updateEventsStatus Map
@@ -367,7 +370,7 @@ function removeCounters(callback) {
             if (processedOCIDs.has(OCID)) processedOCIDs.delete(OCID);
         });
 
-        callback();
+        typeof callback === 'function' && callback();
     });
 }
 
@@ -425,7 +428,29 @@ function waitingForObjects(callback) {
             recordsFromDBCnt += allTopCounters.length;
             log.info('Getting ', allTopCounters.length, ' counter values at first time for ', collectorsNames);
 
-            getCountersValues(allTopCounters);
+            var alepizNames = confServer.get('alepizNames');
+            var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== 1;
+            var filteredCounters = new Set();
+
+            allTopCounters.forEach(function (property) {
+                var objectsAlepizNames = objectAlepizRelation.get(property.objectID);
+                //if(property.objectName === 'ALEPIZ') console.log('!!!', alepizNames, objectsAlepizNames, ownerOfUnspecifiedAlepizIDs, objectAlepizRelation)
+                if ((objectsAlepizNames === undefined && ownerOfUnspecifiedAlepizIDs) ||
+                    objectsAlepizNames.some(name => alepizNames.indexOf(name) !== -1)
+                ) {
+                    filteredCounters.add(property);
+                    //if(property.objectName === 'ALEPIZ') console.log('!!!! add ALEPIZ')
+                }
+            });
+
+            if(filteredCounters.size) {
+                prevTopCounters = filteredCounters;
+                getCountersValues(filteredCounters);
+            }
+            else {
+                log.info('Can\'t find counters without dependents for starting data collection for ', collectorsNames,
+                    ' for Alepiz with names: ', alepizNames);
+            }
         } else log.info('Can\'t find counters without dependents for starting data collection for ', collectorsNames);
 
         callback();
@@ -440,10 +465,7 @@ function processServerMessage(message) {
 
     // message: { removeCounters: [<OCID1>, OCID2, ...], description: ....}
     if(message.removeCounters && message.removeCounters.length) {
-        if(!needToUpdateCache.size) needToUpdateCache.add(true);
-        //log.info('Receiving request for remove counters for OCIDs: ', message.removeCounters,'. Queuing.');
-        countersForRemove.add(message);
-        updateCache();
+        removeCounters(message);
         return
     }
 
@@ -479,7 +501,6 @@ function processChildMessage(message) {
     if(message.updateEventState !== undefined) {
         let updateEventKey = message.parentOCID + '-' + message.OCID;
         updateEventsStatus.set(updateEventKey, message.updateEventState);
-            //if(updateEventKey === '155273-155407' || updateEventKey === '155273-155287') log.warn('!!updateEvent: ', updateEventKey, ': ', message.updateEventState)
         return;
     }
 
@@ -492,13 +513,6 @@ function processChildMessage(message) {
     }
 
     if (message.value === undefined) return;
-
-    /*
-    if(message.variables.UPDATE_EVENT_STATE !== undefined) {
-        let updateEventKey = message.parentOCID + '-' + message.OCID;
-        updateEventsStatus.set(updateEventKey, message.variables.UPDATE_EVENT_STATE);
-    }
-     */
 
     var values = Array.isArray(message.value) ? message.value : [message.value];
 
@@ -525,7 +539,7 @@ function processChildMessage(message) {
 }
 
 /**
- * Return string "<counterName> (<objectName>)" or "OCID: <OCID>" if cache is not ready
+ * Return string "<counterName> (<objectName>)" or "OCID: <OCID>" if cache is not ready for log
  * @param {Number} OCID - objectCounter ID
  * @returns {string} - string "<counterName> (<objectName>)" or "OCID: <OCID>" if cache is not ready
  */
@@ -541,7 +555,7 @@ function getCounterAndObjectName(OCID) {
 /*
  get values for specific counters
 
- counters - [{parentOCID:, OCID:, collector:, updateEventExpression:, updateEventMode:}, ....]
+ counters - Set({parentOCID:, OCID:, collector:, updateEventExpression:, updateEventMode:}, ....]
  parentVariables - variables from parent object {name1: val1, name2: val2, ....}. can be skipped
  */
 function getCountersValues(counters, parentVariables, forceToGetValueAgain, cfg) {
@@ -581,32 +595,25 @@ function getCountersValues(counters, parentVariables, forceToGetValueAgain, cfg)
         filteredCounters.push(counter);
     });
 
-    // they will be removed letter in childGetCountersValue.js getValue()
+    // they will be removed letter in getCountersValue.js getValue()
     if(activeCounters.length) {
         log.info('Counters with an active collector will be removed and updated: ', activeCounters);
     }
 
-    // run confServer.get() without parameters for speedup
+    // call confServer.get() without parameters for speedup
     if(!cfg) cfg = confServer.get().servers[serverID];
     async.eachLimit(filteredCounters, cfg.returnedValuesProcessedLimit || 1000, function (counter, callback) {
-        getCounterValue(counter, parentVariables);
+
+        processedOCIDs.set(counter.OCID, {
+            isActive: activeCollectors.has(counter.collector),
+            timestamp: Date.now(),
+        });
+
+        var updateEventKey = counter.parentOCID + '-' + counter.OCID;
+        counter.parentVariables = parentVariables;
+        counter.updateEventState = updateEventsStatus.get(updateEventKey);
+        childrenThreads.send(counter);
+
         setTimeout(callback, cfg.sleepTimeAfterValueProcessed || 0).unref();
     }, function() {});
-}
-
-function getCounterValue(counter, parentVariables) {
-
-    var OCID = counter.OCID;
-    var isActive = activeCollectors.has(counter.collector);
-
-    processedOCIDs.set(OCID, {
-        isActive: isActive,
-        timestamp: Date.now(),
-    });
-
-    var updateEventKey = counter.parentOCID + '-' + OCID;
-    counter.parentVariables = parentVariables;
-    counter.updateEventState = updateEventsStatus.get(updateEventKey);
-    //if(updateEventKey === '155273-155407' || updateEventKey === '155273-155287') log.warn(updateEventKey, ': ', counter)
-    childrenThreads.send(counter);
 }

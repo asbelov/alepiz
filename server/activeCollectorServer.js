@@ -37,7 +37,7 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
 
     var counterProcessorServer = counterProcessorServerThreadObj.func;
 
-    collectorsCfg.get(null, function (err, collectorsParam) {
+    collectorsCfg.getConfiguration(null, function (err, collectorsParam) {
         if (err) return log.error(err.message);
 
         async.eachSeries(collectorNames, function (collectorName, callback) {

@@ -25,7 +25,7 @@ activeCollector.startAll = function (killTimeout, onExit, callback) {
     var separateCollectors = {};
     collectors = {};
 
-    collectorsCfg.get(null, function (err, _collectorsObj) {
+    collectorsCfg.getConfiguration(null, function (err, _collectorsObj) {
         if (err) return callback(err);
 
         collectorsObj = _collectorsObj;
@@ -150,11 +150,11 @@ activeCollector.connect = function (collectorName, callback) {
         return callback(null, collectorsObj[collectorName].IPC);
     }
 
-    connectToCollector(collectorName, function (err, clientIPC) {
+    connectToCollector(collectorName, function (err, clientIPC, hostPort) {
         if(err) return callback(err);
 
         /* if connected */
-        var collector = new Collector(collectorName, clientIPC);
+        var collector = new Collector(collectorName, clientIPC, hostPort);
 
         if(!collectorsObj[collectorName]) collectorsObj[collectorName] = {};
         collectorsObj[collectorName].IPC = collector;
@@ -162,13 +162,15 @@ activeCollector.connect = function (collectorName, callback) {
     });
 };
 
-function Collector(collectorName, clientIPC) {
-    this.get = function (param, callback) {
+function Collector(collectorName, clientIPC, hostPort) {
+    // active and separate collectors return the result in their counterProcessorServer and do not need
+    // to call the callback through network IPC
+    this.get = function (param) {
         clientIPC.send({
             name: collectorName,
             type: 'get',
             data: param,
-        }, callback);
+        });
     };
 
     this.getOnce = function (param, callback) {
@@ -205,6 +207,9 @@ function Collector(collectorName, clientIPC) {
     this.sendToServer = function (message) {
         clientIPC.send(message);
     };
+
+    // used in counterProcessor.js for sendToServer to send a message no more than once to each server
+    this.hostPort = hostPort;
 }
 
 function connectToCollector(collectorName, callback) {
@@ -244,6 +249,6 @@ function connectToCollector(collectorName, callback) {
         if (!clientIPC) return log.warn('Receiving unexpected message: ', message);
 
         collectors[serverAddress + ':' + port].IPC = clientIPC;
-        callback(err, clientIPC);
+        callback(err, clientIPC, serverAddress + ':' + port);
     });
 }

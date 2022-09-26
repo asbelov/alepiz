@@ -15,7 +15,15 @@ module.exports = function(callback){
         createInteractionsTable(function(err){
             if(err) return callback(err);
 
-            createPropertiesTable(callback);
+            createPropertiesTable(function(err){
+                if(err) return callback(err);
+
+                createAlepizIDsTable(function(err){
+                    if(err) return callback(err);
+
+                    createAlepizRelationTable(callback);
+                });
+            });
         });
     });
 };
@@ -39,13 +47,19 @@ function createObjectsTable(callback){
             if (err) return callback(new Error('Can\'t create objects table in database: ' + err.message));
 
             db.run('CREATE INDEX IF NOT EXISTS sortPosition_objects_index on objects(sortPosition)', function (err) {
-                if (err) return callback(new Error('Can\'t create sortPosition objects index in database: ' + err.message));
+                if (err) {
+                    return callback(new Error('Can\'t create sortPosition objects index in database: ' + err.message));
+                }
 
                 db.run('CREATE INDEX IF NOT EXISTS name_objects_index on objects(name)', function (err) {
-                    if (err) return callback(new Error('Can\'t create name objects index in database: ' + err.message));
+                    if (err) {
+                        return callback(new Error('Can\'t create name objects index in database: ' + err.message));
+                    }
 
                     db.run('CREATE INDEX IF NOT EXISTS disabled_objects_index on objects(disabled)', function (err) {
-                        if (err) return callback(new Error('Can\'t create disabled objects index in database: ' + err.message));
+                        if (err) {
+                            return callback(new Error('Can\'t create disabled objects index in database: ' + err.message));
+                        }
 
                         callback();
                     });
@@ -61,8 +75,6 @@ function createInteractionsTable(callback){
         'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
         'objectID1 INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
         'objectID2 INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
-//          'objectID1 INTEGER NOT NULL REFERENCES objects(id) DEFERRABLE INITIALLY DEFERRED ON DELETE CASCADE ON UPDATE CASCADE,' +
-//          'objectID2 INTEGER NOT NULL REFERENCES objects(id) DEFERRABLE INITIALLY DEFERRED ON DELETE CASCADE ON UPDATE CASCADE,' +
         'type INTEGER DEFAULT 0)',
         function (err) {
             if (err) return callback(new Error('Can\'t create interactions table in database: ' + err.message));
@@ -71,7 +83,9 @@ function createInteractionsTable(callback){
                 function(callback){
                     db.run('CREATE INDEX IF NOT EXISTS objectIDs_interactions_index on interactions(objectID1, objectID2)',
                         function (err) {
-                            if (err) return callback(new Error('Can\'t create interactions index in database: ' + err.message));
+                            if (err) {
+                                return callback(new Error('Can\'t create interactions index in database: ' + err.message));
+                            }
                             callback();
 
                         }
@@ -81,7 +95,10 @@ function createInteractionsTable(callback){
                 function(callback) {
                     db.run('CREATE INDEX IF NOT EXISTS types_interactions_index on interactions(type)',
                         function (err) {
-                            if (err) return callback( new Error('Can\'t create interactions index in database: ' + err.message));
+                            if (err) {
+                                return callback( new Error('Can\'t create interactions index in database: ' +
+                                    err.message));
+                            }
                             callback();
                         }
                     )
@@ -106,11 +123,71 @@ function createPropertiesTable(callback) {
 
             db.run('CREATE INDEX IF NOT EXISTS objectID_objectsProperties_index on objectsProperties(objectID)',
                 function (err) {
-                    if (err) return callback(new Error('Can\'t create objectID objectsProperties index in database: ' + err.message));
+                if (err) {
+                    return callback(new Error('Can\'t create objectID objectsProperties index in database: ' +
+                        err.message));
+                }
+
+                db.run('CREATE INDEX IF NOT EXISTS name_objectsProperties_index on objectsProperties(name)',
+                    function (err) {
+                    if (err) {
+                        return callback(new Error('Can\'t create name objectsProperties index in database: ' +
+                            err.message));
+                    }
                     callback();
                 });
+            });
         }
     );
 }
 
+function createAlepizIDsTable(callback) {
+    db.run(
+        'CREATE TABLE IF NOT EXISTS alepizIDs (' +
+        'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
+        'name TEXT NOT NULL)',
+        function (err) {
 
+        if (err) return callback(new Error('Can\'t create alepizIDs table in database: ' + err.message));
+
+        db.run('INSERT OR IGNORE INTO alepizIDs (id, name) VALUES ' +
+            '(0, "Main server"), ' +
+            '(1, "Secondary server")',
+            function (err) {
+            if (err) {
+                return callback(new Error('Can\'t insert initial data into alepizIDs table in database: ' +
+                    err.message));
+            }
+            callback();
+        });
+    });
+}
+
+function createAlepizRelationTable(callback) {
+    db.run(
+        'CREATE TABLE IF NOT EXISTS objectsAlepizRelation (' +
+        'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
+        'objectID INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
+        'alepizID INTEGER NOT NULL REFERENCES alepizIDs(id) ON DELETE CASCADE ON UPDATE CASCADE)',
+        function (err) {
+            if (err) return callback(new Error('Can\'t create objectsAlepizRelation table in database: ' + err.message));
+
+            db.run('CREATE INDEX IF NOT EXISTS objectID_objectsAlepizRelation_index on objectsAlepizRelation(objectID)',
+                function (err) {
+                if (err) {
+                    return callback(new Error('Can\'t create objectID objectsAlepizRelation index in database: ' +
+                        err.message));
+                }
+
+                db.run('CREATE INDEX IF NOT EXISTS alepizID_objectsAlepizRelation_index on objectsAlepizRelation(alepizID)',
+                    function (err) {
+                    if (err) {
+                        return callback(new Error('Can\'t create alepizID objectsAlepizRelation index in database: ' +
+                            err.message));
+                    }
+                    callback();
+                });
+            });
+        }
+    );
+}

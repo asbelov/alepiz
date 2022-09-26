@@ -12,7 +12,7 @@ var help = require('../../lib/help');
 module.exports = function(args, callback) {
     log.debug('Starting ajax '+__filename+' with parameters', args);
 
-    if(args.func === 'getCollectors') return collectors.get(null, callback);
+    if(args.func === 'getCollectors') return collectors.getConfiguration(null, callback);
 
     if(args.func === 'getCollectorCode') {
         if(!args.name) return callback(new Error('Collector name is not specified for getting collector.js file'));

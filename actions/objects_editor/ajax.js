@@ -5,7 +5,8 @@
 var log = require('../../lib/log')(module);
 var objectsDB = require('../../rightsWrappers/objectsDB');
 var countersDB = require('../../rightsWrappers/countersDB');
-var rowCountersDB = require('../../models_db/countersDB');
+var rawCountersDB = require('../../models_db/countersDB');
+var rawObjectsDB = require('../../models_db/objectsDB');
 
 module.exports = function(args, callback) {
     log.debug('Starting ajax with parameters', args);
@@ -22,16 +23,26 @@ module.exports = function(args, callback) {
             countersDB.getCountersForObjects(args.username, objectsIDs, null, function(err, objectsCountersLinkage) {
                 if(err) return callback(err);
 
-                rowCountersDB.getAllCounters(function(err, counters) {
+                rawCountersDB.getAllCounters(function(err, counters) {
                     if(err) return callback(err);
 
-                    callback(null, {
-                        objectsParameters: objectsParameters,
-                        objectsCountersLinkage: objectsCountersLinkage,
-                        counters: counters
-                    })
+                    rawObjectsDB.getAlepizIDs(function (err, alepizIDs) {
+                        if(err) return callback(err);
+
+                        rawObjectsDB.getObjectsAlepizRelationByObjectIDs(objectsIDs, function (err, objectsAlepizRelations) {
+                            if(err) return callback(err);
+
+                            callback(null, {
+                                objectsParameters: objectsParameters,
+                                objectsCountersLinkage: objectsCountersLinkage,
+                                counters: counters,
+                                alepizIDs: alepizIDs,
+                                objectsAlepizRelations: objectsAlepizRelations,
+                            });
+                        });
+                    });
                 });
-            })
+            });
         });
     }
 };

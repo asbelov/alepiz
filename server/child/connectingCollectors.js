@@ -23,7 +23,7 @@ function connectingCollectors(callback) {
     if(isConnectingToCollectors === 1) return setTimeout(connectingCollectors, 1000, callback);
 
     isConnectingToCollectors = 1;
-    collectors.get(null, function(err, collectorsObj) {
+    collectors.getConfiguration(null, function(err, collectorsObj) {
         if (err) {
             isConnectingToCollectors = 0;
             callback(new Error('Can\'t get collectors: ' + err.nessage));
@@ -86,4 +86,3 @@ function connectingCollectors(callback) {
         });
     });
 }
-

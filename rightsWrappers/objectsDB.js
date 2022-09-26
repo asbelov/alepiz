@@ -64,7 +64,7 @@ rightsWrapper.renameObjects = function(user, objects, callback){
  callback(err, newObjectsIDs, newObjects),
  newObjectsIDs - array of a new objects IDs;
  */
-rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOrder, disabled, callback){
+rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOrder, disabled, color, callback){
     if(!newObjectsNames || !newObjectsNames.length) return callback(null, []);
 
     //user = prepareUser(user);
@@ -82,7 +82,7 @@ rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOr
         }
 
         // add a new objects, its description and order
-        objectsDB.addObjects(newObjectsNames, newDescription, newOrder, (disabled ? 1 : 0), callback);
+        objectsDB.addObjects(newObjectsNames, newDescription, newOrder, (disabled ? 1 : 0), color, callback);
     });
 };
 
@@ -95,15 +95,15 @@ rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOr
  callback(err)
  undefined description or order are not updated
  */
-rightsWrapper.updateObjectsInformation = function (user, initIDs, description, order, disabled, callback){
+rightsWrapper.updateObjectsInformation = function (user, initIDs, description, order, disabled, color, callback){
 
     if((description === undefined && order === undefined && disabled === undefined) || !initIDs.length) return callback();
 
     checkIDs(initIDs, function(err, checkedIDs) {
         if (err) {
             return callback(new Error('User ' + user + ' try to update objects info with incorrect IDs ' +
-                initIDs.join(', ') + '; description: ' + description +
-                 '; order: ' + order + '; disabled: ' + disabled +': ' + err.message ));
+                initIDs.join(', ') + '; description: ' + description + '; order: ' + order +
+                '; disabled: ' + disabled + '; color: ' + color + ': ' + err.message ));
         }
 
         user = prepareUser(user);
@@ -120,11 +120,11 @@ rightsWrapper.updateObjectsInformation = function (user, initIDs, description, o
                     '; order: ' + order + '; disabled: ' + disabled +': ' + err.message ));
             }
 
-            objectsDB.updateObjectsInformation(IDs, description, order, disabled, function(err, res) {
+            objectsDB.updateObjectsInformation(IDs, description, order, disabled, color,function(err, res) {
                 if(err) {
                     return callback(new Error('User ' + user + ' got error when updating objects info for ' +
-                        initIDs.join(', ') + '; description: ' + description +
-                        '; order: ' + order + '; disabled: ' + disabled +': ' + err.message ), res);
+                        initIDs.join(', ') + '; description: ' + description + '; order: ' + order +
+                        '; disabled: ' + disabled + '; color: ' + color + ': ' + err.message ), res);
                 }
 
                 callback(null, res); // res = true or undefined

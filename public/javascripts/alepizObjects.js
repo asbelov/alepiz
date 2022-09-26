@@ -675,7 +675,7 @@ var alepizObjectsNamespace = (function($) {
         if(!shade) return ' '+color+'-text';
 
         shade = shade.toLowerCase();
-        if( !/^(lighten)|(darken)|(accent)-[1-4]$/.test(shade) && shade !== 'lighten-5') return ' ' + color + '-text';
+        if( !/^(lighten)|(darken)|(accent)-[1-4]$/.test(shade)) return ' ' + color + '-text';
 
         return ' ' + color + '-text text-' + shade;
     }

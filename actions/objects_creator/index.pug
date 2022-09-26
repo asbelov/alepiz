@@ -8,32 +8,19 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         title= action.name
         link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
         link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        link(rel='stylesheet', href='/stylesheets/actions.css')
         meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
         script(src='/jquery/jquery.min.js')
         script(src='/jquery-ui/jquery-ui.min.js')
         script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/escapeHTML.js')
+        script(src='/javascripts/colorPicker.js')
+        script(src='/javascripts/alepizIDPicker.js')
         script.
             var parameters = {
                 action: !{JSON.stringify(action)},
                 objects: !{JSON.stringify(objects)}
             };
-
-            var entityMap = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;',
-                '/': '&#x2F;',
-                '`': '&#x60;',
-                '=': '&#x3D;'
-            };
-
-            function escapeHtml(string) {
-                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
-                    return entityMap[s];
-                });
-            }
     body
     main
         div.row
@@ -71,13 +58,21 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                             option(value="5") At the middle and at up level
                                             option(value="9") At the end and at up level
                                         label Order in a objects menu for a new objects
-                    div.col.s12
-                        div.card
-                            div.card-content
-                                span.card-title Groups for new objects:&nbsp;
-                                    b#groupsDescription
-                                p New objects will be included into the objects, which you select from objects menu. If no one objects are selected, you will find a new objects using "Search" button in an objects menu by typing object name. Or select 'up level' object order for set object at the up level of the object list.
-                                p Additional objects interactions you can set using "Objects interactions" action after creating new objects.
-                                p Action returned string with comma separated objects IDs. You can use this in "task maker" using %:PREV_ACTION_RESULT:% variable
+                                div.no-margin.no-padding.row
+                                    div.input-field.col.s12.m6.l3#colorPickerParent
+                                    div.input-field.col.s12.m6.l3#shadePickerParent
+                                    div(style="position:relative").input-field.col.s12.m6.l3
+                                        label.drop-down-label Example of object coloring
+                                        label
+                                            input(type='checkbox')
+                                            span
+                                        div(style="padding: 12px 0 4px 32px" data-tooltip="This is how the color of the object in the list of objects will look like").tooltipped.black-text.col.s11.truncate#colorSample OBJECT NAME
+                                    div.input-field.col.s12.m6.l3#alepizIDPickerParent
+                                div.divider
+                                div.row
+                                    div.input-field
+                                        div.card-title New objects will be included in groups:
+                                        h6
+                                            ol.browser-default#groupsDescription
     footer
         input(type="hidden" name="actionName" value= action.name)

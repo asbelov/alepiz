@@ -1,7 +1,7 @@
 /*
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
-var log = require('../lib/log')(module);
+//var log = require('../lib/log')(module);
 var async = require('async');
 var countersDB = require('../models_db/countersDB');
 var objectsDB = require('../models_db/objectsDB');
@@ -24,7 +24,7 @@ var objectsFilter = {
 
 module.exports = objectsFilter;
 
-/** Return array with objects with filter names and descriptions for init FIULTERS menu
+/** Return array with objects with filter names and descriptions for init FILTERS menu
  *
  * @param {string} userName - username
  * @param {function(null, Array)|function()} callback - callback(null, filterNames) or callback() when filters are undefined
@@ -214,7 +214,7 @@ function getUplevelObjectPropertiesResult(variable, objects, callback) {
 
 /** Filter objects and return new objects list with filtered objects
  *
- * @param {Array|String} filterNamesStr - comma separated filer names for filotering objects
+ * @param {Array|String} filterNamesStr - comma separated filer names for filtering objects
  * @param {string} filterExpression - filters logical expression if selected some filters
  * @param {Array} objects - array of objects [{name: <objectName> id: <objectID>}, {...}, ...]
  * @param {function(Error)|function(null, Array)} callback - callback(err, newObjects) - newObjects

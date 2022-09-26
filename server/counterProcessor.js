@@ -17,7 +17,7 @@ var activeCollectors = {};
 counterProcessor.connect = function(callback) {
     if(Object.keys(activeCollectors).length) return callback();
 
-    collectorsCfg.get(null, function (err, collectorsObj) {
+    collectorsCfg.getConfiguration(null, function (err, collectorsObj) {
         if (err) return callback(err);
 
         async.eachOf(collectorsObj, function (collectorCfg, collectorName, callback) {
@@ -26,7 +26,7 @@ counterProcessor.connect = function(callback) {
 
             activeCollector.connect(collectorName, function (err, collector) {
                 if (err) log.error('Can\'t connect to collector ', collectorName, ': ', err.message);
-                else activeCollectors[collectorName] = collector;
+                else activeCollectors[collector.hostPort] = collector;
                 callback();
             });
         }, function () {
@@ -39,8 +39,8 @@ counterProcessor.connect = function(callback) {
 // sending all messages to servers
 counterProcessor.sendMsg = function(message) {
     counterProcessor.connect(function () {
-        for(var collectorName in activeCollectors) {
-            activeCollectors[collectorName].sendToServer({
+        for(var hostPort in activeCollectors) {
+            activeCollectors[hostPort].sendToServer({
                 server: message,
             });
         }

@@ -28,7 +28,8 @@ module.exports = function(args, callback) {
 
         if(!objects || typeof(objects) !== 'object' || !objects.length)  return callback(null, []);
 
-        getObjectsTree(prepareUser(args.username), objects, 0, args.maxObjectsCnt, function(err, objectsArrayWithDuplicates) {
+        getObjectsTree(prepareUser(args.username), objects, 0, args.maxObjectsCnt,
+            function(err, objectsArrayWithDuplicates) {
             if(err) return callback(err);
 
             // remove duplicates from objects array
@@ -93,4 +94,3 @@ function getObjectsTree(user, objects, depth, maxObjectsCnt, callback) {
         callback(null, objects);
     });
 }
-

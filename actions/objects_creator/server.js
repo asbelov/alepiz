@@ -5,9 +5,10 @@
 /**
  * Created by Alexander Belov on 16.05.2015.
  */
-var rightsWrapper = require('../../rightsWrappers/objectsDB');
-var transactionDB = require('../../models_db/transaction');
-var log = require('../../lib/log')(module);
+const log = require('../../lib/log')(module);
+const rightsWrapper = require('../../rightsWrappers/objectsDB');
+const transactionDB = require('../../models_db/transaction');
+const rawObjectsDB = require("../../models_db/objectsDB");
 
 module.exports = function(args, callback) {
     log.debug('Starting action server \"'+args.actionName+'\" with parameters', args);
@@ -22,34 +23,50 @@ module.exports = function(args, callback) {
 // Add new objects with description, order and interactions
 // parameters - parameters, which returned by HTML form
 // callback(err, <success message>)
-function addNewObjects(user, parameters, callback){
+function addNewObjects(user, param, callback){
 
-    if(!parameters.objectsNames) return callback(new Error('New objects names are not specified: ' + parameters.objectsNames));
+    if(!param.objectsNames) return callback(new Error('New objects names are not specified: ' + param.objectsNames));
 
-    var newUncheckedObjectsNames = parameters.objectsNames.split(/\s*?[,;]\s*?/);
-    if(!Array.isArray(newUncheckedObjectsNames)) newUncheckedObjectsNames = [parameters.objectsNames];
+    var newUncheckedObjectsNames = param.objectsNames.split(/\s*?[,;]\s*?/);
+    if(!Array.isArray(newUncheckedObjectsNames)) newUncheckedObjectsNames = [param.objectsNames];
 
     var newObjectsNames = newUncheckedObjectsNames.filter(function(name) {
         if (!name || /[%\n\r]/.test(name) || /__/.test(name)) {
-            log.error('Can\'t adding object name "' + name + '": Name contain incorrect symbols, such as "%", "\\r", "\\n", "__"');
+            log.error('Can\'t adding object name "' + name +
+                '": Name contain incorrect symbols, such as "%", "\\r", "\\n", "__"');
             return false;
         }
         return true;
     });
 
-    if(!newObjectsNames.length) return callback(new Error('New objects names are not specified or incorrect: ' + newUncheckedObjectsNames));
+    if(!newObjectsNames.length) {
+        return callback(new Error('New objects names are not specified or incorrect: ' + newUncheckedObjectsNames));
+    }
 
-    var description = parameters.objectsDescription;
-    var order = Number(parameters.objectsOrder);
-    var disabled = parameters.disabled; // check disabled value at rightsWrapper.addObjects
+    var description = param.objectsDescription;
+    var order = Number(param.objectsOrder);
+    var disabled = param.disabled; // check disabled value at rightsWrapper.addObjects
 
-    if(order !== parseInt(String(order), 10)) return callback(new Error('Incorrect objects order: ' + parameters.objectsOrder));
+    // color will be unchanged if color is undefined.
+    var color;
+    if(param.objectsColor !== '0') {
+        color = ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue', 'light-blue', 'cyan', 'teal',
+            'green', 'light-green', 'lime', 'yellow', 'amber', 'orange', 'deep-orange', 'brown', 'grey', 'blue-grey',
+            'black', 'white', 'transparent'].indexOf((param.objectsColor || '').toLowerCase()) !== -1 ?
+            param.objectsColor + ':' +
+            (/^(lighten)|(darken)|(accent)-[1-4]$/.test((param.objectsShade || '').toLowerCase()) ? param.objectsShade : '') :
+            null;
+    }
 
-    if(parameters.o) { // string '[{"name": "name1", "id": "XX"}, {"name": "name2", "id": "YY"},....]'
+    if(order !== parseInt(String(order), 10)) {
+        return callback(new Error('Incorrect objects order: ' + param.objectsOrder));
+    }
+
+    if(param.o) { // string '[{"name": "name1", "id": "XX"}, {"name": "name2", "id": "YY"},....]'
         try {
-            var upLevelObjects = JSON.parse(parameters.o);
+            var upLevelObjects = JSON.parse(param.o);
         } catch(err) {
-            return callback(new Error('Can\'t parse JSON string with up level objects: "' + parameters.o + '": ' + err.message));
+            return callback(new Error('Can\'t parse JSON string with up level objects: "' + param.o + '": ' + err.message));
         }
 
         var upLevelObjectsIDs = upLevelObjects.map(function(obj) {
@@ -66,7 +83,8 @@ function addNewObjects(user, parameters, callback){
             ' and object order is not set for top object: ' + order + ' >= 10'));
     }
 
-    log.debug('Adding new object[s] ', newObjectsNames, ' with description: ', description, ' and sort order ', order, '; up level objects: ', upLevelObjects);
+    log.debug('Adding new object[s] ', newObjectsNames, ' with description: ', description, ' and sort order ', order,
+        '; up level objects: ', upLevelObjects);
 
         // before prepare arrays with interactions to inserting or deleting, insert all new objects into a database
         // for gets objects IDs (newObjectsIDs array), witch will be used when inserting interactions
@@ -75,43 +93,51 @@ function addNewObjects(user, parameters, callback){
 
         // add a new objects, its description and order
         //  Top objects has order < 10 objectsFilterDB.js
-        rightsWrapper.addObjects(user, newObjectsNames, description, order, disabled, function (err, newObjectsIDs) {
+        rightsWrapper.addObjects(user, newObjectsNames, description, order, disabled, color,
+            function (err, newObjectsIDs) {
             if (err) {
                 log.error('Error adding new object[s] ', newObjectsNames, ' with description: ', description,
                     ' and sort order ', order, ': ', err.message);
                 return transactionDB.rollback(err, callback);
             }
 
-            // no up level objects for include a new objects in
-            if(!upLevelObjectsIDs.length) {
-                transactionDB.end(function(err) {
-                    if(err) return callback(err);
-
-                    log.info('Added new object[s] ', newObjectsNames, ' with description: ', description, ' and sort order ', order);
-                    // because in case with newObjectsIDs.join(',') and one object it return id as string, i.e. "12"
-                    if(newObjectsIDs.length === 1) callback(null, newObjectsIDs[0]);
-                    else callback(null, newObjectsIDs.join(','));
-                });
-                return;
-            }
-
-            // create interactions array for a new objects and up level objects
-            var interactionsForInserting = [];
-            upLevelObjectsIDs.forEach(function(upLevelObjectID) {
-                newObjectsIDs.forEach(function(newObjectID){
-                    interactionsForInserting.push({id1: upLevelObjectID, id2: newObjectID, type: 0})
-                });
-            });
-
-            rightsWrapper.insertInteractions(user, interactionsForInserting, function (err) {
-
+            var alepizIDs = param.alepizIDs ? param.alepizIDs.split(',').map(id => parseInt(id, 10)) : [];
+            rawObjectsDB.addObjectsAlepizRelation(newObjectsIDs, alepizIDs,function (err) {
                 if (err) return transactionDB.rollback(err, callback);
-                transactionDB.end(function(err) {
-                    if(err) return callback(err);
-                    log.info('Added new object[s] ', newObjectsNames, ' with description: ', description, ' and sort order ', order, '; up level objects: ', upLevelObjects);
-                    // because in case with newObjectsIDs.join(',') and one object it return id as string, i.e. "12"
-                    if(newObjectsIDs.length === 1) callback(null, newObjectsIDs[0]);
-                    else callback(null, newObjectsIDs.join(','));
+
+                // no up level objects for include a new objects in
+                if (!upLevelObjectsIDs.length) {
+                    transactionDB.end(function (err) {
+                        if (err) return callback(err);
+
+                        log.info('Added new object[s] ', newObjectsNames, ' with description: ', description,
+                            ' and sort order ', order);
+                        // because in case with newObjectsIDs.join(',') and one object it return id as string, i.e. "12"
+                        if (newObjectsIDs.length === 1) callback(null, newObjectsIDs[0]);
+                        else callback(null, newObjectsIDs.join(','));
+                    });
+                    return;
+                }
+
+                // create interactions array for a new objects and up level objects
+                var interactionsForInserting = [];
+                upLevelObjectsIDs.forEach(function (upLevelObjectID) {
+                    newObjectsIDs.forEach(function (newObjectID) {
+                        interactionsForInserting.push({id1: upLevelObjectID, id2: newObjectID, type: 0})
+                    });
+                });
+
+                rightsWrapper.insertInteractions(user, interactionsForInserting, function (err) {
+
+                    if (err) return transactionDB.rollback(err, callback);
+                    transactionDB.end(function (err) {
+                        if (err) return callback(err);
+                        log.info('Added new object[s] ', newObjectsNames, ' with description: ', description,
+                            ' and sort order ', order, '; up level objects: ', upLevelObjects);
+                        // because in case with newObjectsIDs.join(',') and one object it return id as string, i.e. "12"
+                        if (newObjectsIDs.length === 1) callback(null, newObjectsIDs[0]);
+                        else callback(null, newObjectsIDs.join(','));
+                    });
                 });
             });
         });

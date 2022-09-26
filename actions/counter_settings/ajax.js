@@ -33,7 +33,7 @@ module.exports = function(args, callback) {
 
     if(func === 'getCounterParameters') return rightsWrappersCountersDB.getCounterParameters(args.username, args.id, callback);
 
-    if(func === 'getCollectors') return collectors.get(null, callback);
+    if(func === 'getCollectors') return collectors.getConfiguration(null, callback);
 
     if(func === 'getCountersGroups') return groupsDB.get(callback);
 

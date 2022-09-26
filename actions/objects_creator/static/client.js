@@ -12,17 +12,34 @@ function onChangeObjects(objects){
 
 
 var JQueryNamespace = (function ($) {
-    $(function () {
+    var serverURL = parameters.action.link+'/ajax';
 
+    $(function () {
         init(parameters.objects);
-        M.FormSelect.init(document.getElementById('objectsOrder'), {});
+
+        var colorSampleElm = $('#colorSample');
+
+        $('#objectsNames').keyup(function () {
+            colorSampleElm.text($(this).val() || 'OBJECT NAME');
+        });
+
+        colorPicker.init($('#colorPickerParent'), $('#shadePickerParent'), colorSampleElm);
+        alepizIDPicker.init($('#alepizIDPickerParent'));
+
+        M.FormSelect.init(document.querySelectorAll('select'), {});
         M.Tooltip.init(document.querySelectorAll('.tooltipped'), {enterDelay: 200});
+
+        $.post(serverURL, {func: 'getAlepizIDs'}, function(alepizIDs) {
+            alepizIDPicker.seObjectServerRelation(alepizIDs);
+        });
     });
 
     return { init: init };
 
     function init(objects) {
-        var objectsNames = objects.length ? objects.map(function(obj){ return obj.name}).join(', ') : 'NO GROUPS';
-        $('#groupsDescription').text(objectsNames);
+        var objectsNames = objects.length ? objects.map(function(obj){
+            return '<li>' + escapeHtml(obj.name) + '</li>'
+        }).join('') : 'NO GROUPS';
+        $('#groupsDescription').html(objectsNames);
     }
 })(jQuery); // end of jQuery name space

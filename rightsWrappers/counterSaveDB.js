@@ -17,17 +17,18 @@ var server = require('../server/counterProcessor');
 var rightsWrapper = {};
 module.exports = rightsWrapper;
 
-/*
-Delete counter with counterID for db and all counters data from history
-user - user name
-counterID - counter ID
-callback(err)
+/**
+ * Delete counter with counterID for db and all counters data from history. counterName used only for log information
+ * @param {string} user - username who removed counter
+ * @param {Number} counterID - counter ID for removing
+ * @param {string} counterName - counter name for removing. Used only for information
+ * @param {function} callback - callback(err)
+ * @returns {*}
  */
-
-rightsWrapper.delete = function(user, counterID, callback) {
+rightsWrapper.deleteCounter = function(user, counterID, counterName, callback) {
 
     if (!counterID || Number(counterID) !== parseInt(String(counterID), 10))
-        return callback(new Error('Delete counter: unexpected counter id: ' + counterID));
+        return callback(new Error('Delete counter: unexpected counter: ' + counterName + '; id: ' + counterID));
     else counterID = Number(counterID);
 
     rightsDB.checkCounterID({
@@ -38,10 +39,16 @@ rightsWrapper.delete = function(user, counterID, callback) {
         if (err) return callback(err);
 
         countersDB.getObjectCounterIDForCounter (counterID, function(err, properties){
-            if(err) return callback(new Error('Can\'t get properties for counterID: ' + counterID + ': ' + err.message));
+            if(err) {
+                return callback(new Error('Can\'t get properties for counter ' + counterName +
+                    '(' + counterID + '): ' + err.message));
+            }
 
             counterSaveDB.delete(counterID, function(err) {
-                if(err) return callback(new Error('Can\'t delete counter with ID ' + counterID + ': ' + err.message));
+                if(err) {
+                    return callback(new Error('Can\'t delete counter ' + counterName +
+                        '(' + counterID + '): ' + err.message));
+                }
 
                 var objectsCountersIDs = properties.map(function(property){
                     return property.id;
@@ -50,7 +57,7 @@ rightsWrapper.delete = function(user, counterID, callback) {
                 // on delete counter
                 server.sendMsg({
                     removeCounters: objectsCountersIDs,
-                    description: 'Counter ID ' + counterID + ' was removed from DB by user ' + user
+                    description: 'Counter' + counterName + '(' + counterID + ') was removed by user ' + user
                 });
                 history.connect('actionCounterSettings', function () {
                     history.del(objectsCountersIDs, function(err) {
@@ -110,14 +117,16 @@ rightsWrapper.saveObjectsCountersIDs = function(user, initObjectIDs, initCounter
                     for (var i = 0; i < countersIDs.length; i++) {
                         var counterID = countersIDs[i];
 
-                        // don't check user rights to counters because it's will be checking user rights to the linked objects and will
+                        // don't check user rights to counters because it's will be checking user rights to the
+                        // linked objects and will
                         // deny adding a new link with the object to the counter
                         objectsIDs.forEach(function (objectID) {
 
                             var isThisObjectCounterIDExist = false;
                             for(var j = 0; j < rows.length; j++) {
                                 var row = rows[j];
-                                if(Number(row.counterID) === Number(counterID) && Number(row.objectID) === Number(objectID)) {
+                                if(Number(row.counterID) === Number(counterID) &&
+                                    Number(row.objectID) === Number(objectID)) {
                                     isThisObjectCounterIDExist = true;
                                     break;
                                 }
@@ -131,7 +140,8 @@ rightsWrapper.saveObjectsCountersIDs = function(user, initObjectIDs, initCounter
                             }
                         })
                     }
-                    if(objectsCountersIDs.length) counterSaveDB.saveObjectsCountersIDs(objectsCountersIDs, function(err) {
+                    if(objectsCountersIDs.length) counterSaveDB.saveObjectsCountersIDs(objectsCountersIDs,
+                        function(err) {
                         if(err) return callback(err);
                         callback(null, objectsCountersIDs);
                     });
@@ -144,7 +154,6 @@ rightsWrapper.saveObjectsCountersIDs = function(user, initObjectIDs, initCounter
 
 
 rightsWrapper.saveCounter = function(user, counterData, callback) {
-    log.debug('Saving counter into the database', counter, '; linked objects: ', initObjectsIDs);
 
     var initObjectsIDs = counterData.initObjectsIDs;
     var counter = counterData.counter;
@@ -207,7 +216,8 @@ rightsWrapper.saveCounter = function(user, counterData, callback) {
 
             // can be undefined or integer > 0
             if(counter.counterID) {
-                if (!Number(counter.counterID) || Number(counter.counterID) !== parseInt(String(counter.counterID), 10))
+                if (!Number(counter.counterID) ||
+                    Number(counter.counterID) !== parseInt(String(counter.counterID), 10))
                     return callback(new Error('Unexpected counter id: ' + counter.counterID));
                 else counter.counterID = Number(counter.counterID);
             }
@@ -229,7 +239,8 @@ rightsWrapper.saveCounter = function(user, counterData, callback) {
 
 function saveCounter(objectsIDs, counter, counterParameters, updateEvents, variables, callback) {
 
-    collectors.checkParameters(counter.collectorID, counterParameters, variables, function(err, preparedCounterParameters){
+    collectors.checkParameters(counter.collectorID, counterParameters, variables,
+        function(err, preparedCounterParameters){
         if(err) return callback(err);
 
         counterParameters = preparedCounterParameters;
@@ -260,14 +271,14 @@ function saveCounter(objectsIDs, counter, counterParameters, updateEvents, varia
                         else {
                             countersDB.getObjectCounterIDForCounter(counter.counterID, function(err, rows) {
                                 if(err) return callback(new Error('Can\'t get objects counters IDs for counter ' +
-                                    counter.counterID + ' for stop collect data for disabled counter: ' + err.message));
+                                    counter.name + ' for stop collect data for disabled counter: ' + err.message));
 
                                 // when disable counter (and possible on update parameters)
                                 if(rows.length) server.sendMsg({
                                     removeCounters: rows.map(function (row) {
                                         return row.id;
                                     }),
-                                    description: 'Counter ' + JSON.stringify(counter) + ' was updated in database'
+                                    description: 'Counter ' + counter.name + ' was updated in database'
                                 });
                                 callback(err, counter.counterID);
                             })
@@ -275,7 +286,8 @@ function saveCounter(objectsIDs, counter, counterParameters, updateEvents, varia
                     });
                 });
             } else {
-                insertCounter(objectsIDs, counter, counterParameters, updateEvents, variables, function(err, counterID) {
+                insertCounter(objectsIDs, counter, counterParameters, updateEvents, variables,
+                    function(err, counterID) {
                     if(err) return transaction.rollback(err, callback);
 
                     transaction.end(function(err) {
@@ -318,13 +330,14 @@ function updateCounter(objectsIDs, counter, counterParameters, updateEvents, var
                     updateUpdateEvents(counterID, updateEvents, function(err) {
                         if(err) return callback(err);
 
-                        updateObjectsCountersRelations(counterID, objectsIDs, function(err) {
+                        updateObjectsCountersRelations(counterID, objectsIDs, counter.name, function(err) {
                             if(err) return callback(err);
 
                             //updateVariablesRef=oldCounterName: update variables references when counter name is changed
                             if(!counter.updateVariablesRef) return callback();
 
-                            counterSaveDB.updateVariablesRefs(counter.updateVariablesRef, counter.name, function(err) {
+                            counterSaveDB.updateVariablesRefs(counter.updateVariablesRef, counter.name,
+                                function(err) {
                                 if(err) {
                                     return callback(new Error('Can\'t update variables refers after change counter name from ' +
                                         counter.updateVariablesRef + ' to ' + counter.name + ': ' + err.message));
@@ -412,7 +425,8 @@ function updateCounterParameters(counterID, counterParameters, callback) {
                     ' parameters:' + JSON.stringify(parametersNamesForRemove)));
             }
 
-            counterSaveDB.updateCounterParameters(counterID, counterParameters, function (err, notUpdatedParameters) {
+            counterSaveDB.updateCounterParameters(counterID, counterParameters,
+                function (err, notUpdatedParameters) {
                 if(err) {
                     return callback(new Error('Error updating counter ' + counterID + ': ' + err.message) +
                         ' parameters: ' + JSON.stringify(counterParameters));
@@ -483,7 +497,7 @@ function updateUpdateEvents(counterID, updateEvents, callback) {
     }
 }
 
-function updateObjectsCountersRelations(counterID, objectsIDs, callback) {
+function updateObjectsCountersRelations(counterID, objectsIDs, counterName, callback) {
 
     counterSaveDB.getObjectsToCounterRelations(counterID, function(err, existingObjectsIDsObj) {
         if (err) {
@@ -497,7 +511,7 @@ function updateObjectsCountersRelations(counterID, objectsIDs, callback) {
         countersDB.getObjectCounterID(existingObjectsIDs[0], counterID, function(err, row) {
             if(err || !row) {
                 return callback(new Error('Can\'t get objectCounterID for objectID: ' +
-                    existingObjectsIDs[0] + ' and counterID: ' + counterID + ': ' +
+                    existingObjectsIDs[0] + ' and counter: ' + counterName + ': ' +
                     (err ? err.mesage : 'relation is not found in database') ));
             }
 
@@ -512,10 +526,11 @@ function updateObjectsCountersRelations(counterID, objectsIDs, callback) {
             });
 
             var objectsCountersIDsForDeleting = [];
-            async.eachLimit(objectsCountersPairsForDeleting, 100,function (objectCounterPairForDeleting, callback) {
+            async.eachLimit(objectsCountersPairsForDeleting, 100,
+                function (objectCounterPairForDeleting, callback) {
                 countersDB.getObjectCounterID(objectCounterPairForDeleting.objectID, counterID, function (err, row) {
                     if (err || !row) return callback(new Error('Can\'t get objectCounterID for objectID: ' +
-                        objectCounterPairForDeleting.objectID + ' and counterID: ' + counterID + ': ' +
+                        objectCounterPairForDeleting.objectID + ' and counter: ' + counterName + ': ' +
                         (err ? err.mesage : 'relation is not found in database')));
 
                     objectsCountersIDsForDeleting.push(row.id);
@@ -528,16 +543,17 @@ function updateObjectsCountersRelations(counterID, objectsIDs, callback) {
                 // in counterSaveDB.deleteObjectCounterID set if(!objectsCountersPairsForDeleting.length) return callback();
                 counterSaveDB.deleteObjectCounterID(objectsCountersPairsForDeleting, function(err) {
                     if(err) {
-                        callback(new Error('Error updating counter ' + counterID +
+                        callback(new Error('Error updating counter ' + counterName +
                             ' when deleting objects to counter relations: ' + err.message +
-                            ': ' +   JSON.stringify(objectsCountersPairsForDeleting)));
+                            ': ' +  JSON.stringify(objectsCountersPairsForDeleting)));
                     }
 
                     if(objectsCountersIDsForDeleting.length) {
                         // on delete some objectsCountersIDs
                         server.sendMsg({
                             removeCounters: objectsCountersIDsForDeleting,
-                            description: 'This objects to counter relations was removed from database'
+                            description: 'This objects to counter ' + counterName +
+                                ' relations was removed from database when updating counter'
                         });
 
                         // delete history only if all objects to counter relations are deleting
@@ -563,7 +579,7 @@ function updateObjectsCountersRelations(counterID, objectsIDs, callback) {
                         }
                     });
 
-                    log.debug('Current ObjectsIDs for counterID ', counterID, ' is: ', existingObjectsIDs,
+                    log.debug('Current ObjectsIDs for counter ', counterName, ' is: ', existingObjectsIDs,
                         ', new objectsIDs: ', objectsIDs,
                         ' objectsCountersIDs for inserting: ', objectsCountersPairsForInserting,
                         ' objectsCountersIDs for deleting: ', objectsCountersPairsForDeleting);
@@ -571,7 +587,7 @@ function updateObjectsCountersRelations(counterID, objectsIDs, callback) {
                     // in counterSaveDB.saveObjectsCountersIDs set if(!objectsCountersPairsForInserting) return callback()
                     counterSaveDB.saveObjectsCountersIDs(objectsCountersPairsForInserting, function(err) {
                         if(err) {
-                            return callback(new Error('Error updating counter ' + counterID +
+                            return callback(new Error('Error updating counter ' + counterName +
                                 ' while inserting new objects to counters relations :' + err.message +
                                 '; OCIDs: '+ JSON.stringify(objectsCountersPairsForInserting)));
                         }
@@ -583,112 +599,3 @@ function updateObjectsCountersRelations(counterID, objectsIDs, callback) {
         });
     });
 }
-
-/*
-function updateObjectsCountersRelations(counterID, objectsIDs, callback) {
-
-    counterSaveDB.getObjectsToCounterRelations(counterID, function(err, existingObjectsIDsObj) {
-        if (err) return callback(new Error('Error getting objects to counters relations for counter ' + counterID + ': ' + err.message));
-
-        // existingObjectsIDsObj: [{objectID:...}, {objectID: ...}, ...]. convert it to plain array
-        var existingObjectsIDs = existingObjectsIDsObj.map(function(obj) { return obj.objectID });
-
-        //existing 5,9,10
-        //new      9,10,12
-
-        // also remove duplicates
-        var objectsCountersPairsForInserting = objectsIDs.filter(function(objectID, pos) {
-            return existingObjectsIDs.indexOf(objectID) === -1 && objectsIDs.indexOf(objectID) === pos;
-        }).map(function (objectID) {
-            return {
-                objectID: objectID,
-                counterID: counterID
-            }
-        });
-
-        // also remove duplicates
-        var objectsCountersPairsForDeleting = existingObjectsIDs.filter(function(objectID, pos) {
-            return objectsIDs.indexOf(objectID) === -1 && existingObjectsIDs.indexOf(objectID) === pos;
-        }).map(function (objectID) {
-            return {
-                objectID: objectID,
-                counterID: counterID
-            }
-        });
-
-        countersDB.getObjectCounterID(existingObjectsIDs[0], counterID, function(err, row) {
-            if(err || !row) {
-                return callback(new Error('Can\'t get objectCounterID for objectID: ' +
-                    existingObjectsIDs[0] + ' and counterID: ' + counterID + ': ' +
-                    (err ? err.mesage : 'relation is not found in database') ));
-            }
-
-            log.debug('Current ObjectsIDs for counterID ', counterID, ' is: ', existingObjectsIDs,
-                ', new objectsIDs: ', objectsIDs,
-                ' objectsCountersIDs for inserting: ', objectsCountersPairsForInserting,
-                ' objectsCountersIDs for deleting: ', objectsCountersPairsForDeleting);
-
-            if(!objectsCountersPairsForDeleting.length) {
-                var deleteObjectsCountersIDs = function (callback) {
-                    callback();
-                };
-            } else deleteObjectsCountersIDs = function(callback) {
-
-                var objectsCountersIDsForDeleting = [];
-                async.eachLimit(objectsCountersPairsForDeleting, 1000,function (objectCounterPairForDeleting, callback) {
-                    countersDB.getObjectCounterID(objectCounterPairForDeleting.objectID, counterID, function (err, row) {
-
-                        if (err || !row) return callback(new Error('Can\'t get objectCounterID for objectID: ' +
-                            objectCounterPairForDeleting.objectID + ' and counterID: ' + counterID + ': ' +
-                            (err ? err.mesage : 'relation is not found in database')));
-
-                        objectsCountersIDsForDeleting.push(row.id);
-                        callback();
-                    });
-
-                }, function (err) {
-                    if (err) return callback(err);
-
-                    counterSaveDB.deleteObjectCounterID(objectsCountersPairsForDeleting, function(err) {
-                        if(err) return callback(err);
-
-                        // on delete some objectsCountersIDs
-                        server.sendMsg({
-                            removeCounters: objectsCountersIDsForDeleting,
-                            description: 'This objects to counters relations was removed from database'
-                        });
-
-                        // delete history only if all objects to counter relations are deleting
-                        history.connect('actionCounterSettings', function () {
-                            history.del(objectsCountersIDsForDeleting, function (err) {
-                                if (err) log.error(err.message);
-                            });
-                        });
-
-                        // Don't wait for the records to be removed from history
-                        // This can last a long time when the housekeeper is working.
-                        callback();
-                    });
-                });
-            };
-
-            deleteObjectsCountersIDs(function(err) {
-                if(err) return callback(new Error('Error updating counter ' + counterID +
-                    ' when deleting objects to counter relations "' +
-                    JSON.stringify(objectsCountersPairsForDeleting) + '": ' + err.message));
-
-                // no objectsCountersIDs for inserting
-                if(!objectsCountersPairsForInserting.length) return callback();
-
-                counterSaveDB.saveObjectsCountersIDs(objectsCountersPairsForInserting, function(err) {
-                    if(err) return callback(new Error('Error updating counter ' + counterID +
-                        ' while inserting new objects to counters relations "' +
-                        JSON.stringify(objectsCountersPairsForInserting) + '": ' +  err.message));
-
-                    callback();
-                })
-            });
-        });
-    });
-}
-*/

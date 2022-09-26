@@ -136,6 +136,20 @@ body
                     производиться не будет. В системном меню Objects отключенные объекты обозначаются курсивом.
                 img(src="./images/help.disabledObjects.png" width="1024").materialboxed.card-panel.hoverable
 
+                h4 Color, Shade и Example of object coloring
+                p.
+                    С помощью Color и Shade можно задать цвет и оттенок этого цвета для нового объекта.
+                    Example of object coloring покажет, как будет выглядеть объект в списке объектов.
+                h4 AlepizID
+                p.
+                    Используется для обозначения принадлежности объекта определенному серверу ALEPIZ.
+                    Данные для объекта будут собираться только на сервере, которому принадлежит объект.
+                    Можно использовать одну конфигурацию для несколько серверов ALEPIZ
+                    и с помощью этого свойства выбирать, какой из серверов будет собирать данные для объекта.
+                    Список всех идентификаторов находится в БД ALEPIZ.
+                    для текущего Alepiz идентификаторы можно указать в файле конфигурации
+                    #[a(href="/help/settingsServer.pug") Описание настроек Counter processor сервера server.json]
+                    с помощью параметра AlepizNames.
                 h4 Link templates counters to objects
                 p.
                     Подключить счетчики, подключенные к объектам из Destination objects к объектам из Source objects.

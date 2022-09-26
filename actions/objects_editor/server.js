@@ -7,11 +7,15 @@
  */
 var objectsDB = require('../../rightsWrappers/objectsDB');
 var countersDB = require('../../rightsWrappers/countersDB');
-var counterDBRaw = require('../../models_db/countersDB');
+var rawCountersDB = require('../../models_db/countersDB');
+var rawObjectsDB = require('../../models_db/objectsDB');
 var counterSaveDB = require('../../models_db/counterSaveDB');
 var transactionDB = require('../../models_db/transaction');
 var log = require('../../lib/log')(module);
 var server = require('../../server/counterProcessor');
+const Conf = require("../../lib/conf");
+const confServer = new Conf('config/server.json');
+
 
 module.exports = function(args, callback) {
     log.debug('Starting action server \"'+args.actionName+'\" with parameters', args);
@@ -72,9 +76,20 @@ function editObjects(user, param, callback){
         }
     }
 
+    // color will be unchanged if color is undefined.
+    var color;
+    if(param.objectsColor !== '0') {
+        color = ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue', 'light-blue', 'cyan', 'teal',
+            'green', 'light-green', 'lime', 'yellow', 'amber', 'orange', 'deep-orange', 'brown', 'grey', 'blue-grey',
+            'black', 'white', 'transparent'].indexOf((param.objectsColor || '').toLowerCase()) !== -1 ?
+            param.objectsColor + ':' +
+            (/^(lighten)|(darken)|(accent)-[1-4]$/.test((param.objectsShade || '').toLowerCase()) ? param.objectsShade : '') :
+            null;
+    }
+
     // Do not check the rights to counters, because otherwise counters that are not linked to any object
     // will be skipped
-    counterDBRaw.getAllCounters(function (err, counterRows) {
+    rawCountersDB.getAllCounters(function (err, counterRows) {
         if(err) return callback(err);
 
         var counterID2Name = {};
@@ -141,7 +156,7 @@ function editObjects(user, param, callback){
                     if(newObjects && newObjects.length) log.info('Rename objects: ', newObjects);
                     // update description and order for all existing objects
                     objectsDB.updateObjectsInformation(user, objectIDs, param.objectsDescription, order,
-                        param.disabled ? 1 : 0, function (err, isObjectsUpdated) {
+                        param.disabled ? 1 : 0, color, function (err, isObjectsUpdated) {
                         if (err) return transactionDB.rollback(err, callback);
                         if(isObjectsUpdated) {
                             log.info('Update object information: order: ', order,
@@ -160,33 +175,66 @@ function editObjects(user, param, callback){
                             counterSaveDB.saveObjectsCountersIDs(Array.from(OCIDsToInsert), function(err) {
                                 if(err) return transactionDB.rollback(err, callback);
 
-                                transactionDB.end(function (err) {
-                                    if (err) return callback(err);
+                                // param.alepizIDs === '' - remove alepizIDs
+                                // param.alepizIDs === '-1' - save alepizIDs unchanged
+                                var objectIDsForRelationships = param.alepizIDs !== '-1' ? objectIDs : [];
+                                rawObjectsDB.deleteObjectsAlepizRelation(objectIDsForRelationships, function (err) {
+                                    if(err) return transactionDB.rollback(err, callback);
 
-                                    // send message for updating collected initial data for objects
-                                    if (!param.disabled) {
-                                        server.sendMsg({
-                                            update: {
-                                                topObjects: true,
-                                                objectsCounters: true
-                                            },
-                                            updateObjectsIDs: objectIDs
+                                    var alepizIDs = param.alepizIDs && param.alepizIDs !== '-1' ?
+                                        param.alepizIDs.split(',').map(id => parseInt(id, 10)) : [];
+
+                                    rawObjectsDB.addObjectsAlepizRelation(objectIDsForRelationships, alepizIDs,
+                                        function (err) {
+                                        if(err) return transactionDB.rollback(err, callback);
+
+                                        transactionDB.end(function (err) {
+                                            if (err) return callback(err);
+
+                                            rawObjectsDB.getAlepizIDs(function (err, alepizIDsObj) {
+                                                if(err) return callback(err);
+
+                                                var alepizID2Name = {};
+                                                alepizIDsObj.forEach(row => { alepizID2Name[row.id] = row.name});
+                                                var alepizNames = confServer.get('alepizNames');
+                                                var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== 1;
+                                                var ownerOfSpecifiedAlepizIDs = alepizIDs.some(alepizID => {
+                                                    return alepizNames.indexOf(alepizID2Name[alepizID]) !== -1;
+                                                });
+                                                //console.log('!!!', param.disabled, alepizIDs, ownerOfUnspecifiedAlepizIDs, ownerOfSpecifiedAlepizIDs)
+                                                var objectsAreEnabled = !param.disabled &&
+                                                    ((!alepizIDs.length && ownerOfUnspecifiedAlepizIDs) ||
+                                                        ownerOfSpecifiedAlepizIDs);
+                                                // send message for updating collected initial data for objects
+                                                if (objectsAreEnabled) {
+                                                    server.sendMsg({
+                                                        update: {
+                                                            topObjects: true,
+                                                            objectsCounters: true
+                                                        },
+                                                        updateObjectsIDs: objectIDs
+                                                    });
+                                                    return callback(null, objectIDs.join(','));
+                                                }
+
+                                                // object disabled. remove counters
+                                                objectsDB.getObjectsCountersIDs(user, objectIDs, function (err, rows) {
+                                                    if (err) return callback(err);
+
+                                                    var OCIDs = rows.map(row => row.id);
+                                                    if (OCIDs.length) server.sendMsg({
+                                                        removeCounters: OCIDs,
+                                                        description: 'Objects were disabled from the "object editor" by user ' +
+                                                            user + '. Object names: ' +
+                                                            objectIDs.map(objectID => objectID2Name[objectID]).join('; ')
+                                                    });
+                                                    callback(null, objectIDs.join(','));
+                                                });
+
+                                            })
                                         });
-                                        return callback(null, objectIDs.join(','));
-                                    }
+                                    })
 
-                                    // object disabled. remove counters
-                                    objectsDB.getObjectsCountersIDs(user, objectIDs, function (err, rows) {
-                                        if (err) return callback(err);
-
-                                        var OCIDs = rows.map(row => row.id);
-                                        if (OCIDs.length) server.sendMsg({
-                                            removeCounters: OCIDs,
-                                            description: 'Object IDs ' + objectIDs.join(', ') +
-                                                ' was disabled from "object editor" by user ' + user
-                                        });
-                                        callback(null, objectIDs.join(','));
-                                    });
                                 });
                             });
                         });

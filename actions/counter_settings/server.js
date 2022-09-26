@@ -15,7 +15,7 @@ module.exports = function(args, callback) {
         if(!Number(args.counterID) || Number(args.counterID) !== parseInt(args.counterID, 10))
             return callback(new Error('Invalid counter ID for delete counter: ' + args.counterID + ' (' + args.name + ')'));
 
-        counterSaveDB.delete(args.username, args.counterID, function(err){
+        counterSaveDB.deleteCounter(args.username, args.counterID, args.name, function(err){
             if(err) return callback(err);
 
             log.info('Counter ', args.counterID ,'(' + args.name + ') was deleted');

@@ -3,18 +3,19 @@
  */
 
 function callbackBeforeExec(callback) {
-    if(!$('#sourceObjectsIDs').val()) return callback(new Error('Source objects are not selected'));
-    if(!$('#cloneToObjectsIDs').val()) return callback(new Error('Destination objects are not selected'));
-    callback()
+    jqueryNameSpace.beforeExec(callback);
 }
 
-(function ($) {
+var jqueryNameSpace = (function ($) {
     $(function () {
         objects = parameters.objects;
         disabledCBElm = $('#disabledCB');
         disabledElm = $('#disabled');
         objectsOrderElm = $('#objectsOrder');
         objectsDescriptionElm = $('#objectsDescription');
+        colorSampleElm = $('#colorSample');
+        colorPicker.init($('#colorPickerParent'), $('#shadePickerParent'), colorSampleElm);
+        alepizIDPicker.init($('#alepizIDPickerParent'));
         init();
         initEvents();
     });
@@ -26,6 +27,7 @@ function callbackBeforeExec(callback) {
     var objectsDescriptionElm;
     var defaultValueForDisabled;
     var objectsInteractions, objectsCountersLinkage, objectsProperties, objectsParameters;
+    var colorSampleElm;
 
     function init() {
         $('#sourceObjectsIDs').objectsSelector(parameters.objects, initSourceObjects);
@@ -35,9 +37,27 @@ function callbackBeforeExec(callback) {
         M.Tooltip.init(document.querySelectorAll('.tooltipped'), {enterDelay: 500});
     }
 
+    function beforeExec(callback) {
+        var cloneToObjectsIDsElm = $('#cloneToObjectsIDs');
+        if(!$('#sourceObjectsIDs').val()) return callback(new Error('Source objects are not selected'));
+        if(!cloneToObjectsIDsElm.val()) return callback(new Error('Destination objects are not selected'));
+        $('#cloneToObjectNames').val(cloneToObjectsIDsElm.getObjects().map(o => o.name).join(', '));
+        callback()
+    }
+
+
     function initSourceObjects() {
         objectsInteractions = objectsCountersLinkage = objectsProperties = objectsParameters = undefined;
-        var objectsIDs = $('#sourceObjectsIDs').val();
+
+        var objects = $('#sourceObjectsIDs').getObjects() || [];
+        var objectsIDs = [], objectsNames = [];
+        objects.forEach(function (obj) {
+            objectsIDs.push(obj.id)
+            objectsNames.push(obj.name);
+        });
+
+        colorSampleElm.text(objectsNames.join(', ').trim() || 'OBJECT NAME');
+        //var objectsIDs = $('#sourceObjectsIDs').val();
 
         // objects were not selected
         if(!objectsIDs || !objectsIDs.length) {
@@ -45,6 +65,9 @@ function callbackBeforeExec(callback) {
             drawCounters();
             drawObjectsProperties();
             drawObjectParameters();
+            $.post(serverURL, {func: 'getObjectServerRelation'}, function(alepizIDs) {
+                alepizIDPicker.seObjectServerRelation(alepizIDs);
+            });
             return;
         }
 
@@ -52,6 +75,9 @@ function callbackBeforeExec(callback) {
         $.post(serverURL, {func: 'getCounters', ids: objectsIDs.join(',')}, drawCounters);
         $.post(serverURL, {func: 'getProperties', ids: objectsIDs.join(',')}, drawObjectsProperties);
         $.post(serverURL, {func: 'getTemplatesParameters', ids: objectsIDs.join(',')}, drawObjectParameters);
+        $.post(serverURL, {func: 'getObjectServerRelation', ids: objectsIDs.join(',')}, function(data) {
+            alepizIDPicker.seObjectServerRelation(data.alepizIDs, data.objectsAlepizRelations, objectsIDs.length);
+        });
     }
 
     function initEvents() {
@@ -239,15 +265,19 @@ function callbackBeforeExec(callback) {
         if(_objectsParameters && _objectsParameters.length) {
             objectsParameters = _objectsParameters;
 
-            var disabled = objectsParameters[0].disabled, sortPosition = objectsParameters[0].sortPosition,
-                description = objectsParameters[0].description;
+            var disabled = objectsParameters[0].disabled,
+                sortPosition = objectsParameters[0].sortPosition,
+                description = objectsParameters[0].description,
+                colorShade = objectsParameters[0].color;
 
             for (var i = 1; i < objectsParameters.length; i++) {
                 var obj = objectsParameters[i];
                 if (disabled !== obj.disabled) disabled = undefined;
                 if (sortPosition !== obj.sortPosition) sortPosition = undefined;
                 if (description !== obj.description) description = undefined;
-                if (description === undefined && sortPosition === undefined && disabled === undefined) break;
+                if (colorShade !== obj.color) colorShade = undefined; // save unchanged
+                if (description === undefined && sortPosition === undefined &&
+                    disabled === undefined && colorShade === undefined) break;
             }
         }
 
@@ -266,8 +296,16 @@ function callbackBeforeExec(callback) {
         if(description) objectsDescriptionElm.val(description);
         else objectsDescriptionElm.val('');
 
+        var [color, shade] = colorShade ? colorShade.split(':') : ['', ''];
+
+        if(colorShade === undefined && objectsParameters && objectsParameters.length) var addSaveUnchanged = true
+        colorPicker.setColorAndShade(color, shade, addSaveUnchanged);
+
         M.updateTextFields();
-        M.FormSelect.init(objectsOrderElm[0], {});
+        M.FormSelect.init(document.querySelectorAll('select'), {});
     }
 
+    return {
+        beforeExec: beforeExec,
+    }
 })(jQuery); // end of jQuery name space

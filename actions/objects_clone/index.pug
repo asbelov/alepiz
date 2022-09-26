@@ -12,28 +12,14 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         script(src='/jquery/jquery.min.js')
         script(src='/jquery-ui/jquery-ui.min.js')
         script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/escapeHTML.js')
+        script(src='/javascripts/colorPicker.js')
+        script(src='/javascripts/alepizIDPicker.js')
         script.
             var parameters = {
                 action: !{JSON.stringify(action)},
                 objects: !{JSON.stringify(objects)}
             };
-
-            var entityMap = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;',
-                '/': '&#x2F;',
-                '`': '&#x60;',
-                '=': '&#x3D;'
-            };
-
-            function escapeHtml(string) {
-                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
-                    return entityMap[s];
-                });
-            }
     body
     main
         div.row
@@ -47,11 +33,12 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                 div.row
                     div.col.l6.m6.s12
                         select(title="Source objects"
-                            description="Selected objects will be used as source (or templates) for clone counters links, properties and interaction")#sourceObjectsIDs
+                            description="Selected objects will be used as source (or templates) for clone counters links, properties and interaction").browser-default#sourceObjectsIDs
                     div.col.l6.m6.s12
                         select(title="Destination objects"
                             description="Select objects or add a new objects for clone. If you add a new objects, this objects will be created"
-                            add-custom-object="a new objects")#cloneToObjectsIDs
+                            add-custom-object="a new objects").browser-default#cloneToObjectsIDs
+                        input(type="hidden")#cloneToObjectNames
                     div.col.s12
                         div.card
                             div.card-content
@@ -76,6 +63,16 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                             input(type='checkbox' value="1")#disabledCB
                                             span(data-tooltip="Prevent to collect data by object counters").tooltipped Disable objects
                                         input(type="hidden")#disabled
+                                div.no-margin.no-padding.row
+                                    div.input-field.col.s12.m6.l3#colorPickerParent
+                                    div.input-field.col.s12.m6.l3#shadePickerParent
+                                    div(style="position:relative").input-field.col.s12.m6.l3
+                                        label.drop-down-label Example of object coloring
+                                        label
+                                            input(type='checkbox')
+                                            span
+                                        div(style="padding: 12px 0 4px 32px" data-tooltip="This is how the color of the object in the list of objects will look like").tooltipped.black-text.col.s11.truncate#colorSample OBJECT NAME
+                                    div.input-field.col.s12.m6.l3#alepizIDPickerParent
                                 div.row
                                     div.col.s12.m4.l4
                                         div.row

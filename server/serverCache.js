@@ -12,7 +12,7 @@ var recordsFromDBCnt = 0;
 module.exports = createCache;
 
 
-function createCache(updateMode, callback) {
+function createCache(updateMode, alepizNames, callback) {
     if(updateMode && (!updateMode.updateObjectsCounters && !updateMode.getHistoryVariables.length &&
         !updateMode.getVariablesExpressions.length && !updateMode.geObjectsProperties.length)) return callback();
 
@@ -23,15 +23,18 @@ function createCache(updateMode, callback) {
         objectsProperties: new Map(),
     };
     var counterObjectNames = new Map();
+    var objectAlepizRelation = new Map();
 
     async.parallel([
         // countersObjects and counterObjectNames
         function(callback) {
             if(updateMode  && !updateMode.updateObjectsCounters) return callback();
 
-            getDataForCheckDependencies(function(err, _counterObjectNames, countersObjects) {
+            getDataForCheckDependencies(alepizNames,
+                function(err, _counterObjectNames, countersObjects, _objectAlepizRelation) {
                 counterObjectNames = _counterObjectNames;
                 cache.countersObjects = countersObjects;
+                objectAlepizRelation = _objectAlepizRelation;
                 callback(err);
             });
         },
@@ -54,18 +57,20 @@ function createCache(updateMode, callback) {
                 'objectID', cache.objectsProperties, callback);
         }
     ], function(err) {
-        return callback(err, cache, counterObjectNames, recordsFromDBCnt);
+        return callback(err, cache, counterObjectNames, objectAlepizRelation, recordsFromDBCnt);
     });
 }
 
-function getDataForCheckDependencies(callback) {
+function getDataForCheckDependencies(alepizNames, callback) {
     var counters = new Map(),
         objects = new Map(),
+        objectAlepizRelation = new Map(),
         allObjects = new Map(),
         countersParams = new Map(),
         objectName2OCID = new Map(),
         OCIDs = new Map(),
         counterObjectNames = new Map();
+
 
     countersDB.getAllObjectsCounters(function(err, rowsOCIDs) {
         if (err) return callback(err);
@@ -82,84 +87,107 @@ function getDataForCheckDependencies(callback) {
                     objectsDB.getAllObjects(function(err, rowsObjects) {
                         if (err) return callback(err);
 
-                        recordsFromDBCnt += rowsOCIDs.length + rowsCounters.length + rowsUpdateEvents.length + rowsObjects.length;
+                        objectsDB.getObjectsAlepizRelation(function (err, rowsAlepizRelations) {
+                            if (err) return callback(err);
 
-                        rowsObjects.forEach(function (row) {
-                            // All available hosts needs for calcFunction.js: findObjectsLike()
-                            allObjects.set(row.id, row.name);
-                            if(!row.disabled) objects.set(row.id, row.name);
-                        });
+                            recordsFromDBCnt += rowsOCIDs.length + rowsCounters.length + rowsUpdateEvents.length +
+                                rowsObjects.length + rowsAlepizRelations.length;
 
-                        rowsCountersParams.forEach(function (row) {
-                            if(!countersParams.has(row.counterID)) countersParams.set(row.counterID, []);
-                            countersParams.get(row.counterID).push({
-                                name: row.name,
-                                value: row.value,
-                            });
-                        });
 
-                        rowsCounters.forEach(function (row) {
-                            if(row.disabled) return;
-
-                            counters.set(row.id, {
-                                objectsIDs: new Map(),
-                                dependedUpdateEvents: new Map(), // {parentCounterID1: { expression, mode, parentObjectID, counterID}, ... }
-                                //counterID: row.id,
-                                collector: row.collectorID,
-                                counterName: row.name,
-                                debug: row.debug,
-                                taskCondition: row.taskCondition,
-                                //groupID: row.groupID,
-                                counterParams: countersParams.get(row.id),
-                            });
-                        });
-
-                        rowsUpdateEvents.forEach(function (row) {
-                            if(!counters.has(row.parentCounterID) || !counters.has(row.counterID) ||
-                                (row.parentObjectID && !objects.has(row.parentObjectID)) ) return;
-
-                            counters.get(row.parentCounterID).dependedUpdateEvents.set(row.counterID, {
-                                counterID: row.counterID,
-                                expression: row.expression,
-                                mode: row.mode,
-                                objectFilter: row.objectFilter,
-                                parentObjectID: row.parentObjectID,
-                            });
-                        });
-
-                        rowsOCIDs.forEach(function (row) {
-                            if(!counters.has(row.counterID) || !objects.has(row.objectID)) return;
-                            counters.get(row.counterID).objectsIDs.set(row.objectID, row.id);
-
-                            OCIDs.set(row.id, {
-                                objectID: row.objectID,
-                                counterID: row.counterID,
+                            rowsAlepizRelations.forEach(function (row) {
+                                if(objectAlepizRelation.has(row.objectID)) {
+                                    objectAlepizRelation.get(row.objectID).push(row.alepizName);
+                                } else {
+                                    objectAlepizRelation.set(row.objectID, [row.alepizName]);
+                                }
                             });
 
-                            counterObjectNames.set(row.id, {
-                                objectName: allObjects.get(row.objectID),
-                                counterName: counters.get(row.counterID).counterName,
+                            var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== 1;
+                            rowsObjects.forEach(function (row) {
+                                // All available hosts are needed for calcFunction.js: findObjectsLike()
+                                allObjects.set(row.id, row.name);
+                                var objectsAlepizNames = objectAlepizRelation.get(row.id);
+                                if (!row.disabled) {
+                                    if ((objectsAlepizNames === undefined && ownerOfUnspecifiedAlepizIDs) ||
+                                        objectsAlepizNames.some(name => alepizNames.indexOf(name) !== -1)
+                                    ) {
+                                        objects.set(row.id, row.name);
+                                    }
+                                }
                             });
 
-                            var objectNameInUpperCase = objects.get(row.objectID).toUpperCase();
-                            if(!objectName2OCID.has(objectNameInUpperCase)) {
-                                objectName2OCID.set(objectNameInUpperCase, new Map());
-                            }
-                            objectName2OCID.get(objectNameInUpperCase).set(row.counterID, row.id);
-                        });
+                            rowsCountersParams.forEach(function (row) {
+                                if (!countersParams.has(row.counterID)) countersParams.set(row.counterID, []);
+                                countersParams.get(row.counterID).push({
+                                    name: row.name,
+                                    value: row.value,
+                                });
+                            });
 
-                        //console.log(counters);
+                            rowsCounters.forEach(function (row) {
+                                if (row.disabled) return;
 
-                        callback(null, counterObjectNames, {
-                            // Map(<OCID>, <Map(<objectID>, <counterID>)>
-                            OCIDs: OCIDs,
-                            // Map(<objectID, objectName>)
-                            objects: allObjects,
-                            // Map(<objectNameInUpperCase>, <Map(<counterID>, <OCID>)>)
-                            objectName2OCID: objectName2OCID,
-                            // Map(<counterID>, <{objectsIDs, dependedUpdateEvents, collector, counterName, debug, taskCondition,
-                            // groupID, counterParams}>)
-                            counters: counters,
+                                counters.set(row.id, {
+                                    objectsIDs: new Map(),
+                                    // {parentCounterID1: { expression, mode, parentObjectID, counterID}, ... }
+                                    dependedUpdateEvents: new Map(),
+                                    //counterID: row.id,
+                                    collector: row.collectorID,
+                                    counterName: row.name,
+                                    debug: row.debug,
+                                    taskCondition: row.taskCondition,
+                                    //groupID: row.groupID,
+                                    counterParams: countersParams.get(row.id),
+                                });
+                            });
+
+                            rowsUpdateEvents.forEach(function (row) {
+                                if (!counters.has(row.parentCounterID) || !counters.has(row.counterID) ||
+                                    (row.parentObjectID && !objects.has(row.parentObjectID))) return;
+
+                                counters.get(row.parentCounterID).dependedUpdateEvents.set(row.counterID, {
+                                    counterID: row.counterID,
+                                    expression: row.expression,
+                                    mode: row.mode,
+                                    objectFilter: row.objectFilter,
+                                    parentObjectID: row.parentObjectID,
+                                });
+                            });
+
+                            rowsOCIDs.forEach(function (row) {
+                                if (!counters.has(row.counterID) || !objects.has(row.objectID)) return;
+                                counters.get(row.counterID).objectsIDs.set(row.objectID, row.id);
+
+                                OCIDs.set(row.id, {
+                                    objectID: row.objectID,
+                                    counterID: row.counterID,
+                                });
+
+                                counterObjectNames.set(row.id, {
+                                    objectName: allObjects.get(row.objectID),
+                                    counterName: counters.get(row.counterID).counterName,
+                                });
+
+                                var objectNameInUpperCase = objects.get(row.objectID).toUpperCase();
+                                if (!objectName2OCID.has(objectNameInUpperCase)) {
+                                    objectName2OCID.set(objectNameInUpperCase, new Map());
+                                }
+                                objectName2OCID.get(objectNameInUpperCase).set(row.counterID, row.id);
+                            });
+
+                            //console.log(counters);
+
+                            callback(null, counterObjectNames, {
+                                // Map(<OCID>, <Map(<objectID>, <counterID>)>
+                                OCIDs: OCIDs,
+                                // Map(<objectID, objectName>)
+                                objects: allObjects,
+                                // Map(<objectNameInUpperCase>, <Map(<counterID>, <OCID>)>)
+                                objectName2OCID: objectName2OCID,
+                                // Map(<counterID>, <{objectsIDs, dependedUpdateEvents, collector, counterName,
+                                // debug, taskCondition, groupID, counterParams}>)
+                                counters: counters,
+                            }, objectAlepizRelation);
                         });
                     });
                 });

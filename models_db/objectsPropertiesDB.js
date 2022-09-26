@@ -24,25 +24,21 @@ objectsPropertiesDB.getProperties = function (objectsIDs, callback) {
 
     if(!objectsIDs || !objectsIDs.length) return db.all('SELECT * FROM objectsProperties', callback);
 
-    if(objectsIDs.length < db.maxVariableNumber)
-        db.all('SELECT * FROM objectsProperties WHERE objectID IN (' + (Array(objectsIDs.length).fill('?')).join(',')+ ')', objectsIDs, callback);
-    else {
-        var rows = [];
-        var stmt = db.prepare('SELECT * FROM objectsProperties WHERE objectID = ?', function(err) {
-            if(err) return callback(err);
+    var rows = [];
+    var stmt = db.prepare('SELECT * FROM objectsProperties WHERE objectID = ?', function(err) {
+        if(err) return callback(err);
 
-            async.eachLimit(objectsIDs,100,function(objectID, callback) {
-                stmt.all(objectID, function(err, res) {
-                    if(err) return callback(err);
-                    rows.push.apply(rows, res);
-                    callback();
-                });
-            }, function(err) {
-                stmt.finalize();
-                callback(err, rows);
+        async.eachLimit(objectsIDs,100,function(objectID, callback) {
+            stmt.all(objectID, function(err, res) {
+                if(err) return callback(err);
+                rows.push.apply(rows, res);
+                callback();
             });
+        }, function(err) {
+            stmt.finalize();
+            callback(err, rows);
         });
-    }
+    });
 };
 
 objectsPropertiesDB.updateProperties = function(objectID, properties, callback) {
@@ -120,9 +116,9 @@ objectsPropertiesDB.deleteProperties = function(objectID, propertiesNames, callb
     });
 };
 
-/** Get object property by property name (SQL LIKE sintaxis)
+/** Get object property by property name (SQL LIKE syntax)
  *
- * @param {string} propertyName - SQL Like property name (wildcards: "%" any simbols, "_" one simbol, "\\";"\%";"\_" - for escape)
+ * @param {string} propertyName - SQL Like property name (wildcards: "%" any symbols, "_" one symbol, "\\";"\%";"\_" - for escape)
  * @param {function(Error)|function(null, Array)} callback - return error or an Array with object properties
  * [{objectName:..., objectID:..., propName:..., propVal:..., propMode:... propDescription:...}, ....]
  */
@@ -134,16 +130,4 @@ objectsPropertiesDB.getObjectsForProperty = function (propertyName, callback) {
         'objectsProperties.description AS propDescription FROM objects ' +
         'JOIN objectsProperties ON objects.id=objectsProperties.objectID '+
         'WHERE objectsProperties.name LIKE ? ESCAPE "\\" ORDER BY objects.name', propertyName, callback);
-}
-
-objectsPropertiesDB.getObjectProperty = function (objectName, propertyName, callback) {
-    log.debug('Getting property ', propertyName,' for object like ', objectName);
-
-    db.all('SELECT objects.name AS objectName, objectsProperties.name AS propertyName, objectsProperties.value AS value ' +
-        'FROM objectsProperties ' +
-        'JOIN objects ON objects.ID = objectsProperties.objectID ' +
-        'WHERE objects.name LIKE $objectName ESCAPE "\\" AND objectsProperties.name = $propertyName COLLATE NOCASE', {
-        $objectName: objectName,
-        $propertyName: propertyName,
-    }, callback);
 }

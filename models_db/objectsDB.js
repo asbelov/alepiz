@@ -61,16 +61,18 @@ objectsDB.getAllObjects = function(callback) {
  newObjectNames - array of new objects names
  description - description for new object names
  order - sort position for new objects.  Top objects has order < 10 objectsFilterDB.js
+ disabled - 1|0
+ color = <color>:<shade> (https://materializecss.com/color.html#palette)
  callback(err, newObjectsIDs),
  newObjectsIDs - array of a new objects IDs;
  newObjects - object like {<objectName1>: <objectID1>, ...}
  */
-objectsDB.addObjects = function(newObjectsNames, description, order, disabled, callback){
+objectsDB.addObjects = function(newObjectsNames, description, order, disabled, color, callback){
     log.debug('Add objects: ', newObjectsNames, ', description: ', description, ', order: ', order, ', disabled: ', disabled);
 
     // Prepare statement for inserting new objects into a database
-    var stmt = db.prepare('INSERT INTO objects (name, description, sortPosition, disabled, created) VALUES ' +
-        '($name,$description,$sortPosition, $disabled, $created)', function(err) {
+    var stmt = db.prepare('INSERT INTO objects (name, description, sortPosition, disabled, color, created) VALUES ' +
+        '($name,$description,$sortPosition, $disabled, $color, $created)', function(err) {
         if(err) return callback(err);
 
         // array with IDs of a new objects, which inserting
@@ -83,6 +85,7 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled, c
                 $description: description,
                 $sortPosition: order,
                 $disabled: disabled,
+                $color: color,
                 $created: Date.now(),
             }, function (err, info) {
                 if(err) return callback(err);
@@ -106,16 +109,18 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled, c
 // description - object description one for all
 // order - object sort position in an objects' menu, one for all.  Top objects has order < 10 objectsFilterDB.js
 // disabled - 1|0|undefined if unchanged
+// color = <color>:<shade> (https://materializecss.com/color.html#palette)
 // callback(err, true|undefined), where "true" if objects information are updated
 //
 // undefined description or order are not updated
-objectsDB.updateObjectsInformation = function (IDs, description, order, disabled,  callback) {
+objectsDB.updateObjectsInformation = function (IDs, description, order, disabled,  color, callback) {
     log.debug('Update objects IDs: ', IDs, '; description: ', description, '; order; ', order, '; disabled: ', disabled);
 
     var subQuery = [];
     if(disabled !== undefined) subQuery.push('disabled=$disabled');
     if(order !== undefined) subQuery.push('sortPosition=$order');
     if(description) subQuery.push('description=$description');
+    if(color || color === null) subQuery.push('color=$color');
     if(!subQuery.length) return callback();
 
     var stmt = db.prepare('UPDATE objects SET ' + subQuery.join(', ') + ' WHERE id=$id', function(err) {
@@ -128,6 +133,7 @@ objectsDB.updateObjectsInformation = function (IDs, description, order, disabled
             };
             if(order !== undefined) updateData.$order = order;
             if(description) updateData.$description = description;
+            if(color || color === null) updateData.$color = color;
 
             stmt.run(updateData, callback);
         }, function(err) {
@@ -364,6 +370,80 @@ WHERE objectsCounters.id = ?', function (err) {
         }, function (err) {
             stmt.finalize();
             callback(err, rows);
+        });
+    });
+}
+
+/**
+ * Get Alepiz IDs and Alepiz names using SELECT * FROM alepizIDs
+ * @param {function} callback - callback(err, rows), where rows: [{id, name}, ....]
+ */
+objectsDB.getAlepizIDs = function (callback) {
+    db.all('SELECT * FROM alepizIDs', callback);
+}
+
+objectsDB.getObjectsAlepizRelationByObjectIDs = function (objectIDs, callback) {
+    var stmt = db.prepare('SELECT * FROM objectsAlepizRelation WHERE objectsAlepizRelation.objectID = ?', function (err) {
+        if(err) return callback(err);
+
+        var rows = [];
+        async.each(objectIDs, function (objectID, callback) {
+            stmt.all(objectID, function (err, subRows) {
+                if(err) return callback(err);
+
+                rows.push.apply(rows, subRows);
+                callback();
+            });
+        }, function (err) {
+            stmt.finalize();
+            callback(err, rows);
+        });
+    });
+}
+
+objectsDB.getObjectsAlepizRelation = function (callback) {
+    db.all('SELECT objectsAlepizRelation.objectID AS objectID, alepizIDs.name AS alepizName \
+        FROM objectsAlepizRelation \
+        JOIN alepizIDs ON objectsAlepizRelation.alepizID = alepizIDs.id', callback);
+}
+
+objectsDB.deleteObjectsAlepizRelation = function(objectIDs, callback) {
+    if(!objectIDs.length) return callback();
+
+    var stmt = db.prepare('DELETE FROM objectsAlepizRelation WHERE objectID=?', function(err) {
+        if(err) return callback(err);
+
+        async.eachSeries(objectIDs, function(objectID, callback) {
+            stmt.run(objectID, callback);
+        }, function(err) {
+            stmt.finalize();
+            callback(err);
+        });
+    });
+};
+
+objectsDB.addObjectsAlepizRelation = function (objectIDs, alepizIDs, callback) {
+    if(!objectIDs.length || !alepizIDs.length) return callback();
+
+    var objectsAlepizRelations = [];
+    objectIDs.forEach(objectID => {
+        alepizIDs.forEach(alepizID => {
+            objectsAlepizRelations.push({
+                $objectID: objectID,
+                $alepizID: alepizID,
+            });
+        });
+    });
+
+    var stmt = db.prepare('INSERT INTO objectsAlepizRelation (objectID, alepizID) VALUES ($objectID, $alepizID)',
+        function(err) {
+        if(err) return callback(err);
+
+        async.eachSeries(objectsAlepizRelations, function(objectAlepizRelation, callback){
+            stmt.run(objectAlepizRelation, callback);
+        }, function(err) {
+            stmt.finalize();
+            callback(err);
         });
     });
 }

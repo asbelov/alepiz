@@ -161,7 +161,7 @@ function eventGeneratorGet(param, callback) {
         }
 
         var runTaskOnProblem = confSettings.get('runTaskOnProblem');
-        if(param.problemTaskID && runTaskOnProblem) {
+        if(Number(param.problemTaskID) && runTaskOnProblem) {
             task.runTask({
                 userName: systemUser,
                 taskID: param.problemTaskID,
@@ -224,7 +224,7 @@ function solveEvent(param, eventTimestamp) {
     var runTaskOnSolve = confSettings.get('runTaskOnSolve');
     if(runTaskOnSolve &&
         (!disabledEventsCache.has(OCID) || !isEventDisabled(disabledEventsCache.get(OCID).intervals)) &&
-        param.solvedTaskID && !dontRunTask) {
+        Number(param.solvedTaskID) && !dontRunTask) {
         task.runTask({
             userName: systemUser,
             taskID: param.solvedTaskID,

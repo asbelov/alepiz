@@ -131,7 +131,7 @@ function addOrUpdateObjects(user, param, callback) {
     var addOrUpdateObjects = param.id ? objectsDB.updateObjectsInformation : objectsDB.addObjects;
     var objectID = param.id || param.name;
 
-    addOrUpdateObjects(user, [objectID], description, order, disabled, function (err, newObjectIDs) {
+    addOrUpdateObjects(user, [objectID], description, order, disabled, null, function (err, newObjectIDs) {
         if (err) return callback(new Error('Can\'t insert object: ' + err.message));
 
         if (!param.id) log.info('Inserting object ', param.name, '; objectID: ', newObjectIDs[0]);
@@ -236,4 +236,3 @@ function saveInteractions(user, param, objects, callback) {
         });
     });
 }
-

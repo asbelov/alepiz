@@ -5,6 +5,7 @@ var log = require('../../lib/log')(module);
 var objectsDB = require('../../rightsWrappers/objectsDB');
 var countersDB = require('../../rightsWrappers/countersDB');
 var objectsProperties = require('../../rightsWrappers/objectsPropertiesDB');
+var rawObjectsDB = require('../../models_db/objectsDB');
 
 module.exports = function(args, callback) {
     log.debug('Starting ajax '+__filename+' with parameters', args);
@@ -20,6 +21,24 @@ module.exports = function(args, callback) {
     if (func === 'getTemplatesParameters') return objectsDB.getObjectsByIDs(args.username, args.ids.split(','), callback);
 
     if (func === 'getAllForCounter') return  countersDB.getAllForCounter(args.username, args.ids.split(','), callback);
+
+    if (func === 'getObjectServerRelation') {
+        rawObjectsDB.getAlepizIDs(function (err, alepizIDs) {
+            if(err) return callback(err);
+
+            if(!args.ids) return callback(null, alepizIDs);
+
+            rawObjectsDB.getObjectsAlepizRelationByObjectIDs(args.ids.split(','), function (err, objectsAlepizRelations) {
+                if(err) return callback(err);
+
+                callback(null, {
+                    alepizIDs: alepizIDs,
+                    objectsAlepizRelations: objectsAlepizRelations,
+                });
+            });
+        });
+        return;
+    }
 
     return callback(new Error('Ajax function is not set or unknown function'));
 };

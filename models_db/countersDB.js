@@ -181,7 +181,7 @@ countersDB.getVariablesExpressions = function(counterID, callback) {
     callback(err, data)
     data: [{OCID: <objectsCountersID>, collector: <collectorID>, counterID:.., counterName:..., objectID:.., objectName:..}, {...}...]
  */
-countersDB.getCountersForFirstCalculation = function(collectorNames, objectsIDs, countersIDs, callback){
+countersDB.getCountersForFirstCalculation = function(collectorNames, objectsIDs, countersIDs, callback) {
     log.debug('Getting data for independent counters calculation for counters: ', countersIDs,' and objects: ', objectsIDs);
 
     var queryParameters = collectorNames.slice();
@@ -363,7 +363,7 @@ WHERE counters.collectorID = ?', [collectorName], function(err, rows){
 /** Get update events for counter ID
  *
  * @param {uint} counterID - counter ID
- * @param {function(Error)|function(null, rows)} callback - callback(err, updateEvents) return error or array with
+ * @param {function(Error)|function(null, Array)} callback - callback(err, updateEvents) return error or array with
  * update events like [{counterID:<parentCounterID>, counterName: <counterName>, expression: <updateEventExpression>,
  * mode: <0|1|2>, objectID: <parentObjectID>, objectFilter: <objectsFilter> , description: <updateEventDescription>,
  * updateEventOrder: <updateEventOrder>}, ...];
@@ -389,6 +389,11 @@ JOIN counters ON counters.id = countersUpdateEvents.parentCounterID \
 WHERE countersUpdateEvents.counterID=?', [counterID], callback) //callback(err, updateEvents)
 };
 
+/**
+ * Get counter name by OCID
+ * @param {uint} OCID - object counter ID
+ * @param {function} callback - callback(err, rows), where rows [{name: }, {name: }, ...]
+ */
 countersDB.getCounterByOCID = function (OCID, callback) {
     db.all(`SELECT counters.name FROM counters 
 JOIN objectsCounters ON counters.id = objectsCounters.counterID 

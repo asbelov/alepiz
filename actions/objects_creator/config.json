@@ -4,6 +4,7 @@
     "homePage": "index",
     "execMethod": "post",
     "launcher": "nodeModule",
+    "ajaxServer": "ajax.js",
     "startAjaxAsThread": true,
     "launcherPrms": {
         "javaScript": "server.js",

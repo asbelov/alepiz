@@ -232,6 +232,7 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
             executionMode: executionMode,
             user: user,
             args: args,
+            notInQueue: true, // run the action started by the user without a queue
             sessionID: sessionID,
             updateAction: actionsForUpdate.has(actionID) ? actionsForUpdate.get(actionID)[executionMode] : false
         }, function(err, data){

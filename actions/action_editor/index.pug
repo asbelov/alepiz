@@ -13,28 +13,13 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         script(src='/jquery/jquery.min.js')
         script(src='/jquery-ui/jquery-ui.min.js')
         script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/escapeHTML.js')
         script.
             var parameters = {
                 action: !{JSON.stringify(action)},
                 objects: !{JSON.stringify(objects)}
             };
 
-            var entityMap = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;',
-                '/': '&#x2F;',
-                '`': '&#x60;',
-                '=': '&#x3D;'
-            };
-
-            function escapeHtml(string) {
-                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
-                    return entityMap[s];
-                });
-            }
     body
     main
         div.row
@@ -82,7 +67,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                             var log = require('../../lib/log')(module);
 
                             module.exports = function(args, callback) {
-                                log.info('Starting action server "', args.actionName, '" with parameters', args);
+                                log.info('Starting action server ', args.actionName, ' with parameters', args);
 
                                 /* Enter your server code here */
                                 if(!args.o) return callback(new Error('Objects are not selected'));
