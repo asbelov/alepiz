@@ -131,7 +131,15 @@ function addOrUpdateObjects(user, param, callback) {
     var addOrUpdateObjects = param.id ? objectsDB.updateObjectsInformation : objectsDB.addObjects;
     var objectID = param.id || param.name;
 
-    addOrUpdateObjects(user, [objectID], description, order, disabled, null, function (err, newObjectIDs) {
+    var [objectsColor, objectsShade] = param.color ? param.color.split(':') : ['', ''];
+    var color = ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue', 'light-blue', 'cyan', 'teal',
+        'green', 'light-green', 'lime', 'yellow', 'amber', 'orange', 'deep-orange', 'brown', 'grey', 'blue-grey',
+        'black', 'white', 'transparent'].indexOf((objectsColor || '').toLowerCase()) !== -1 ?
+        objectsColor + ':' +
+        (/^(lighten)|(darken)|(accent)-[1-4]$/.test((objectsShade || '').toLowerCase()) ? objectsShade : '') :
+        null;
+
+    addOrUpdateObjects(user, [objectID], description, order, disabled, color, function (err, newObjectIDs) {
         if (err) return callback(new Error('Can\'t insert object: ' + err.message));
 
         if (!param.id) log.info('Inserting object ', param.name, '; objectID: ', newObjectIDs[0]);
