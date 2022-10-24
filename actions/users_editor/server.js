@@ -4,10 +4,10 @@
 var async = require('async');
 var log = require('../../lib/log')(module);
 var checkIDs = require('../../lib/utils/checkIDs');
-var usersDB = require('../../models_db/usersDB');
+var usersDBSave = require('../../models_db/modifiers/modifierWapper').usersDB;
 var communication = require('../../lib/communication');
 var encrypt = require('../../lib/encrypt');
-var transactionDB = require('../../models_db/transaction');
+var transactionDB = require('../../models_db/modifiers/transaction');
 
 module.exports = function(args, callback) {
     // prevent to print a password from parameters
@@ -32,7 +32,7 @@ function removeUsers(args, callback) {
     checkIDs(args.removedUsers.split(','), function (err, removedUsersIDs) {
         if (err) return callback(err);
 
-        usersDB.removeUsers(removedUsersIDs, function(err) {
+        usersDBSave.removeUsers(removedUsersIDs, function(err) {
             if(err) return callback(new Error('Can\'t remove users with IDs: ' + args.removedUsers + ': ' + err.message));
 
             log.info('Removed users IDs: ', removedUsersIDs);
@@ -54,14 +54,14 @@ function addOrUpdateUser(args, callback) {
         var medias= createMedias(args);
 
         if(!args.userID) {
-            usersDB.addUser({
+            usersDBSave.addUser({
                 name: args.userName,
                 fullName: args.fullUserName,
                 password: encrypt(args.userPassword1)
             }, function (err, newUserID) {
                 if (err) return callback(new Error('Can\'t add new user ' + args.userName + ': ' + err.message));
 
-                usersDB.addRolesForUser(newUserID, checkedRoles, function (err) {
+                usersDBSave.addRolesForUser(newUserID, checkedRoles, function (err) {
                     if (err) return callback(new Error('Can\'t add roles "' + checkedRoles.join(',') +
                         '" for a new user ' + args.userName + ', user ID: '+ newUserID +' : ' + err.message));
 
@@ -80,7 +80,7 @@ function addOrUpdateUser(args, callback) {
         } else {
             var userID = Number(args.userID);
 
-            usersDB.updateUser({
+            usersDBSave.updateUser({
                 id: userID,
                 name: args.userName,
                 fullName: args.fullUserName,
@@ -89,15 +89,15 @@ function addOrUpdateUser(args, callback) {
                 if (err) return callback(new Error('Can\'t update user ' + args.userName + ', user ID: ' +
                     userID + ' : ' + err.message));
 
-                usersDB.deleteAllRolesForUser(userID, function(err) {
+                usersDBSave.deleteAllRolesForUser(userID, function(err) {
                     if(err) return callback(new Error('Can\'t delete roles for user ' + args.userName +
                         ', user ID: ' + userID +' when updating: ' + err.message));
 
-                    usersDB.addRolesForUser(userID, checkedRoles, function (err) {
+                    usersDBSave.addRolesForUser(userID, checkedRoles, function (err) {
                         if (err) return callback(new Error('Can\'t add roles "' + checkedRoles.join(',') +
                             '" for a user ' + args.userName + ', user ID: ' + userID + ' when updating: ' + err.message));
 
-                        usersDB.deleteAllMediasForUser(userID, function (err) {
+                        usersDBSave.deleteAllMediasForUser(userID, function (err) {
                             if(err) return callback(new Error('Can\'t delete communication medias for user ' + args.userName +
                                 ', user ID: ' + userID +' when updating: ' + err.message));
 
@@ -169,14 +169,13 @@ function addCommunicationMedia(userID, medias, callback) {
                 return callback(new Error('Media ' + mediaID + ' not exist'));
             }
 
-            usersDB.addCommunicationMedia(userID, initMediasArr[mediaInx], medias[mediaID].address, function (err, ID) {
+            usersDBSave.addCommunicationMedia(userID, initMediasArr[mediaInx], medias[mediaID].address, function (err, ID) {
                 if(err) return callback(new Error('Can\'t add media ' + mediaID + ': ' + err.message));
 
                 async.eachSeries(medias[mediaID].priorities, function (priority, callback) {
-                    usersDB.addCommunicationMediaPriority(ID, priority, callback);
+                    usersDBSave.addCommunicationMediaPriority(ID, priority, callback);
                 }, callback);
             })
         }, callback)
     });
 }
-

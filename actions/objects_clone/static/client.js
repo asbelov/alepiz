@@ -25,7 +25,7 @@ var jqueryNameSpace = (function ($) {
     var disabledElm;
     var objectsOrderElm;
     var objectsDescriptionElm;
-    var defaultValueForDisabled;
+    var initDisabledStatus;
     var objectsInteractions, objectsCountersLinkage, objectsProperties, objectsParameters;
     var colorSampleElm;
 
@@ -84,13 +84,8 @@ var jqueryNameSpace = (function ($) {
         // checkbox element return only 1 or undefined.
         // for return undefined when set to default value or 1 or 0 when set to a new value I use this code
         disabledCBElm.click(function () {
-            if($(this).is(':checked')) {
-                if(defaultValueForDisabled === 0) disabledElm.val(1);
-                else disabledElm.val(undefined);
-            } else {
-                if(defaultValueForDisabled === 1) disabledElm.val(0);
-                else disabledElm.val(undefined);
-            }
+            if(disabledCBElm.val() !== initDisabledStatus) disabledElm.val(initDisabledStatus ? 1 : 0);
+            else disabledElm.val('');
         });
 
         $('#cloneAllCounters').click(function() {
@@ -185,18 +180,18 @@ var jqueryNameSpace = (function ($) {
 
                 if (objectsIDs.indexOf(String(interaction.id1)) !== -1) {
                     interactions[interactionTypes[interaction.type] + interaction.name2] = {
-                        id: interaction.id2,
+                        data: interaction.id2 + ',' + interaction.type,
                         idx: idx,
                     };
                     if (objectsIDs.indexOf(String(interaction.id2)) !== -1) {
                         interactions[interactionTypes[interaction.type] + interaction.name1] = {
-                            id: interaction.id1,
+                            data: (interaction.type === 0 ? -interaction.id1 : interaction.id1) + ',' + interaction.type,
                             idx: idx,
                         };
                     }
                 } else {
                     interactions[interactionTypes[interaction.type + 100] + interaction.name1] = {
-                        id: interaction.id1,
+                        data: interaction.id1 + ',' + interaction.type,
                         idx: idx,
                     };
                 }
@@ -206,7 +201,8 @@ var jqueryNameSpace = (function ($) {
         $('#interactingObjects').html(Object.keys(interactions).map(function(name) {
             return '\
 <div style="margin-top:0.7em">\
-    <label><input type="checkbox" data-interactionObjectID="' +  interactions[name].idx + '" id="interactionID-' + interactions[name].id + '" checked disabled="disabled" />\
+    <label><input type="checkbox" data-interactionObjectID="' + interactions[name].idx +
+                '" id="interactionID-' + interactions[name].data + '" checked disabled="disabled" />\
     <span>' + name + '</span></label>\
 </div>';
         }).join(''));
@@ -281,14 +277,9 @@ var jqueryNameSpace = (function ($) {
             }
         }
 
-        if(disabled === 1) {
-            defaultValueForDisabled = 1;
-            disabledCBElm.prop('checked', "1");
-        }
-        else {
-            defaultValueForDisabled = 0;
-            disabledCBElm.prop('checked', "");
-        }
+        if(disabled === 1) initDisabledStatus = "1";
+        else initDisabledStatus = "";
+        disabledCBElm.prop('checked', initDisabledStatus);
 
         if(sortPosition) objectsOrderElm.val(sortPosition);
         else objectsOrderElm.val(0);

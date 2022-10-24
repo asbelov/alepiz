@@ -14,6 +14,7 @@ const getVarFromExpression = require("./getVarFromExpression");
 
 const Conf = require('../../lib/conf');
 const conf = new Conf('config/common.json');
+const confServer = new Conf('config/server.json');
 
 
 module.exports = getVars;
@@ -30,7 +31,12 @@ const updateEventsMode = {
  * @param param {{
  *      parentCounterName: ({string}|*),
  *      updateEventMode,
- *      cache: {variablesExpressions: unknown, variablesHistory: unknown, objectsProperties: unknown},
+ *      cache: {
+ *          variablesExpressions: unknown,
+ *          variablesHistory: unknown,
+ *          objectsProperties: unknown,
+ *          alepizInstance: {id: Number, name: string}
+ *      },
  *      parentVariables: (*|{"<var1>": "<value1>"}),
  *      updateEventExpression,
  *      variablesDebugInfo: {},
@@ -45,7 +51,7 @@ const updateEventsMode = {
  *      OCID,
  *      objectID: number,
  *      parentOCID: ({number}|*),
- *      countersObjects: {}
+ *      countersObjects: {},
  *  }}
  * @param callback {function}
  * @private
@@ -70,12 +76,16 @@ function getVars(param, callback) {
         }
     }
 
+    var alepizNames = confServer.get('alepizNames');
+
     // add static data from current and parent objects to variable list
     variables.PARENT_OBJECT_NAME = param.parentObjectName === undefined ? '' : param.parentObjectName;
     variables.PARENT_COUNTER_NAME = param.parentCounterName === undefined ? '' : param.parentCounterName;
     variables.OBJECT_NAME = param.objectName === undefined ? '' : param.objectName;
     variables.PARENT_VALUE = param.parentObjectValue === undefined ? '' : param.parentObjectValue;
     variables.COUNTER_NAME = param.counterName === undefined ? '' : param.counterName;
+    variables.ALEPIZ_NAME = param.cache.alepizInstance.name || '';
+    variables.ALEPIZ_ID = param.cache.alepizInstance.id || 0;
 
     param.variablesDebugInfo = {};
 
@@ -263,7 +273,10 @@ function getCounterParameters(param, variables, callback) {
                     (!res ? 'not a string' : 'has unresolved variables: ' + (res.unresolvedVariables.join(',')))));
             }
             value = res ? fromHuman(res.value) : parameter.value;
-            param.variablesDebugInfo[variablesDebugName].result = value;
+            // some time got Stack: TypeError: Cannot set property 'result' of undefined
+            if (param.variablesDebugInfo[variablesDebugName]) {
+                param.variablesDebugInfo[variablesDebugName].result = value;
+            }
             counterParameters[parameter.name] = value;
             //if(param.counterID === 166) console.log('!!getCounterParameters end2: ', parameter.name, '=', value, ';', res, '; vars: ', variables);
             callback();

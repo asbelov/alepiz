@@ -14,7 +14,9 @@ var rightsWrappersCountersDB = require('../../rightsWrappers/countersDB');
 var rightsWrappersObjectsDB = require('../../rightsWrappers/objectsDB');
 var counterDB = require('../../models_db/countersDB');
 var groupsDB = require('../../models_db/countersGroupsDB');
+var groupsDBSave = require('../../models_db/modifiers/modifierWapper').countersGroupsDB;
 var unitsDB = require('../../models_db/countersUnitsDB');
+var unitsDBSave = require('../../models_db/modifiers/modifierWapper').countersUnitsDB;
 var history = require('../../models_history/history');
 var functions = require('../../lib/calcFunction');
 var calc = require('../../lib/calc');
@@ -62,21 +64,21 @@ module.exports = function(args, callback) {
         return rightsWrappersCountersDB.getCountersForObjects(args.username, args.ids, groupID, callback);
     }
 
-    if(func === 'addCounterGroup') return groupsDB.new(args.group, callback);
+    if(func === 'addCounterGroup') return groupsDBSave.new(args.group, callback);
 
-    if(func === 'editCounterGroup') return groupsDB.edit(args.oldGroup, args.group, callback);
+    if(func === 'editCounterGroup') return groupsDBSave.edit(args.oldGroup, args.group, callback);
 
-    if(func === 'setDefaultCounterGroup') return groupsDB.setInitial(args.group, args.groupProp, callback);
+    if(func === 'setDefaultCounterGroup') return groupsDBSave.setInitial(args.group, args.groupProp, callback);
 
-    if(func === 'removeCounterGroup') return groupsDB.remove(args.group, callback);
+    if(func === 'removeCounterGroup') return groupsDBSave.remove(args.group, callback);
 
     if(func === 'addCounterUnit')
-        return unitsDB.new(args.unit, args.abbreviation, args.prefixes, args.multiplies, args.onlyPrefixes, callback);
+        return unitsDBSave.new(args.unit, args.abbreviation, args.prefixes, args.multiplies, args.onlyPrefixes, callback);
 
     if(func === 'editCounterUnit')
-        return unitsDB.edit(args.oldUnitID, args.unit, args.abbreviation, args.prefixes, args.multiplies, args.onlyPrefixes, callback);
+        return unitsDBSave.edit(args.oldUnitID, args.unit, args.abbreviation, args.prefixes, args.multiplies, args.onlyPrefixes, callback);
 
-    if(func === 'removeCounterUnit') return unitsDB.remove(args.unit, callback);
+    if(func === 'removeCounterUnit') return unitsDBSave.remove(args.unit, callback);
 
     if(func === 'getFunctionsDescription') return callback(null, getFunctionsDescription());
 

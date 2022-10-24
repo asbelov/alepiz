@@ -6,7 +6,7 @@
  * Created by Alexander Belov on 25.03.2017.
  */
 var log = require('../../lib/log')(module);
-var transactionsDB = require('../../models_db/transaction');
+var transactionsDB = require('../../models_db/modifiers/transaction');
 var tasksDB = require('../../rightsWrappers/tasksDB');
 var tasks = require('../../lib/tasks');
 var taskServer = require('../../serverTask/taskServerClient');
@@ -387,11 +387,12 @@ function processTaskExecutionCondition(args, taskID, hasRightsForRunByActions, f
             return callback(new Error('User ' + args.username + ' has no rights for executing task ID ' + taskID));
         }
 
-        tasks.runTask({
+        taskServer.runTask({
             userName: args.username,
             taskID: taskID,
             filterSessionIDs: filterSessionIDs,
             mySessionID: args.sessionID,
+            runTaskFrom: 'taskMaker',
         }, function(err) {
             if(err) log.error(err.message);
 
@@ -425,10 +426,11 @@ function processApproves(userName, mySessionID, newApproves, workflow, callback)
 
             // [2 - ask to run now; 12 - run now already started; 32 - canceled run now] => run task now
             if(runType === 2 || runType === 12 || runType === 32) {
-                tasks.runTask({
+                taskServer.runTask({
                     userName: userName,
                     taskID: taskID,
                     mySessionID: mySessionID,
+                    runTaskFrom: 'taskMaker',
                 }, function(err) {
                     if(err) log.error(err.message);
                     sendMessage(userName, taskID, workflow, 'execute', err, function(err) {

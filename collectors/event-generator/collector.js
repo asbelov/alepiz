@@ -80,10 +80,8 @@ function init() {
     }
 
     async.each(dbPaths, function (dbPath, callback) {
-        runInThread(path.join(__dirname, 'lib', 'eventGenerator.js'), {/*
-            get: {
-                permanentCallback: true,
-            }*/},function (err, eventGenerator) {
+        runInThread(path.join(__dirname, 'lib', 'eventGenerator.js'), {},
+            function (err, eventGenerator) {
             eventGenerators.push(eventGenerator.func);
             eventGenerator.func.init(dbPath, callback);
         });

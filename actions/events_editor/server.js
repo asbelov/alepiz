@@ -10,9 +10,9 @@ var log = require('../../lib/log')(module);
 var checkIDs = require('../../lib/utils/checkIDs');
 var prepareUser = require('../../lib/utils/prepareUser');
 var userRolesRights = require('../../models_db/usersRolesRightsDB');
-var transactions = require('../../models_db/transaction');
+var transactions = require('../../models_db/modifiers/transaction');
 var counterDB = require('../../models_db/countersDB');
-var counterSaveDB = require('../../models_db/counterSaveDB');
+var counterSaveDB = require('../../models_db/modifiers/modifierWapper').countersDB;
 var activeCollector = require('../../server/activeCollector');
 
 

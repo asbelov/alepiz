@@ -4,6 +4,7 @@
 
 var log = require('../lib/log')(module);
 var objectsDB = require('../models_db/objectsDB');
+var objectsDBSave = require('../models_db/modifiers/modifierWapper').objectsDB;
 var rightsDB = require('../models_db/usersRolesRightsDB');
 var prepareUser = require('../lib/utils/prepareUser');
 var checkIDs = require('../lib/utils/checkIDs');
@@ -42,12 +43,13 @@ rightsWrapper.renameObjects = function(user, objects, callback){
                     JSON.stringify(objects) + ': ' + err.message ));
             }
 
-            objectsDB.renameObjects(objects, function(err) {
+            objectsDBSave.renameObjects(objects, function(err) {
                 if(err) {
                     return callback(new Error('Error while user ' + user +' rename objects ' +
                         JSON.stringify(objects) + ': ' + err.message));
                 }
-                callback();
+
+                callback(null, true);
             });
         });
     });
@@ -81,8 +83,16 @@ rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOr
             return callback(new Error('Some object names already exists in database: ' + existingObjectsNames));
         }
 
+        var [objectsColor, objectsShade] = typeof color === 'string' ? color.split(':') : ['', ''];
+        color = ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue', 'light-blue', 'cyan', 'teal',
+            'green', 'light-green', 'lime', 'yellow', 'amber', 'orange', 'deep-orange', 'brown', 'grey', 'blue-grey',
+            'black', 'white', 'transparent'].indexOf((objectsColor || '').toLowerCase()) !== -1 ?
+            objectsColor + ':' +
+            (/^(lighten)|(darken)|(accent)-[1-4]$/.test((objectsShade || '').toLowerCase()) ? objectsShade : '') :
+            null;
+
         // add a new objects, its description and order
-        objectsDB.addObjects(newObjectsNames, newDescription, newOrder, (disabled ? 1 : 0), color, callback);
+        objectsDBSave.addObjects(newObjectsNames, newDescription, newOrder, (disabled ? 1 : 0), color, callback);
     });
 };
 
@@ -97,7 +107,22 @@ rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOr
  */
 rightsWrapper.updateObjectsInformation = function (user, initIDs, description, order, disabled, color, callback){
 
-    if((description === undefined && order === undefined && disabled === undefined) || !initIDs.length) return callback();
+    if(!initIDs.length) return callback();
+
+    var updateData = {};
+    if(disabled !== undefined) updateData.$disabled = Number(disabled) ? 1 : 0;
+    if(order !== undefined) updateData.$sortPosition = order;
+    if(description !== undefined) updateData.$description = description;
+    if(color !== undefined) {
+        var [objectsColor, objectsShade] = typeof color === 'string' ? color.split(':') : ['', ''];
+        updateData.$color = ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue', 'light-blue', 'cyan', 'teal',
+            'green', 'light-green', 'lime', 'yellow', 'amber', 'orange', 'deep-orange', 'brown', 'grey', 'blue-grey',
+            'black', 'white', 'transparent'].indexOf((objectsColor || '').toLowerCase()) !== -1 ?
+            objectsColor + ':' +
+            (/^(lighten)|(darken)|(accent)-[1-4]$/.test((objectsShade || '').toLowerCase()) ? objectsShade : '') :
+            null;
+    }
+    if(!Object.keys(updateData).length) return callback();
 
     checkIDs(initIDs, function(err, checkedIDs) {
         if (err) {
@@ -120,53 +145,120 @@ rightsWrapper.updateObjectsInformation = function (user, initIDs, description, o
                     '; order: ' + order + '; disabled: ' + disabled +': ' + err.message ));
             }
 
-            objectsDB.updateObjectsInformation(IDs, description, order, disabled, color,function(err, res) {
-                if(err) {
-                    return callback(new Error('User ' + user + ' got error when updating objects info for ' +
-                        initIDs.join(', ') + '; description: ' + description + '; order: ' + order +
-                        '; disabled: ' + disabled + '; color: ' + color + ': ' + err.message ), res);
-                }
+            objectsDB.getObjectsByIDs(IDs, function (err, rows) {
+                if(err) callback(new Error('User ' + user + ' got error when getting objects info for ' +
+                    initIDs.join(', ') + ': ' + err.message ));
 
-                callback(null, res); // res = true or undefined
+                var needToUpdate = false, objectNames = rows.map(object => {
+                    if((description !== undefined && object.description !== description) ||
+                        (order !== undefined && object.sortPosition !== order) ||
+                        (disabled !== undefined && object.disabled !== disabled) ||
+                        (color !== undefined && object.color !== color)) {
+                        needToUpdate = true;
+                    }
+                    return object.name;
+                });
+
+                if(!needToUpdate) return callback(null, null, objectNames);
+
+                objectsDBSave.updateObjectsInformation(IDs, updateData, function(err) {
+                    if(err) {
+                        return callback(new Error('User ' + user + ' got error when updating objects info for ' +
+                            initIDs.join(', ') + '; description: ' + description + '; order: ' + order +
+                            '; disabled: ' + disabled + '; color: ' + color + ': ' + err.message ), null, objectNames);
+                    }
+
+                    delete(updateData.$id);
+                    callback(null, updateData, objectNames);
+                });
             });
         });
     });
 };
 
-/*
- inserting new objects interactions
- user - user name
- interactions = [{id1: <objectID1>, id2: <objectID2>, type: <interactionType>}]
- callback(err)
+
+/**
+ * Inserting new not existing object interactions
+ * @param {string} user - username
+ * @param {Array} newInteractions - [{id1: <objectID1>, id2: <objectID2>, type: <interactionType>}];
+ *  interaction types: 0 - include; 1 - intersect, 2 - exclude
+ * @param {function} callback - callback(err)
+ * @returns {*}
  */
-rightsWrapper.insertInteractions = function(user, interactionsForInserting, callback) {
+rightsWrapper.insertInteractions = function(user, newInteractions, callback) {
 
-    if(!interactionsForInserting.length) {
-        log.info('Interactions are not set: ', interactionsForInserting);
-        return callback(null, {});
+    if(!newInteractions.length) {
+        log.info('Interactions are not set: ', newInteractions);
+        return callback();
     }
 
-    var initIDs = interactionsForInserting.map(function(obj){ return obj.id1; });
-    initIDs.push.apply(initIDs, interactionsForInserting.map(function(obj){ return obj.id2; }));
+    var allInteractedObjectIDs = [];
+    newInteractions.forEach(interaction => {
+        allInteractedObjectIDs.push(interaction.id1);
+        allInteractedObjectIDs.push(interaction.id2);
+    });
 
-    if(!initIDs.length) {
-        log.info('Interactions are not set: ', interactionsForInserting);
-        return callback(null, {});
-    }
-
-    checkIDs(initIDs, function(err, checkedIDs) {
-        if (err && !checkedIDs) return callback(err);
+    checkIDs(allInteractedObjectIDs, function(err, checkedInteractedObjectIDs) {
+        if (err && !checkedInteractedObjectIDs) return callback(err);
 
         user = prepareUser(user);
 
         rightsDB.checkObjectsIDs({
             user: user,
-            IDs: checkedIDs,
+            IDs: checkedInteractedObjectIDs,
             checkChangeInteractions: true,
             errorOnNoRights: true
         }, function (err) {
             if (err) return callback(err);
-            objectsDB.insertInteractions(interactionsForInserting, callback);
+
+            objectsDB.getInteractions(checkedInteractedObjectIDs, function(err, existingInteractions) {
+                if (err) {
+                    return callback(new Error('Can\'t get interactions for check existing interactions for ' +
+                        'save only not existing interactions: ' + err.message +
+                        '; objectIDs: ' + checkedInteractedObjectIDs.join(',')));
+                }
+
+                // will inserted only not existing interactions
+                var notExistingNewInteractions = new Set();
+                newInteractions.forEach(newInteraction => {
+                    // finding existing interaction
+                    if(!existingInteractions.some(existingInteraction => {
+                        // don't touch it
+                        if(existingInteraction.type === newInteraction.type &&
+                            (
+                                // for inclusion (0), the order of interaction of objects is important
+                                // for intersection (1) or exclusion (2), the order of interaction of objects is not important
+                                newInteraction.type === 0 &&
+                                (
+                                    existingInteraction.id1 === newInteraction.id1 &&
+                                    existingInteraction.id2 === newInteraction.id2
+                                )
+                            ) ||
+                            (
+                                (
+                                    existingInteraction.id1 === newInteraction.id1 &&
+                                    existingInteraction.id2 === newInteraction.id2
+                                ) ||
+                                (
+                                    existingInteraction.id1 === newInteraction.id2 &&
+                                    existingInteraction.id2 === newInteraction.id1
+                                )
+                            )
+                        ) {
+                            return true;
+                        }
+                    })) {
+                        notExistingNewInteractions.add(newInteraction);
+                    }
+                });
+
+                if(!notExistingNewInteractions.size) return callback();
+
+                objectsDBSave.insertInteractions(Array.from(notExistingNewInteractions), function (err) {
+                    log.info('Saved not existing interactions: ', notExistingNewInteractions);
+                    return callback(err, true);
+                });
+            });
         });
     });
 };
@@ -200,7 +292,7 @@ rightsWrapper.deleteInteractions = function(user, interactionsForDeleting, callb
             errorOnNoRights: true
         }, function (err) {
             if (err) return callback(err);
-            objectsDB.deleteInteractions(interactionsForDeleting, callback);
+            objectsDBSave.deleteInteractions(interactionsForDeleting, callback);
         });
     });
 };
@@ -230,53 +322,50 @@ rightsWrapper.getObjectsByIDs = function(user, initIDs, callback) {
     });
 };
 
-/*
- get interactions for specified objects IDs
- user - user name
- IDs - array of objects IDs
- callback(err, interactions), where
- interactions - [{
-                  name1: <objName1>, description1: <objDescription1>, id1: <id1>,
-                  name2: <objName2>, description2: <objDescription2>, id2: <id2>,
-                  type: <interactionType1>},
-                  {...},...]
- interaction types: 0 - include; 1 - intersect, 2 - exclude
-*/
+
+/** Get interactions for specified objects IDs.
+ * @param {string} user - username
+ * @param {Array} IDs - array of objects IDs
+ * @param {function(Error)|function(null, Array)} callback - callback(err, interactions)
+ *
+ * @example
+ * // interactions returned by callback(err, interactions)
+ * interactions - [{
+ *      name1: <objName1>, description1: <objDescription1>, id1: <id1>,
+ *      name2: <objName2>, description2: <objDescription2>, id2: <id2>,
+ *      type: <interactionType1>},
+ *      {...},...]
+ * interaction types: 0 - include; 1 - intersect, 2 - exclude
+ * function can be used for less than 999 objects, according  SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999
+ * https://www.sqlite.org/limits.html
+ */
+
 rightsWrapper.getInteractions = function(user, initIDs, callback){
     checkIDs(initIDs, function(err, checkedIDs) {
         if (err && !checkedIDs) return callback(err);
 
         user = prepareUser(user);
 
-        rightsDB.checkObjectsIDs({
-            user: user,
-            IDs: checkedIDs,
-            checkView: true,
-            errorOnNoRights: true
-        }, function (err, IDs) {
-            if (err) return callback(err);
+        objectsDB.getInteractions(checkedIDs, function(err, interactions) {
+            if(err) return callback(err);
 
-            objectsDB.getInteractions(IDs, function(err, interactions) {
+            // checking rights for returned objects
+            var objectsIDs = [];
+            interactions.forEach(function(interaction) {
+                objectsIDs.push(interaction.id1, interaction.id2)
+            });
+            rightsDB.checkObjectsIDs({
+                user: user,
+                IDs: objectsIDs,
+                checkView: true,
+                errorOnNoRights: true
+            }, function (err/*, IDs*/) {
+
                 if(err) return callback(err);
 
-                // checking rights for returned objects
-                var objectsIDs = [];
-                interactions.forEach(function(interaction) {
-                    objectsIDs.push(interaction.id1, interaction.id2)
-                });
-                rightsDB.checkObjectsIDs({
-                    user: user,
-                    IDs: objectsIDs,
-                    checkView: true,
-                    errorOnNoRights: true
-                }, function (err/*, IDs*/) {
-
-                    if(err) return callback(err);
-
-                    callback(null, interactions);
-                });
-
+                callback(null, interactions);
             });
+
         });
     });
 };
@@ -340,6 +429,65 @@ rightsWrapper.getObjectsIDs = function (user, objectsNames, callback) {
             if(err) return callback(err);
 
             callback(null, checkedObjectsIDs);
+        });
+    });
+}
+
+rightsWrapper.addObjectsAlepizRelation = function (user, objectIDs, alepizIDs, callback) {
+    if(!objectIDs.length) return callback();
+
+    rightsDB.checkObjectsIDs({
+        user: user,
+        IDs: objectIDs,
+        errorOnNoRights: true
+    }, function(err, checkedObjectsIDs) {
+        if(err) return callback(err);
+
+        objectsDB.getObjectsAlepizRelationByObjectIDs(checkedObjectsIDs, function (err, rows) {
+            if(err) {
+                return callback(new Error('Can\'t get objectsAlepizRelations: ' + err.message +
+                    '; objectIDs: ' + checkedObjectsIDs.join(', ')));
+            }
+            var newObjectIDsSet = new Set(checkedObjectsIDs);
+            var newAlepizIDsSet = new Set(alepizIDs);
+            var objectIDsSet = new Set(), alepizIDsSet = new Set();
+            var newObjectsAlepizRelations = [], objectsAlepizRelationsForRemove = [];
+            rows.forEach(row => {
+                if(!newObjectIDsSet.has(row.objectID) || !newAlepizIDsSet.has(row.alepizID)) {
+                    objectsAlepizRelationsForRemove.push({
+                        $objectID: row.objectID,
+                        $alepizID: row.alepizID,
+                    });
+                }
+                objectIDsSet.add(row.objectID);
+                alepizIDsSet.add(row.alepizID);
+            });
+
+            checkedObjectsIDs.forEach(objectID => {
+                alepizIDs.forEach(alepizID => {
+                    if(!objectIDsSet.has(objectID) || !alepizIDsSet.has(alepizID)) {
+                        newObjectsAlepizRelations.push({
+                            $objectID: objectID,
+                            $alepizID: alepizID,
+                        });
+                    }
+                });
+            });
+            objectsDBSave.deleteObjectsAlepizRelation(objectsAlepizRelationsForRemove, function (err) {
+                if(err) {
+                    return callback('Can\'t remove objectsAlepizRelations: ' + err.message +
+                        ': ', JSON.stringify(objectsAlepizRelationsForRemove));
+                }
+
+                objectsDBSave.addObjectsAlepizRelation(newObjectsAlepizRelations, function (err) {
+                    if(err) {
+                        return callback('Can\'t add objectsAlepizRelations: ' + err.message +
+                            ': ', JSON.stringify(newObjectsAlepizRelations));
+                    }
+
+                    callback(null, newObjectsAlepizRelations, objectsAlepizRelationsForRemove);
+                });
+            });
         });
     });
 }

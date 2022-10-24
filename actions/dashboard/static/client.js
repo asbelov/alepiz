@@ -987,6 +987,7 @@ var JQueryNamespace = (function ($) {
             },
             error: ajaxError,
             success: function (result) { //{history: [..], current: [...], disabled: [...]}
+                //console.log(result)
                 if (!result) {
                     bodyElm.css("cursor", "auto");
                     gettingDataInProgress = 0;
@@ -1308,7 +1309,7 @@ var JQueryNamespace = (function ($) {
         // this is the new changed state of the checkbox after click
         var newCheckedProp = clickedCheckboxElm.is(':checked');
 
-        // find all inputs in the current table (tbody) with attribute counterID whth equal <counterID> of selected checkbox
+        // find all inputs in the current table (tbody) with attribute counterID with equal <counterID> of selected checkbox
         // and revert they checked property
         clickedCheckboxElm.closest('tbody').find('tr:not(.hide)').find('input[counterID="' + counterID+ '"]').prop('checked', newCheckedProp);
     }

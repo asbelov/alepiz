@@ -251,6 +251,7 @@ function getVariablesAndCheckUpdateEvents(message) {
             variablesHistory: cache.variablesHistory.get(counterID) || new Map(),
             variablesExpressions: cache.variablesExpressions.get(counterID) || new Map(),
             objectsProperties: cache.objectsProperties.get(objectID) || new Map(),
+            alepizInstance: cache.alepizInstance || {},
         },
     };
 

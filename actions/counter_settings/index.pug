@@ -172,7 +172,10 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                                 li PARENT_VALUE - if the counter has a dependency on another object, then this variable will be assigned the value returned by the counter of the parent object;
                                                 li UPDATE_EVENT_STATE - if the counter has a dependency on another counter, then this variable will take the value of the expression for the update event for the counter.
                                                 li UPDATE_EVENT_TIMESTAMP - if the counter has a dependency on another counter, then this variable will be set to the timestamp (ms since 1.1.1970) when the update event state was changed
-                                            span If the action returned some value, you can use this value in the "task maker" using the %:PREV_ACTION_RESULT:% variable. Also you can use all variables from the parent counter.
+                                                li ALEPIZ_NAME - the name of the instance of ALEPIZ or the empty string if the instance name is not defined.
+                                                li ALEPIZ_NAME - the name of the instance of ALEPIZ or the empty string if the instance name is not defined.
+                                                li ALEPIZ_ID - ID of the instance of ALEPIZ or 0 if the instance is not defined.
+                                            p If the action returned some value, you can use this value in the "task maker" using the %:PREV_ACTION_RESULT:% variable. Also you can use all variables from the parent counter.
                                             span#inheritedVariables
                     ul#variables
                     input(type="hidden")#variablesOrder

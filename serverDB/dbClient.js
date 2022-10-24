@@ -2,69 +2,31 @@
  * Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var log = require('../lib/log')(module);
-
-var IPC = require('../lib/IPC');
-var thread = require('../lib/threads');
-var Conf = require('../lib/conf');
+const log = require('../lib/log')(module);
+const IPC = require('../lib/IPC');
+const Conf = require('../lib/conf');
 const confSqlite = new Conf('config/sqlite.json');
-const path = require("path");
 
-var cfg = confSqlite.get(); // configuration for each module
 var clientIPC, connectInProgress = false, cache = new Set(), dbServerProcess;
 
 var dbClient = {
-    stop: function(callback) {callback()},
-    kill: function () {},
     maxVariableNumber: require('../models_db/dbWrapper').maxVariableNumber,
 };
 module.exports = dbClient;
 
 dbClient.connect = function (callback) {
+    var cfg = confSqlite.get(); // configuration for each module
 
     cfg.id = 'dbClient';
     new IPC.client(cfg, function (err, msg, _clientIPC) {
         if (err) log.error(err.message);
         else if (_clientIPC && typeof callback === 'function') {
-            log.info('Connecting to dbServer');
+            log.info('Connected to dbServer');
             clientIPC = _clientIPC;
             callback();
             callback = null; // prevent running callback on reconnect
         }
     });
-};
-
-// starting dbClient child process and IPC system
-dbClient.start = function (_callback) {
-    var callback = function(err, isDbServerExit) {
-        if(typeof _callback === 'function') return _callback(err, isDbServerExit);
-        if(err) log.error(err.message)
-    };
-
-    if(cfg.disableServer) {
-        log.info('dbClient is disabled in configuration and not started');
-        return callback();
-    }
-
-    dbServerProcess = new thread.parent({
-        childrenNumber: 1,
-        childProcessExecutable: path.join(__dirname, 'dbServer.js'),
-        restartAfterErrorTimeout: 0, // was 2000
-        killTimeout: 3000,
-        module: 'dbClient',
-    }, function(err, dbServerProcess) {
-        if(err) return callback(new Error('Can\'t initializing dbServer process: ' + err.message));
-
-        dbServerProcess.start(function (err) {
-            if(err) return callback(new Error('Can\'t run dbServer process: ' + err.message));
-
-            log.info('dbServer was started: ', cfg);
-            callback();
-        });
-    });
-
-    dbClient.stop = dbServerProcess.stop;
-    dbClient.kill = dbServerProcess.kill;
 };
 
 function dbDo(func, args, stmtID, prepareCallback) {

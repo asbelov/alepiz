@@ -1,10 +1,10 @@
 /*
- * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-const log = require('../lib/log')(module);
-const db = require('./db');
-const setShift = require('../lib/utils/setShift');
+const log = require('../../lib/log')(module);
+const db = require('../db');
+const setShift = require('../../lib/utils/setShift');
 
 var transaction = {};
 module.exports = transaction;
@@ -27,9 +27,7 @@ transaction.begin = function(callback) {
     transactionInProgress = true;
 
     //log.debug('Begin transaction. No ', (new Error).stack);
-    db.serialize(function() {
-        db.exec('BEGIN', callback);
-    });
+    db.exec('BEGIN', callback);
 };
 
 transaction.end = function(callback) {

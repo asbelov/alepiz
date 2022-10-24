@@ -4,7 +4,7 @@
 */
 const log = require('../../lib/log')(module);
 const async = require('async');
-const transactionDB = require("../../models_db/transaction");
+const transactionDB = require("../../models_db/modifiers/transaction");
 const objectsDB = require("../../rightsWrappers/objectsDB");
 const modelsDBObjectsDB = require('../../models_db/objectsDB');
 const objectsPropertiesDB = require("../../rightsWrappers/objectsPropertiesDB");
@@ -131,15 +131,7 @@ function addOrUpdateObjects(user, param, callback) {
     var addOrUpdateObjects = param.id ? objectsDB.updateObjectsInformation : objectsDB.addObjects;
     var objectID = param.id || param.name;
 
-    var [objectsColor, objectsShade] = param.color ? param.color.split(':') : ['', ''];
-    var color = ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue', 'light-blue', 'cyan', 'teal',
-        'green', 'light-green', 'lime', 'yellow', 'amber', 'orange', 'deep-orange', 'brown', 'grey', 'blue-grey',
-        'black', 'white', 'transparent'].indexOf((objectsColor || '').toLowerCase()) !== -1 ?
-        objectsColor + ':' +
-        (/^(lighten)|(darken)|(accent)-[1-4]$/.test((objectsShade || '').toLowerCase()) ? objectsShade : '') :
-        null;
-
-    addOrUpdateObjects(user, [objectID], description, order, disabled, color, function (err, newObjectIDs) {
+    addOrUpdateObjects(user, [objectID], description, order, disabled, param.color, function (err, newObjectIDs) {
         if (err) return callback(new Error('Can\'t insert object: ' + err.message));
 
         if (!param.id) log.info('Inserting object ', param.name, '; objectID: ', newObjectIDs[0]);

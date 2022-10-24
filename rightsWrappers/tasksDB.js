@@ -7,11 +7,12 @@ var prepareUser = require('../lib/utils/prepareUser');
 var actionRightsWrapper = require('../rightsWrappers/actions');
 var log = require('../lib/log')(module);
 var tasksDB = require('../models_db/tasksDB');
+var tasksDBSave = require('../models_db/modifiers/modifierWapper').tasksDB;
 var countersDB = require('../models_db/countersDB');
 var objectsDB = require('../models_db/objectsDB');
 var usersDB = require('../models_DB/usersDB');
-var transactionDB = require('../models_DB/transaction');
-var auditUsers = require('../models_db/auditUsersDB');
+var transactionDB = require('../models_db/modifiers/transaction');
+var sessionDB = require('../models_db/modifiers/modifierWapper').auditUsersDB;
 var checkIDs = require('../lib/utils/checkIDs');
 
 
@@ -192,7 +193,7 @@ rightsWrapper.removeTask = function(initUser, taskID, callback) {
 
         rightsWrapper.checkActionsRights(initUser, actionsIDs, 'modify', function (err) {
             if (err) return callback(err);
-            tasksDB.removeTask(taskID, callback);
+            tasksDBSave.removeTask(taskID, callback);
         });
     })
 };
@@ -278,12 +279,12 @@ rightsWrapper.addTask = function(initUser, task, actions, callback) {
                         addNewSessionID(userID, sessionID, actions[sessionID].id, actions[sessionID].name, timestamp, actions[sessionID].addNewSessionID, function(err) {
                             if(err) return callback(err);
 
-                            tasksDB.addAction(taskID, sessionID, startupOptions, actionsOrder[sessionID], function(err, actionID) {
+                            tasksDBSave.addAction(taskID, sessionID, startupOptions, actionsOrder[sessionID], function(err, actionID) {
                                 if(err) return callback(err);
 
                                 log.info('Add parameters for task ID: ', taskID, ', actionID: ', actionID, ', params: ',
                                     actions[sessionID].args);
-                                tasksDB.addParameters(actionID, actions[sessionID].args, callback);
+                                tasksDBSave.addParameters(actionID, actions[sessionID].args, callback);
                             });
                         });
                     }, function (err) {
@@ -297,7 +298,7 @@ rightsWrapper.addTask = function(initUser, task, actions, callback) {
     function addNewSessionID(userID, sessionID, actionID, actionName, timestamp, doIt, callback) {
         if(!doIt) return callback();
 
-        auditUsers.addNewSessionID(userID, sessionID, actionID, actionName, timestamp, function(err) {
+        sessionDB.addNewSessionID(userID, sessionID, actionID, actionName, timestamp, function(err) {
             if(err) return callback(new Error('Error while inserting new session "'+sessionID+'", for action ID "'+actionID+'" and action name "'+actionName+'" into the auditUsers table: ' + err.message));
             log.info('Adding a new session "'+sessionID+'", for action ID "'+actionID+'" and action name "'+actionName+'" into the auditUsers table');
             callback();
@@ -306,7 +307,7 @@ rightsWrapper.addTask = function(initUser, task, actions, callback) {
 
     function addOrUpdateTask(taskID, userID, timestamp, name, groupID, callback) {
         if(!taskID) {
-            tasksDB.addTask(userID, timestamp, name, groupID, function(err, taskID) {
+            tasksDBSave.addTask(userID, timestamp, name, groupID, function(err, taskID) {
                 if(err) {
                     return callback(new Error('Can\'t insert a new task "' + name + '", userID "' + userID +
                         '", timestamp: "' + timestamp + '", groupID: "' + groupID + '": ' + err.message));
@@ -316,12 +317,12 @@ rightsWrapper.addTask = function(initUser, task, actions, callback) {
             return;
         }
 
-        tasksDB.updateTask(taskID, name, groupID, function (err) {
+        tasksDBSave.updateTask(taskID, name, groupID, function (err) {
             if(err) {
                 return callback(new Error('Can\'t update task #' + taskID + '"' + name +
                     '", groupID: "' + groupID + '": ' + err.message));
             }
-            tasksDB.removeTaskActionsAndParameters(taskID, function (err) {
+            tasksDBSave.removeTaskActionsAndParameters(taskID, function (err) {
                 if(err) {
                     return callback(new Error('Can\'t remove actions for update task #' + taskID + '"' + name +
                         '", groupID: "' + groupID + '": ' + err.message));
@@ -348,16 +349,16 @@ rightsWrapper.saveAction = function (user, sessionID, args, callback) {
                     if(err) return callback(new Error('Can\'t start transaction for add new task into the database: '+err.message));
 
                     var timestamp = new Date().getTime();
-                    tasksDB.addTask(userID, timestamp, null, 0, function (err, taskID) {
+                    tasksDBSave.addTask(userID, timestamp, null, 0, function (err, taskID) {
                         if (err) {
                             return transactionDB.rollback(new Error('Can\'t insert a new unnamed task for userID "'
                                 + userID + ': ' + err.message), callback);
                         }
 
-                        tasksDB.addAction(taskID, sessionID, 0, 0, function(err, actionID){
+                        tasksDBSave.addAction(taskID, sessionID, 0, 0, function(err, actionID){
                             if (err) return transactionDB.rollback(err, callback);
 
-                            tasksDB.addParameters(actionID, args, function(err){
+                            tasksDBSave.addParameters(actionID, args, function(err){
                                 if(err) return transactionDB.rollback(err, callback);
                                 log.info('New task ', taskID, ' and action ', sessionID, ' successfully saved');
                                 transactionDB.end(callback);
@@ -369,10 +370,10 @@ rightsWrapper.saveAction = function (user, sessionID, args, callback) {
                 transactionDB.begin(function(err){
                     if(err) return callback(new Error('Can\'t start transaction for add new task into the database: '+err.message));
 
-                    tasksDB.addAction(taskID, sessionID, null, null, function(err, actionID) {
+                    tasksDBSave.addAction(taskID, sessionID, null, null, function(err, actionID) {
                         if (err) return transactionDB.rollback(err, callback);
 
-                        tasksDB.addParameters(actionID, args, function(err){
+                        tasksDBSave.addParameters(actionID, args, function(err){
                             if(err) return transactionDB.rollback(err, callback);
                             log.info('Action ', sessionID, ' successfully added to task ', taskID);
                             transactionDB.end(callback);
@@ -409,11 +410,11 @@ rightsWrapper.addRunCondition = function (taskID, runType, OCIDs, callback) {
                     return callback(new Error('Invalid OCIDs: ' + OCIDs + ' while add new task condition: ' + err.message));
                 }
 
-                tasksDB.deleteRunConditionOCIDs(checkedTaskID[0], function (err) {
+                tasksDBSave.deleteRunConditionOCIDs(checkedTaskID[0], function (err) {
                     if(err) return callback(new Error('Can\'t delete old OCIDs for add a new task condition OCIDs for taskID' + taskID + ', OCIDs: ' +
                         OCIDs + ': ' + err.message));
 
-                    tasksDB.addRunConditionOCIDs(checkedTaskID[0], checkedOCIDs, function (err) {
+                    tasksDBSave.addRunConditionOCIDs(checkedTaskID[0], checkedOCIDs, function (err) {
                         if(err) return callback(new Error('Can\'t add new task condition OCIDs for taskID' + taskID + ', OCIDs: ' +
                             OCIDs + ': ' + err.message));
 
@@ -426,12 +427,12 @@ rightsWrapper.addRunCondition = function (taskID, runType, OCIDs, callback) {
 
     function addOrUpdateTaskCondition(taskID, runType, callback) {
         log.info('For task ID ', taskID, ' set runType: ', runType);
-        tasksDB.addRunCondition(taskID, runType, function(err) {
+        tasksDBSave.addRunCondition(taskID, runType, function(err) {
             if(!err) return callback();
 
             var insertErr = err;
             if (err) {
-                tasksDB.updateRunCondition(taskID, runType, function(err) {
+                tasksDBSave.updateRunCondition(taskID, runType, function(err) {
                     if(err) {
                         return callback(new Error('Can\'t add or update task condition for taskID ' + taskID +
                             ', runType: ' + runType + ', insert error: ' + insertErr.message + '; update error: ' + err.message));
@@ -444,10 +445,10 @@ rightsWrapper.addRunCondition = function (taskID, runType, OCIDs, callback) {
 };
 
 rightsWrapper.deleteRunCondition = function (taskID, callback) {
-    tasksDB.deleteRunCondition(taskID, function (err) {
+    tasksDBSave.deleteRunCondition(taskID, function (err) {
         if(err) return callback(new Error('Can\'t delete task run condition for taskID: ' + taskID + ': ' + err.message));
 
-        tasksDB.deleteRunConditionOCIDs(taskID, function (err) {
+        tasksDBSave.deleteRunConditionOCIDs(taskID, function (err) {
             if(err) return callback(new Error('Can\'t delete task run condition OCIDs for taskID: ' + taskID + ': ' + err.message));
             callback();
         });
@@ -458,7 +459,7 @@ rightsWrapper.approveTask = function (userName, taskID, callback) {
     checkTaskRightsForExecution(userName, taskID, function (err, userID) {
         if(err) return callback(err);
 
-        tasksDB.approveTask(taskID, userID, function(err) {
+        tasksDBSave.approveTask(taskID, userID, function(err) {
             if(err) return callback(new Error('Can\'t approve task ID ' + taskID + ', user ' + userName + ': ' + err.message));
             callback();
         });
@@ -469,7 +470,7 @@ rightsWrapper.cancelTask = function (userName, taskID, callback) {
     checkTaskRightsForExecution(userName, taskID, function (err, userID) {
         if(err) return callback(err);
 
-        tasksDB.cancelTask(taskID, userID, function(err) {
+        tasksDBSave.cancelTask(taskID, userID, function(err) {
             if(err) return callback(new Error('Can\'t cancel task ID ' + taskID + ', user ' + userName + ': ' + err.message));
             callback();
         });
@@ -507,7 +508,7 @@ rightsWrapper.markTaskCompleted = function (taskID, callback) {
         return callback(new Error('Can\'t mark task ID ' + taskID + ' completed: Invalid taskID'));
     }
 
-    tasksDB.updateRunCondition(Number(taskID), 11, function(err) {
+    tasksDBSave.updateRunCondition(Number(taskID), 11, function(err) {
         if(err) return callback(new Error('Can\'t mark task ID ' + taskID + ' completed: ' + err.message));
         callback();
     });
@@ -529,7 +530,7 @@ rightsWrapper.getTaskConditions = function(taskID, callback) {
 };
 
 rightsWrapper.removeApproval = function (taskID, callback) {
-    tasksDB.removeApproval(taskID, function (err) {
+    tasksDBSave.removeApproval(taskID, function (err) {
         if(err) return callback(new Error('Can\'t remove approval from task ID ' + taskID + ': ' + err.message));
         callback();
     });

@@ -304,24 +304,14 @@ countersDB.getObjectsCounters = function(OCIDs, callback) {
     });
 };
 
-/*
-    get all counters IDs and objectsCountersIDs by objects IDs array from objectsCounters table
-
-    objectsIDs - objectsIDs array
-
-    callback(err, rows)
-    rows: [{id: objectCounterID, objectID: ..., counterID: ...}, {},...]
+/**
+ * Get data form the objectsCounters table for an array of specified object IDs using
+ * SELECT * FROM objectsCounters WHERE objectsCounters.objectID = ?
+ * @param {Array} objectsIDs - array of objectIDs [<objectID1>, <objectID2>, ...]
+ * @param {function} callback - callback(err, rows), where rows [{id: objectCounterID, objectID: ..., counterID: ...}, {},...]
  */
 countersDB.getCountersForObjects = function(objectsIDs, callback) {
     log.debug('Getting countersIDs and objectCountersIDs for objects IDs: ', objectsIDs);
-
-    // for small count of objectsIDs
-    if(objectsIDs.length < db.maxVariableNumber) {
-        db.all('SELECT * FROM objectsCounters WHERE objectsCounters.objectID IN (' +
-            (new Array(objectsIDs.length)).fill('?').join(',') + ')', objectsIDs, callback);
-
-        return;
-    }
 
     var rows = [];
     var stmt = db.prepare('SELECT * FROM objectsCounters WHERE objectsCounters.objectID = ?', function(err) {

@@ -14,7 +14,7 @@ const confServer = new Conf('config/server.json');
 var activeCollector = {};
 module.exports = activeCollector;
 
-var collectors = {}, collectorsObj = {};
+var collectors = {}, collectorsObj = {}, startTime = Date.now();
 /* collectors[serverAddress + ':' + port] = {
     names: <array of collectors names>
     IPC: <clientIPC for connect to collectors>
@@ -213,15 +213,14 @@ function Collector(collectorName, clientIPC, hostPort) {
 }
 
 function connectToCollector(collectorName, callback) {
-    var reconnectInProgress = false;
 
     getCollectorParameters(collectorName);
     var serverAddress = collectorsObj[collectorName].serverAddress,
         localAddress = collectorsObj[collectorName].localAddress,
         port = collectorsObj[collectorName].port;
 
-    // connectToCollector and startAll can be in different process
-    // init collectors again
+    // connectToCollector() and startAll() can be called from different processes
+    // init collectors[] again
     if(!collectors[serverAddress + ':' + port]) {
         collectors[serverAddress + ':' + port] = {
             names: getCollectorNamesWithSameIPAndPort(serverAddress, port)
@@ -239,16 +238,15 @@ function connectToCollector(collectorName, callback) {
         separateStorageByProcess: true,
         id: path.basename(module.parent.filename, '.js') + '=>' + collectors[serverAddress + ':' + port].names.join(','),
     }, function(err, message, clientIPC) {
+        /*
+         Active collectors cannot be initialized at the same time to connect to each other.
+         After 5 seconds, they will reconnect. Wait 30 sec and do not print connection errors
+         */
+        if (err && Date.now() - startTime > 30000) log.warn('IPC client error: ', err.message);
 
-        // prevent to start this function after reconnect
-        if (reconnectInProgress) {
-            if (err) log.error(err);
-            return;
-        } else reconnectInProgress = true;
-
-        if (!clientIPC) return log.warn('Receiving unexpected message: ', message);
-
-        collectors[serverAddress + ':' + port].IPC = clientIPC;
-        callback(err, clientIPC, serverAddress + ':' + port);
+        if (clientIPC) {
+            collectors[serverAddress + ':' + port].IPC = clientIPC;
+            callback(err, clientIPC, serverAddress + ':' + port);
+        }
     });
 }

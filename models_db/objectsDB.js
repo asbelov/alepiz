@@ -8,178 +8,9 @@ var db = require('./db');
 
 var objectsDB = {};
 module.exports = objectsDB;
-/*
- Delete objects.
- Check user rights before using this functions
- IDs - array objects IDs
- callback(err)
-*/
-objectsDB.deleteObjects = function(IDs, callback) {
-    log.debug('Deleting objects IDs: ', IDs);
-
-    var stmt = db.prepare('DELETE FROM objects WHERE id=?', function(err) {
-        if(err) return callback(err);
-
-        async.eachSeries(IDs, function(ID, callback) {
-            stmt.run(ID, callback);
-        }, function(err) {
-            stmt.finalize();
-            callback(err);
-        });
-    });
-};
-
-/*
- renaming objects with IDs in initIDs to names in newObjectsNamesStr
- Check user rights before using this functions
- objects - [{id: XX, name: "newObjectName1"}, {..},.... ]
- callback(err)
- */
-objectsDB.renameObjects = function(objects, callback) {
-    log.debug('Renaming objects: ', objects);
-
-    var stmt = db.prepare('UPDATE objects SET name=? WHERE id=?', function(err){
-        if(err) return callback(err);
-
-        // eachSeries used for possible transaction rollback if error occurred
-        async.eachSeries(objects, function(object, callback){
-                stmt.run([object.name, object.id], callback);
-            }, function(err) {
-            stmt.finalize();
-            callback(err);
-        });
-    });
-};
 
 objectsDB.getAllObjects = function(callback) {
     db.all('SELECT * FROM objects', callback);
-};
-
-/*
- add new objects into a database.
-
- newObjectNames - array of new objects names
- description - description for new object names
- order - sort position for new objects.  Top objects has order < 10 objectsFilterDB.js
- disabled - 1|0
- color = <color>:<shade> (https://materializecss.com/color.html#palette)
- callback(err, newObjectsIDs),
- newObjectsIDs - array of a new objects IDs;
- newObjects - object like {<objectName1>: <objectID1>, ...}
- */
-objectsDB.addObjects = function(newObjectsNames, description, order, disabled, color, callback){
-    log.debug('Add objects: ', newObjectsNames, ', description: ', description, ', order: ', order, ', disabled: ', disabled);
-
-    // Prepare statement for inserting new objects into a database
-    var stmt = db.prepare('INSERT INTO objects (name, description, sortPosition, disabled, color, created) VALUES ' +
-        '($name,$description,$sortPosition, $disabled, $color, $created)', function(err) {
-        if(err) return callback(err);
-
-        // array with IDs of a new objects, which inserting
-        var newObjectsIDs = [], newObjects = {};
-        // async inserting new objects into a database. series used for transaction rollback if error and
-        // save order of newObjectsIDs
-        async.eachSeries(newObjectsNames, function(name, callback){
-            stmt.run({
-                $name: name,
-                $description: description,
-                $sortPosition: order,
-                $disabled: disabled,
-                $color: color,
-                $created: Date.now(),
-            }, function (err, info) {
-                if(err) return callback(err);
-                // push new object ID into array
-                var newObjectID = this.lastID === undefined ? info.lastInsertRowid : this.lastID;
-                newObjectsIDs.push(newObjectID);
-                newObjects[name] = newObjectID;
-                callback();
-            });
-        }, function(err){
-            stmt.finalize();
-            if(err) return callback(err);
-            callback(null, newObjectsIDs, newObjects);
-        });
-    });
-};
-
-// Update description and sort position for objects with IDs
-// Check user rights before using this functions
-// IDs - array of objects IDs
-// description - object description one for all
-// order - object sort position in an objects' menu, one for all.  Top objects has order < 10 objectsFilterDB.js
-// disabled - 1|0|undefined if unchanged
-// color = <color>:<shade> (https://materializecss.com/color.html#palette)
-// callback(err, true|undefined), where "true" if objects information are updated
-//
-// undefined description or order are not updated
-objectsDB.updateObjectsInformation = function (IDs, description, order, disabled,  color, callback) {
-    log.debug('Update objects IDs: ', IDs, '; description: ', description, '; order; ', order, '; disabled: ', disabled);
-
-    var subQuery = [];
-    if(disabled !== undefined) subQuery.push('disabled=$disabled');
-    if(order !== undefined) subQuery.push('sortPosition=$order');
-    if(description) subQuery.push('description=$description');
-    if(color || color === null) subQuery.push('color=$color');
-    if(!subQuery.length) return callback();
-
-    var stmt = db.prepare('UPDATE objects SET ' + subQuery.join(', ') + ' WHERE id=$id', function(err) {
-        if(err) return callback(err);
-        async.eachSeries(IDs, function(ID, callback) {
-
-            var updateData = {
-                $id: ID,
-                $disabled: (disabled ? 1 : 0)
-            };
-            if(order !== undefined) updateData.$order = order;
-            if(description) updateData.$description = description;
-            if(color || color === null) updateData.$color = color;
-
-            stmt.run(updateData, callback);
-        }, function(err) {
-            stmt.finalize();
-            callback(err, true);
-        });
-    })
-};
-
-
-// inserting new objects interactions
-// interactions = [{id1: <objectID1>, id2: <objectID2>, type: <interactionType>}]
-// callback(err)
-objectsDB.insertInteractions = function(interactions, callback){
-
-    var stmt = db.prepare('INSERT INTO interactions (objectID1, objectID2, type) VALUES (?,?,?)', function(err){
-        if(err) return callback(err);
-
-        // eachSeries used for possible transaction rollback if error occurred
-        async.eachSeries(interactions, function(interaction, callback){
-            stmt.run([interaction.id1, interaction.id2, interaction.type], callback);
-        }, function(err) {
-            stmt.finalize();
-            callback(err);
-        });
-    });
-};
-
-// deleting some objects interactions
-// Check user rights before using it functions
-// interactions = [{id1:<objectID1>, id2: <objectID2>, type: <interactionType>}]
-// callback(err)
-objectsDB.deleteInteractions = function(interactions, callback){
-    if(!interactions.length) return callback();
-
-    var stmt = db.prepare('DELETE FROM interactions WHERE objectID1=? AND objectID2=? AND type=?', function(err) {
-        if(err) return callback(err);
-
-        // eachSeries used for possible transaction rollback if error occurred
-        async.eachSeries(interactions, function(interaction, callback){
-            stmt.run([interaction.id1, interaction.id2, interaction.type], callback);
-        }, function(err) {
-            stmt.finalize();
-            callback(err);
-        });
-    });
 };
 
 /*
@@ -382,6 +213,13 @@ objectsDB.getAlepizIDs = function (callback) {
     db.all('SELECT * FROM alepizIDs', callback);
 }
 
+/**
+ * Get object relationship to Alepiz instances for specific objectIDs using
+ *  SELECT * FROM objectsAlepizRelation WHERE objectsAlepizRelation.objectID = ?
+ * @param {Array} objectIDs - array of the objectIDs list
+ * @param {function(Error)|function(null, Array)} callback - callback(err, rows) ,where rows is array like
+ *  [{id:, objectID:, alepizID: }, ...]
+ */
 objectsDB.getObjectsAlepizRelationByObjectIDs = function (objectIDs, callback) {
     var stmt = db.prepare('SELECT * FROM objectsAlepizRelation WHERE objectsAlepizRelation.objectID = ?', function (err) {
         if(err) return callback(err);
@@ -401,49 +239,13 @@ objectsDB.getObjectsAlepizRelationByObjectIDs = function (objectIDs, callback) {
     });
 }
 
+/**
+ * Get all object relationships to Alepiz instances
+ * @param {function(Error)|function(null, Array)} callback - callback(err, rows), where rows is array like
+ *  [{objectID:, alepizName:}, ....]
+ */
 objectsDB.getObjectsAlepizRelation = function (callback) {
     db.all('SELECT objectsAlepizRelation.objectID AS objectID, alepizIDs.name AS alepizName \
         FROM objectsAlepizRelation \
         JOIN alepizIDs ON objectsAlepizRelation.alepizID = alepizIDs.id', callback);
-}
-
-objectsDB.deleteObjectsAlepizRelation = function(objectIDs, callback) {
-    if(!objectIDs.length) return callback();
-
-    var stmt = db.prepare('DELETE FROM objectsAlepizRelation WHERE objectID=?', function(err) {
-        if(err) return callback(err);
-
-        async.eachSeries(objectIDs, function(objectID, callback) {
-            stmt.run(objectID, callback);
-        }, function(err) {
-            stmt.finalize();
-            callback(err);
-        });
-    });
-};
-
-objectsDB.addObjectsAlepizRelation = function (objectIDs, alepizIDs, callback) {
-    if(!objectIDs.length || !alepizIDs.length) return callback();
-
-    var objectsAlepizRelations = [];
-    objectIDs.forEach(objectID => {
-        alepizIDs.forEach(alepizID => {
-            objectsAlepizRelations.push({
-                $objectID: objectID,
-                $alepizID: alepizID,
-            });
-        });
-    });
-
-    var stmt = db.prepare('INSERT INTO objectsAlepizRelation (objectID, alepizID) VALUES ($objectID, $alepizID)',
-        function(err) {
-        if(err) return callback(err);
-
-        async.eachSeries(objectsAlepizRelations, function(objectAlepizRelation, callback){
-            stmt.run(objectAlepizRelation, callback);
-        }, function(err) {
-            stmt.finalize();
-            callback(err);
-        });
-    });
 }

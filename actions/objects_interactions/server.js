@@ -7,7 +7,7 @@
  */
 var async = require('async');
 var rightsWrapper = require('../../rightsWrappers/objectsDB');
-var transactionDB = require('../../models_db/transaction');
+var transactionDB = require('../../models_db/modifiers/transaction');
 var log = require('../../lib/log')(module);
 var server = require('../../server/counterProcessor');
 

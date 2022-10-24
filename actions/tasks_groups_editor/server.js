@@ -7,8 +7,9 @@
  */
 var log = require('../../lib/log')(module);
 var tasksDB = require('../../models_db/tasksDB');
+var tasksDBSave = require('../../models_db/modifiers/modifierWapper').tasksDB;
 var checkIDs = require('../../lib/utils/checkIDs');
-var transactionDB = require('../../models_db/transaction');
+var transactionDB = require('../../models_db/modifiers/transaction');
 
 module.exports = function(args, callback) {
     log.debug('Starting action server \"'+args.actionName+'\" with parameters', args);
@@ -34,7 +35,7 @@ module.exports = function(args, callback) {
                     }
                 }
 
-                tasksDB.removeTasksGroups(groupNames, function (err) {
+                tasksDBSave.removeTasksGroups(groupNames, function (err) {
                     if (err) return callback(err);
 
                     updateGroup(args.groupID, args.groupName, args.userRoles, function(err) {
@@ -63,10 +64,10 @@ function updateGroup(id, name, roles, callback) {
 
             if (id === "00") {
                 log.debug('Add new group ', name);
-                tasksDB.addTasksGroup(name, function (err, taskGroupID) {
+                tasksDBSave.addTasksGroup(name, function (err, taskGroupID) {
                     if (err) return callback(new Error('Can\'t add new task group ' + name + ': ' + err.message));
 
-                    tasksDB.addRolesForGroup(taskGroupID, checkedRoles, function (err) {
+                    tasksDBSave.addRolesForGroup(taskGroupID, checkedRoles, function (err) {
                         if (err) return callback(new Error('Can\'t add roles "' + checkedRoles.join(',') +
                             '" for a new task group ' + taskGroupID + ', task group ID: ' + taskGroupID + ' : ' + err.message));
 
@@ -80,17 +81,17 @@ function updateGroup(id, name, roles, callback) {
             id = Number(id);
             if (id === parseInt(String(id), 10)) {
                 log.debug('Rename group ID ', id, ' to ', name);
-                tasksDB.renameTasksGroup(id, name, function(err) {
+                tasksDBSave.renameTasksGroup(id, name, function(err) {
                     if(err) {
                         return callback(new Error('Can\'t rename task group ID ' + id + ', new name: ' + name +
                             ': ' + err.message));
                     }
 
-                    tasksDB.deleteAllRolesForGroup(id, function(err) {
+                    tasksDBSave.deleteAllRolesForGroup(id, function(err) {
                         if(err) return callback(new Error('Can\'t delete roles for task group ' + name +
                             ', task group ID: ' + id +' when updating: ' + err.message));
 
-                        tasksDB.addRolesForGroup(id, checkedRoles, function (err) {
+                        tasksDBSave.addRolesForGroup(id, checkedRoles, function (err) {
                             if (err) return callback(new Error('Can\'t add roles "' + checkedRoles.join(',') +
                                 '" for a task group ' + name + ', task group ID: ' + id + ' when updating: ' + err.message));
 

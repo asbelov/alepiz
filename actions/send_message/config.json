@@ -18,6 +18,7 @@
     "descriptionTemplate": "Make some action with objects %:o:%",
     "icon": "settings",
     "canAddParametersToAction": true,
+    "runActionOnRemoteServers": false,
     "parameters": {
         "objects": {
             "description": "List of objects IDs, used as templates"

@@ -1,5 +1,5 @@
 //var log = require('../../lib/log')(module);
-var tasks = require('../../lib/tasks');
+const taskServer = require('../../serverTask/taskServerClient');
 
 var Conf = require('../../lib/conf');
 const conf = new Conf('config/common.json');
@@ -37,22 +37,19 @@ collector.get = function(prms, callback) {
 
     /*
     result: {
-        sessionID1: actionData1,
-        sessionID2: actionData2,
+        taskActionID1: actionData1,
+        taskActionID1: actionData2,
         ...
     }
      */
-	tasks.runTask({
+    taskServer.runTask({
         userName: systemUser,
         taskID: taskID,
         variables: prms.$variables,
+        runTaskFrom: 'server',
     }, function(err, result) {
 		if(err) return callback(err);
 
-		try {
-			return callback(null, JSON.stringify(result));
-        } catch(err) {
-			return callback(null, result);
-        }
+		callback(null, typeof result === 'object' ? JSON.stringify(result) : result.toString());
     });
 };

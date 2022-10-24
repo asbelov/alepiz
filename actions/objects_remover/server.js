@@ -8,7 +8,7 @@
 
 var async = require('async');
 var rightsWrapper = require('../../rightsWrappers/objectsDB');
-var objectsDB = require('../../models_db/objectsDB');
+var rawObjectsDB = require('../../models_db/modifiers/modifierWapper').objectsDB;
 var log = require('../../lib/log')(module);
 var server = require('../../server/counterProcessor');
 var history = require('../../models_history/history');
@@ -97,7 +97,7 @@ module.exports = function(args, callback) {
                     callback();
                 }, function (callback) {
                     log.info('Removing objects from database: ', objectNamesForRemove, '; object IDs: ', objectsIDs);
-                    objectsDB.deleteObjects(objectsIDs, function (err) {
+                    rawObjectsDB.deleteObjects(objectsIDs, function (err) {
                         if (err) log.error(err.message);
                         callback();
                     });

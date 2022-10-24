@@ -27,20 +27,11 @@ var serverIPC,
     waitingConditionsTime = cfg.waitingConditionsTime || 30000,
     scheduledTasks = new Map();
 
-if(!cfg) {
-    log.warn('Task server is not configured. Try to start server again after 3min');
-    setTimeout(runServerProcess, 180000);
-}
-
 tasks.startCheckConditions(function (err) {
-    if(err) {
-        log.warn('Error starting to check conditions. Try to start server again after 3min: ', err.message);
-        setTimeout(runServerProcess, 180000).unref();
-        return;
-    }
+    if(err) return log.warn('Error starting to check conditions: ', err.message);
 
     cfg.id = 'taskServer';
-    serverIPC = new IPC.server(cfg, function (err, message, socket) {
+    serverIPC = new IPC.server(cfg, function (err, message, socket, callback) {
         if(err) log.error(err.message);
 
         if (socket === -1) { // server starting listening
@@ -56,6 +47,10 @@ tasks.startCheckConditions(function (err) {
             log.debug('Received message ', message);
 
             var taskID = Number(message.taskID);
+
+            // run task from server|eventGenerator|taskMaker
+            if(taskID && message.runTaskFrom) return tasks.runTask(message, callback);
+
             // add new task running on time by schedule (runType is a timestamp)
             if(taskID && message.runType > 100) return scheduleTask(taskID, message.runType, message.workflow);
 

@@ -1,13 +1,13 @@
 /*
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
-var log = require('../../lib/log')(module);
-var countersDB = require('../../rightsWrappers/countersDB');
-var objectsDB = require('../../rightsWrappers/objectsDB');
-var counterSaveDB = require('../../rightsWrappers/counterSaveDB');
-var objectsPropertiesDB = require('../../rightsWrappers/objectsPropertiesDB');
-var transactionDB = require('../../models_db/transaction');
-var server = require('../../server/counterProcessor');
+const log = require('../../lib/log')(module);
+const countersDB = require('../../rightsWrappers/countersDB');
+const objectsDB = require('../../rightsWrappers/objectsDB');
+const counterSaveDB = require('../../rightsWrappers/counterSaveDB');
+const objectsPropertiesDB = require('../../rightsWrappers/objectsPropertiesDB');
+const transactionDB = require('../../models_db/modifiers/transaction');
+const server = require('../../server/counterProcessor');
 const rawObjectsDB = require("../../models_db/objectsDB");
 const Conf = require("../../lib/conf");
 const confServer = new Conf('config/server.json');
@@ -18,28 +18,20 @@ module.exports = function(args, callback) {
         if(err) return callback(err);
 
         var user = args.username;
-        if(param.objectsIDs.length && (
-            param.description && // '' - save old description
-            param.order && // 0 - Current order will be unchanged
-            (param.disabled === 1 || param.disabled === 0) // can be an undefined (if unchanged) or 1 or 0
-        )) {
-            log.info('Update objects parameters: ', param.objectsIDs, ': description: ', param.description,
-                '; order: ', param.order, '; disabled: ', param.disabled);
-            var updateObjects = objectsDB.updateObjectsInformation;
-        } else updateObjects = nop;
-
         var addNewObjects = param.newObjectsNames.length ? objectsDB.addObjects : nop;
         var _saveProperties = args.isCloneProperties ? saveProperties : nop;
         var _saveCounters = args.isCloneCounters ? saveCounters : nop;
-        var _saveInteractions = args.isCloneInteractions ?
-            saveInteractions : (param.interactions.length ? addUpLevelObjectsInteractions : nop);
+        var _saveInteractions = args.isCloneInteractions ? saveInteractions : nop;
 
         transactionDB.begin(function(err) {
             if (err) return callback(err);
 
-            updateObjects(user,  param.objectsIDs, param.description, param.order, param.disabled, param.color,
-                function(err, isObjectsUpdated) {
+            objectsDB.updateObjectsInformation(user,  param.objectsIDs, param.description, param.order, param.disabled,
+                param.color,function(err, updateData, objectNames) {
                 if(err) return transactionDB.rollback(err, callback);
+
+                if(!objectNames) objectNames = param.objectsIDs;
+                if(updateData) log.info('Update object information: ', updateData, ' for ', objectNames);
 
                 if(param.newObjectsNames.length) log.info('Add a new objects: ', param.newObjectsNames);
                 addNewObjects(user, param.newObjectsNames, param.description, param.order, param.disabled, param.color,
@@ -55,98 +47,100 @@ module.exports = function(args, callback) {
                         _saveCounters(user, param, args.cloneAllCounters, function(err, updatedOCIDs) {
                             if(err) return transactionDB.rollback(err, callback);
 
-                            _saveInteractions(user, param, args.cloneAllInteractions,
-                                function(err, isUpdatedInteractions) {
+
+                            _saveInteractions(user, param.objectsIDs, args, function(err, isUpdatedInteractions) {
                                 if (err) return transactionDB.rollback(err, callback);
 
-                                // param.alepizIDs === '' - remove alepizIDs
-                                // param.alepizIDs === '-1' - save alepizIDs unchanged
+                                // args.alepizIDs === '' - remove alepizIDs
+                                // args.alepizIDs === '-1' - save alepizIDs unchanged
                                 var objectIDsForRelationships = args.alepizIDs !== '-1' ? param.objectsIDs : [];
-                                rawObjectsDB.deleteObjectsAlepizRelation(objectIDsForRelationships,
-                                    function (err) {
+                                var alepizIDs = args.alepizIDs && args.alepizIDs !== '-1' ?
+                                    args.alepizIDs.split(',').map(id => parseInt(id, 10)) : [];
+                                objectsDB.addObjectsAlepizRelation(user, objectIDsForRelationships, alepizIDs,
+                                    function(err, newObjectsAlepizRelations, objectsAlepizRelationsForRemove) {
                                     if (err) return transactionDB.rollback(err, callback);
 
-                                    var alepizIDs = param.alepizIDs && param.alepizIDs !== '-1' ?
-                                        args.alepizIDs.split(',').map(id => parseInt(id, 10)) : [];
+                                    if(newObjectsAlepizRelations && newObjectsAlepizRelations.length) {
+                                        log.info('Add object Alepiz relations: ', newObjectsAlepizRelations,
+                                            ' for ', objectNames);
+                                    }
 
-                                    rawObjectsDB.addObjectsAlepizRelation(objectIDsForRelationships, alepizIDs,
-                                        function (err) {
-                                        if (err) return transactionDB.rollback(err, callback);
+                                    if(objectsAlepizRelationsForRemove && objectsAlepizRelationsForRemove.length) {
+                                        log.info('Remove object Alepiz relations: ', objectsAlepizRelationsForRemove,
+                                            ' for ', objectNames);
+                                    }
 
-                                        transactionDB.end(function (err) {
+                                    transactionDB.end(function (err) {
+                                        if (err) return callback(err);
+
+                                        rawObjectsDB.getAlepizIDs(function (err, alepizIDsObj) {
                                             if (err) return callback(err);
 
-                                            rawObjectsDB.getAlepizIDs(function (err, alepizIDsObj) {
-                                                if (err) return callback(err);
-
-                                                var alepizID2Name = {};
-                                                alepizIDsObj.forEach(row => {
-                                                    alepizID2Name[row.id] = row.name
-                                                });
-
-                                                var alepizNames = confServer.get('alepizNames');
-                                                var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== 1;
-                                                var ownerOfSpecifiedAlepizIDs = alepizIDs.some(alepizID => {
-                                                    return alepizNames.indexOf(alepizID2Name[alepizID]) !== -1;
-                                                });
-                                                var objectsAreEnabled = !param.disabled &&
-                                                    ((!alepizIDs.length && ownerOfUnspecifiedAlepizIDs) ||
-                                                        ownerOfSpecifiedAlepizIDs);
-
-                                                // send message for updating collected initial data for objects
-                                                // parameters.disabled can be undefined (if unchanged), 0 or 1
-                                                if (objectsAreEnabled && (!isObjectsUpdated && !newObjectsIDs &&
-                                                    (updatedObjectsIDs && updatedObjectsIDs.length) &&
-                                                    !updatedOCIDs && !isUpdatedInteractions)) {
-
-                                                    server.sendMsg({
-                                                        update: {
-                                                            topObjects: true,
-                                                            objectsProperties: true,
-                                                        },
-                                                        updateObjectsIDs: updatedObjectsIDs
-                                                    });
-
-                                                    return callback(null, updatedObjectsIDs.join(','));
-                                                } else if (objectsAreEnabled && (isObjectsUpdated || newObjectsIDs ||
-                                                    (updatedObjectsIDs && updatedObjectsIDs.length) || updatedOCIDs ||
-                                                    isUpdatedInteractions)) {
-
-                                                    server.sendMsg({
-                                                        update: {
-                                                            topObjects: true,
-                                                            objectsProperties: updatedObjectsIDs && updatedObjectsIDs.length ?
-                                                                updatedObjectsIDs : undefined,
-                                                            objectsCounters: updatedOCIDs || isObjectsUpdated || newObjectsIDs
-                                                        },
-                                                        updateObjectsIDs: param.objectsIDs,
-                                                        updateCountersIDs: updatedOCIDs ? updatedOCIDs.map(function (obj) {
-                                                            return obj.counterID
-                                                        }) : undefined
-                                                    });
-
-                                                    return callback(null, param.objectsIDs.join(','));
-                                                } else if (param.disabled !== 1) {
-                                                    log.debug('Nothing to update for objects: ', param.objectsIDs);
-                                                }
-
-                                                // object state changed to disabled. remove counters
-                                                if (param.disabled === 1 && !objectsAreEnabled) {
-                                                    objectsDB.getObjectsCountersIDs(user, param.objectsIDs,
-                                                        function (err, rows) {
-                                                            if (err) return callback(err);
-
-                                                            var OCIDs = rows.map(row => row.id);
-                                                            if (OCIDs.length) server.sendMsg({
-                                                                removeCounters: OCIDs,
-                                                                description: 'Objects was disabled from "object clone" ' +
-                                                                    'by user ' + user +
-                                                                    '. Object names: ' + param.cloneToObjectNames
-                                                            });
-                                                            callback(null, param.objectsIDs.join(','));
-                                                        })
-                                                } else callback(null, param.objectsIDs.join(','));
+                                            var alepizID2Name = {};
+                                            alepizIDsObj.forEach(row => {
+                                                alepizID2Name[row.id] = row.name
                                             });
+
+                                            var alepizNames = confServer.get('alepizNames');
+                                            var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== 1;
+                                            var ownerOfSpecifiedAlepizIDs = alepizIDs.some(alepizID => {
+                                                return alepizNames.indexOf(alepizID2Name[alepizID]) !== -1;
+                                            });
+                                            var objectsAreEnabled = !param.disabled &&
+                                                ((!alepizIDs.length && ownerOfUnspecifiedAlepizIDs) ||
+                                                    ownerOfSpecifiedAlepizIDs);
+
+                                            // send message for updating collected initial data for objects
+                                            // parameters.disabled can be undefined (if unchanged), 0 or 1
+                                            if (objectsAreEnabled && (!updateData && !newObjectsIDs &&
+                                                (updatedObjectsIDs && updatedObjectsIDs.length) &&
+                                                !updatedOCIDs && !isUpdatedInteractions)) {
+
+                                                server.sendMsg({
+                                                    update: {
+                                                        topObjects: true,
+                                                        objectsProperties: true,
+                                                    },
+                                                    updateObjectsIDs: updatedObjectsIDs
+                                                });
+
+                                                return callback(null, updatedObjectsIDs.join(','));
+                                            } else if (objectsAreEnabled && (updateData || newObjectsIDs ||
+                                                (updatedObjectsIDs && updatedObjectsIDs.length) || updatedOCIDs ||
+                                                isUpdatedInteractions)) {
+
+                                                server.sendMsg({
+                                                    update: {
+                                                        topObjects: true,
+                                                        objectsProperties: updatedObjectsIDs && updatedObjectsIDs.length ?
+                                                            updatedObjectsIDs : undefined,
+                                                        objectsCounters: updatedOCIDs || updateData || newObjectsIDs
+                                                    },
+                                                    updateObjectsIDs: param.objectsIDs,
+                                                    updateCountersIDs: updatedOCIDs ? updatedOCIDs.map(function (obj) {
+                                                        return obj.counterID
+                                                    }) : undefined
+                                                });
+
+                                                return callback(null, param.objectsIDs.join(','));
+                                            }// else if (param.disabled !== 1) log.debug('Nothing to update for objects: ', objectNames);
+
+                                            // object state changed to disabled. remove counters
+                                            if (param.disabled === 1 && !objectsAreEnabled) {
+                                                objectsDB.getObjectsCountersIDs(user, param.objectsIDs,
+                                                    function (err, rows) {
+                                                        if (err) return callback(err);
+
+                                                        var OCIDs = rows.map(row => row.id);
+                                                        if (OCIDs.length) server.sendMsg({
+                                                            removeCounters: OCIDs,
+                                                            description: 'Objects were disabled from "object clone" ' +
+                                                                'by user ' + user +
+                                                                '. Object names: ' + objectNames.join(','),
+                                                        });
+                                                        callback(null, param.objectsIDs.join(','));
+                                                    })
+                                            } else callback(null, param.objectsIDs.join(','));
                                         });
                                     });
                                 });
@@ -181,12 +175,9 @@ function parseArgs(args, callback) {
         }
     }
 
-    var color = ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue', 'light-blue', 'cyan', 'teal',
-        'green', 'light-green', 'lime', 'yellow', 'amber', 'orange', 'deep-orange', 'brown', 'grey', 'blue-grey',
-        'black', 'white', 'transparent'].indexOf((args.objectsColor || '').toLowerCase()) !== -1 ?
-        args.objectsColor + ':' +
-        (/^(lighten)|(darken)|(accent)-[1-4]$/.test((args.objectsShade || '').toLowerCase()) ? args.objectsShade : '') :
-        null;
+    // color will be unchanged if color is undefined. args.objectsColor !== undefined for old tasks
+    var color = args.objectsColor !== '0' && args.objectsColor !== undefined ?
+        args.objectsColor + ':' + args.objectsShade : undefined;
 
     // you can use as source objects args.o (in tasks) or from objects selector
     if(!args.sourceObjectsIDs) {
@@ -237,39 +228,26 @@ function parseArgs(args, callback) {
         return Number(id);
     });
 
-    var description = args.objectsDescription;
-    var order = parseInt(args.objectsOrder, 10);
-    var disabled = args.disabledCB; // checking for correct disabled value at rightsWrapper.addObjects
+    var description = objectsIDs.length > 1 && args.objectsDescription === '' ? undefined : args.objectsDescription;
+    var disabled = args.disabled !== '' ? args.disabled : undefined;
 
-    if((order || newObjectsNames.length) && order !== parseInt(String(order), 10))
-        return callback(new Error('Incorrect objects order for objects :' +
-            args.cloneToObjectsJSON + ': ' + args.objectsOrder));
-
-    var interactions = [];
-    if(args.upLevelObjectsIDs) {
-        String(args.upLevelObjectsIDs).split(/\s*[,;]\s*/).filter(function (id) {
-            return id && Number(id) === parseInt(id, 10);
-        }).forEach(function (id) {
-            objectsIDs.forEach(function (id2) {
-                interactions.push({
-                    id1: Number(id),
-                    id2: id2,
-                    type: 0
-                });
-            });
-        });
+    if(args.objectsOrder) {
+        var order = Number(args.objectsOrder);
+        // when parameters.objectsOrder is 0, the order should remain unchanged, but in updateObjectsInformation(),
+        // the order will remain unchanged if the parameters.objectsOrder is undefined
+        if(!order) order = undefined;
+        else if(order !== parseInt(String(order), 10) || isNaN(order)) {
+            return callback(new Error('Incorrect sort order ' + args.objectsOrder + '. It can be an integer value'))
+        }
     }
 
-    var countersIDs = [], propertiesIDs = [], interactionsObjectsIDs = [], num;
+    var countersIDs = [], propertiesIDs = [], num;
     Object.keys(args).forEach(function (arg) {
         if(args[arg]) {
             if (arg.indexOf('counterID-') === 0 && (num = parseInt(arg.substring('counterID-'.length), 10))) {
                 countersIDs.push(num);
             } else if (arg.indexOf('propertyID-') === 0 && (num = parseInt(arg.substring('propertyID-'.length), 10))) {
                 propertiesIDs.push(num);
-            } else if (arg.indexOf('interactionID-') === 0 &&
-                (num = parseInt(arg.substring('interactionID-'.length), 10))) {
-                interactionsObjectsIDs.push(num);
             }
         }
     });
@@ -278,18 +256,59 @@ function parseArgs(args, callback) {
         objectsIDs: objectsIDs,
         newObjectsNames: newObjectsNames,
         templatesObjectsIDs: templatesObjectsIDs,
-        interactions: interactions,
         description: description,
         order: order,
-        disabled: Number(disabled),
+        disabled: disabled,
         color: color,
         countersIDs: countersIDs,
         propertiesIDs: propertiesIDs,
-        interactionsObjectsIDs: interactionsObjectsIDs
     };
 
     log.debug('Parsed parameters: ', parameters);
     callback(null, parameters);
+}
+
+function createInteractions(cloneToObjectIDs, args) {
+
+    var newInteractions = [], num;
+    cloneToObjectIDs.forEach(function (id2) {
+        if(args.upLevelObjectsIDs) { // <id1>,<id2>,....
+            String(args.upLevelObjectsIDs).split(/\s*[,;]\s*/).forEach(function (id1) {
+                // the ID1 will be verified later
+                newInteractions.push({
+                    id1: parseInt(id1, 10),
+                    id2: id2,
+                    type: 0
+                });
+            });
+        }
+
+        Object.keys(args).forEach(function (arg) {
+            if(args[arg]) {
+                if (arg.indexOf('interactionID-') === 0) { // interactionID-<objectID>,<interactionType>
+                    var [id1, type] = arg.substring('interactionID-'.length).split(/\s*[,;]\s*/);
+                    id1 = parseInt(id1); type = parseInt(type, 10);
+                    // IDs will be verified later
+                    if([0,1,2].indexOf(type) === -1) return;
+                    if(id1 > 0) {
+                        newInteractions.push({
+                            id1: id1,
+                            id2: id2,
+                            type: type,
+                        });
+                    } else {
+                        newInteractions.push({
+                            id1: id2,
+                            id2: -id1,
+                            type: type,
+                        });
+                    }
+                }
+            }
+        });
+    });
+
+    return newInteractions;
 }
 
 /*
@@ -305,11 +324,8 @@ function saveCounters(user, parameters, cloneAllCounters, callback) {
     countersDB.getCountersForObjects(user, parameters.templatesObjectsIDs, null,function(err, rows) {
         if(err) return callback(err);
 
-        var countersIDs = cloneAllCounters ? rows.map(function(row) { return row.id; }) : rows.filter(function(row) {
-                return parameters.countersIDs.indexOf(row.id) !== -1
-            }).map(function(row) {
-                return row.id
-            });
+        var countersIDs = cloneAllCounters ? rows.map(row => row.id) :
+            rows.filter(row => parameters.countersIDs.indexOf(row.id) !== -1).map(row => row.id);
 
         if(!countersIDs.length) {
             log.warn('Can\'t find objects to counters relations for objects IDs: ', parameters.objectsIDs);
@@ -328,11 +344,11 @@ function saveCounters(user, parameters, cloneAllCounters, callback) {
 }
 
 function saveProperties(user, parameters, cloneAllProperties, callback) {
-    objectsPropertiesDB.getProperties(user, parameters.templatesObjectsIDs, function(err, propertiesObj) {
+    objectsPropertiesDB.getProperties(user, parameters.templatesObjectsIDs, function(err, rows) {
         if(err) return callback(err);
 
         var propertiesNames = {}; // checking for duplicate properties
-        if(!cloneAllProperties) propertiesObj = propertiesObj.filter(function (property) {
+        if(!cloneAllProperties) rows = rows.filter(function (property) {
             if(propertiesNames[property.name]) {
                 if(property.value !== propertiesNames[property.name])
                     log.warn('Templates has properties with equal names: "', property.name,
@@ -349,16 +365,13 @@ function saveProperties(user, parameters, cloneAllProperties, callback) {
         /*
         properties: [{name:.., mode:.., value:.., description:..}, ...]
         */
-        var properties = Object.keys(propertiesObj).filter(function (key) {
-                var prop = propertiesObj[key];
+        var properties = rows.filter(function (prop) {
                 if(prop.description === undefined) prop.description = '';
                 if(prop.mode !== undefined) prop.mode = Number(prop.mode);
                 return prop.name && prop.value !== undefined && [0, 1, 2, 3].indexOf(prop.mode) !== -1
-            }).map(function (key) {
-                return propertiesObj[key];
             });
 
-        objectsPropertiesDB.saveObjectsProperties(user, parameters.objectsIDs, properties,true,
+        objectsPropertiesDB.saveObjectsProperties(user, parameters.objectsIDs, properties,false,
             function(err, updatedObjectsIDs, properties) {
             if(updatedObjectsIDs.length) log.info('Changes in properties: ', properties);
             callback(err, updatedObjectsIDs)
@@ -366,84 +379,15 @@ function saveProperties(user, parameters, cloneAllProperties, callback) {
     });
 }
 
-/*
-    Add uplevel objects interactions.
-    user: user name
-    parameters: see return of parseArgs() function
-    "cloneAllInteractions" used for align parameters with saveInteraction(user, parameters, cloneAllInteractions, callback) function
-
-    callback(err)
- */
-function addUpLevelObjectsInteractions(user, parameters, cloneAllInteractions, callback) {
-    objectsDB.insertInteractions(user, parameters.interactions, callback);
-}
-
 // interaction types: 0 - include; 1 - intersect, 2 - exclude
-function saveInteractions(user, parameters, cloneAllInteractions, callback) {
-    objectsDB.getInteractions(user, parameters.templatesObjectsIDs, function(err, rows) {
-        if(err) return callback(err);
+function saveInteractions(user, cloneToObjectIDs, args, callback) {
 
-        if(cloneAllInteractions) var templateInteractions = rows;
-        else templateInteractions = rows.filter(function(row) {
-            return parameters.interactionsObjectsIDs.indexOf(row.id1) !== -1 ||
-                parameters.interactionsObjectsIDs.indexOf(row.id2) !== -1
-        });
+    // add upLevel interaction
+    // parameters.interactionsObjectsIDs = [{id1:, id2:. type:}, {...}, ...]
+    // parameters.upLevelObjectsIDs: [{id1:, id2:. type: 0}, {...}, ...] - interactions with upLevel objects
 
-        objectsDB.getInteractions(user, parameters.objectsIDs, function(err, rows) {
-            if (err) return callback(err);
+    var newInteractions = createInteractions(cloneToObjectIDs, args);
 
-            var interactions = parameters.interactions; // interactions with upLevel objects
-            parameters.objectsIDs.forEach(function (id2) {
-
-                templateInteractions.forEach(function (interaction) {
-                    if (parameters.templatesObjectsIDs.indexOf(interaction.id1) !== -1) {
-                        interactions.push({
-                            id1: id2,
-                            id2: interaction.id2,
-                            type: interaction.type
-                        });
-                        if (parameters.templatesObjectsIDs.indexOf(interaction.id2) !== -1) {
-                            interactions.push({
-                                id1: interaction.id1,
-                                id2: id2,
-                                type: interaction.type
-                            });
-                        }
-                    } else if (parameters.templatesObjectsIDs.indexOf(interaction.id2) !== -1) {
-                        interactions.push({
-                            id1: interaction.id1,
-                            id2: id2,
-                            type: interaction.type
-                        });
-                    }
-
-                    if(!interactions.length) return;
-
-                    var lastInteraction = interactions[interactions.length -1];
-                    for(var i = 0; i < rows.length; i++) {
-                        if( (
-                                rows.id1 === lastInteraction.id1 &&
-                                rows.id2 === lastInteraction.id2 &&
-                                rows.type === lastInteraction.type
-                            ) ||
-                            (
-                                lastInteraction.type === 1 &&
-                                (
-                                    rows.id1 === lastInteraction.id2 &&
-                                    rows.id2 === lastInteraction.id1 &&
-                                    rows.type === lastInteraction.type
-                                ))
-                        ) interaction.pop();
-                    }
-                });
-            });
-
-            log.info('Saved interactions: ', interactions);
-            if(!interactions.length) return callback();
-
-            objectsDB.insertInteractions(user, interactions, function (err) {
-                callback(err, true);
-            });
-        });
-    });
+    if(!newInteractions.length) return callback();
+    objectsDB.insertInteractions(user, newInteractions, callback);
 }

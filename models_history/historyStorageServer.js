@@ -81,12 +81,19 @@ function dbOpen() {
             readonly: !isTransactionProcess,
             timeout: Number(parameters.dbLockTimeout) || 5000
         });
-        db.pragma('synchronous = "OFF"');
-        db.pragma('foreign_keys = "ON"');
-        db.pragma('encoding = "UTF-8"');
-        db.pragma('journal_mode = "WAL"');
     } catch (err) {
-        return log.warn('Can\'t open DB ', dbPath, ' or set some required pragma modes: ', err.message);
+        return log.warn('Can\'t open DB ', dbPath, ': ', err.message);
+    }
+
+    try {
+        if(isTransactionProcess) {
+            db.pragma('synchronous = "OFF"');
+            db.pragma('foreign_keys = "ON"');
+            db.pragma('encoding = "UTF-8"');
+            db.pragma('journal_mode = "WAL"');
+        }
+    } catch (err) {
+        log.warn('Can\'t set some required pragma modes to ', dbPath, ': ', err.message);
     }
 }
 
@@ -115,7 +122,7 @@ function init(callback) {
         try {
             var rows = db.prepare('SELECT * FROM objects').all();  // id, type, cachedRecords
         } catch (err) {
-            return log.throw('Can\'t get data from objects table from storage database: ' + err.message);
+            return log.throw('Can\'t get data from objects table from storage DB: ' + err.message);
         }
 
         rows.forEach(function (row) {
@@ -126,7 +133,7 @@ function init(callback) {
         try {
             rows = db.prepare('SELECT id, trends FROM objects').all();
         } catch (err) {
-            return log.throw('Can\'t initialize replication for storage database ' + dbPath +
+            return log.throw('Can\'t initialize replication for storage DB ' + dbPath +
                 ': Can\'t load trends data from DB' + err.message);
         }
 
@@ -160,7 +167,7 @@ function truncateWal() {
             if (err.code !== 'ENOENT') log.error('Can\'t stat ', dbPath + '-wal: ', err.message);
         } else if (stat.size > 104857600) { // 100Mb
             log.warn('Size of ', dbPath + '-wal file is a ',
-                Math.round(stat.size/1048576), 'Mb. Truncating wal and optimizing database...');
+                Math.round(stat.size/1048576), 'Mb. Truncating wal and optimizing DB...');
             try {
                 db.pragma('wal_checkpoint(TRUNCATE)');
             } catch (err) {
@@ -169,7 +176,7 @@ function truncateWal() {
             try {
                 db.pragma('optimize');
             } catch (err) {
-                log.error('Can\' optimize database: ', err.message);
+                log.error('Can\' optimize DB: ', err.message);
             }
         }
     });
@@ -232,7 +239,7 @@ function onMessage(message, callback) {
 function onStop(callback) {
     var timeToWaitForDB = transactionInProgress || isTransactionProcess ? 300 : 15; //sec
     var terminateTimeout = setTimeout(function () {
-        log.warn('Cannot close database ', dbPath, ' in ', timeToWaitForDB,'sec. Terminate...');
+        log.warn('Cannot close DB ', dbPath, ' in ', timeToWaitForDB,'sec. Terminate...');
         if (typeof callback === 'function') callback();
         callback = null;
     }, timeToWaitForDB * 1000);
@@ -244,7 +251,7 @@ function onStop(callback) {
             else log.error('Unexpected transaction committed successfully');
         };
 
-        log.warn('Closing the database for ', (isTransactionProcess ?
+        log.warn('Closing the DB for ', (isTransactionProcess ?
             ('transactions process ' + dbPath + '...') : 'queries process...'));
 
         try {
@@ -286,7 +293,7 @@ function onStop(callback) {
             if (err) log.error('Error while commit transaction for ' + dbPath + ': ' + err.message);
             else log.warn('Transaction commit successfully for ' + dbPath);
 
-            log.warn('Closing the database after commit transaction for ' + dbPath + '...');
+            log.warn('Closing the DB after commit transaction for ' + dbPath + '...');
             try {
                 db.close();
                 log.warn('Storage DB closed successfully after commit transaction for ' + dbPath);
@@ -587,7 +594,7 @@ functions.beginTransaction = function(description, callback) {
     try {
         db.prepare('BEGIN').run();
     } catch (err) {
-        return callback(new Error('Can\'t start transaction for storage database: ' + err.message));
+        return callback(new Error('Can\'t start transaction for storage DB: ' + err.message));
     }
     callback();
 };
@@ -597,7 +604,7 @@ functions.commitTransaction = function(err, _callback) {
     function callback(err) {
         if(err) log.warn('Error in transaction "', transactionDescriptionInProgress, '": ', err);
         if(typeof callbackOnStop === 'function') {
-            if(err) log.info('Stopping database after transaction "', transactionDescriptionInProgress ,'" error...');
+            if(err) log.info('Stopping DB after transaction "', transactionDescriptionInProgress ,'" error...');
             callbackOnStop(err);
         }
         clearInterval(commitWatchdog);
@@ -627,7 +634,7 @@ functions.commitTransaction = function(err, _callback) {
         try {
             db.prepare('ROLLBACK').run();
         } catch (errRollback) {
-            return callback(new Error(err.message + '; and can\'t rollback transaction for storage database :' +
+            return callback(new Error(err.message + '; and can\'t rollback transaction for storage DB :' +
                 errRollback.message));
         }
         callback(err);
@@ -635,7 +642,7 @@ functions.commitTransaction = function(err, _callback) {
         try {
             db.prepare('COMMIT').run();
         } catch (err) {
-            return callback(new Error('Can\'t commit transaction for storage database: ' + err.message));
+            return callback(new Error('Can\'t commit transaction for storage DB: ' + err.message));
         }
         callback();
     }
@@ -848,7 +855,7 @@ function delRecords(IDs, daysToKeepHistory, daysToKeepTrends, _callback) {
 
 
 functions.saveRecordsForObject = function (id, newObjectParameters, recordsForSave, callback) {
-    if (!id) return callback(new Error('Undefined ID while saving records to storage database'));
+    if (!id) return callback(new Error('Undefined ID while saving records to storage DB'));
 
     var objectParametersObj = objectsParameters.get(Number(id));
 
@@ -985,7 +992,7 @@ function createStorage (id, objectParameters) {
             .run([id, objectParameters.cachedRecords, 0]);
     } catch (err) {
         return new Error('Can\'t create a new storage for id ' + id + ', cached records: ' +
-            objectParameters.cachedRecords + ' in storage database: ' + err.message);
+            objectParameters.cachedRecords + ' in storage DB: ' + err.message);
     }
 }
 
@@ -995,7 +1002,7 @@ functions.removeZombiesFromStorage = function (callback) {
     try {
         var rows = db.prepare('SELECT * FROM objects').all();  // id, type, cachedRecords
     }  catch (err) {
-        return callback(new Error('Can\'t get data from objects table from storage database: ' + err.message));
+        return callback(new Error('Can\'t get data from objects table from storage DB: ' + err.message));
     }
 
     var OCIDs = rows.map(row => row.id);

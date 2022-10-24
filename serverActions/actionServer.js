@@ -15,15 +15,15 @@ const conf = new Conf('config/common.json');
 const confActions = new Conf('config/actions.json');
 
 
-var actionsDB = require('../models_db/actionsDB');
+const actionsDB = require('../models_db/actionsDB');
+const actionsDBSave = require('../models_db/modifiers/modifierWapper').actionsDB;
 
-var tasksDB = require('../rightsWrappers/tasksDB');
 const actionConf = require('../lib/actionsConf');
 var actionClient = require('./actionClient');
 
 var userDB = require('../models_db/usersDB');
-var auditUsersDB = require('../models_db/auditUsersDB');
-var transaction = require('../models_db/transaction');
+var sessionDB = require('../models_db/modifiers/modifierWapper').auditUsersDB;
+var transaction = require('../models_db/modifiers/transaction');
 const thread = require("../lib/threads");
 const path = require("path");
 const runAction = require('./runAction');
@@ -59,10 +59,11 @@ attachRunAction(cfg.serverNumber || 5, function (err, _runActionSystem) {
             if (err) log.error(err.message);
 
             if (msg && msg.msg === 'runAction') return addActionToQueue(msg.param, callback);
-            if (msg && msg.msg === 'createSession') return addCreateSessionToQueue(msg.param, callback);
-            if (msg && msg.msg === 'markTaskCompleted') return tasksDB.markTaskCompleted(msg.taskID, callback);
+            if (msg && msg.msg === 'addSessionID') return addCreateSessionToQueue(msg.param);
             if (msg && msg.msg === 'getActionConfig') return actionsDB.getActionConfig(msg.user, msg.actionID, callback);
-            if (msg && msg.msg === 'setActionConfig') return actionsDB.setActionConfig(msg.user, msg.actionID, msg.config, callback);
+            if (msg && msg.msg === 'setActionConfig') {
+                return actionsDBSave.setActionConfig(msg.user, msg.actionID, msg.config, callback);
+            }
 
             if (socket === -1) {
                 actionClient.connect(function () {
@@ -136,15 +137,20 @@ function attachRunAction(serverNumber, callback) {
 }
 
 /*
-  Create new session ID for each running actions or if no action running
-  return sessionID.
+  Add new session ID for each running actions or if no action running
 */
-function createSession(param, callback) {
+/**
+ * Add new session ID for each running actions or if no action running
+ * @param {{user: {string}, sessionID: {uint}, actionID: {string}, actionName: {string}}} param -
+ *  parameters for creating sessionID
+ * @param {function(Error)} callback - callback(err)
+ */
+function addSession(param, callback) {
 
-    var user = param.user, actionID = param.actionID, actionName = param.actionName;
-
-    // Must be an integer
-    var sessionID = parseInt(String(new Date().getTime()) + String(parseInt(String(Math.random() * 100), 10)), 10);
+    var user = param.user,
+        actionID = param.actionID,
+        actionName = param.actionName,
+        sessionID = param.sessionID;
 
     userDB.getID(user, function(err, userID) {
         if (err) return callback(new Error('Can\'t get user ID for user ' + user + ': ' + err.message));
@@ -153,21 +159,21 @@ function createSession(param, callback) {
         transaction.begin(function (err) {
             if(err) return callback(err);
 
-            auditUsersDB.addNewSessionID(userID, sessionID, actionID, actionName, new Date().getTime(), function (err) {
+            sessionDB.addNewSessionID(userID, sessionID, actionID, actionName, Date.now(),
+                function (err) {
                 if(err) return transaction.rollback(err, callback);
 
                 transaction.end(function (err) {
-                    callback(err, sessionID);
+                    callback(err);
                 });
             });
         });
     });
 }
 
-function addCreateSessionToQueue(param, callback) {
+function addCreateSessionToQueue(param) {
     createSessionQueue.add({
         param: param,
-        callback: callback,
     });
     runActionFromQueue();
 }
@@ -240,13 +246,13 @@ function runActionFromQueue() {
             action: {
                 conf: {
                     timeout: 60,
-                    name: 'createSessions: ' + JSON.stringify(sessions),
+                    name: 'addSessions: ' + JSON.stringify(sessions),
                 }
             },
         };
         async.eachSeries(sessions, function (session, callback) {
-            createSession(session.param, function (err, sessionID) {
-                session.callback(err, sessionID);
+            addSession(session.param, function (err) {
+                if(err) log.error('Error add new session to DB: ', err.message, ': ', session.param);
                 lastProcessedAction = {};
                 callback();
             });

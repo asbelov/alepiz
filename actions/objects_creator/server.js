@@ -7,8 +7,7 @@
  */
 const log = require('../../lib/log')(module);
 const rightsWrapper = require('../../rightsWrappers/objectsDB');
-const transactionDB = require('../../models_db/transaction');
-const rawObjectsDB = require("../../models_db/objectsDB");
+const transactionDB = require('../../models_db/modifiers/transaction');
 
 module.exports = function(args, callback) {
     log.debug('Starting action server \"'+args.actionName+'\" with parameters', args);
@@ -23,12 +22,12 @@ module.exports = function(args, callback) {
 // Add new objects with description, order and interactions
 // parameters - parameters, which returned by HTML form
 // callback(err, <success message>)
-function addNewObjects(user, param, callback){
+function addNewObjects(user, args, callback){
 
-    if(!param.objectsNames) return callback(new Error('New objects names are not specified: ' + param.objectsNames));
+    if(!args.objectsNames) return callback(new Error('New objects names are not specified: ' + args.objectsNames));
 
-    var newUncheckedObjectsNames = param.objectsNames.split(/\s*?[,;]\s*?/);
-    if(!Array.isArray(newUncheckedObjectsNames)) newUncheckedObjectsNames = [param.objectsNames];
+    var newUncheckedObjectsNames = args.objectsNames.split(/\s*?[,;]\s*?/);
+    if(!Array.isArray(newUncheckedObjectsNames)) newUncheckedObjectsNames = [args.objectsNames];
 
     var newObjectsNames = newUncheckedObjectsNames.filter(function(name) {
         if (!name || /[%\n\r]/.test(name) || /__/.test(name)) {
@@ -43,30 +42,23 @@ function addNewObjects(user, param, callback){
         return callback(new Error('New objects names are not specified or incorrect: ' + newUncheckedObjectsNames));
     }
 
-    var description = param.objectsDescription;
-    var order = Number(param.objectsOrder);
-    var disabled = param.disabled; // check disabled value at rightsWrapper.addObjects
+    var description = args.objectsDescription;
+    var order = Number(args.objectsOrder);
+    var disabled = args.disabled; // check disabled value at rightsWrapper.addObjects
 
-    // color will be unchanged if color is undefined.
-    var color;
-    if(param.objectsColor !== '0') {
-        color = ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue', 'light-blue', 'cyan', 'teal',
-            'green', 'light-green', 'lime', 'yellow', 'amber', 'orange', 'deep-orange', 'brown', 'grey', 'blue-grey',
-            'black', 'white', 'transparent'].indexOf((param.objectsColor || '').toLowerCase()) !== -1 ?
-            param.objectsColor + ':' +
-            (/^(lighten)|(darken)|(accent)-[1-4]$/.test((param.objectsShade || '').toLowerCase()) ? param.objectsShade : '') :
-            null;
+    if(order !== parseInt(String(order), 10) || isNaN(order)) {
+        return callback(new Error('Incorrect objects order: ' + args.objectsOrder));
     }
 
-    if(order !== parseInt(String(order), 10)) {
-        return callback(new Error('Incorrect objects order: ' + param.objectsOrder));
-    }
+    // color will be unchanged if color is undefined. args.objectsColor !== undefined for old tasks
+    var color = args.objectsColor !== '0' && args.objectsColor !== undefined ?
+        args.objectsColor + ':' + args.objectsShade : undefined;
 
-    if(param.o) { // string '[{"name": "name1", "id": "XX"}, {"name": "name2", "id": "YY"},....]'
+    if(args.o) { // string '[{"name": "name1", "id": "XX"}, {"name": "name2", "id": "YY"},....]'
         try {
-            var upLevelObjects = JSON.parse(param.o);
+            var upLevelObjects = JSON.parse(args.o);
         } catch(err) {
-            return callback(new Error('Can\'t parse JSON string with up level objects: "' + param.o + '": ' + err.message));
+            return callback(new Error('Can\'t parse JSON string with up level objects: "' + args.o + '": ' + err.message));
         }
 
         var upLevelObjectsIDs = upLevelObjects.map(function(obj) {
@@ -101,8 +93,8 @@ function addNewObjects(user, param, callback){
                 return transactionDB.rollback(err, callback);
             }
 
-            var alepizIDs = param.alepizIDs ? param.alepizIDs.split(',').map(id => parseInt(id, 10)) : [];
-            rawObjectsDB.addObjectsAlepizRelation(newObjectsIDs, alepizIDs,function (err) {
+            var alepizIDs = args.alepizIDs ? args.alepizIDs.split(',').map(id => parseInt(id, 10)) : [];
+            rightsWrapper.addObjectsAlepizRelation(user, newObjectsIDs, alepizIDs, function (err) {
                 if (err) return transactionDB.rollback(err, callback);
 
                 // no up level objects for include a new objects in

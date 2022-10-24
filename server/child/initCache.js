@@ -11,6 +11,10 @@ module.exports = initCache;
  * @returns {*}
  * @example
  * cache {
+ *     alepizInstance: {
+ *         id: <alepizInstanceID>,
+ *         name: <alepizInstanceName>
+ *     },
  *     countersObjects: {
  *          OCIDs: Map<<OCID>: {objectID: Number, counterID: Number}, ...>
  *         // for getVarFromHistory.js
@@ -76,6 +80,7 @@ module.exports = initCache;
  */
 
 function initCache(message, cache) {
+    if (message.alepizInstance) cache.alepizInstance = message.alepizInstance;
     if (message.countersObjects && message.countersObjects.counters) cache.countersObjects = message.countersObjects;
     if (message.variablesHistory.size) cache.variablesHistory = message.variablesHistory;
     if (message.variablesExpressions.size) cache.variablesExpressions = message.variablesExpressions;

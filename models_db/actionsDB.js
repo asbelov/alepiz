@@ -15,21 +15,3 @@ actionsDB.getActionConfig = function (user, actionID, callback) {
         $userName: user,
     }, callback);
 };
-
-/*
-It will insert new or update action configuration for existent userID-actionName unique pairs because
-CREATE TABLE IF NOT EXISTS actionsConfig (' +
-        'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
-        'userID INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
-        'actionName TEXT NOT NULL,' +
-        'config TEXT,' +
-        'UNIQUE(userID, actionName) ON CONFLICT REPLACE)
- */
-actionsDB.setActionConfig = function (user, actionID, config, callback) {
-    db.run('INSERT INTO actionsConfig (userID, actionName, config) ' +
-        'VALUES ((SELECT id FROM users WHERE isDeleted=0 AND name = $userName), $actionName, $config)', {
-        $userName: user,
-        $actionName: actionID,
-        $config: config,
-    }, callback);
-}

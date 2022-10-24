@@ -23,14 +23,15 @@ collector.get = function(param, callback) {
     }
 
     param.warnTimeDirSizeCalculation = Number(param.warnTimeDirSizeCalculation);
-    if (param.warnTimeDirSizeCalculation !== parseInt(String(param.warnTimeDirSizeCalculation), 10) || !param.warnTimeDirSizeCalculation) {
+    if (param.warnTimeDirSizeCalculation !== parseInt(String(param.warnTimeDirSizeCalculation), 10) ||
+        !param.warnTimeDirSizeCalculation) {
         log.warn('Incorrect warnTimeDirSizeCalculation parameter value. Set warnTimeDirSizeCalculation to 5min: ', param);
         param.warnTimeDirSizeCalculation = 300000;
     }
 
     var dirNames = param.dirNames.split(',').map(name => name.trim());
     var excluded = !param.excludedDirs ? [] : param.excludedDirs.split(',').map(function(excl) {
-        if (!param.regExpExcludedDirs) return excl.trim();
+        if (!param.regExpExcludedDirs) return excl.trim().toLowerCase();
         try {
             return new RegExp(excl.trim(), 'gi');
         } catch (e) {
@@ -40,10 +41,12 @@ collector.get = function(param, callback) {
     });
 
     var size = 0, allObjectsNum = 0, allFilesNum = 0;
-    async.eachSeries(dirNames, function(dirName, callback) {
+    async.eachLimit(dirNames, 10, function(dirName, callback) {
         fs.stat(dirName, function(err, dirStats) {
             if (err) {
-                if (!param.dontLogErrors) log.warn('Can\'t get file info ' + dirName + ': ' + err.message + ' for ' + JSON.stringify(param));
+                if (!param.dontLogErrors) {
+                    log.warn('Can\'t get file info ', dirName, ': ', err.message, ' for ', JSON.stringify(param));
+                }
                 return callback();
             }
             if (dirStats.isDirectory()) {
@@ -61,7 +64,7 @@ collector.get = function(param, callback) {
             } else if (dirStats.isFile()) {
                 var fileSize = Number(dirStats.size);
                 ++allFilesNum;
-                ++allFilesNum;
+                ++allObjectsNum;
                 if (!isNaN(fileSize)) size += fileSize;
                 setTimeout(callback, param.sleepTime);
             }
@@ -84,7 +87,7 @@ function getDirSize(dirName, excluded, sleepTime, paramStr, dontLogErrors, callb
         if (err) return callback(new Error('Can\'t read directory ' + dirName + ': ' + err.message + ' for ' + paramStr));
 
         allObjectsNum = dirEntObjects.length;
-        async.eachSeries(dirEntObjects, function(dirEntObj, callback) {
+        async.eachLimit(dirEntObjects, 40, function(dirEntObj, callback) {
             for (var i = 0; i < excluded.length; i++) {
                 if (!excluded[i]) continue;
 
@@ -92,11 +95,11 @@ function getDirSize(dirName, excluded, sleepTime, paramStr, dontLogErrors, callb
                     if (excluded[i] === dirEntObj.name.toLowerCase()) return callback();
                 } else {
                     try {
-                        if (excluded[i].test(dirEntObj.name.toLowerCase())) return callback();
+                        if (excluded[i].test(dirEntObj.name)) return callback();
                     } catch (e) {
                         if (!dontLogErrors) {
-                            log.warn('Can\'t check ' + dirEntObj.name + ' for exclude RE(' + JSON.stringify(excluded[i]) +
-                                '): ' + err.message + '; ' + paramStr);
+                            log.warn('Can\'t check ', dirEntObj.name, ' for exclude: ', err.message,
+                                '; RegExp: (', excluded[i], '); param: ', paramStr);
                         }
                     }
                 }
@@ -104,18 +107,22 @@ function getDirSize(dirName, excluded, sleepTime, paramStr, dontLogErrors, callb
 
             var filePath = path.join(dirName, dirEntObj.name);
             if (dirEntObj.isDirectory()) {
-                getDirSize(filePath, excluded, sleepTime, paramStr, dontLogErrors, function(err, childSize) {
+                getDirSize(filePath, excluded, sleepTime, paramStr, dontLogErrors, function(err, childSize, chilObjectsNum, childfilesNum) {
                     if (err) {
                         if (!dontLogErrors) log.warn(err.message);
                         return callback();
                     }
+                    if (!isNaN(chilObjectsNum)) allObjectsNum += chilObjectsNum;
+                    if (!isNaN(childfilesNum)) filesNum += childfilesNum;
                     if (!isNaN(childSize)) size += childSize;
                     callback();
                 });
             } else if (dirEntObj.isFile()) {
                 fs.stat(filePath, { bigint: false }, function(err, statStruct) {
                     if (err) {
-                        if (!dontLogErrors) log.warn('Can\'t get file info ' + filePath + ': ' + err.message + ' for ' + paramStr);
+                        if (!dontLogErrors) {
+                            log.warn('Can\'t get file info ', filePath, ': ', err.message, ' for ', paramStr);
+                        }
                         return callback();
                     }
                     var fileSize = Number(statStruct.size);

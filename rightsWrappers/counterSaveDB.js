@@ -3,13 +3,13 @@
  */
 
 var log = require('../lib/log')(module);
-var counterSaveDB = require('../models_db/counterSaveDB');
+var counterSaveDB = require('../models_db/modifiers/modifierWapper').countersDB;
 var countersDB = require('../models_db/countersDB');
 var rightsDB = require('../models_db/usersRolesRightsDB');
 var prepareUser = require('../lib/utils/prepareUser');
 var checkIDs = require('../lib/utils/checkIDs');
 var collectors = require('../lib/collectors');
-var transaction = require('../models_db/transaction');
+var transaction = require('../models_db/modifiers/transaction');
 var history = require('../models_history/history');
 var async = require('async');
 var server = require('../server/counterProcessor');
@@ -74,13 +74,13 @@ rightsWrapper.deleteCounter = function(user, counterID, counterName, callback) {
     });
 };
 
-/*
-    Save object counter relations
-
-    objectsCountersIDs: array oj objects with object and counter IDs [{objectID:.., counterID:..}, {..}, ...]
-    initObjectsIDs: array of objects IDs
-    initCountersIDs: array of counters IDs. For each object ID will be linked all initCountersIDs
-    callback(err, objectsCountersIDs) objectsCountersIDs = [{objectID:, counterID:}, ...]
+/**
+ * Save not existing object counter relations and does not save existing object counter relation
+ * I.e. checks existing object counter relationships and does not save if the relationship already exists
+ * @param {string} user - username
+ * @param {Array} initObjectIDs - array of object IDs
+ * @param {Array} initCountersIDs - array of counter IDs
+ * @param {function} callback - callback(err, objectsCountersIDs), where objectsCountersIDs = [{objectID:, counterID:}, ...]
  */
 rightsWrapper.saveObjectsCountersIDs = function(user, initObjectIDs, initCountersIDs,  callback) {
 
@@ -140,11 +140,12 @@ rightsWrapper.saveObjectsCountersIDs = function(user, initObjectIDs, initCounter
                             }
                         })
                     }
-                    if(objectsCountersIDs.length) counterSaveDB.saveObjectsCountersIDs(objectsCountersIDs,
-                        function(err) {
-                        if(err) return callback(err);
-                        callback(null, objectsCountersIDs);
-                    });
+                    if(objectsCountersIDs.length) {
+                        counterSaveDB.saveObjectsCountersIDs(objectsCountersIDs, function(err) {
+                                if(err) return callback(err);
+                                callback(null, objectsCountersIDs);
+                            });
+                    }
                     else callback();
                 });
             });

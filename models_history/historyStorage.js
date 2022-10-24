@@ -96,7 +96,7 @@ storage.initStorage = function (initParameters, callback) {
                     if (err) log.error('Error sending parameters to storage processes for processing transaction: ', err.message);
                     storageModifyingProcess = initStorageModifyingProcess;
 
-                    log.info('Starting storage processes for getting data from database...');
+                    log.info('Starting storage processes for getting data from DB...');
                     var initStorageQueryingProcesses = new threads.parent({
                         childProcessExecutable: path.join(__dirname, 'historyStorageServer.js'),
                         killTimeout: 60000,
@@ -106,19 +106,19 @@ storage.initStorage = function (initParameters, callback) {
                         childrenNumber: parameters.storageQueryingProcessesNum || 0,
                     }, function (err, _storageQueryingProcesses) {
                         if (err) {
-                            return callback(new Error('Can\'t initializing storage processes for for getting data from database: ' + err.message));
+                            return callback(new Error('Can\'t initializing storage processes for for getting data from DB: ' + err.message));
                         }
 
                         _storageQueryingProcesses.startAll(function (err) {
                             if (err) {
-                                return callback(new Error('Can\'t run storage processes for getting data from database: ' + err.message));
+                                return callback(new Error('Can\'t run storage processes for getting data from DB: ' + err.message));
                             }
 
-                            log.info('Sending parameters to storage processes for for getting data from database...');
+                            log.info('Sending parameters to storage processes for for getting data from DB...');
                             _storageQueryingProcesses.sendAndReceiveToAll({
                                 parameters: paramsForTransfer,
                             }, function(err) {
-                                if (err) log.error('Error sending parameters to storage processes for for getting data from database: ', err.message);
+                                if (err) log.error('Error sending parameters to storage processes for for getting data from DB: ', err.message);
                                 storageQueryingProcesses = initStorageQueryingProcesses;
                                 callback();
                             });
@@ -146,7 +146,7 @@ storage.restartStorageQueryProcesses = function(callback) {
 }
 
 storage.stop = function(callback) {
-    // use series to be able to fetch data while waiting while transactional processes are closing the database
+    // use series to be able to fetch data while waiting while transactional processes are closing the DB
     async.series([
         function(callback) {
             if(storageModifyingProcess && typeof storageModifyingProcess.stopAll === "function") {
@@ -206,7 +206,7 @@ function childFunc() {
         return;
     }
 
-    // storageModifyingProcess for modify database
+    // storageModifyingProcess for modify DB
     var sendAndReceive = dontPushToQueue === 0 || dontPushToQueue === 1 ?
         storageModifyingProcess.sendAndReceiveToAll : storageQueryingProcesses.sendAndReceive;
 
@@ -245,7 +245,7 @@ function initDB(dbPath, callback) {
             'cachedRecords INTEGER,' +
             'trends TEXT)').run();
     } catch (err) {
-        return callback(new Error('Can\'t create objects table in storage database: ' + err.message))
+        return callback(new Error('Can\'t create objects table in storage DB: ' + err.message))
     }
 
     try {
@@ -255,13 +255,13 @@ function initDB(dbPath, callback) {
             'timestamp INTEGER NOT NULL,' +
             'data REAL NOT NULL)').run();
     } catch (err) {
-        return callback(new Error('Can\'t create numbers table in storage database: ' + err.message));
+        return callback(new Error('Can\'t create numbers table in storage DB: ' + err.message));
     }
 
     try {
         db.prepare('CREATE INDEX IF NOT EXISTS objectID_timestamp_numbers_index on numbers(objectID, timestamp)').run();
     } catch (err) {
-        return callback(new Error('Can\'t create objects-timestamp index in numbers table in storage database: ' + err.message));
+        return callback(new Error('Can\'t create objects-timestamp index in numbers table in storage DB: ' + err.message));
     }
 
     try {
@@ -271,13 +271,13 @@ function initDB(dbPath, callback) {
             'timestamp INTEGER NOT NULL,' +
             'data TEXT NOT NULL)').run();
     } catch (err) {
-        return callback(new Error('Can\'t create strings table in storage database: ' + err.message));
+        return callback(new Error('Can\'t create strings table in storage DB: ' + err.message));
     }
 
     try {
         db.prepare('CREATE INDEX IF NOT EXISTS objectID_timestamp_strings_index on strings(objectID, timestamp)').run();
     } catch (err) {
-        return callback(new Error('Can\'t create objects-timestamp index in strings table in storage database: ' + err.message));
+        return callback(new Error('Can\'t create objects-timestamp index in strings table in storage DB: ' + err.message));
     }
 
     try {
@@ -286,7 +286,7 @@ function initDB(dbPath, callback) {
             'name TEXT NOT NULL UNIQUE,' +
             'value TEXT)').run();
     } catch (err) {
-        return callback(new Error('Can\'t create config table in storage database: ' + err.message));
+        return callback(new Error('Can\'t create config table in storage DB: ' + err.message));
     }
 
     for (var i = 0; i < trendsTimeIntervals.length; i++) {
@@ -298,7 +298,7 @@ function initDB(dbPath, callback) {
                 'timestamp INTEGER NOT NULL,' +
                 'data REAL NOT NULL)').run();
         } catch (err) {
-            return callback(new Error('Can\'t create trends' + timeInterval + 'min table in storage database: ' + err.message));
+            return callback(new Error('Can\'t create trends' + timeInterval + 'min table in storage DB: ' + err.message));
         }
 
         try {
@@ -306,7 +306,7 @@ function initDB(dbPath, callback) {
                 'min_index on trends' + timeInterval + 'min(objectID, timestamp)').run();
         } catch (err) {
             return callback(new Error('Can\'t create objects-timestamp index in trends' + timeInterval +
-                'min table in storage database: ' + err.message));
+                'min table in storage DB: ' + err.message));
         }
     }
 

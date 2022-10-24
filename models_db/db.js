@@ -2,8 +2,7 @@
  * Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-const log = require('../lib/log')(module);
-const path = require('path');
+//const log = require('../lib/log')(module);
 const Conf = require('../lib/conf');
 const confSqlite = new Conf('config/sqlite.json');
 

@@ -17,6 +17,7 @@
     "outputFormat": "text",
     "icon": "description",
     "showOnlyForObjectsWithProperties": "SERVICE_PATH",
+    "applyToOwnObjects": true,
     "options": {
         "IDForm": "EditorForm",
         "IDResult": "editorResult",

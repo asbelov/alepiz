@@ -222,7 +222,7 @@ function createServer() {
                     result = JSON.parse(resultStr);
                 } catch(err) {
                     socket.destroy();
-                    return log.error(errorMessage + 'can\'t parse JSON in response: ' + err.message);
+                    return log.error(errorMessage + 'can\'t parse JSON in response: ', err.message, ': ', resultStr);
                 }
 
                 if(!result || !result.request) {
@@ -335,6 +335,7 @@ function reqAgentData(result, socket){
 
     var errCnt = 0;
     var timestamp = Date.now();
+    var dataDuplacatesForHosts = new Set(), duplicateDataNum = 0;
     result.data.forEach(function(data) {
 
         if(!data.host || typeof data.host  !== 'string' || !data.key || typeof data.key !== 'string' ||
@@ -351,8 +352,13 @@ function reqAgentData(result, socket){
             else {
                 if(agentSessions.get(result.session) < data.id) agentSessions.set(result.session, data.id);
                 else {
+                    dataDuplacatesForHosts.add(data.host);
+                    ++duplicateDataNum;
+                    /*
+                    // some time received too many errors
                     log.info('Duplicate data received: ', data ,'; received ID (', result.session, ':', data.id,
                         '), <= previous ID (', result.session , ':', agentSessions.get(result.session), ')');
+                     */
                     return;
                 }
             }
@@ -415,6 +421,11 @@ function reqAgentData(result, socket){
             countersParameters.get(zabbixHost).get(zabbixKey).get('callbacks').get(OCID)(null, res);
         }
     });
+
+    if(duplicateDataNum) {
+        log.info('Received ', duplicateDataNum, ' duplicate values for hosts: ',
+            Array.from(dataDuplacatesForHosts).join(', '));
+    }
 
     sendToZabbix(null, socket, JSON.stringify({
         response: 'success',

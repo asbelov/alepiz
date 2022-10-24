@@ -3,7 +3,7 @@
  */
 
 const log = require('../../../lib/log')(module);
-const task = require('../../../lib/tasks');
+const taskServer = require('../../../serverTask/taskServerClient');
 const initDB = require('./initDB');
 const Conf = require('../../../lib/conf');
 const conf = new Conf('config/common.json');
@@ -162,10 +162,11 @@ function eventGeneratorGet(param, callback) {
 
         var runTaskOnProblem = confSettings.get('runTaskOnProblem');
         if(Number(param.problemTaskID) && runTaskOnProblem) {
-            task.runTask({
+            taskServer.runTask({
                 userName: systemUser,
                 taskID: param.problemTaskID,
                 variables: param.$variables,
+                runTaskFrom: 'eventGenerator'
             },function(err) {
                 if(err) log.error(err.message, ' for ', dbPath);
             });
@@ -225,10 +226,11 @@ function solveEvent(param, eventTimestamp) {
     if(runTaskOnSolve &&
         (!disabledEventsCache.has(OCID) || !isEventDisabled(disabledEventsCache.get(OCID).intervals)) &&
         Number(param.solvedTaskID) && !dontRunTask) {
-        task.runTask({
+        taskServer.runTask({
             userName: systemUser,
             taskID: param.solvedTaskID,
             variables: param.$variables,
+            runTaskFrom: 'eventGenerator',
         },function(err) {
             if(err) log.error(err.message, ' for ', dbPath);
         });

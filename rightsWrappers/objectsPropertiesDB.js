@@ -6,6 +6,7 @@
 var log = require('../lib/log')(module);
 var async = require('async');
 var objectsPropertiesDB = require('../models_db/objectsPropertiesDB');
+var objectsPropertiesDBSave = require('../models_db/modifiers/modifierWapper').objectsPropertiesDB;
 var objectsDB = require('../models_db/objectsDB');
 var rightsDB = require('../models_db/usersRolesRightsDB');
 var prepareUser = require('../lib/utils/prepareUser');
@@ -20,10 +21,11 @@ module.exports = rightsWrapper;
  * @param {string} user - username for check right for objects
  * @param {Array|string|number} objectIDs - array or comma separated string with objects IDs
  * @param {boolean} errorOnNoRights - return error if user has not rights for some objects from obkectIDs
- * @param {function(Error)|function(null, Array)} callback - return error or an Array with all columns of object properties
+ * @param {function(Error)|function(null, Array)} callback - return error or an Array with all object properties
+ *  using SELECT * FROM objectsProperties WHERE objectID = ?
  */
 
-function getCachedProperties(user, objectIDs, errorOnNoRights, callback) {
+function getProperties(user, objectIDs, errorOnNoRights, callback) {
     checkIDs(objectIDs, function(err, checkedIDs) {
         if (err) return callback(err);
 
@@ -72,10 +74,11 @@ rightsWrapper.getSharedProperties = function(user, objectsIDs, noCache, callback
  *
  * @param {string} user - username for check right for objects
  * @param {Array|string|number} objectsIDs - array or comma separated string with objects IDs
- * @param {function(Error)|function(null, Array)} callback - return error or an Array with all columns of object properties
+ * @param {function(Error)|function(null, Array)} callback - return error or an Array with all
+ *  of object properties using SELECT * FROM objectsProperties WHERE objectID = ?
  */
 rightsWrapper.getProperties = function(user, objectsIDs, callback) {
-    getCachedProperties(user, objectsIDs, true, callback);
+    getProperties(user, objectsIDs, true, callback);
 };
 
 /**
@@ -104,7 +107,7 @@ rightsWrapper.getPropertiesByOCIDs = function (user, OCIDs, mode, callback) {
                 else objectsIDs2OCIDs[row.objectID].push(row.OCID);
             });
 
-            getCachedProperties(user, Object.keys(objectsIDs2OCIDs), false, function(err, rows) {
+            getProperties(user, Object.keys(objectsIDs2OCIDs), false, function(err, rows) {
                 if(err) {
                     return callback(new Error('Can\'t get objects properties for objects IDs  ' +
                         JSON.stringify(Object.keys(objectsIDs2OCIDs)) + ': ' + err.message));
@@ -204,18 +207,18 @@ rightsWrapper.saveObjectsProperties = function (user, objectsIDs, propertiesForS
                 function (callback) {
                     if(!properties.update[objectID]) return callback();
                     updatedObjectsIDs[objectID] = objectID;
-                    objectsPropertiesDB.updateProperties(objectID, Object.values(properties.update[objectID]), callback);
+                    objectsPropertiesDBSave.updateProperties(objectID, Object.values(properties.update[objectID]), callback);
                 }, function (callback) {
                     if(!properties.updateDescription[objectID]) return callback();
-                    objectsPropertiesDB.updateProperties(objectID, Object.values(properties.updateDescription[objectID]), callback);
+                    objectsPropertiesDBSave.updateProperties(objectID, Object.values(properties.updateDescription[objectID]), callback);
                 }, function (callback) {
                     if(!properties.insert[objectID]) return callback();
                     updatedObjectsIDs[objectID] = objectID;
-                    objectsPropertiesDB.insertProperties(objectID, Object.values(properties.insert[objectID]), callback)
+                    objectsPropertiesDBSave.insertProperties(objectID, Object.values(properties.insert[objectID]), callback)
                 }, function (callback) {
                     if(!deleteNotListedProperties || !properties.deleteShared || !properties.deleteShared.length) return callback();
                     updatedObjectsIDs[objectID] = objectID;
-                    objectsPropertiesDB.deleteProperties(objectID, properties.deleteShared, callback);
+                    objectsPropertiesDBSave.deleteProperties(objectID, properties.deleteShared, callback);
                 }
             ], callback);
         }, function (err) {
@@ -246,7 +249,7 @@ rightsWrapper.saveObjectsProperties = function (user, objectsIDs, propertiesForS
  * } */
 function sortProperties(user, objectsIDs, initProperties, deleteNotListedProperties, callback) {
 
-    getCachedProperties(user, objectsIDs, true, function(err, rows) {
+    getProperties(user, objectsIDs, true, function(err, rows) {
         if (err) return callback(err);
 
         var sharedProperties = {};

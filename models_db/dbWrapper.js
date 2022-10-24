@@ -7,15 +7,45 @@ const log = require('../lib/log')(module);
 const path = require('path');
 const Conf = require('../lib/conf');
 const confSqlite = new Conf('config/sqlite.json');
-var Database = require('better-sqlite3');
+const Database = require('better-sqlite3');
+
+/*
+ Show compiled flags
+WITH opts(n, opt) AS (
+  VALUES(0, NULL)
+  UNION ALL
+  SELECT n + 1,
+         sqlite_compileoption_get(n)
+  FROM opts
+  WHERE sqlite_compileoption_get(n) IS NOT NULL
+)
+SELECT opt
+FROM opts;
+
+result:
+COMPILER=msvc-1916
+ENABLE_FTS3
+ENABLE_FTS3_PARENTHESIS
+ENABLE_FTS5
+ENABLE_GEOPOLY
+ENABLE_JSON1
+ENABLE_RTREE
+ENABLE_STAT4
+HAS_CODEC
+MAX_ATTACHED=125
+MAX_TRIGGER_DEPTH=100
+SOUNDEX
+TEMP_STORE=2
+THREADSAFE=1
+ */
+
+var bestDB = dbInit();
 
 var db = {
     maxVariableNumber: confSqlite.get('maxVariableNumber') || 99,
     init: dbInit,
 };
 module.exports = db;
-
-var bestDB = dbInit();
 
 function dbInit() {
     var dbPath = path.join(__dirname, '..', confSqlite.get('path'));
@@ -35,11 +65,18 @@ function dbInit() {
 
     try {
         var bestDB = new Database(dbPath, options);
-        bestDB.pragma('foreign_keys = "ON"');
-        bestDB.pragma('encoding = "UTF-8"');
-        bestDB.pragma('journal_mode = "WAL"');
     } catch (err) {
-        log.throw('Can\'t open DB ', dbPath, ' or set some required pragma modes: ', err.message);
+        log.throw('Can\'t open DB ', dbPath, ': ', err.message);
+    }
+
+    if(!options.readonly) {
+        try {
+            bestDB.pragma('foreign_keys = "ON"');
+            bestDB.pragma('encoding = "UTF-8"');
+            bestDB.pragma('journal_mode = "WAL"');
+        } catch (err) {
+            log.warn('Can\'t set some required pragma modes to ', dbPath, ': ', err.message);
+        }
     }
 
     return bestDB;
@@ -172,7 +209,7 @@ db.exec = function () {
     if (typeof callback === 'function') return callback();
 }
 
-db.serialize = function (callback) { callback(); }
+//db.serialize = function (callback) { callback(); }
 
 db.prepare = function () {
     return new STMT(Array.prototype.slice.call(arguments));
@@ -211,7 +248,7 @@ function STMT(prepareArgs) {
             var info = bestStmt.run.apply(bestStmt, convertNamedParam(args));
         } catch (err) {
             if (typeof callback === 'function') {
-                return callback(new Error('run(): ' + err.message + '; SQL: ' + sql + '; ARGS: ' + JSON.stringify(args)));
+                return callback(new Error('stmt run(): ' + err.message + '; SQL: ' + sql + '; ARGS: ' + JSON.stringify(args)));
             } else throw err;
         }
 
@@ -233,7 +270,7 @@ function STMT(prepareArgs) {
             var res = bestStmt.get.apply(bestStmt, convertNamedParam(args));
         } catch (err) {
             if (typeof callback === 'function') {
-                return callback(new Error('get(): ' + err.message + '; SQL: ' + sql + '; ARGS: ' + JSON.stringify(args)));
+                return callback(new Error('stmt get(): ' + err.message + '; SQL: ' + sql + '; ARGS: ' + JSON.stringify(args)));
             } else throw err;
         }
         if (typeof callback === 'function') return callback(null, res);
@@ -254,7 +291,7 @@ function STMT(prepareArgs) {
             var res = bestStmt.all.apply(bestStmt, convertNamedParam(args));
         } catch (err) {
             if (typeof callback === 'function') {
-                return callback(new Error('all(): ' + err.message + '; SQL: ' + sql + '; ARGS: ' + JSON.stringify(args)));
+                return callback(new Error('stmt all(): ' + err.message + '; SQL: ' + sql + '; ARGS: ' + JSON.stringify(args)));
             } else throw err;
         }
         if (typeof callback === 'function') return callback(null, res);

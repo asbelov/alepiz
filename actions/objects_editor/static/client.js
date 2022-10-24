@@ -61,6 +61,7 @@ function callbackBeforeExec(callback) {
 var JQueryNamespace = (function ($) {
     $(function () {
         disabledElm = $('#disabled');
+        disabledCBElm = $('#disabledCB');
         objectsDescriptionElm = $('#objectsDescription');
         objectsOrderElm = $('#objectsOrder');
         objectsREField = $('#objectsREField');
@@ -71,10 +72,16 @@ var JQueryNamespace = (function ($) {
         init(parameters.objects);
         colorPicker.init($('#colorPickerParent'), $('#shadePickerParent'), colorSampleElm);
         alepizIDPicker.init($('#alepizIDPickerParent'));
+        disabledCBElm.click(function () {
+            if(disabledCBElm.val() !== initDisabledStatus) disabledElm.val(initDisabledStatus ? 1 : 0);
+            else disabledElm.val('');
+        });
     });
 
     var serverURL = parameters.action.link+'/ajax',
+        initDisabledStatus,
         disabledElm,
+        disabledCBElm,
         objectsDescriptionElm,
         objectsOrderElm,
         objectsREField,
@@ -127,8 +134,9 @@ var JQueryNamespace = (function ($) {
             }
 
 
-            if(disabled === 1) disabledElm.prop('checked', "1");
-            else disabledElm.prop('checked', "");
+            if(disabled === 1) initDisabledStatus = "1";
+            else initDisabledStatus = "";
+            disabledCBElm.prop('checked', initDisabledStatus);
 
             if(sortPosition) objectsOrderElm.val(sortPosition);
             else objectsOrderElm.val(0);

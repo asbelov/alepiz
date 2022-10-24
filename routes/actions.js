@@ -62,86 +62,88 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
             return;
         }
 
-        actionClient.getSessionID({
+        var sessionID = getSessionID();
+        actionClient.addSessionID({
             user: user,
             actionID: actionID,
-            actionName: actionCfg.name
-        }, function (err, sessionID) {
-            if (err) {
-                log.error('Can\'t create sessionID for user: "', user, '", action: "', actionID, '": ', err.message);
-                return next(err);
-            }
+            actionName: actionCfg.name,
+            sessionID: sessionID,
+        });
 
-            module.sessionID = sessionID;
-            log.debug('Creating new session for user: "', user, '",  action: "', actionCfg.name, '", sessionID: ', sessionID);
+        module.sessionID = sessionID;
+        log.debug('Creating new session for user: "', user, '",  action: "', actionCfg.name, '", sessionID: ', sessionID);
 
-            if (!'o' in req.body) {
-                return callback(new Error('Error while initialisation action "' + actionID + '": ' +
-                    'parameter "o" with object names is not present'));
+        if (!'o' in req.body) {
+            return callback(new Error('Error while initialisation action "' + actionID + '": ' +
+                'parameter "o" with object names is not present'));
+        }
+        objectFilterDB.getObjectsByNames(req.body.o.split(','), user, function(err, objectsFull) {
+            if(err) {
+                return callback(new Error('Error getting object information action "' + actionID + '": ' +
+                    err.message + '. Objects: ' + req.body.o));
             }
-            objectFilterDB.getObjectsByNames(req.body.o.split(','), user, function(err, objectsFull) {
-                if(err) {
-                    return callback(new Error('Error getting object information action "' + actionID + '": ' +
-                        err.message + '. Objects: ' + req.body.o));
+            var objects = objectsFull.map((obj) => {
+                return {
+                    name: obj.name,
+                    id: obj.id,
                 }
-                var objects = objectsFull.map((obj) => {
-                    return {
-                        name: obj.name,
-                        id: obj.id,
-                    }
-                });
-                async.parallel([
-                    // get action configuration and check for objects compatibility
-                    function(callback){
-                        rightsWrapper.checkForObjectsCompatibility(actionCfg, objects, callback);
-                    },
-                    // check user rights for view this action
-                    function(callback){
-                        rightsWrapper.checkActionRights(user, actionID, 'ajax', callback);
-                    }
-                ], function(err){
+            });
+            async.parallel([
+                // get action configuration and check for objects compatibility
+                function(callback){
+                    rightsWrapper.checkForObjectsCompatibility(actionCfg, objects, callback);
+                },
+                // check user rights for view this action
+                function(callback){
+                    rightsWrapper.checkActionRights(user, actionID, 'ajax', callback);
+                }
+            ], function(err){
+                if(err) {
+                    log.error('Error while checking rights for action "', actionID, '": ', err.message);
+                    return next(err);
+                }
+
+                var result = {};
+                result.action = actionCfg;
+                result.objects = objects;
+
+                var actionLink = result.action.link;
+                result.action.link += '_' + String(sessionID);
+                result.action.sessionID = sessionID;
+
+                log.info('Init a new action ' + (req.body.actionUpdate === '1' ? 'with full reload' : '' ) +
+                    '. Parameters: ', result);
+
+                var actionHomePage = path.join(__dirname, '..', actionLink, result.action.homePage);
+
+                if(req.body.actionUpdate === '1') {
+                    actionsForUpdate.set(actionID, {
+                        ajax: true,
+                        server: true
+                    });
+                }
+
+                res.render(actionHomePage, result, function(err, html) {
                     if(err) {
-                        log.error('Error while checking rights for action "', actionID, '": ', err.message);
+                        log.error('Can\'t render action html page "', actionHomePage, '": ', err.message);
                         return next(err);
                     }
 
-                    var result = {};
-                    result.action = actionCfg;
-                    result.objects = objects;
-
-                    var actionLink = result.action.link;
-                    result.action.link += '_' + String(sessionID);
-                    result.action.sessionID = sessionID;
-
-                    log.info('Init a new action ' + (req.body.actionUpdate === '1' ? 'with full reload' : '' ) +
-                        '. Parameters: ', result);
-
-                    var actionHomePage = path.join(__dirname, '..', actionLink, result.action.homePage);
-
-                    if(req.body.actionUpdate === '1') {
-                        actionsForUpdate.set(actionID, {
-                            ajax: true,
-                            server: true
-                        });
-                    }
-
-                    //res.render(actionHomePage, result);
-                    res.render(actionHomePage, result, function(err, html) {
-                        if(err) {
-                            log.error('Can\'t render action html page "', actionHomePage, '": ', err.message);
-                            return next(err);
-                        }
-
-                        res.json({
-                            html: html,
-                            params: result.action
-                        });
-                    })
-                });
+                    res.json({
+                        html: html,
+                        params: result.action
+                    });
+                })
             });
         });
     });
 });
+
+function getSessionID() {
+    // Must be an integer
+    return parseInt(String(new Date().getTime()) +
+        String(parseInt(String(Math.random() * 100), 10)), 10);
+}
 
 // sending static files from action's static dir
 router.all('/' + confActions.get('dir') + '/:action_sessionID/' + confActions.get('staticDir') + '/*', function(req, res){
@@ -220,76 +222,82 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
             return next(err);
         }
 
-        var args = req.method === 'POST' ? req.body : req.query;
-
-        // for ajax run action directly from webServer without actionClient->actionServer IPC
-        // but action server connected to history and server and make too many connections
-        // and when webServer is restarted, we receive an errors in log from IPC system
-        //var actionProcessor = executionMode === 'ajax' ? actionServer : actionClient;
-        //actionProcessor.runAction({
-        actionClient.runAction({
-            actionID: actionID,
-            executionMode: executionMode,
-            user: user,
-            args: args,
-            notInQueue: true, // run the action started by the user without a queue
-            sessionID: sessionID,
-            updateAction: actionsForUpdate.has(actionID) ? actionsForUpdate.get(actionID)[executionMode] : false
-        }, function(err, data){
-            if(!data) data = {actionError: ''};
-            if(err) {
-                log.error('Error in action "', actionID, '": ', err.message);
-                data.actionError = err.message;
+        // for getting action name for run a new actionClient.addSessionID() and get runAjaxOnRemoteServers
+        actions.getConfiguration(actionID, function(err, actionCfg) {
+            if (err) {
+                log.error('Error while getting action configuration for "', actionID, '": ', err.message);
+                return next(err);
             }
 
-            if(actionsForUpdate.has(actionID)) actionsForUpdate.get(actionID)[executionMode] = false;
 
-            if(executionMode === 'ajax') {
-                log.debug('Sending back for action "',actionID,'", mode: ajax: ', data,
-                    ': ', (Buffer.isBuffer(data) ? '(buffer)' : typeof data));
-                if(typeof data === 'string') return res.send(data);
-                else if(typeof data === 'object' && data.type === 'Buffer' && Array.isArray(data.data)) {
+            var args = req.method === 'POST' ? req.body : req.query;
 
-                    res.set({
-                        'Content-Type': 'application/octet-stream',
-                        'Content-Disposition': 'attachment' + (data.fileName ? ('; filename="' + data.fileName + '"') : ''),
-                    });
-                    res.write(Buffer.from(data.data), 'binary');
-                    res.end();
-                    return;
-                } return res.json(data);
-            }
+            // for ajax run action directly from webServer without actionClient->actionServer IPC
+            // but action server connected to history and server and make too many connections
+            // and when webServer is restarted, we receive an errors in log from IPC system
+            //var actionProcessor = executionMode === 'ajax' ? actionServer : actionClient;
+            actionClient.runAction({
+                actionID: actionID,
+                executionMode: executionMode,
+                user: user,
+                args: args,
+                notInQueue: true, // run the action started by the user without a queue
+                // default value of actionCfg.runActionOnRemoteServers is true.
+                // if actionCfg.runActionOnRemoteServers === false, then do not run action on remote server
+                runActionOnRemoteServers: actionCfg.runActionOnRemoteServers === undefined ||
+                    Boolean(actionCfg.runActionOnRemoteServers) !== false,
+                // if true, then data will be an array of all results returned from the current and remote servers
+                runAjaxOnRemoteServers: actionCfg.runAjaxOnRemoteServers,
+                sessionID: sessionID,
+                updateAction: actionsForUpdate.has(actionID) ? actionsForUpdate.get(actionID)[executionMode] : false
+            }, function(err, data){
+                if(!data) data = {actionError: ''};
+                if(err) {
+                    log.error('Error in action "', actionID, '": ', err.message);
+                    data.actionError = err.message;
+                }
 
-            // when action is finished, clear old and create new session ID
-            browserLog.deleteSession(sessionID);
+                if(actionsForUpdate.has(actionID)) actionsForUpdate.get(actionID)[executionMode] = false;
 
-                // only for getting action name for run a new actionClient.getSessionID()
-                actions.getConfiguration(actionID, function(err, actionCfg) {
-                    if (err) {
-                        log.error('Error while getting action configuration for "', actionID, '": ', err.message);
-                        return next(err);
-                    }
+                if(executionMode === 'ajax') {
+                    log.debug('Sending back for action "',actionID,'", mode: ajax: ', data,
+                        ': ', (Buffer.isBuffer(data) ? '(buffer)' : typeof data));
+                    if(typeof data === 'string') return res.send(data);
+                    else if(typeof data === 'object' && data.type === 'Buffer' && Array.isArray(data.data)) {
 
-                    actionClient.getSessionID({
+                        res.set({
+                            'Content-Type': 'application/octet-stream',
+                            'Content-Disposition': 'attachment' + (data.fileName ? ('; filename="' + data.fileName + '"') : ''),
+                        });
+                        res.write(Buffer.from(data.data), 'binary');
+                        res.end();
+                        return;
+                    } return res.json(data);
+                }
+
+                // when action is finished, clear old and create new session ID
+                browserLog.deleteSession(sessionID);
+
+                    var sessionID = getSessionID();
+                    actionClient.addSessionID({
                         user: user,
                         actionID: actionID,
-                        actionName: actionCfg.name
-                    }, function (err, sessionID) {
-                        if (err) {
-                            log.error('Can\'t create sessionID for user: "', user, '", action: "', actionID, '": ', err.message);
-                            return next(err);
-                        }
-
-                        data.sessionID = sessionID;
-                        if(executionMode === 'server') log.info('Complete executing action ', actionID, ' with result: ', data);
-                        else if(executionMode === 'makeTask') log.info('Completed saving action ', actionID);
-
-                        log.debug('Sending back for action "',actionID,'", mode: ', executionMode, ': ', data);
-                        res.json(data);
-
-                        module.sessionID = sessionID;
-                        log.debug('New sessionID for user: "', user, '",  action: "', actionCfg.name, '": ', sessionID);
+                        actionName: actionCfg.name,
+                        sessionID: sessionID,
                     });
+
+                    data.sessionID = sessionID;
+                    if(executionMode === 'server') {
+                        log.info('Complete executing action ', actionID, ' with result: ', data);
+                    } else if(executionMode === 'makeTask') {
+                        log.info('Completed saving action ', actionID);
+                    }
+
+                    log.debug('Sending back for action "',actionID,'", mode: ', executionMode, ': ', data);
+                    res.json(data);
+
+                    module.sessionID = sessionID;
+                    log.debug('New sessionID for user: "', user, '",  action: "', actionCfg.name, '": ', sessionID);
             });
         });
     });

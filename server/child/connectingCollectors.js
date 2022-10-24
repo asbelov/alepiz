@@ -11,7 +11,7 @@ const runInThread = require("../../lib/runInThread");
 const Conf = require("../../lib/conf");
 const confCollectors = new Conf('config/collectors.json');
 
-var isConnectingToCollectors = 0
+var isConnectingToCollectors = 0, callbacks = [];
 
 module.exports = connectingCollectors;
 
@@ -19,14 +19,17 @@ function connectingCollectors(callback) {
 
     // already connected
     if(isConnectingToCollectors === 2) return callback();
+    callbacks.push(callback);
+
     // connection in progress
-    if(isConnectingToCollectors === 1) return setTimeout(connectingCollectors, 1000, callback);
+    if(isConnectingToCollectors === 1) return;
 
     isConnectingToCollectors = 1;
     collectors.getConfiguration(null, function(err, collectorsObj) {
         if (err) {
             isConnectingToCollectors = 0;
-            callback(new Error('Can\'t get collectors: ' + err.nessage));
+            callbacks.forEach(callback => callback(new Error('Can\'t get collectors configuration: ' + err.nessage)));
+            callbacks = [];
         }
 
         log.debug('Collectors: ', collectorsObj);
@@ -47,8 +50,10 @@ function connectingCollectors(callback) {
                     if(!callbackAlreadyCalled[collectorName]) {
                         callbackAlreadyCalled[collectorName] = true;
                         callback();
+                    } else {
+                        log.info('Reconnected to ', (collectorsObj[collectorName].active ? 'active' : 'separate'),
+                            ' collector: ', collectorName, ': OK');
                     }
-                    log.debug('Connected to ', (collectorsObj[collectorName].active ? 'active' : 'separate'), ' collector: ', collectorName, ': OK');
                 });
                 return;
             }
@@ -79,10 +84,13 @@ function connectingCollectors(callback) {
         }, function (err) {
             if(err) {
                 isConnectingToCollectors = 0;
-                return callback(new Error('Can\'t get collectors: ' + err.nessage));
+                callbacks.forEach(callback => callback(new Error('Can\'t connect to collectors: ' + err.nessage)));
+                callbacks = [];
+                return;
             }
             isConnectingToCollectors = 2;
-            callback(null, collectorsObj);
+            callbacks.forEach(callback => callback(null, collectorsObj));
+            callbacks = [];
         });
     });
 }
