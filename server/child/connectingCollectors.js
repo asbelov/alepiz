@@ -33,27 +33,15 @@ function connectingCollectors(callback) {
         }
 
         log.debug('Collectors: ', collectorsObj);
-        var callbackAlreadyCalled = {};
 
         async.each(Object.keys(collectorsObj), function (collectorName, callback) {
 
             if(collectorsObj[collectorName].active || collectorsObj[collectorName].separate) {
                 activeCollector.connect(collectorName, function(err, collector) {
                     // don't use return callback because error can occur several times
-                    if(err) return log.error('Can\'t connect to collector ', collectorName, ': ', err.message);
-
-                    for(var key in collector) {
-                        collectorsObj[collectorName][key] = collector[key];
-                    }
-
-                    // don't call callback again when reconnect to collector
-                    if(!callbackAlreadyCalled[collectorName]) {
-                        callbackAlreadyCalled[collectorName] = true;
-                        callback();
-                    } else {
-                        log.info('Reconnected to ', (collectorsObj[collectorName].active ? 'active' : 'separate'),
-                            ' collector: ', collectorName, ': OK');
-                    }
+                    if(err) callback(new Error('Can\'t connect to collector ' + collectorName + ': ' + err.message));
+                    collectorsObj[collectorName] = collector;
+                    callback();
                 });
                 return;
             }

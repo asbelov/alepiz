@@ -20,7 +20,7 @@ counterProcessor.sendMsg = function(message) {
                 err.message, '; message: ', message);
         }
 
-        var messageAlreadySent = {}, callbackAlreadyCalled = {};
+        var messageAlreadySent = {};
 
         // async.eachOfSeries is required to send messages one after the other.
         // To avoid sending a message to the same collector[hostPort] several times.
@@ -29,19 +29,14 @@ counterProcessor.sendMsg = function(message) {
             if (!collectorCfg.active && !collectorCfg.separate) return callback();
 
             activeCollector.connect(collectorName, function (err, collector) {
-                // don't send message again and dont call callback() after reconnect to collector
-                if(callbackAlreadyCalled[collectorName]) return;
-                // set to true before calling callback
-                callbackAlreadyCalled[collectorName] = true;
-
-                // don't send message to collectors for whom the message was sent earlier
-                if (messageAlreadySent[collector.hostPort]) return callback();
-
                 if (err) {
-                    log.error('Can\'t connect to active collector ', collectorName, ' for send message: ', err.message,
+                    log.warn('Can\'t connect to active collector ', collectorName, ' for send message: ', err.message,
                         '; message: ', message);
                     return callback();
                 }
+
+                // don't send message to collectors for whom the message was sent earlier
+                if (messageAlreadySent[collector.hostPort]) return callback();
 
                 collector.sendToServer({
                     server: message,

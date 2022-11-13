@@ -39,14 +39,9 @@ var historyProcess = new proc.child({
 
 function processMessage(message, socket, callback) {
 
-    if(message.msg === 'add') {
-        cache.add(message.id, message.record);
-        // callback used only for cleanup callback stack from IPC cluster worker
-        // empty data will not be sent to history client
-        return callback();
-    }
+    if(message.msg === 'add') cache.add(message.id, message.record);
 
-    if(message.msg === 'del') return cache.del(message.IDs, 0, 0,callback);
+    if(message.msg === 'del') return cache.del(message.IDs, 0, 0);
 
     if(message.msg === 'getLastValues') return cache.getLastValues(message.IDs, callback);
 
@@ -100,7 +95,6 @@ function processMessage(message, socket, callback) {
                 // starting IPC after all history functions are initializing
                 log.info('Starting history storage IPC...');
                 parameters.id = 'history';
-                //serverIPC = new IPC.cluster(parameters, function(err, msg, socket, messageCallback) {
                 serverIPC = new IPC.server(parameters, function(err, msg, socket, messageCallback) {
                     if(err) log.error(err.message);
 

@@ -6,13 +6,16 @@ const countersDB = require("../models_db/countersDB");
 const objectsPropertiesDB = require("../models_db/objectsPropertiesDB");
 const objectsDB = require("../models_db/objectsDB");
 const checkIDs = require("../lib/utils/checkIDs");
+const Conf = require('../lib/conf');
+
+const confMyNode = new Conf('config/node.json');
 
 var recordsFromDBCnt = 0;
 
 module.exports = createCache;
 
 
-function createCache(updateMode, alepizNames, callback) {
+function createCache(updateMode, callback) {
     if(updateMode && (!updateMode.updateObjectsCounters && !updateMode.getHistoryVariables.length &&
         !updateMode.getVariablesExpressions.length && !updateMode.geObjectsProperties.length)) return callback();
 
@@ -30,7 +33,7 @@ function createCache(updateMode, alepizNames, callback) {
         function(callback) {
             if(updateMode  && !updateMode.updateObjectsCounters) return callback();
 
-            getDataForCheckDependencies(alepizNames,
+            getDataForCheckDependencies(
                 function(err, _counterObjectNames, countersObjects, _objectAlepizRelation, alepizInstance) {
                 counterObjectNames = _counterObjectNames;
                 cache.countersObjects = countersObjects;
@@ -62,7 +65,7 @@ function createCache(updateMode, alepizNames, callback) {
     });
 }
 
-function getDataForCheckDependencies(alepizNames, callback) {
+function getDataForCheckDependencies(callback) {
     var counters = new Map(),
         objects = new Map(),
         objectAlepizRelation = new Map(),
@@ -97,25 +100,28 @@ function getDataForCheckDependencies(alepizNames, callback) {
                                 recordsFromDBCnt += rowsOCIDs.length + rowsCounters.length + rowsUpdateEvents.length +
                                     rowsObjects.length + rowsAlepizRelations.length + rowsAlepizIDs.length;
 
-                                var alepizInstance = rowsAlepizIDs.filter(row => row.name === alepizNames[0])[0] || {};
+                                var cfg = confMyNode.get();
+                                var indexOfOwnNode = cfg.indexOfOwnNode;
+                                var ownerOfUnspecifiedAlepizIDs = cfg.serviceNobodyObjects;
+
+                                var alepizInstance = rowsAlepizIDs.filter(row => row.id === indexOfOwnNode)[0] || {};
 
                                 rowsAlepizRelations.forEach(function (row) {
                                     if (objectAlepizRelation.has(row.objectID)) {
-                                        objectAlepizRelation.get(row.objectID).push(row.alepizName);
+                                        objectAlepizRelation.get(row.objectID).push(row.alepizID);
                                     } else {
-                                        objectAlepizRelation.set(row.objectID, [row.alepizName]);
+                                        objectAlepizRelation.set(row.objectID, [row.alepizID]);
                                     }
                                 });
 
-                                var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== -1;
                                 rowsObjects.forEach(function (row) {
                                     // All available hosts are needed for calcFunction.js: findObjectsLike()
                                     allObjects.set(row.id, row.name);
-                                    var objectsAlepizNames = objectAlepizRelation.get(row.id);
+                                    var objectsAlepizIDs = objectAlepizRelation.get(row.id);
                                     if (!row.disabled) {
-                                        if ((objectsAlepizNames === undefined && ownerOfUnspecifiedAlepizIDs) ||
-                                            (Array.isArray(objectsAlepizNames) &&
-                                                objectsAlepizNames.some(name => alepizNames.indexOf(name) !== -1))) {
+                                        if ((objectsAlepizIDs === undefined && ownerOfUnspecifiedAlepizIDs) ||
+                                            (Array.isArray(objectsAlepizIDs) &&
+                                                objectsAlepizIDs.some(alepizID => alepizID === alepizInstance.id))) {
                                             objects.set(row.id, row.name);
                                         }
                                     }

@@ -8,10 +8,10 @@ const Conf = require("../../../lib/conf");
 const confSqlite = new Conf('config/sqlite.json');
 
 module.exports = {
-    init: init,
+    initDB: initDB,
 };
 
-function init (dbPath) {
+function initDB (dbPath) {
 
     try {
         var db = new Database(dbPath, {});
@@ -43,7 +43,6 @@ function init (dbPath) {
     // will return { db, eventsCache,disabledEventsCache }
     return loadDataToCache(db);
 }
-
 
 function createEventsCommentsTable(db) {
     try {

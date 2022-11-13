@@ -2,22 +2,20 @@
  * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var express = require('express');
-var path = require('path');
-var async = require('async');
-var log = require('../lib/log')(module);
-var Conf = require('../lib/conf');
+const express = require('express');
+const path = require('path');
+const async = require('async');
+const log = require('../lib/log')(module);
+const Conf = require('../lib/conf');
 const confActions = new Conf('config/actions.json');
-var prepareUser = require('../lib/utils/prepareUser');
-var rightsWrapper = require('../rightsWrappers/actions');
-var actions = require('../lib/actionsConf');
-var browserLog = require('../lib/browserLog'); // used for delete messages counter for session
-
-var userDB = require('../models_db/usersDB');
-
-var actionClient = require('../serverActions/actionClient');
+const prepareUser = require('../lib/utils/prepareUser');
+const rightsWrapper = require('../rightsWrappers/actions');
+const actions = require('../lib/actionsConf');
+const browserLog = require('../lib/browserLog'); // used for delete messages counter for session
+const unique = require('../lib/utils/unique');
+const userDB = require('../models_db/usersDB');
+const actionClient = require('../serverActions/actionClient');
 const objectFilterDB = require("../models_db/objectsFilterDB");
-//var actionServer = require('../lib/actionServer');
 
 var router = express.Router();
 module.exports = router;
@@ -62,7 +60,7 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
             return;
         }
 
-        var sessionID = getSessionID();
+        var sessionID = unique.createID();
         actionClient.addSessionID({
             user: user,
             actionID: actionID,
@@ -138,12 +136,6 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
         });
     });
 });
-
-function getSessionID() {
-    // Must be an integer
-    return parseInt(String(new Date().getTime()) +
-        String(parseInt(String(Math.random() * 100), 10)), 10);
-}
 
 // sending static files from action's static dir
 router.all('/' + confActions.get('dir') + '/:action_sessionID/' + confActions.get('staticDir') + '/*', function(req, res){
@@ -248,6 +240,9 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
                     Boolean(actionCfg.runActionOnRemoteServers) !== false,
                 // if true, then data will be an array of all results returned from the current and remote servers
                 runAjaxOnRemoteServers: actionCfg.runAjaxOnRemoteServers,
+                slowAjaxTime: actionCfg.slowAjaxTime,
+                slowServerTime: actionCfg.slowServerTime,
+                debug: actionCfg.debug,
                 sessionID: sessionID,
                 updateAction: actionsForUpdate.has(actionID) ? actionsForUpdate.get(actionID)[executionMode] : false
             }, function(err, data){
@@ -278,26 +273,26 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
                 // when action is finished, clear old and create new session ID
                 browserLog.deleteSession(sessionID);
 
-                    var sessionID = getSessionID();
-                    actionClient.addSessionID({
-                        user: user,
-                        actionID: actionID,
-                        actionName: actionCfg.name,
-                        sessionID: sessionID,
-                    });
+                var newSessionID = unique.createID();
+                actionClient.addSessionID({
+                    user: user,
+                    actionID: actionID,
+                    actionName: actionCfg.name,
+                    sessionID: newSessionID,
+                });
 
-                    data.sessionID = sessionID;
-                    if(executionMode === 'server') {
-                        log.info('Complete executing action ', actionID, ' with result: ', data);
-                    } else if(executionMode === 'makeTask') {
-                        log.info('Completed saving action ', actionID);
-                    }
+                if(executionMode === 'server') {
+                    log.info('Complete executing action ', actionID, ' with result: ', data);
+                } else if(executionMode === 'makeTask') {
+                    log.info('Completed saving action ', actionID);
+                }
 
-                    log.debug('Sending back for action "',actionID,'", mode: ', executionMode, ': ', data);
-                    res.json(data);
+                data.sessionID = newSessionID;
+                log.debug('Sending back for action ', actionID, ', mode: ', executionMode, ': ', data);
+                res.json(data);
 
-                    module.sessionID = sessionID;
-                    log.debug('New sessionID for user: "', user, '",  action: "', actionCfg.name, '": ', sessionID);
+                module.sessionID = newSessionID;
+                log.debug('New sessionID for user: ', user, ',  action: ', actionCfg.name, ': ', newSessionID);
             });
         });
     });

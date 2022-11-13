@@ -8,13 +8,12 @@
 var objectsDB = require('../../rightsWrappers/objectsDB');
 var countersDB = require('../../rightsWrappers/countersDB');
 var rawCountersDB = require('../../models_db/countersDB');
-var rawObjectsDB = require('../../models_db/objectsDB');
-var counterSaveDB = require('../../models_db/modifiers/modifierWapper').countersDB;
+var counterSaveDB = require('../../models_db/modifiers/countersDB');
 var transactionDB = require('../../models_db/modifiers/transaction');
 var log = require('../../lib/log')(module);
 var server = require('../../server/counterProcessor');
 const Conf = require("../../lib/conf");
-const confServer = new Conf('config/server.json');
+const confMyNode = new Conf('config/node.json');
 
 
 module.exports = function(args, callback) {
@@ -115,8 +114,8 @@ function editObjects(user, args, callback){
                                     objectID: Number(objectID),
                                     counterID: Number(counterID),
                                 });
-                                OCIDsToInsertHuman.add(objectID2Name[objectID] + ' #' + objectID + ' => ' +
-                                    counterID2Name[counterID] + ' #' + counterID);
+                                OCIDsToInsertHuman.add(objectID2Name[objectID] + ' #' + String(objectID).slice(-5) +
+                                    ' => ' + counterID2Name[counterID] + ' #' + String(counterID).slice(-5));
                             }
                         });
                     });
@@ -131,8 +130,8 @@ function editObjects(user, args, callback){
                                     objectID: Number(objectID),
                                     counterID: Number(counterID),
                                 });
-                                OCIDsForDeleteHuman.add(objectID2Name[objectID] + ' #' + objectID + ' => ' +
-                                    counterID2Name[counterID] + ' #' + counterID);
+                                OCIDsForDeleteHuman.add(objectID2Name[objectID] + ' #' + String(objectID).slice(-5) +
+                                    ' => ' + counterID2Name[counterID] + ' #' + String(counterID).slice(-5));
                             }
                         });
                     });
@@ -154,7 +153,7 @@ function editObjects(user, args, callback){
 
                     if(newObjects && newObjects.length) log.info('Rename objects: ', newObjects);
                     // update description and order for all existing objects
-                    objectsDB.updateObjectsInformation(user, objectIDs, description, order, disabled, color,
+                    objectsDB.updateObjectsInformation(user, objectIDs, description, order, disabled, color, args.sessionID,
                         function (err, updateData) {
                         if (err) return transactionDB.rollback(err, callback);
                         if(updateData) {
@@ -196,46 +195,47 @@ function editObjects(user, args, callback){
                                         transactionDB.end(function (err) {
                                         if (err) return callback(err);
 
-                                        rawObjectsDB.getAlepizIDs(function (err, alepizIDsObj) {
-                                            if(err) return callback(err);
 
-                                            var alepizID2Name = {};
-                                            alepizIDsObj.forEach(row => { alepizID2Name[row.id] = row.name});
-                                            var alepizNames = confServer.get('alepizNames');
-                                            var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== 1;
-                                            var ownerOfSpecifiedAlepizIDs = alepizIDs.some(alepizID => {
-                                                return alepizNames.indexOf(alepizID2Name[alepizID]) !== -1;
+                                        var cfg = confMyNode.get();
+                                        var indexOfOwnNode = cfg.indexOfOwnNode;
+                                        var ownerOfUnspecifiedAlepizIDs = cfg.serviceNobodyObjects;
+
+                                        //console.log('!!!', param.disabled, alepizIDs, ownerOfUnspecifiedAlepizIDs, indexOfOwnNode)
+                                        var objectsAreEnabled = !args.disabled &&
+                                            ((!alepizIDs.length && ownerOfUnspecifiedAlepizIDs) ||
+                                                alepizIDs.indexOf(indexOfOwnNode) !== -1);
+
+                                        // send message for updating collected initial data for objects
+                                        if (objectsAreEnabled) {
+                                            log.info('Sending message to the server for update objects ',
+                                                Object.values(objectID2Name).join('; '));
+                                            server.sendMsg({
+                                                update: {
+                                                    topObjects: true,
+                                                    objectsCounters: true
+                                                },
+                                                updateObjectsIDs: objectIDs
                                             });
-                                            //console.log('!!!', param.disabled, alepizIDs, ownerOfUnspecifiedAlepizIDs, ownerOfSpecifiedAlepizIDs)
-                                            var objectsAreEnabled = !args.disabled &&
-                                                ((!alepizIDs.length && ownerOfUnspecifiedAlepizIDs) ||
-                                                    ownerOfSpecifiedAlepizIDs);
-                                            // send message for updating collected initial data for objects
-                                            if (objectsAreEnabled) {
+                                            return callback(null, objectIDs.join(','));
+                                        }
+
+                                        // object disabled. remove counters
+                                        objectsDB.getObjectsCountersIDs(user, objectIDs, function (err, rows) {
+                                            if (err) return callback(err);
+
+                                            var OCIDs = rows.map(row => row.id);
+                                            if (OCIDs.length) {
+                                                log.info('Sending message to the server for remove counters for ' +
+                                                    'disabled objects ', Object.values(objectID2Name).join('; '),
+                                                    '; OCIDs: ', OCIDs);
                                                 server.sendMsg({
-                                                    update: {
-                                                        topObjects: true,
-                                                        objectsCounters: true
-                                                    },
-                                                    updateObjectsIDs: objectIDs
-                                                });
-                                                return callback(null, objectIDs.join(','));
-                                            }
-
-                                            // object disabled. remove counters
-                                            objectsDB.getObjectsCountersIDs(user, objectIDs, function (err, rows) {
-                                                if (err) return callback(err);
-
-                                                var OCIDs = rows.map(row => row.id);
-                                                if (OCIDs.length) server.sendMsg({
                                                     removeCounters: OCIDs,
                                                     description: 'Objects were disabled from the "object editor" by user ' +
                                                         user + '. Object names: ' + Object.values(objectID2Name).join('; ')
                                                 });
-                                                callback(null, objectIDs.join(','));
-                                            });
-
-                                        })
+                                            }
+                                            callback(null, objectIDs.join(','));
+                                        });
                                     });
                                 });
                             });

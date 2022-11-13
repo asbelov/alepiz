@@ -2,7 +2,7 @@
 * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
 * Created on 2020-6-23 0:39:38
 */
-var JQueryNamespace = (function ($) {
+(function ($) {
     $(function () {
         init();
     });
@@ -75,7 +75,8 @@ var JQueryNamespace = (function ($) {
 
     function createPriorities(priorities) {
         return priorities.map(function (priority) {
-            return '<option value="' + priority.id + '">#' + priority.id + ' ' + priority.description + '</option>';
+            return '<option value="' + priority.id + '">#' + String(priority.id).slice(-5) + ' ' +
+                priority.description + '</option>';
         });
     }
 

@@ -252,8 +252,7 @@ function createServer() {
         });
 
         socket.on('error', function(err) {
-            log.warn('Active check socket error: ', err.message, ' for: ', socket.remoteAddress, ':',
-                socket.remotePort, '->', socket.localAddress, ':', socket.localPort);
+            log.info('Active check socket error: ', err.message);
         });
 	});
 
@@ -300,8 +299,9 @@ function sendToZabbix(err, socket, data) {
     //log.debug('ZBX send ', socket.remoteAddress, ':', socket.remotePort,': length: ',data.length,', data: ', zabbixData.toString());
 
     // callback for async sending data
-    socket.write(zabbixData, function (err) {
-        if(err) log.info('Can\'t send data to zabbix: ', err.message);
+    socket.write(zabbixData, function (/*err*/) {
+        // error will be logged in the socket.on('error', ...) event handler
+        //if(err) log.info('Can\'t send data to zabbix: ', err.message);
     });
 }
 

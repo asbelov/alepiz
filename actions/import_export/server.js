@@ -72,6 +72,8 @@ module.exports = function(args, callback) {
                         disabled: param.disabled,
                         sortPosition: param.sortPosition,
                         color: param.color,
+                        sessionID: args.sessionID,
+                        timestamp: args.timestamp,
                     }, function (err, objectID) {
                         if (err) {
                             return callback(new Error('Can\'t insert or update object ' + param.name + ': ' +
@@ -126,19 +128,25 @@ function addOrUpdateObjects(user, param, callback) {
     }
 
     var description = param.description || '';
-    var disabled = Boolean(param.disabled);
+    var disabled = param.disabled ? 1 : 0;
 
-    var addOrUpdateObjects = param.id ? objectsDB.updateObjectsInformation : objectsDB.addObjects;
-    var objectID = param.id || param.name;
+    if(!param.id) {
+        objectsDB.addObjects(user, param.id, description, order, disabled, param.color, param.sessionID, param.timestamp,
+            function (err, newObjectIDs) {
+                if (err) return callback(new Error('Can\'t insert object: ' + err.message));
 
-    addOrUpdateObjects(user, [objectID], description, order, disabled, param.color, function (err, newObjectIDs) {
-        if (err) return callback(new Error('Can\'t insert object: ' + err.message));
+                log.info('Inserting object ', param.name, '; objectID: ', newObjectIDs[0]);
+                callback(null, newObjectIDs[0]);
+            });
+    } else {
+        objectsDB.updateObjectsInformation(user, param.name, description, order, disabled, param.color, param.sessionID,
+            function (err) {
+                if (err) return callback(new Error('Can\'t update object: ' + err.message));
 
-        if (!param.id) log.info('Inserting object ', param.name, '; objectID: ', newObjectIDs[0]);
-        else log.info('Updating object ', param.name, '; objectID: ', objectID);
-
-        callback(null, param.id || newObjectIDs[0]);
-    });
+                log.info('Updating object ', param.name, '; objectID: ', objectID);
+                callback(null, param.id);
+            });
+    }
 }
 
 function saveProperties(user, param, callback) {

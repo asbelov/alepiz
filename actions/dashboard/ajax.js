@@ -13,16 +13,20 @@ var actionsRights = require('../../rightsWrappers/actions');
 var Database = require('better-sqlite3');
 const Conf = require('../../lib/conf');
 const confCollectors = new Conf('config/collectors.json');
+const confActions = new Conf('config/actions.json');
 const confOptionsEventGenerator = new Conf(confCollectors.get('dir') + '/event-generator/settings.json');
 var eventDisabled = require('../../' + confCollectors.get('dir') + '/event-generator/lib/eventGenerator').isEventDisabled; // only for isEventsDisabled()
 var checkIDs = require('../../lib/utils/checkIDs');
 
 var db;
+var hostPort = confActions.get('serverAddress') + ':' + confActions.get('serverPort');
 module.exports = ajax; // initDB need to run ajax again in recursion
 
 function ajax(args, callback) {
 
     log.debug('Starting ajax ', __filename, ' with parameters ', args);
+
+    if(args.hostPort) hostPort = args.hostPort;
 
     var cfg = args.actionCfg;
     if(!cfg || !cfg.restrictions) return callback(new Error('Can\'t find "restrictions" in action configuration'));
@@ -32,7 +36,10 @@ function ajax(args, callback) {
     var user = prepareUser(args.username);
 
     usersDB.getUsersInformation(user, function(err, rows) {
-        if(err) return callback(new Error('Can\'t get user information for ' + args.username + '(' + user +'): ' + err.message));
+        if(err) {
+            return callback(new Error('Can\'t get user information for ' + args.username + '(' + user +'): ' +
+                err.message));
+        }
         if(rows.length < 1) {
             return callback(new Error('Error while getting user information for ' + args.username + '(' + user +
                 '): received data for ' + rows.length + ' users'));
@@ -91,7 +98,7 @@ function ajax(args, callback) {
         } else if(restrictions.Comments && args.func === 'getCommentedEventsList') {
             getDashboardDataForCommentedEventsList(args.objectsIDs, args.commentID, restrictions.Importance, callback);
         } else if(restrictions.History && args.func === 'getHistoryData') {
-            getHistoryForOCID(args, Number(restrictions.Importance), callback);
+            getHistoryForOCID(args.OCID, Number(restrictions.Importance), callback);
         } else if(restrictions.Message && args.func === 'getObjectsProperties') {
             objectsPropertiesDB.getPropertiesByOCIDs(args.username, args.IDs, 0, callback);
         } else if(restrictions.Links && args.func === 'getCounterVariables') {
@@ -210,9 +217,9 @@ ORDER BY disabledEvents.eventID DESC, events.startTime DESC').all(queryParameter
     });
 }
 
-function getHistoryForOCID (args, maxImportance, callback) {
-    checkIDs(args.OCID, function (err, OCID) {
-        if (!args.OCID || !OCID || !OCID.length) return callback(new Error('OCID is not set for getting history'));
+function getHistoryForOCID (initOCID, maxImportance, callback) {
+    checkIDs(initOCID, function (err, OCIDs) {
+        if (!initOCID || !OCIDs || !OCIDs.length) return callback(new Error('OCID is not set for getting history'));
         else if (err) return callback(err);
 
         try {
@@ -225,9 +232,9 @@ disabledEvents.disableUntil AS disableUntil, disabledEvents.intervals AS disable
 FROM events \
 LEFT JOIN disabledEvents ON disabledEvents.eventID=events.id \
 WHERE events.OCID = ? AND events.importance <= ? \
-ORDER BY disabledEvents.eventID DESC, events.startTime DESC LIMIT 100').all([OCID[0], maxImportance]);
+ORDER BY disabledEvents.eventID DESC, events.startTime DESC LIMIT 100').all([OCIDs[0], maxImportance]);
         } catch (err) {
-            return callback(new Error('Can\'t get history data for OCID ' + OCID[0] + ' and importance ' +
+            return callback(new Error('Can\'t get history data for OCID ' + OCIDs[0] + ' and importance ' +
                 maxImportance + ' from events: ' + err.message));
         }
         callback(null, events);
@@ -271,16 +278,21 @@ WHERE comments.timestamp BETWEEN ? AND ? AND events.importance <= ? '
     });
 }
 
-function getDashboardDataForCommentedEventsList (initObjectsIDs, commentID, maxImportance, callback) {
-    checkIDs(initObjectsIDs, function (err, objectsIDs) {
-        if(!initObjectsIDs) objectsIDs = ''; // sorry for this
+function getDashboardDataForCommentedEventsList (initObjectIDs, hostPortCommentID, maxImportance, callback) {
+    var initCommentID = hostPortCommentID.indexOf(hostPort) === 0 ?
+        parseInt(hostPortCommentID.replace(/^.+:(\d+)$/, '$1'), 10) : 0;
+
+    if(!initCommentID) return callback();
+
+    checkIDs(initObjectIDs, function (err, objectsIDs) {
+        if(!initObjectIDs) objectsIDs = '';
         else if(err) return callback(err);
 
-        checkIDs(commentID, function (err, commentIDs) {
+        checkIDs(initCommentID, function (err, commentIDs) {
             if (err) return callback(err);
 
-            var queryParameters = commentIDs;
-            queryParameters.push(maxImportance);
+            // commentIDs[0] because checkIDs return array
+            var queryParameters = [commentIDs[0], maxImportance];
             if(objectsIDs && objectsIDs.length) Array.prototype.push.apply(queryParameters, objectsIDs);
             else objectsIDs = null;
 
@@ -307,8 +319,13 @@ WHERE events.commentID = ? AND events.importance <= ? ' +
     });
 }
 
-function getCommentForEvent(IDs, callback) {
-    checkIDs(IDs, function (err, IDs) {
+function getCommentForEvent(hostPortID_OCID, callback) {
+    if(!hostPortID_OCID.length) return callback();
+
+    // ID_OCID = "ID,OCID" or "ID"
+    var ID_OCID = parseInt(hostPortID_OCID.replace(/^.+:([^:]+)$/, '$1'), 10);
+
+    checkIDs(ID_OCID, function (err, IDs) {
         if (err) return callback(err);
 
         var commentID = IDs[0];

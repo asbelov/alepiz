@@ -15,8 +15,9 @@ const thread = require("../lib/threads");
 const conf = new Conf('config/common.json');
 const confActions = new Conf('config/actions.json');
 const confLaunchers = new Conf('config/launchers.json');
-const confServer = new Conf('config/server.json');
+const confMyNode = new Conf('config/node.json');
 
+//110591
 
 var systemUser = conf.get('systemUser') || 'system';
 var ajax = {}, launchers = {};
@@ -37,27 +38,21 @@ if(serverNumber < 1 || module.parent) {
 /**
  * Execute action or run ajax or add action to a new task
  *
- * @param {actionID: string, executionMode: "ajax"|"server"|"makeTask", user: string, args: Object, sessionID: uint} param -
- *  action parameters.
- * @param {function(Error)|function(null, *)} callback - callback(err, actionResult), where actionResult is result
+ * @param {Object} param: object with action parameters
+ * @param {string} param.actionID: action directory name
+ * @param {string} param.executionMode="ajax"|"server"|"makeTask": action execution mode
+ * @param {string} param.user: username
+ * @param {number} param.sessionID: action session ID
+ * @param {number} param.timestamp: timestamp when the action was started
+ * @param {Object} param.args: object with action arguments, like {<name>: <value>, ...}
+ * @param {function(Error)|function(null, *)} callback: callback(err, actionResult), where actionResult is result
  *  returned by action or data for ajax
  */
 function runAction(param, callback) {
-
     var actionID = param.actionID;
     var executionMode = param.executionMode;
 
     module.sessionID = param.sessionID;
-    if(param.user !== systemUser && executionMode === 'server') {
-        log.info('Running action: ', actionID, ', parameters: ',
-            // replace passwords in parameters
-            JSON.stringify(param).replace(/"(.*?pass.*?":)"[^"]*?"/gi, '$1"****"'));
-    }
-    else { // don't log action start, running by for system users (running automatically)
-        log.debug('Running action: ', actionID, ', execution mode: ', executionMode, ', parameters: ',
-            // replace passwords in parameters
-            JSON.stringify(param).replace(/"(.*?pass.*?":)"[^"]*?"/gi, '$1"****"'));
-    }
 
     // checking in parallel for objects compatibility and user action rights
     actions.getConfiguration(actionID, function(err, actionCfg){
@@ -66,6 +61,7 @@ function runAction(param, callback) {
         if(!param.args) param.args = {};
         param.args.actionName = actionCfg.name;
         param.args.actionID = actionID;
+        param.args.hostPort = param.hostPort;
 
         if(executionMode !== 'ajax') {
             if (!'o' in param.args) return callback(new Error('Error in parameter specification for run action'));
@@ -73,18 +69,19 @@ function runAction(param, callback) {
             if (param.args.o) {
                 try {
                     var objects = JSON.parse(param.args.o);
+                    // checking objects
                     for (var i = 0; i < objects.length; i++) {
-                        var ID = objects[i].id;
-                        if (ID && Number(ID) === parseInt(String(ID), 10) && objects[i].name &&
+                        var ID = Number(objects[i].id);
+                        if (ID && ID === parseInt(String(ID), 10) && objects[i].name &&
                             typeof (objects[i].name) === 'string') {
-                            ID = Number(ID);
+                            objects[i].id = ID;
                             continue;
                         }
                         return callback(new Error('Some objects are incorrect in parameter "o": ' + param.args.o));
                     }
                 } catch (err) {
                     return callback(new Error('Error in parameter specification for action: can\'t convert "o" ' +
-                        'parameter from string "' + JSON.stringify(param.args.o) + '" to JSON: ' + err.message));
+                        'parameter from string "' + param.args.o + '" to JSON: ' + err.message));
                 }
             } else objects = [];
 
@@ -108,13 +105,24 @@ function runAction(param, callback) {
             //var rights = result[1]; // rights.view, rights.run, rights.makeTask = true|false
             param.args.username = param.user;
             param.args.sessionID = param.sessionID;
+            param.args.timestamp = param.timestamp;
             param.args.actionCfg = actionCfg;
+
+            // replace passwords in parameters
+            var paramWithoutPass = JSON.stringify(param).replace(/"(.*?pass.*?":)"[^"]*?"/gi, '$1"****"');
+            try { paramWithoutPass = JSON.parse(paramWithoutPass); } catch (e) {}
+            if(param.user !== systemUser && executionMode === 'server') {
+                log.info('Running action: ', actionID, ', parameters: ', paramWithoutPass );
+            } else { // don't log action start, running by for system users (running automatically)
+                log.debug('Running action: ', actionID, ', execution mode: ', executionMode, ', parameters: ', paramWithoutPass);
+            }
+
             if(executionMode === 'makeTask') {
                 module.sessionID = param.sessionID;
-                log.debug('Saving action settings: ', param.args);
+                log.info('Saving action to the new task: ', param.args);
 
                 // saving action parameters
-                tasksDB.saveAction(param.user, param.sessionID, param.args, callback);
+                tasksDB.saveAction(param.user, param.args, callback);
             } else if(executionMode === 'ajax') {
                 if(!confActions.get('dir')) {
                     return callback(new Error('Undefined "actions:dir" parameter in main configuration'));
@@ -142,8 +150,20 @@ function runAction(param, callback) {
                     if(err) return callback(err);
 
                     if(param.args.o && Array.isArray(filteredObjects)) {
-                        // there are no objects for this action in this instance of Alepiz
-                        if(!filteredObjects.length && objects.length) return callback();
+                        if(param.user !== systemUser) {
+                            // there are no objects for this action in this instance of Alepiz
+                            if (!filteredObjects.length && objects.length) {
+                                log.info('There are no objects for ', actionID, ' in this instance: objects: ',
+                                    filteredObjects, '; all objects: ', objects);
+                                return callback();
+                            } else if (filteredObjects.length !== objects.length) {
+                                log.info('Run action ', actionID, ' for objects: ',
+                                    filteredObjects, '; all objects: ', objects);
+                            } else if (actionCfg.applyToOwnObjects) {
+                                log.info('Run action ', actionID, ' for all objects: ', filteredObjects,
+                                    ', applyToOwnObjects: ', actionCfg.applyToOwnObjects);
+                            }
+                        }
 
                         param.args.o = JSON.stringify(filteredObjects);
                     }
@@ -272,19 +292,19 @@ function waitingForUpdateAjax(ajaxSource, callback) {
  *  filteredObjects is objects served by the current instance of ALEPIZ like [{id:. name:}, ... ]
  */
 function getOwnObjectIDs(objects, applyToOwnObjects, callback) {
-    if(!applyToOwnObjects || !objects || !objects.length) return callback(null, objects);
+    if(!applyToOwnObjects || !Array.isArray(objects) || !objects.length) return callback(null, objects);
 
-    var alepizNames = confServer.get('alepizNames');
-    var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== 1;
+    var cfg = confMyNode.get();
+    var indexOfOwnNode = cfg.indexOfOwnNode;
+    var ownerOfUnspecifiedAlepizIDs = cfg.serviceNobodyObjects;
 
     var allRelatedObjectIDs = new Set(), filteredObjects = [];
     getObjectsAlepizRelation(function (err, objectsAlepizRelationsRows) {
         if(err) log.warn(err.message);
-
         objectsAlepizRelationsRows.forEach(row => {
-            for(var i = 0; i < object.length; i++) {
-                if(alepizNames.indexOf(row.alepizName) !== -1 && object[i].id === row.objectID) {
-                    filteredObjects.push(object[i]);
+            for(var i = 0; i < objects.length; i++) {
+                if(indexOfOwnNode === row.alepizID && objects[i].id === row.objectID) {
+                    filteredObjects.push(objects[i]);
                     break;
                 }
             }
@@ -306,10 +326,10 @@ function getOwnObjectIDs(objects, applyToOwnObjects, callback) {
  * The cache will be updated from the database no longer than the cacheTimeout of ms
  *
  * @param {function(Error, Set)| function(null, Set)} callback - callback(err, objectsAlepizRelationsCache), where
- *  objectsAlepizRelationsCache is new Set([{objectID:, alepizName:}, ...])
+ *  objectsAlepizRelationsCache is new Set([{objectID:, alepizID:}, ...])
  */
 function getObjectsAlepizRelation(callback) {
-    if(Date.now() - dataRcvTime > cacheTimeout) return callback(null, objectsAlepizRelationsCache);
+    if(Date.now() - dataRcvTime < cacheTimeout) return callback(null, objectsAlepizRelationsCache);
 
     dataRcvTime = Date.now();
     objectsDB.getObjectsAlepizRelation(function (err, objectsAlepizRelationsRows) {

@@ -8,9 +8,8 @@ const counterSaveDB = require('../../rightsWrappers/counterSaveDB');
 const objectsPropertiesDB = require('../../rightsWrappers/objectsPropertiesDB');
 const transactionDB = require('../../models_db/modifiers/transaction');
 const server = require('../../server/counterProcessor');
-const rawObjectsDB = require("../../models_db/objectsDB");
 const Conf = require("../../lib/conf");
-const confServer = new Conf('config/server.json');
+const confMyNode = new Conf('config/node.json');
 
 module.exports = function(args, callback) {
 
@@ -27,7 +26,7 @@ module.exports = function(args, callback) {
             if (err) return callback(err);
 
             objectsDB.updateObjectsInformation(user,  param.objectsIDs, param.description, param.order, param.disabled,
-                param.color,function(err, updateData, objectNames) {
+                param.color, param.sessionID, function(err, updateData, objectNames) {
                 if(err) return transactionDB.rollback(err, callback);
 
                 if(!objectNames) objectNames = param.objectsIDs;
@@ -35,7 +34,7 @@ module.exports = function(args, callback) {
 
                 if(param.newObjectsNames.length) log.info('Add a new objects: ', param.newObjectsNames);
                 addNewObjects(user, param.newObjectsNames, param.description, param.order, param.disabled, param.color,
-                    function(err, newObjectsIDs) {
+                    args.sessionID, args.timestamp,function(err, newObjectsIDs) {
                     if(err) return transactionDB.rollback(err, callback);
 
                     if(newObjectsIDs) Array.prototype.push.apply(param.objectsIDs, newObjectsIDs);
@@ -73,84 +72,83 @@ module.exports = function(args, callback) {
                                     transactionDB.end(function (err) {
                                         if (err) return callback(err);
 
-                                        rawObjectsDB.getAlepizIDs(function (err, alepizIDsObj) {
-                                            if (err) return callback(err);
+                                        var cfg = confMyNode.get();
+                                        var indexOfOwnNode = cfg.indexOfOwnNode;
+                                        var ownerOfUnspecifiedAlepizIDs = cfg.serviceNobodyObjects;
 
-                                            var alepizID2Name = {};
-                                            alepizIDsObj.forEach(row => {
-                                                alepizID2Name[row.id] = row.name
+                                        //console.log('!!!', param.disabled, alepizIDs, ownerOfUnspecifiedAlepizIDs, indexOfOwnNode)
+                                        var objectsAreEnabled = !args.disabled &&
+                                            ((!alepizIDs.length && ownerOfUnspecifiedAlepizIDs) ||
+                                                alepizIDs.indexOf(indexOfOwnNode) !== -1);
+
+                                        // send message for updating collected initial data for objects
+                                        // parameters.disabled can be undefined (if unchanged), 0 or 1
+                                        if (objectsAreEnabled && (!updateData && !newObjectsIDs &&
+                                            (updatedObjectsIDs && updatedObjectsIDs.length) &&
+                                            !updatedOCIDs && !isUpdatedInteractions)) {
+                                            log.info('Sending message to the server for update objects ',
+                                                objectNames.join('; '));
+                                            server.sendMsg({
+                                                update: {
+                                                    topObjects: true,
+                                                    objectsProperties: true,
+                                                },
+                                                updateObjectsIDs: updatedObjectsIDs
                                             });
 
-                                            var alepizNames = confServer.get('alepizNames');
-                                            var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== 1;
-                                            var ownerOfSpecifiedAlepizIDs = alepizIDs.some(alepizID => {
-                                                return alepizNames.indexOf(alepizID2Name[alepizID]) !== -1;
+                                            return callback(null, updatedObjectsIDs.join(','));
+                                        } else if (objectsAreEnabled && (updateData || newObjectsIDs ||
+                                            (updatedObjectsIDs && updatedObjectsIDs.length) || updatedOCIDs ||
+                                            isUpdatedInteractions)) {
+
+                                            log.info('Sending message to the server for separately update objects ',
+                                                objectNames.join('; '));
+                                            server.sendMsg({
+                                                update: {
+                                                    topObjects: true,
+                                                    objectsProperties: updatedObjectsIDs && updatedObjectsIDs.length ?
+                                                        updatedObjectsIDs : undefined,
+                                                    objectsCounters: updatedOCIDs || updateData || newObjectsIDs
+                                                },
+                                                updateObjectsIDs: param.objectsIDs,
+                                                updateCountersIDs: updatedOCIDs ? updatedOCIDs.map(function (obj) {
+                                                    return obj.counterID
+                                                }) : undefined
                                             });
-                                            var objectsAreEnabled = !param.disabled &&
-                                                ((!alepizIDs.length && ownerOfUnspecifiedAlepizIDs) ||
-                                                    ownerOfSpecifiedAlepizIDs);
 
-                                            // send message for updating collected initial data for objects
-                                            // parameters.disabled can be undefined (if unchanged), 0 or 1
-                                            if (objectsAreEnabled && (!updateData && !newObjectsIDs &&
-                                                (updatedObjectsIDs && updatedObjectsIDs.length) &&
-                                                !updatedOCIDs && !isUpdatedInteractions)) {
+                                            return callback(null, param.objectsIDs.join(','));
+                                        }// else if (param.disabled !== 1) log.debug('Nothing to update for objects: ', objectNames);
 
-                                                server.sendMsg({
-                                                    update: {
-                                                        topObjects: true,
-                                                        objectsProperties: true,
-                                                    },
-                                                    updateObjectsIDs: updatedObjectsIDs
-                                                });
+                                        // object state changed to disabled. remove counters
+                                        if (param.disabled === 1 && !objectsAreEnabled) {
+                                            objectsDB.getObjectsCountersIDs(user, param.objectsIDs,
+                                                function (err, rows) {
+                                                    if (err) return callback(err);
 
-                                                return callback(null, updatedObjectsIDs.join(','));
-                                            } else if (objectsAreEnabled && (updateData || newObjectsIDs ||
-                                                (updatedObjectsIDs && updatedObjectsIDs.length) || updatedOCIDs ||
-                                                isUpdatedInteractions)) {
-
-                                                server.sendMsg({
-                                                    update: {
-                                                        topObjects: true,
-                                                        objectsProperties: updatedObjectsIDs && updatedObjectsIDs.length ?
-                                                            updatedObjectsIDs : undefined,
-                                                        objectsCounters: updatedOCIDs || updateData || newObjectsIDs
-                                                    },
-                                                    updateObjectsIDs: param.objectsIDs,
-                                                    updateCountersIDs: updatedOCIDs ? updatedOCIDs.map(function (obj) {
-                                                        return obj.counterID
-                                                    }) : undefined
-                                                });
-
-                                                return callback(null, param.objectsIDs.join(','));
-                                            }// else if (param.disabled !== 1) log.debug('Nothing to update for objects: ', objectNames);
-
-                                            // object state changed to disabled. remove counters
-                                            if (param.disabled === 1 && !objectsAreEnabled) {
-                                                objectsDB.getObjectsCountersIDs(user, param.objectsIDs,
-                                                    function (err, rows) {
-                                                        if (err) return callback(err);
-
-                                                        var OCIDs = rows.map(row => row.id);
-                                                        if (OCIDs.length) server.sendMsg({
+                                                    var OCIDs = rows.map(row => row.id);
+                                                    if (OCIDs.length) {
+                                                        log.info('Sending message to the server for remove counters ' +
+                                                            'for disabled objects ', objectNames.join('; '),
+                                                            '; OCIDs: ', OCIDs);
+                                                        server.sendMsg({
                                                             removeCounters: OCIDs,
                                                             description: 'Objects were disabled from "object clone" ' +
                                                                 'by user ' + user +
                                                                 '. Object names: ' + objectNames.join(','),
                                                         });
-                                                        callback(null, param.objectsIDs.join(','));
-                                                    })
-                                            } else callback(null, param.objectsIDs.join(','));
-                                        });
+                                                    }
+                                                    callback(null, param.objectsIDs.join(','));
+                                                })
+                                        } else callback(null, param.objectsIDs.join(','));
                                     });
                                 });
                             });
-                        })
-                    })
-                })
+                        });
+                    });
+                });
             });
         });
-    })
+    });
 };
 
 /*
@@ -270,7 +268,7 @@ function parseArgs(args, callback) {
 
 function createInteractions(cloneToObjectIDs, args) {
 
-    var newInteractions = [], num;
+    var newInteractions = [];
     cloneToObjectIDs.forEach(function (id2) {
         if(args.upLevelObjectsIDs) { // <id1>,<id2>,....
             String(args.upLevelObjectsIDs).split(/\s*[,;]\s*/).forEach(function (id1) {
@@ -366,10 +364,10 @@ function saveProperties(user, parameters, cloneAllProperties, callback) {
         properties: [{name:.., mode:.., value:.., description:..}, ...]
         */
         var properties = rows.filter(function (prop) {
-                if(prop.description === undefined) prop.description = '';
-                if(prop.mode !== undefined) prop.mode = Number(prop.mode);
-                return prop.name && prop.value !== undefined && [0, 1, 2, 3].indexOf(prop.mode) !== -1
-            });
+            if(prop.description === undefined) prop.description = '';
+            if(prop.mode !== undefined) prop.mode = Number(prop.mode);
+            return prop.name && prop.value !== undefined && [0, 1, 2, 3].indexOf(prop.mode) !== -1
+        });
 
         objectsPropertiesDB.saveObjectsProperties(user, parameters.objectsIDs, properties,false,
             function(err, updatedObjectsIDs, properties) {

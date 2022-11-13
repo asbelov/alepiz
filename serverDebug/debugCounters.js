@@ -59,10 +59,13 @@ debugCounters.get = function(tag, id, callback) {
             ') is not set for getting data from counter debugger'));
     }
 
-    if(clientIPC && typeof clientIPC.sendAndReceive === 'function') {
-        clientIPC.sendAndReceive({
+    if(clientIPC && typeof clientIPC.sendExt === 'function') {
+        clientIPC.sendExt({
             tag: tag,
             id: id
+        }, {
+            sendAndReceive: true,
+            dontSaveUnsentMessage: true,
         }, callback);
     } else callback();
 };
@@ -75,12 +78,11 @@ function connect (callback) {
     cfg.disconnectOnIdleTime = 180000;
     clientIPC = new IPC.client(cfg, function (err, msg, _clientIPC) {
         if (err) log.error(err.message);
-        else if (_clientIPC) {
+
+        // run callback only after connect
+        if (_clientIPC) {
             clientIPC = _clientIPC;
-            if(typeof callback === 'function') {
-                callback();
-                callback = null; // prevent running callback on reconnect
-            }
+            callback();
         }
     });
 }

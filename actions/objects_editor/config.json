@@ -11,6 +11,7 @@
         "startAsThread": true
     },
   "staticDir": "static",
+  "debug": false,
   "callbackBeforeExec": "callbackBeforeExec",
   "onChangeObjectMenuEvent": "callback:onChangeObjects",
   "timeout": 180,

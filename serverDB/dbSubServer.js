@@ -15,9 +15,9 @@ var stmtsDeleteInterval = confSqlite.get('stmtsDeleteInterval') || 18000000;
 var stmtsMaxNum = 10000;
 var serverType = thread.workerData[0];
 var socket = thread.workerData[1];
-var serverTypeAndSocket = serverType + (socket ? ': ' + socket : '');
+var serverTypeAndSocket = serverType + (socket ? ' #' + socket : '');
 
-log.info('Starting dbSubServer ', serverTypeAndSocket ,' thread');
+log.info('Starting dbSubServer thread for ', serverTypeAndSocket);
 
 dbServerThread = new thread.child({
     module: 'dbSubServer:' + serverTypeAndSocket,

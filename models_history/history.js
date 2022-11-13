@@ -16,6 +16,7 @@ const historyGet = require('../models_history/historyFunctionsGet');
 const historyStorageServer = require("../models_history/historyStorageServer");
 const countersDB = require('../models_db/countersDB');
 const Conf = require('../lib/conf');
+const connectToRemoteNodes = require("../lib/connectToRemoteNodes");
 const confHistory = new Conf('config/history.json');
 parameters.init(confHistory.get());
 
@@ -27,54 +28,68 @@ var history = {
 };
 module.exports = history;
 
-var clientIPC, truncateWatchDogInterval, restartInProgress = false, usedToSaveDataToHistory = false;
-var houseKeeperData = {};
+var clientIPC,
+    allClientIPC = new Map(),
+    connectionInitialized = false,
+    truncateWatchDogInterval,
+    restartInProgress = false,
+    usedToSaveDataToHistory = false;
+var houseKeeperData = new Map();
 
 /** Skip to send data to history when keepHistory = 0.
- * For this set the global object houseKeeperData[<OCID with keepHistory = 0>] = 0
- * every <reloadKeepHistoryInterval> time.
+ * For this set the global Map houseKeeperData.set(<OCID with keepHistory = 0>, 0)
+ * every parameters.reloadKeepHistoryInterval time.
  */
 function getHouseKeeperData() {
     if (!usedToSaveDataToHistory) return;
     countersDB.getKeepHistoryAndTrends(function (err, rows) {
         if (err) return log.error('Can\'t get information about data keeping period');
 
-        var newHouseKeeperData = {}
+        houseKeeperData.clear()
         rows.forEach(function (row) {
-            if (row.history === 0) newHouseKeeperData[row.OCID] = 0;
+            if (row.history === 0) houseKeeperData.set(row.OCID, 0);
         });
 
-        houseKeeperData = newHouseKeeperData;
         setTimeout(getHouseKeeperData, parameters.reloadKeepHistoryInterval);
     });
 }
 
 /** Connect to history. If already connected, callback will be called without connection procedure
  *
- * @param {string|null} id - name of connecting service for print name to the log file
- * @param {function(void)} callback - on connect return callback(). Error is not returned.
+ * @param {string|null} id the name of the connected services to identify in the log file
+ * @param {function(void)} callback on connect return callback(). Error is not returned.
+ * @param {Boolean} [notConnectToRemoteInstances=false] if true, then not connect to remote Alepiz instances.
+ *  used in server for history.add()
  */
-history.connect = function(id, callback) {
-    if(!clientIPC) {
-        if(id) {
-            parameters.separateStorageByProcess = false;
-            parameters.suffix = '-' + id;
-        }
+history.connect = function(id, callback, notConnectToRemoteInstances = false) {
+    if(connectionInitialized) return callback();
 
-        new IPC.client(parameters, function (err, msg, _clientIPC) {
-            if (err) log.error(err.message);
-            else if (_clientIPC) {
-                clientIPC = _clientIPC;
-                if(typeof callback === 'function') {
-                    callback();
-                    callback = null; // prevent run callback again on reconnect
-                }
-            }
-        });
-    } else if(typeof callback === 'function') {
-        callback();
-        callback = null; // prevent run callback on reconnect
+    if(id) {
+        parameters.separateStorageByProcess = false;
+        parameters.suffix = '-' + id;
     }
+
+    new IPC.client(parameters, function (err, msg, _clientIPC) {
+        if (err) log.warn('IPC client error: ', err.message);
+        if (_clientIPC) {
+            clientIPC = _clientIPC;
+            log.info('Initialized connection to the history server: ',
+                parameters.serverAddress, ':', parameters.serverPort);
+
+            if(notConnectToRemoteInstances) return callback();
+
+            connectToRemoteNodes('history', (id || ''),function (err, _allClientIPC) {
+                if(!_allClientIPC) {
+                    log.warn('No remote nodes specified for history');
+                    _allClientIPC = new Map();
+                }
+                _allClientIPC.set(parameters.serverAddress + ':' + parameters.serverPort, clientIPC);
+                allClientIPC = _allClientIPC;
+                connectionInitialized = true;
+                callback();
+            });
+        }
+    });
 };
 
 // creating array with function names
@@ -122,7 +137,7 @@ for(var funcName in functions) {
     })(funcName);
 }
 
-/** Returning list of all history functions
+/** Returning list of all history functions. Can be used without history.connect
  * @returns {array} - return array of objects [{name: ..., description:...}, {}, ...]
  */
 history.getFunctionList = function() { return functionsArray; };
@@ -134,10 +149,7 @@ history.getFunctionList = function() { return functionsArray; };
 history.start = function (initParameters, callback) {
     //parameters.init(initParameters);
 
-    // if run history.start(), then clientIPC use proc IPC communication
-    // for exchange messages to the parent process
-    // in all other cases run history.connect() and use net IPC communication
-    clientIPC = new proc.parent({
+    var historyProcess = new proc.parent({
         childrenNumber: 1,
         childProcessExecutable: path.join(__dirname, 'historyServer.js'),
         killTimeout: 1900000,
@@ -145,7 +157,7 @@ history.start = function (initParameters, callback) {
         onStart: function(err) {
             if(err) return callback(new Error('Can\'t run history server: ' + err.message));
             //truncateWalWatchdog(parameters, callback);
-            clientIPC.sendAndReceive({type: 'initParameters', data: initParameters}, function(err) {
+            historyProcess.sendAndReceive({type: 'initParameters', data: initParameters}, function(err) {
                 initParameters['__restart'] = true;
                 if(truncateWatchDogInterval) clearInterval(truncateWatchDogInterval);
                 truncateWatchDogInterval = null;
@@ -164,16 +176,14 @@ history.start = function (initParameters, callback) {
 
 /** Dumps the cached historical data to a file before exiting.
  * The data from the dump file will be loaded into the cache on next startup
- * @type {function(callback, boolean): void}
  * @param {function(void): void} callback - Called when done
- * @param {boolean|undefined} [isScheduled=undefined] - the function is called when the history is scheduled to restart
+ * @param {boolean} [isScheduled] - the function is called when the history is scheduled to restart
  */
 history.dump = cache.dumpData;
 
 /** Set or get cacheServiceIsRunning variable
  *
- * @type {function(number|void): number}
- * @param {number|void} val - if val defined (must be a unix time), then set cacheServiceIsRunning variable to val. Else return cacheServiceIsRunning value
+ * @param {number} [val] - if val defined (must be a unix time), then set cacheServiceIsRunning variable to val. Else return cacheServiceIsRunning value
  */
 history.cacheServiceIsRunning = cache.cacheServiceIsRunning;
 
@@ -198,42 +208,45 @@ history.add = function(initID, data) {
 
     // checking for correct OCID
     var id = Number(initID);
-    if(id !== parseInt(String(id), 10) || !id) {
-        log.error('Try to add data to history for not integer objectCounterID: ', initID, ', data: ', data);
+    if(id !== parseInt(String(id), 10) || id < 1) {
+        log.error('Try to add data to history for not unsigned integer objectCounterID: ', initID, ', data: ', data);
         return;
     }
 
-    var record = {};
-    var value = data;
+    var record = {}, value = data, now = Date.now();
     if(typeof data === 'object') {
         // data is a prepared history record {timestamp:..., value:...}
         if(data.timestamp && 'value' in data) {
+            value = data.value;
             // don't add empty value
-            if(data.value === undefined || data.value === null) return;
+            if(value === undefined || value === null || (typeof value === 'object' && !Object.keys(value).length)) {
+                return;
+            }
 
             // checking timestamp
             var timestamp = Number(data.timestamp);
             if(!timestamp || timestamp !== parseInt(String(timestamp), 10) ||
-                timestamp < 1477236595310 || timestamp > Date.now() + 60000) { // 1477236595310 01/01/2000
-                log.error('Try to add data to history with invalid timestamp or very old timestamp or timestamp ' +
-                    'from a future: ', id, ', data: ', data, '; now: ', Date.now());
-                return;
+                timestamp < 1477236595310 || timestamp > now + 60000) { // 1477236595310 01/01/2000
+                log.warn('Try to add data to history with invalid timestamp or very old timestamp or timestamp ' +
+                    'from a future: ', id, ', data: ', data, '; now: ', now);
+                timestamp = now;
             }
 
-            value = data.value;
             record = {
                 timestamp: timestamp,
-                data: value,
+                data: typeof value === 'object' ? JSON.stringify(value) : value,
             }
-        } else { // stringify object and add to the history
+        } else {
+            if(!Object.keys(data).length) return;
+            // stringify object and add to the history
             record = {
-                timestamp: Date.now(),
+                timestamp: now,
                 data: JSON.stringify(data), // do stringify once and here and skip stringify on server side
             }
         }
     } else if( typeof data === 'number' || typeof 'data' === 'string' || typeof data === 'boolean') {
         record = {
-            timestamp: Date.now(),
+            timestamp: now,
             data: data,
         }
     } else { // data is not an object, number, string or boolean
@@ -247,7 +260,7 @@ history.add = function(initID, data) {
     }
 
     // send data to history only if counter.keepHistory != 0
-    if(houseKeeperData[id] !== 0) {
+    if(houseKeeperData.get(id) !== 0) {
         clientIPC.send({
             msg: 'add',
             id: id,
@@ -266,15 +279,17 @@ history.add = function(initID, data) {
 /** Remove data from history for specified history IDs (OCIDs)
  *
  * @param {array} IDs - array of history IDs (OCIDs) for remove
- * @param {function(Error): void} callback - called when done
- * @returns {void}
+ * @param {function(Error)|function()} callback - callback(err)
  */
 history.del = function(IDs, callback){
-    if(typeof callback !== 'function') return log.error('Error deleting object ',IDs,' from history: callback is not a function');
-    if(!Array.isArray(IDs))
+    if(typeof callback !== 'function') {
+        return log.error('Error deleting object ',IDs,' from history: callback is not a function');
+    }
+    if(!Array.isArray(IDs)) {
         return callback(new Error('Try to delete data objects from history with not an array objects IDs'));
+    }
 
-    clientIPC.sendAndReceive( {
+    clientIPC.send( {
         msg: 'del',
         IDs: IDs
     }, callback);
@@ -296,9 +311,12 @@ history.getLastValues = function(IDs, callback) {
         return callback(new Error('Try to get data by function "getLastValues" when objectCounterIDs is not an array: '+ IDs));
     }
 
-    clientIPC.sendAndReceive( {
+    clientIPC.sendExt( {
         msg: 'getLastValues',
         IDs: IDs,
+    }, {
+        sendAndReceive: true,
+        dontSaveUnsentMessage: true,
     }, callback);
 };
 
@@ -330,22 +348,28 @@ function getByIdx (id, offset, cnt, maxRecordsCnt, callback) {
             '"cnt" parameter: '+cnt));
     }
 
-    clientIPC.sendAndReceive( {
+    clientIPC.sendExt( {
         msg: 'getByIdx',
         id: Number(id),
         last: Number(offset),
         cnt: Number(cnt),
         maxRecordsCnt: Number(maxRecordsCnt),
         recordsType: 0,
+    }, {
+        sendAndReceive: true,
+        dontSaveUnsentMessage: true,
     }, function(err, result) {
+        if(err && !result)  return callback(err);
+        if(!result) return callback();
+
         var recordsFromCache = result.records;
         var param = result.param;
         var isGotAllRequiredRecords = result.all;
 
         if(typeof param !== 'object') return callback(err, recordsFromCache, isGotAllRequiredRecords);
 
-        historyStorageServer.getRecordsFromStorageByIdx(Number(id), param.storageOffset, param.storageCnt, param.storageTimestamp,
-            Number(maxRecordsCnt), 0, function(err, recordsFromStorage) {
+        historyStorageServer.getRecordsFromStorageByIdx(Number(id), param.storageOffset, param.storageCnt,
+            param.storageTimestamp, Number(maxRecordsCnt), 0, function(err, recordsFromStorage) {
 
             if (err) return callback(err);
             if(!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
@@ -396,14 +420,20 @@ function getByTime (id, time, interval, maxRecordsCnt, callback) {
             '"interval" parameter: '+interval));
     }
 
-    clientIPC.sendAndReceive( {
+    clientIPC.sendExt( {
         msg: 'getByTime',
         id: Number(id),
         time: Number(time),
         interval: Number(interval),
         maxRecordsCnt: Number(maxRecordsCnt),
         recordsType: 0,
+    }, {
+        sendAndReceive: true,
+        dontSaveUnsentMessage: true,
     }, function(err, result) {
+        if(err && !result) return callback(err);
+        if(!result) return callback();
+
         var recordsFromCache = result.records;
         var param = result.param;
         var isGotAllRequiredRecords = result.all;
@@ -462,12 +492,16 @@ history.getByValue = function(id, value, callback){
             'undefined or not number or not string value parameter: '+ JSON.stringify(value)));
     }
 
-    clientIPC.sendAndReceive( {
+    clientIPC.sendExt( {
         msg: 'getByValue',
         id: Number(id),
         value: value
-    }, function(err, records) {
-        if(err !== null || records !== null) return callback(err, records);
+    }, {
+        sendAndReceive: true,
+        dontSaveUnsentMessage: true,
+    }, function(err, result) {
+
+        if(err !== null || !result) return callback(err, result);
 
         historyStorageServer.getLastRecordTimestampForValue(Number(id), value, callback);
     });

@@ -18,7 +18,11 @@
     "callbackAfterExec": "callbackAfterExec",
     "timeout": 60,
     "icon": "event",
-    "runActionOnRemoteServers": false,
+    "runActionOnRemoteServers": true,
+    "runAjaxOnRemoteServers": true,
+    "debug": false,
+    "slowAjaxTime": 2000,
+    "slowServerTime": 3000,
     "updateInterval": 15,
     "commentsInterval": 3,
     "monthNames": [

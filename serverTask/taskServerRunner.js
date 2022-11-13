@@ -30,7 +30,7 @@ function taskServerStart(callback) {
     }, function (err, taskServerProcess) {
         if (err) return callback(new Error('Can\'t initializing task server: ' + err.message));
 
-        log.info('Starting task server process');
+        log.info('Starting task server thread');
 
         taskServerProcess.start(function (err) {
             if (err) return callback(new Error('Can\'t start task server: ' + err.message));

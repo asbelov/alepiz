@@ -2,24 +2,41 @@
  * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-//var log = require('../lib/log')(module);
-var db = require('../db');
-var async = require('async');
-var log = require('../../lib/log')(module);
+const log = require('../../lib/log')(module);
+const db = require('../db');
+const async = require('async');
+const unique = require('../../lib/utils/unique');
 
 var usersDB = {};
 module.exports = usersDB;
 
+/**
+ * Remove specific users by userIDs
+ * @param {Array} usersIDs - array of user IDs for remove
+ * @param {function(Error)} callback - callback(err)
+ */
 usersDB.removeUsers = function(usersIDs, callback) {
-    log.debug('Remove users IDs: ', usersIDs);
+    log.debug('Remove user IDs: ', usersIDs);
 
-    db.run('UPDATE users SET isDeleted=1 WHERE id IN (' + (new Array(usersIDs.length)).fill('?').join(',') +')', usersIDs, callback);
+    db.run('UPDATE users SET isDeleted=1 WHERE id IN (' + (new Array(usersIDs.length)).fill('?').join(',') +')',
+        usersIDs, callback);
 };
 
+/**
+ * Add a new user to the database
+ * @param {Object} userProperties - object with user parameters.
+ * @param {string} userProperties.name - user name
+ * @param {string} userProperties.fullName - user full real name
+ * @param {string} userProperties.password - user encrypted password
+ * @param {number} userProperties.sessionID - sessionID for create unique user ID
+ * @param {function(Error) | function(null, Number)} callback - callback(err, userID), where userID is a new user ID
+ */
 usersDB.addUser = function(userProperties, callback) {
     log.debug('Add user ', userProperties);
 
-    db.run('INSERT INTO users (name, fullName, password, isDeleted) VALUES ($name, $fullName, $password, 0)', {
+    const id = unique.createHash(userProperties);
+    db.run('INSERT INTO users (id, name, fullName, password, isDeleted) VALUES ($id, $name, $fullName, $password, 0)', {
+        $id: id,
         $name: userProperties.name,
         $fullName: userProperties.fullName,
         $password: userProperties.password
@@ -28,16 +45,25 @@ usersDB.addUser = function(userProperties, callback) {
     });
 };
 
+/**
+ * Add roles for specific userID
+ * @param {Number} userID - user ID
+ * @param {Array} rolesIDs - array with roles for specific user
+ * @param {function(Error|undefined)} callback - callback(err)
+ */
 usersDB.addRolesForUser = function(userID, rolesIDs, callback) {
     log.debug('Add roles IDs ', rolesIDs, ' to user ID ', userID);
 
-    var stmt = db.prepare('INSERT INTO usersRoles (userID, roleID) VALUES ($userID, $roleID)', function(err) {
+    var stmt = db.prepare('INSERT INTO usersRoles (id, userID, roleID) VALUES ($id, $userID, $roleID)',
+        function(err) {
         if(err) return callback(err);
 
         async.eachSeries(rolesIDs, function(roleID, callback) {
+            const id = unique.createHash(userID.toString(36) + roleID.toString());
             stmt.run({
+                $id: id,
                 $userID: userID,
-                $roleID: roleID
+                $roleID: roleID,
             }, callback);
         }, function (err) {
             stmt.finalize();
@@ -75,8 +101,19 @@ usersDB.deleteAllRolesForUser = function(userID, callback) {
     db.run('DELETE FROM usersRoles WHERE userID=?', userID, callback);
 };
 
+/**
+ * Add communication media for specific user ID
+ * @param {Number} userID - user ID
+ * @param {string} mediaID - media name
+ * @param {string} address - communication media address, f.e. email, mobile phone etc
+ * @param {function(Error) | function(null, Number)} callback - callback(err, userCommunicationID), where
+ *  userCommunicationID is a new userCommunicationID
+ */
 usersDB.addCommunicationMedia = function(userID, mediaID, address, callback) {
-    db.run('INSERT INTO userCommunication (userID, mediaID, address) VALUES ($userID, $mediaID, $address)', {
+    const id = unique.createHash(userID.toString(36) + mediaID + address);
+
+    db.run('INSERT INTO userCommunication (id, userID, mediaID, address) VALUES ($id, $userID, $mediaID, $address)', {
+        $id: id,
         $userID: userID,
         $mediaID: mediaID,
         $address: address,
@@ -85,8 +122,17 @@ usersDB.addCommunicationMedia = function(userID, mediaID, address, callback) {
     });
 };
 
+/**
+ * Add communication media priority
+ * @param {Number} userCommunicationID - userCommunicationID - id from userCommunication table
+ * @param {Number} priority - communication media priority
+ * @param {function(Error|undefined)} callback - callback(err)
+ */
 usersDB.addCommunicationMediaPriority = function (userCommunicationID, priority, callback) {
-    db.run('INSERT INTO userCommunicationPriorities (userCommunicationID, priority) VALUES ($userCommunicationID, $priority)', {
+    const id = unique.createHash(userCommunicationID.toString(36) + priority.toString(36));
+
+    db.run('INSERT INTO userCommunicationPriorities (id, userCommunicationID, priority) VALUES ($id, $userCommunicationID, $priority)', {
+        $id: id,
         $userCommunicationID: userCommunicationID,
         $priority: priority,
     }, callback);

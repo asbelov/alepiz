@@ -114,7 +114,8 @@ var JQueryNamespace = (function ($) {
             var priorityDescriptions = {}, priorityHTML = '';
             rows.forEach(function (row) {
                 priorityDescriptions[row.id] = row.description;
-                priorityHTML += '<option value="' + row.id + '">' + escapeHtml('#' + row.id + ': ' + row.description) + '</option>';
+                priorityHTML += '<option value="' + row.id + '">' + escapeHtml('#' + String(row.id).slice(-5) +
+                    ': ' + row.description) + '</option>';
             });
 
             $.post(serverURL, {func: 'getMedias'}, function (medias) {

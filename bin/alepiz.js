@@ -20,6 +20,8 @@ const conf = new Conf('config/common.json');
 var log = require('../lib/log')(module);
 const proc = require("../lib/proc");
 
+const defaultStopTimeout = 180000;
+
 console.log((new Date()).toLocaleString(), 'Starting ALEPIZ... (', process.pid, ')');
 
 new proc.parent({
@@ -32,7 +34,13 @@ new proc.parent({
     if(err) return log.throw('Can\'t initializing Alepiz: ' + err.message);
 
     service.run (function() {
+        const stopTimeout = Number(conf.get('serviceStopTimeout')) || defaultStopTimeout;
+        setTimeout(function() {
+            log.exit('ALEPIZ was not stopped in timeout ' + (stopTimeout / 1000) + ' sec. Exiting');
+        }, stopTimeout + 60000).unref();
+
         alepizProcess.stop(function () {
+            setTimeout(process.exit, 10000, 6);
             service.stop(0);
         });
     });

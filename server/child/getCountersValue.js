@@ -41,7 +41,7 @@ history.connect(childID, function () {
             onDestroy: destroyCollectors,
         });
     });
-});
+}, true);
 
 //profiling.init(60);
 

@@ -3,11 +3,11 @@
 * Created on 2021-3-22 15:46:56
 */
 
-var async = require('async');
-var log = require('../../lib/log')(module);
-var objectDB = require('../../models_db/objectsDB');
-var counterDB = require('../../models_db/countersDB');
-var history = require('../../models_history/history');
+const async = require('async');
+const log = require('../../lib/log')(module);
+const objectDB = require('../../models_db/objectsDB');
+const counterDB = require('../../models_db/countersDB');
+const history = require('../../models_history/history');
 
 var collector = {};
 module.exports = collector;
@@ -17,7 +17,8 @@ var func = {};
 collector.get = function(param, callback) {
 
     if(!param.objectNamesLike || !param.counterName || typeof func[param.func] !== 'function') {
-        return callback(new Error('Object or counter name or function is not specify or error: ' + JSON.stringify(param)));
+        return callback(new Error('Object or counter name or function is not specify or error: ' +
+            JSON.stringify(param)));
     }
 
     var objectsNames = param.objectNamesLike.split(',').map(obj => obj.trim());
@@ -52,7 +53,8 @@ collector.get = function(param, callback) {
                         ', counterID: ' + counterID +': ' + err.message + '; ' + JSON.stringify(param)));
 
                     if(!rowOCIDs || !rowOCIDs.id) {
-                        log.debug('Counter ', param.counterName, ' is not linked to object ', rowObject.name, ': ', param, '; ', rowOCIDs);
+                        log.debug('Counter ', param.counterName, ' is not linked to object ', rowObject.name, ': ',
+                            param, '; ', rowOCIDs);
                         return callback();
                     }
 
@@ -66,8 +68,9 @@ collector.get = function(param, callback) {
                         if (err) return callback(new Error('Can\'t get last values for OCIDs ' + OCIDs.join(', ') +
                             ': ' + err.message + '; ' + JSON.stringify(param)));
 
-                        if (!Object.keys(records).length) {
-                            log.debug('History values are not found for ', param.counterName, ' and ', rowsObjects, '; OCIDs: ', OCIDs);
+                        if (!records || typeof records !== 'object' || !Object.keys(records).length) {
+                            log.debug('History values are not found for ', param.counterName, ' and ',
+                                rowsObjects, '; OCIDs: ', OCIDs);
                             return callback();
                         }
 

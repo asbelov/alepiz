@@ -12,7 +12,7 @@ var prepareUser = require('../../lib/utils/prepareUser');
 var userRolesRights = require('../../models_db/usersRolesRightsDB');
 var transactions = require('../../models_db/modifiers/transaction');
 var counterDB = require('../../models_db/countersDB');
-var counterSaveDB = require('../../models_db/modifiers/modifierWapper').countersDB;
+var counterSaveDB = require('../../models_db/modifiers/countersDB');
 var activeCollector = require('../../server/activeCollector');
 
 
@@ -100,6 +100,7 @@ function saveChanges(args, param, callback) {
                             keepHistory: args.keepHistory === '' ? counter.keepHistory : Number(args.keepHistory),
                             keepTrends: counter.keepTrends,
                             counterID: counterID,
+                            timestamp: args.timestamp,
                             description: args.counterDescription ? args.counterDescription :
                                 (args.counterDescriptionShared === '0' ? counter.counterDescription : ''),
                             disabled: args.counterDisabledCB ? 1 :

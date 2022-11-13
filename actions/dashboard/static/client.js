@@ -11,8 +11,8 @@ function callbackBeforeExec(callback) {
     JQueryNamespace.checkBeforeExec(callback)
 }
 
-function callbackAfterExec(data, callback) {
-    JQueryNamespace.runAfterExec(data, callback);
+function callbackAfterExec(parameterNotUsed, callback) {
+    JQueryNamespace.runAfterExec(parameterNotUsed, callback);
 }
 
 function onChangeObjects(objects){
@@ -631,7 +631,13 @@ var JQueryNamespace = (function ($) {
             if(actionConfig.sound === false) soundOff();
 
             // res = {actions:[]..., restrictions: <>}
-            $.post(serverURL, {func: 'getRestrictions'}, function(res) {
+            $.post(serverURL, {func: 'getRestrictions'}, function(results) {
+                if(!results || typeof results !== 'object' || !Object.values(results)[0]) {
+                    console.error('Restrictions are not returned or error:', results);
+                    return callback();
+                }
+
+                var res = Object.values(results)[0];
                 actions = res.actions; // filter actions to display links only to actions allowed by the user
 
                 restrictions = res.restrictions;
@@ -864,7 +870,7 @@ var JQueryNamespace = (function ($) {
         }
     }
 
-    function runAfterExec (data, callback) {
+    function runAfterExec (parameterNotUsed, callback) {
         lastAction = null;
         if(restrictions.Message) {
             subjectElm.val('');
@@ -879,9 +885,13 @@ var JQueryNamespace = (function ($) {
             $('#addAsComment').prop('checked', true);
         }
         setDisabledEventsControlPanel();
-        startUpdate();
-        eventsFilterElm.focus();
-        callback();
+
+        // waiting for making changes in database
+        setTimeout(function () {
+            startUpdate();
+            eventsFilterElm.focus();
+            callback();
+        }, 1500);
     }
 
     function setUntilDateTimeControl(addMinutes) {
@@ -986,9 +996,9 @@ var JQueryNamespace = (function ($) {
                 objectsIDs: objectsIDs.join(','),
             },
             error: ajaxError,
-            success: function (result) { //{history: [..], current: [...], disabled: [...]}
+            success: function (results) { //{history: [..], current: [...], disabled: [...]}
                 //console.log(result)
-                if (!result) {
+                if (!results || typeof results !== 'object') {
                     bodyElm.css("cursor", "auto");
                     gettingDataInProgress = 0;
                     var lastUpdateTime = new Date();
@@ -996,6 +1006,34 @@ var JQueryNamespace = (function ($) {
                     updateTimeElm.text(' (' + Math.round((lastUpdateTime - startUpdateTime) / 10) / 100 + 'sec)');
                     if (typeof callback === 'function') callback();
                     return;
+                }
+
+                var result = {
+                    history: [],
+                    current: [],
+                    disabled: [],
+                }
+
+                for(var hostPort in results) {
+                    var res = results[hostPort];
+                    if(Array.isArray(res.history)) {
+                        res.history.forEach(row => {
+                            row.id = hostPort + ':' + row.id;
+                            result.history.push(row);
+                        });
+                    }
+                    if(Array.isArray(res.current)) {
+                        res.current.forEach(row => {
+                            row.id = hostPort + ':' + row.id;
+                            result.current.push(row);
+                        });
+                    }
+                    if(Array.isArray(res.disabled)) {
+                        res.disabled.forEach(row => {
+                            row.id = hostPort + ':' + row.id;
+                            result.disabled.push(row);
+                        });
+                    }
                 }
 
                 hintCache = {};
@@ -1082,6 +1120,7 @@ var JQueryNamespace = (function ($) {
             var OCID = $(this).attr('OCID');
             makeHint('getComment', OCID ? ID + ',' + OCID : ID, function(hint) {
                 if(hint.subject) $('#hintSubject').text(hint.subject);
+                else $('#hintSubject').text('');
                 $('#hintComment').html(hint.text);
                 hintDialogInstance.open();
             });
@@ -1099,9 +1138,11 @@ var JQueryNamespace = (function ($) {
                     commentID: $(this).attr('data-commentIDForEvents')
                 },
                 error: ajaxError,
-                success: function (rows) {
-                    if (!rows) $('#hintComment').text('Can\'t find events list for this comment');
-                    else {
+                success: function (results) {
+                    $('#hintSubject').text('Event list');
+                    if (!results || typeof results !== 'object') {
+                        $('#hintComment').text('Can\'t find events list for this comment');
+                    } else {
                         $('#hintComment').html('\
 <table class="bordered highlight responsive-table">\
     <thead>\
@@ -1128,6 +1169,16 @@ var JQueryNamespace = (function ($) {
         </tr>\
     </tbody>\
 </table>');
+                        var rows = [];
+                        for(var hostPort in results) {
+                            var res = results[hostPort];
+                            if (Array.isArray(res)) {
+                                res.forEach(row => {
+                                    row.id = hostPort + ':' + row.id;
+                                    rows.push(row);
+                                });
+                            }
+                        }
                         drawHistoryEventsTable(rows, $('#historyEventsTableForCommentedEvents'));
                     }
                     hintDialogInstance.open();
@@ -1151,7 +1202,8 @@ var JQueryNamespace = (function ($) {
                     OCID: OCID,
                 },
                 error: ajaxError,
-                success: function (rows) {
+                success: function (results) {
+                    $('#hintSubject').text('Event history');
                     $('#hintComment').html('\
 <table class="bordered highlight responsive-table">\
     <thead>\
@@ -1178,6 +1230,20 @@ var JQueryNamespace = (function ($) {
         </tr>\
     </tbody>\
 </table>');
+                    if(!results || typeof results !== 'object') {
+                        console.error('Historical events are not returned or error:', results);
+                        return;
+                    }
+                    var rows = [];
+                    for(var hostPort in results) {
+                        var res = results[hostPort];
+                        if (Array.isArray(res)) {
+                            res.forEach(row => {
+                                row.id = hostPort + ':' + row.id;
+                                rows.push(row);
+                            });
+                        }
+                    }
                     drawHistoryEventsTable(rows, $('#historyEventsTableForHistoryData'));
                     hintDialogInstance.open();
                     addHintClickEvent();
@@ -1210,9 +1276,19 @@ var JQueryNamespace = (function ($) {
                 objectsIDs: objectsIDs.join(',')
             },
             error: ajaxError,
-            success: function (comments) {
-                if (comments) {
-                    drawHistoryCommentedEventsTable(comments);
+            success: function (results) {
+                if (results && typeof results === 'object') {
+                    var rows = [];
+                    for(var hostPort in results) {
+                        var res = results[hostPort];
+                        if (Array.isArray(res)) {
+                            res.forEach(row => {
+                                row.id = hostPort + ':' + row.id;
+                                rows.push(row);
+                            });
+                        }
+                    }
+                    drawHistoryCommentedEventsTable(rows);
                     addEventHandlersToTables(objectsIDs);
                 }
                 bodyElm.css("cursor", "auto");
@@ -1226,6 +1302,7 @@ var JQueryNamespace = (function ($) {
             var ID = $(this).attr('hintID');
             makeHint('getHint', ID, function(comment) {
                 if(comment.subject) $('#hintSubject').text(comment.subject);
+                else $('#hintSubject').text('');
                 $('#hintComment').html(comment.text);
                 hintDialogInstance.open();
             });
@@ -1365,8 +1442,10 @@ var JQueryNamespace = (function ($) {
                 ID: ID
             },
             error: ajaxError,
-            success: function (row) {
-                if (!row) return;
+            success: function (results) {
+
+                if(!results || typeof results !== 'object' || !Object.values(results)[0]) return;
+                var row = Object.values(results)[0];
 
                 var disabledTimeIntervals = '';
                 if (row.disableUntil && row.disableIntervals) {
@@ -1406,7 +1485,7 @@ var JQueryNamespace = (function ($) {
         if (!result || !result.length) tablePartHTML = '<tr><td colspan="12" style="text-align: center;">No history events</td></tr>';
         else {
             var maxWidth = Math.round((elm.width() * 0.2 > $(window).width() ? $(window).width() : elm.width()) * 0.5);
-            result.forEach(function (row, idx) {
+            result.sort((a, b) => b.startTime - a.startTime).forEach(function (row, idx) {
                 if(idx > maxEventsNumberInTable) return;
                 if(restrictions.importanceFilter && importanceFilter > -1 && row.importance > importanceFilter) return;
 
@@ -1505,7 +1584,7 @@ var JQueryNamespace = (function ($) {
         if (!result || !result.length) tablePartHTML = '<tr><td colspan="11" style="text-align: center;">No events</td></tr>';
         else {
             var maxWidth = Math.round($(window).width() * 0.5);
-            result.forEach(function (row) {
+            result.sort((a, b) => b.startTime - a.startTime).forEach(function (row) {
                 if(restrictions.importanceFilter && importanceFilter > -1 && row.importance > importanceFilter) return;
                 var importance = getHumanImportance(row.importance);
                 // use bgcolor attribute for instead style for possible to change color of the row on mouse over
@@ -1555,7 +1634,7 @@ var JQueryNamespace = (function ($) {
         if (!result || !result.length) tablePartHTML = '<tr><td colspan="15" style="text-align: center;">No disabled events</td></tr>';
         else {
             var maxWidth = Math.round($(window).width() * 0.5);
-            result.forEach(function (row) {
+            result.sort((a, b) => b.startTime - a.startTime).forEach(function (row) {
                 if(restrictions.importanceFilter && importanceFilter > -1 && row.importance > importanceFilter) return;
                 var importance = getHumanImportance(row.importance);
                 // use bgcolor attribute for instead style for possible to change color of the row on mouse over
@@ -1617,7 +1696,7 @@ var JQueryNamespace = (function ($) {
 
         if (!result.length) tablePartHTML = '<tr><td colspan="8" style="text-align: center;">No commented events</td></tr>';
         else {
-            result.forEach(function (row) {
+            result.sort((a, b) => b.timestamp - a.timestamp).forEach(function (row) {
                 if(restrictions.importanceFilter && importanceFilter > -1 && row.importance > importanceFilter) return;
                 var importance = getHumanImportance(row.importance);
                 // use bgcolor attribute for instead style for possible to change color of the row on mouse over
@@ -1878,7 +1957,7 @@ var JQueryNamespace = (function ($) {
         getObjectsProperties(Object.keys(variables), function(rows) {
             var props = {};
 
-            if(rows && rows.length) {
+            if(Array.isArray(rows) && rows.length) {
                 rows.forEach(function (row) {
                     //if (row.mode !== 0) return;
                     if (!props[row.OCID]) props[row.OCID] = {};
@@ -1988,8 +2067,10 @@ var JQueryNamespace = (function ($) {
                 IDs: OCIDs.join(','),
             },
             error: function (jqXHR, exception) { ajaxError(jqXHR, exception, callback)},
-            success: function(rows) {
-                callback(rows);
+            success: function(results) {
+                if(!results || typeof results !== 'object' || !Object.values(results)[0]) return;
+                var result = Object.values(results)[0];
+                callback(result);
                 /*
                 if(!rows || !rows.length) return callback(text);
 
@@ -2079,7 +2160,10 @@ var JQueryNamespace = (function ($) {
                     counterID: counterID,
                 },
                 error: ajaxError,
-                success: function (rows) { //{.. OCID:...}
+                success: function (results) { //{.. OCID:...}
+                    if(!results || typeof results !== 'object' || !Object.values(results)[0]) return;
+                    var rows = Object.values(results)[0];
+
                     if(rows.actionError) console.log(rows.actionError);
                     if(!Array.isArray(rows)) rows = [];
 

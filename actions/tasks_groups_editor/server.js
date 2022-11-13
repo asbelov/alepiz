@@ -7,7 +7,7 @@
  */
 var log = require('../../lib/log')(module);
 var tasksDB = require('../../models_db/tasksDB');
-var tasksDBSave = require('../../models_db/modifiers/modifierWapper').tasksDB;
+var tasksDBSave = require('../../models_db/modifiers/tasksDB');
 var checkIDs = require('../../lib/utils/checkIDs');
 var transactionDB = require('../../models_db/modifiers/transaction');
 

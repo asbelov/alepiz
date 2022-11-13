@@ -2,17 +2,29 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var async = require('async');
-var log = require('../../lib/log')(module);
-var db = require('../db');
+const async = require('async');
+const log = require('../../lib/log')(module);
+const db = require('../db');
+const unique = require('../../lib/utils/unique');
 
 var tasksDB = {};
 module.exports = tasksDB;
 
-tasksDB.addTask = function(userID, timestamp, name, groupID, callback) {
+/**
+ * Insert a new task
+ * @param {Number} userID - user ID
+ * @param {Number} timestamp - create task timestamp (Date.now())
+ * @param {string|null} name - task name
+ * @param {Number} groupID - task group ID
+ * @param {number} sessionID - sessionID for crate unique task ID
+ * @param {function(Error) | function(null, Number)} callback - callback(err, taskID), where taskID is inserted task ID
+ */
+tasksDB.addTask = function(userID, timestamp, name, groupID, sessionID, callback) {
     if(!name) name = null;
 
-    db.run('INSERT INTO tasks (userID, timestamp, name, groupID) VALUES ($userID,$timestamp,$name,$groupID)', {
+    const id = unique.createHash(userID.toString(36) + name + groupID + sessionID);
+    db.run('INSERT INTO tasks (id, userID, timestamp, name, groupID) VALUES ($id, $userID, $timestamp, $name, $groupID)', {
+        $id: id,
         $userID: userID,
         $timestamp: timestamp,
         $name: name,
@@ -44,33 +56,54 @@ tasksDB.updateTask = function(taskID, name, groupID, callback) {
     });
 };
 
+/**
+ * Insert action for specific taskID
+ * @param {Number} taskID - task ID
+ * @param {Number} sessionID - session ID
+ * @param {Number} startupOptions - startupOptions
+ * @param {Number} actionsOrder - order of action in the task
+ * @param {function(Error) | function(null, Number)} callback - callback(err, taskActionID), where taskActionID
+ *  is a new id of inserted action for the task
+ */
 tasksDB.addAction = function(taskID, sessionID, startupOptions, actionsOrder, callback) {
-    db.run('INSERT INTO tasksActions (taskID, sessionID, startupOptions, actionsOrder) VALUES (?,?,?,?)',
-        [taskID, sessionID, startupOptions, actionsOrder], function (err, info) {
+    const id = unique.createHash(taskID.toString(36) + sessionID + startupOptions + actionsOrder);
+
+    db.run('INSERT INTO tasksActions (id, taskID, sessionID, startupOptions, actionsOrder) VALUES (?, ?, ?, ?, ?)',
+        [id, taskID, sessionID, startupOptions, actionsOrder], function (err, info) {
         if(err) {
-            return callback(new Error('Can\'t insert new actions for task with taskID "' + taskID +
+            return callback(new Error('Can\'t insert new actions with taskActionID: '+ id +
+                ' for task with taskID "' + taskID +
                 '", sessionID "' + sessionID + '", startupOptions: ' + startupOptions +
-                ', actionsOrder: ' + actionsOrder +' into the tasksActions database: ' + err.message));
+                ', actionsOrder: ' + actionsOrder + ' into the tasksActions database: ' + err.message));
         }
         callback(null, this.lastID === undefined ? info.lastInsertRowid : this.lastID);
     })
 };
 
-tasksDB.addParameters = function(actionID, params, callback) {
-    var stmt = db.prepare('INSERT INTO tasksParameters (taskActionID, name, value) VALUES (?,?,?)', function(err) {
+/**
+ * Insert action parameters for specific action for the task
+ * @param {Number} taskActionID - action ID for the task (id from the tasksActions table)
+ * @param {Object} params - objects with an action parameters {<name>: <value>, ....}
+ * @param {function(Error)|function()} callback - callback(err)
+ */
+tasksDB.addParameters = function(taskActionID, params, callback) {
+    var stmt = db.prepare('INSERT INTO tasksParameters (id, taskActionID, name, value) VALUES (?, ?, ?, ?)',
+        function(err) {
         if(err) {
-            return callback(new Error('Can\'t prepare to insert new task parameters for actionID "' + actionID +
-                + '": ', err.message + '; params: ' + JSON.stringify(params) + ' into the tasksParameters table: '));
+            return callback(new Error('Can\'t prepare to insert new task parameters for taskActionID "' + taskActionID +
+                + '": ' + err.message + '; params: ' + JSON.stringify(params) + ' into the tasksParameters table: '));
         }
 
         async.eachSeries(Object.keys(params), function(name, callback) {
             if(['actionName', 'actionID', 'username', 'sessionID', 'actionCfg'].indexOf(name) !== -1) return callback();
-            var param = typeof params[name] === 'object' ? JSON.stringify(params[name]) : params[name];
-            stmt.run([actionID, name, param], callback);
+            const value = typeof params[name] === 'object' ? JSON.stringify(params[name]) : params[name];
+            const id = unique.createHash(taskActionID.toString(36) + name + value);
+
+            stmt.run([id, taskActionID, name, value], callback);
         }, function(err) {
             stmt.finalize();
             if(err) {
-                return callback(new Error('Error while add task parameters for action "' + actionID  +
+                return callback(new Error('Error while add task parameters for action "' + taskActionID  +
                     '": ' + err.message + '; params: ' + JSON.stringify(params)));
             }
             callback();
@@ -111,15 +144,16 @@ tasksDB.renameTasksGroup = function(id, name, callback){
     })
 };
 
-/*
-Add a new tasks group
-
-name: tasks group name
-callback(err, newGroupID);
+/**
+ * Add a new tasks group
+ * @param {string} groupName - task group name
+ * @param {function(Error)|function(null, Number)} callback - callback(err, groupID), where groupID is a new group ID
  */
-tasksDB.addTasksGroup = function(name, callback) {
-    db.run('INSERT INTO tasksGroups (name) VALUES (?)', [name], function (err, info) {
-        if(err) return callback(new Error('Can\'t add new tasks groups "'+name+'": '+err.message));
+tasksDB.addTasksGroup = function(groupName, callback) {
+    const id = unique.createHash(groupName);
+
+    db.run('INSERT INTO tasksGroups (id, name) VALUES (?, ?)', [id, groupName], function (err, info) {
+        if(err) return callback(new Error('Can\'t add new tasks groups "' + groupName + '": '+err.message));
         callback(null, this.lastID === undefined ? info.lastInsertRowid : this.lastID);
     })
 };
@@ -152,20 +186,23 @@ tasksDB.removeTaskActionsAndParameters = function(taskID, callback) {
     });
 };
 
-/*
-Add roles to task group
-taskGroupID: task group ID
-rolesIDs: array of roles IDs
-callback(err)
+/**
+ * Add roles to task group
+ * @param {Number} taskGroupID - task group ID
+ * @param {Array} rolesIDs - array of the task role IDs
+ * @param {function(Error|undefined)} callback - callback(err)
  */
 tasksDB.addRolesForGroup = function(taskGroupID, rolesIDs, callback) {
     log.debug('Add roles IDs ', rolesIDs, ' to task group ID ', taskGroupID);
 
-    var stmt = db.prepare('INSERT INTO tasksGroupsRoles (taskGroupID, roleID) VALUES ($taskGroupID, $roleID)', function(err) {
+    var stmt = db.prepare('INSERT INTO tasksGroupsRoles (id, taskGroupID, roleID) VALUES ($id, $taskGroupID, $roleID)',
+        function(err) {
         if(err) return callback(err);
 
         async.eachSeries(rolesIDs, function(roleID, callback) {
+            const id = unique.createHash(taskGroupID.toString(36) + roleID.toString());
             stmt.run({
+                $id: id,
                 $taskGroupID: taskGroupID,
                 $roleID: roleID
             }, callback);
@@ -226,6 +263,7 @@ callback(err)
 tasksDB.addRunConditionOCIDs = function (taskID, OCIDs, callback) {
     log.debug('Add OCIDs ', OCIDs, ' to tasksRunConditionsOCIDs with  taskID ', taskID);
 
+    // NOT UNIQUE INDEX is set to TaskID and OCID. Table has not id filed
     var stmt = db.prepare(
         'INSERT INTO tasksRunConditionsOCIDs (taskID, OCID) VALUES ($taskID, $OCID)',
         function(err) {

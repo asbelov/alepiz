@@ -5,20 +5,19 @@
 /**
  * Created by Alexander Belov on 30.08.2015.
  */
-var log = require('../../lib/log')(module);
-var db = require('../db');
+const log = require('../../lib/log')(module);
+const db = require('../db');
+const unique = require('../../lib/utils/unique');
 
 var groupsDB = {};
 module.exports = groupsDB;
 
-groupsDB.new = function(group, callback) {
-    if(!group) {
-        var err = new Error('Error inserting counters group into database: group name is not set');
-        return callback(err);
-    }
-    db.run('INSERT INTO countersGroups (name) VALUES (?)', group, function(err){
+groupsDB.new = function(groupName, sessionID, callback) {
+    const id = unique.createHash(groupName + sessionID);
+
+    db.run('INSERT INTO countersGroups (id, name) VALUES (?, ?)', [id, groupName], function(err){
         if(err) {
-            log.error('Error inserting counter group '+group+' into database: ', err.message);
+            log.error('Error inserting counter group ', groupName , ' into the database: ', err.message);
             return callback(err);
         }
         callback();

@@ -108,6 +108,9 @@ function getFromHistory(id, shift, num, recordsType, callback) {
             return callback(err, null, rawRecords);
         }
 
+        // can be on disconnect
+        if(!Array.isArray(rawRecords)) return callback();
+
         // convert numeric to Number
         if(recordsType < 2) {
             var records = rawRecords.map(function (record) {

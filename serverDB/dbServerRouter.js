@@ -33,7 +33,7 @@ new IPC.server(cfg, function (err, msg, socket, callback) {
             childProcessExecutable: path.join(__dirname, 'dbSubServer.js'),
             restartAfterErrorTimeout: 0, // was 2000
             killTimeout: 3000,
-            args: ['query', 0],
+            args: ['query'],
             module: 'dbClientQuery',
         }, function (err, dbQueryServerProcess) {
             if (err) return log.error('Can\'t initializing dbServer query thread: ', err.message);

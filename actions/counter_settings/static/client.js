@@ -54,7 +54,7 @@ function callbackBeforeExec(callback) {
 }
 
 function callbackAfterExec(counterData, callback) {
-    var counterID = counterData ? Number(counterData.counter.counterID) : null;
+    var counterID = counterData ? Number(counterData[Object.keys(counterData)[0]].counter.counterID) : null;
 
     // waiting while onChangeObjects with initCountersSelector() is executed for set returned counterID
     // to select#counterIDSelector element for a new counter
@@ -212,13 +212,15 @@ var JQueryNamespace = (function ($) {
             var counters = getSharedCounters(objectsIDs.length, allCounters);
             var selectHTML = '<option value="">New counter</option>';
             if(counters && counters.length) {
-            selectHTML += counters.sort(function(a, b) {
-                return (new Intl.Collator('us', { numeric: true }).compare(a.name, b.name));
-            }).map(function (counter) {
-                var selected = initCounterID === counter.id ? ' selected' : '';
-                // dont change ' (#'+ counter.id + ') to something. It used in replace function in import\export
-                return '<option value="' + counter.id + '"' + selected + '>' + escapeHtml(counter.name) + ' (#'+ counter.id + ')</option>';
-            }).join('');
+                selectHTML += counters.sort(function(a, b) {
+                    return (new Intl.Collator('us', { numeric: true }).compare(a.name, b.name));
+                }).map(function (counter) {
+                    var selected = initCounterID === counter.id ? ' selected' : '';
+                    // dont change ' (#' + counter.id + ') to something. It used in replace function in import\export
+                    // for get counter name using .replace(/ \(#\d+\)$/, '')
+                    return '<option value="' + counter.id + '"' + selected + '>' +
+                        escapeHtml(counter.name) + ' (#' + String(counter.id).slice(-5) + ')</option>';
+                }).join('');
             }
 
             counterSelectorElm.html(selectHTML);
@@ -499,19 +501,20 @@ var JQueryNamespace = (function ($) {
                         encodeURIComponent(externalObjectNames.map(o => o.name).join(',')) +
                         '" target="_blank">"' + escapeHtml(externalObjectNames.map(o => o.name).join(', ')) +
                         '"</a></b></li>') : '') +
-                    externalObjectNames.map(o => {
+                    externalObjectNames.map(obj => {
                         return '<li>object:&nbsp;&nbsp; <b>' + '<a href="/?a=%2Factions%2Fimport_export&c=' +
-                            encodeURIComponent(o.name) +
-                            '" target="_blank">"' + escapeHtml(o.name) + '"</a> (#' + o.id +
-                            ')</b> for ' + o.where + '</li>';
+                            encodeURIComponent(obj.name) +
+                            '" target="_blank">"' + escapeHtml(obj.name) + '"</a> (#' + String(obj.id).slice(-5) +
+                            ')</b> for ' + obj.where + '</li>';
                     }).join('') +
-                    externalCounterNames.map(o => {
+                    externalCounterNames.map(counter => {
                         return '<li>counter: <b>' +
-                            (o.id ?
-                                '<a href="/?a=%2Factions%2Fcounter_settings&cid=' + o.id +
-                                '" target="_blank">"' + escapeHtml(o.name) + '"</a> (#' + o.id + ')' :
+                            (counter.id ?
+                                '<a href="/?a=%2Factions%2Fcounter_settings&cid=' + counter.id +
+                                '" target="_blank">"' + escapeHtml(counter.name) +
+                                '"</a> (#' + String(counter.id).slice(-5) + ')' :
                                 '<span class="red-text">Not selected</span>') +
-                            '</b> for ' + o.where + '</li>';
+                            '</b> for ' + counter.where + '</li>';
                     }).join('')
                 )
                 var modalExportExternalEntitiesInfoInstance =
@@ -768,7 +771,7 @@ var JQueryNamespace = (function ($) {
             rows.forEach(function (row) {
                 if(row.debug) {
                     countersWithDebug.push('<a style="color:yellow" href="/?a=%2Factions%2Fcounter_settings&cid=' +
-                        row.id + '" target="_blank">' + (num++) + '. #' + row.id + ' ' + escapeHtml(row.name) + '</a><br>');
+                        row.id + '" target="_blank">' + (num++) + '. #' + String(row.id).slice(-5) + ' ' + escapeHtml(row.name) + '</a><br>');
                 }
             });
 
@@ -917,7 +920,7 @@ var JQueryNamespace = (function ($) {
             }).map(function (row) {
                 return '<li><a href="/?a=%2Factions%2Fcounter_settings&cid=' +
                         row.counterID + '" target="_blank">' + escapeHtml(row.counterName) +
-                    ' (#' +  + row.counterID + ')</a>' + ': ' + (row.variableName ?
+                    ' (#' +  + String(row.counterID).slice(-5) + ')</a>' + ': ' + (row.variableName ?
                 '<b>' + escapeHtml(row.variableName) + '</b> [ <i>' + escapeHtml(row.variableExpression || '') + '</i> ]' +
                         (row.variableDescription ?
                     ' - ' + escapeHtml(row.variableDescription) : '') : ' NO VARIABLES' ) + '</li>';
@@ -1145,12 +1148,16 @@ var JQueryNamespace = (function ($) {
 
                 setUpdateEventsOrder();
 
-                var updateEventSelectCounterElm = $('#' +updateEventID+ '_counterID');
+                var updateEventSelectCounterElm = $('#' + updateEventID + '_counterID');
                 //var updateEventVal = updateEventSelectCounterElm.val();
                 if(updateEvent.counterID) updateEventSelectCounterElm.val(updateEvent.counterID);
                 if(!updateEventSelectCounterElm.val()) {
-                    updateEventSelectCounterElm.append('<option value="' + updateEvent.counterID + '" selected>' + updateEvent.counterName + '</option>');
-                    M.toast({html: 'Counter ' + updateEvent.counterName + '(#' +updateEvent.counterID+ ') is not linked to ' + escapeHtml(updateEvent.name) + ' and update event for this object is never occurred', displayLength: 10000});
+                    updateEventSelectCounterElm.append('<option value="' + updateEvent.counterID + '" selected>' +
+                        updateEvent.counterName + '</option>');
+                    M.toast({html: 'Counter ' + updateEvent.counterName +
+                            '(#' + String(updateEvent.counterID).slice(-5) + ') is not linked to ' +
+                            escapeHtml(updateEvent.name) + ' and update event for this object is never occurred',
+                        displayLength: 10000});
                     //updateEventSelectCounterElm.val(updateEventVal);
                 }
 

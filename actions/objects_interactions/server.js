@@ -174,6 +174,8 @@ function editObjectsInteractions(user, args, callback){
                 transactionDB.end(function(err) {
                     if(err) return callback(err);
 
+                    log.info('Sending message to the server for update objects ',
+                        args.objectsIDs);
                     // send message for updating collected initial data for objects
                     server.sendMsg({
                         update: {

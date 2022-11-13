@@ -94,6 +94,8 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                     }, function (err, message, socket, callback) {
                         if (err) {
                             if (stopInProgress) return;
+                            log.warn('IPC server error: ', err.message);
+                            /*
                             stopInProgress = true;
 
                             log.exit(err.message);
@@ -104,10 +106,11 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                                     });
                                 });
                             });
+                            */
                             return;
                         }
 
-                        // on connect
+                        // on bind
                         if (socket === -1) {
                             log.info('Active collectors ', collectorNamesStr, ' starting and listening ',
                                 serverAddress, ':', serverPort, ' for IPC');
@@ -193,7 +196,7 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                                 message.type, ': ', e.stack, ' (data: ', message.data, ')');
                         }
                     });
-                });
+                }, true);
             });
         });
 

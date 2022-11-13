@@ -3,7 +3,8 @@
  */
 
 
-var db = require('../db');
+const db = require('../db');
+const unique = require('../../lib/utils/unique');
 
 var actionsDB = {};
 module.exports = actionsDB;
@@ -20,11 +21,15 @@ module.exports = actionsDB;
  * @param {string} user username
  * @param {string} actionID - action directory
  * @param {string} config - stringified action configuration (usually JSON.stringify())
+ * @param {number} sessionID - sessionID for create unique ID for inserted row
  * @param {function(Error)} callback - callback(err)
  */
-actionsDB.setActionConfig = function (user, actionID, config, callback) {
-    db.run('INSERT INTO actionsConfig (userID, actionName, config) ' +
-        'VALUES ((SELECT id FROM users WHERE isDeleted=0 AND name = $userName), $actionName, $config)', {
+actionsDB.setActionConfig = function (user, actionID, config, sessionID, callback) {
+    const id = unique.createHash(user + actionID + config + sessionID);
+
+    db.run('INSERT INTO actionsConfig (id, userID, actionName, config) ' +
+        'VALUES ($id, (SELECT id FROM users WHERE isDeleted=0 AND name = $userName), $actionName, $config)', {
+        $id: id,
         $userName: user,
         $actionName: actionID,
         $config: config,

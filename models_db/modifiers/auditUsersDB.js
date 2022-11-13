@@ -2,11 +2,12 @@
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var db = require('../db');
+const db = require('../db');
 
 var session = {};
 module.exports = session;
 
+// primary key for auditUsers is a sessionID
 session.addNewSessionID = function(userID, sessionID, actionID, actionName, timestamp, callback) {
     db.run('INSERT INTO auditUsers (userID, sessionID, actionID, actionName, timestamp) VALUES (?,?,?,?,?)',
         [userID, sessionID, actionID, actionName, timestamp], function(err){

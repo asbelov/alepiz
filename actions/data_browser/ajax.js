@@ -40,7 +40,7 @@ module.exports = function(args, callback) {
 
     if (func === 'getUnits') return units.getUnits(callback);
 
-    history.connect('actionDataBrowser', function() {
+    history.connect('actionDataBrowser',function() {
 
         if (func === 'getObjectsCountersValues') {
             if (!args.IDs) return callback(new Error('Can\'t get last values for objects: objectsCounters IDs not specified'));
@@ -73,7 +73,7 @@ module.exports = function(args, callback) {
                         log.warn(err.message);
                         return callback();
                     }
-                    if (!result[0]) {
+                    if (!result || !result[0]) {
                         log.warn('Returned empty history values for object-counter: ', id);
                         return callback();
                     }

@@ -8,15 +8,15 @@
 var fs = require('fs');
 var path = require('path');
 
-var log = require('../../lib/log')(module);
+//var log = require('../../lib/log')(module);
 var collectors = require('../../lib/collectors');
 var rightsWrappersCountersDB = require('../../rightsWrappers/countersDB');
 var rightsWrappersObjectsDB = require('../../rightsWrappers/objectsDB');
 var counterDB = require('../../models_db/countersDB');
 var groupsDB = require('../../models_db/countersGroupsDB');
-var groupsDBSave = require('../../models_db/modifiers/modifierWapper').countersGroupsDB;
+var groupsDBSave = require('../../models_db/modifiers/countersGroupsDB');
 var unitsDB = require('../../models_db/countersUnitsDB');
-var unitsDBSave = require('../../models_db/modifiers/modifierWapper').countersUnitsDB;
+var unitsDBSave = require('../../models_db/modifiers/countersUnitsDB');
 var history = require('../../models_history/history');
 var functions = require('../../lib/calcFunction');
 var calc = require('../../lib/calc');
@@ -64,7 +64,7 @@ module.exports = function(args, callback) {
         return rightsWrappersCountersDB.getCountersForObjects(args.username, args.ids, groupID, callback);
     }
 
-    if(func === 'addCounterGroup') return groupsDBSave.new(args.group, callback);
+    if(func === 'addCounterGroup') return groupsDBSave.new(args.group, args.sessionID, callback);
 
     if(func === 'editCounterGroup') return groupsDBSave.edit(args.oldGroup, args.group, callback);
 
@@ -72,8 +72,10 @@ module.exports = function(args, callback) {
 
     if(func === 'removeCounterGroup') return groupsDBSave.remove(args.group, callback);
 
-    if(func === 'addCounterUnit')
-        return unitsDBSave.new(args.unit, args.abbreviation, args.prefixes, args.multiplies, args.onlyPrefixes, callback);
+    if(func === 'addCounterUnit') {
+        return unitsDBSave.new(args.unit, args.abbreviation, args.prefixes, args.multiplies, args.onlyPrefixes,
+            args.sessionID, callback);
+    }
 
     if(func === 'editCounterUnit')
         return unitsDBSave.edit(args.oldUnitID, args.unit, args.abbreviation, args.prefixes, args.multiplies, args.onlyPrefixes, callback);

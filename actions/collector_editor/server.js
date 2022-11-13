@@ -25,7 +25,7 @@ module.exports = function(args, callback) {
 
             server.sendMsg({reconnectToCollectors: 1});
 
-            log.info('Collector ', ID, ' deleted successfully');
+            log.info('Collector ', ID, ' deleted successfully. Sending message to server for reconnect to collectors');
             callback(null, ID);
         });
         return;
@@ -118,7 +118,7 @@ module.exports = function(args, callback) {
             if(err) callback(err);
 
             if(args.restartServer) {
-                log.info('Sending message to restart server for applying changes');
+                log.info('Sending message to server to restart for applying changes');
                 server.sendMsg({restart: 1});
             } else log.warn('Changes are not applying to server, because server was not restarted');
 

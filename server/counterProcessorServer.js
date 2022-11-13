@@ -15,6 +15,7 @@ const storeUpdateEventsData = require('./storeUpdateEventsData');
 const Conf = require("../lib/conf");
 const conf = new Conf('config/common.json');
 const confServer = new Conf('config/server.json');
+const confMyNode = new Conf('config/node.json');
 
 // not less than 3000 (child diff for killTimeout)
 // this timeout also is a sleep time between stop and start when restart occurred
@@ -52,7 +53,6 @@ var startMemUsageTime = 0,
     needToUpdateCache = new Set(),
     counterObjectNamesCache = new Map(),
     objectAlepizRelation = new Map(),
-    alepizInstance = {},
     recordsFromDBCnt = 0,
     lastFullUpdateTime = Date.now(),
     updateCacheInProgress = 0,
@@ -158,13 +158,12 @@ function runChildren(callback) {
     var cfg = confServer.get('servers')[serverID];
     var childrenNumber = cfg.childrenNumber || Math.floor(os.cpus().length);
     processedOCIDs.clear();
-    serverCache(null, confServer.get('alepizNames') || [],
-        function(err, cache, _counterObjectNames, _objectAlepizRelation, _alepizInstance, _recordsFromDBCnt) {
+    serverCache(null,
+        function(err, cache, _counterObjectNames, _objectAlepizRelation, _recordsFromDBCnt) {
         if(err) return callback(new Error('Error when loading data to cache: ' + err.message));
 
         counterObjectNamesCache = _counterObjectNames;
         objectAlepizRelation = _objectAlepizRelation;
-        alepizInstance = _alepizInstance;
         recordsFromDBCnt = _recordsFromDBCnt;
         log.info('Starting ', childrenNumber, ' children for server: ', serverName,
             '. CPU cores number: ', os.cpus().length);
@@ -285,9 +284,8 @@ function updateCache() {
         '; counters for remove: ', countersForRemove.size, '; update mode: ', updateMode);
 
      */
-    var alepizNames = confServer.get('alepizNames') || [];
-    serverCache(updateMode, alepizNames,
-        function(err, cache, __counterObjectNames, _objectAlepizRelation, _alepizInstance, _recordsFromDBCnt) {
+    serverCache(updateMode,
+        function(err, cache, __counterObjectNames, _objectAlepizRelation, _recordsFromDBCnt) {
         if(err) {
             updateCacheInProgress = 0;
             return log.error('Error when loading data to cache: ', err.message);
@@ -295,7 +293,6 @@ function updateCache() {
 
         counterObjectNamesCache = __counterObjectNames;
         if(_objectAlepizRelation) objectAlepizRelation = _objectAlepizRelation;
-        if(_alepizInstance) alepizInstance = _alepizInstance;
         recordsFromDBCnt = _recordsFromDBCnt;
         if(cache) {
             cache.fullUpdate = !updateMode;
@@ -332,13 +329,15 @@ function updateCache() {
                     }
                     recordsFromDBCnt += counters.length;
 
-                    var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== -1;
+                    var cfg = confMyNode.get();
+                    var indexOfOwnNode = cfg.indexOfOwnNode;
+                    var ownerOfUnspecifiedAlepizIDs = cfg.serviceNobodyObjects;
+
                     counters.forEach(function (property) {
-                        var objectsAlepizNames = objectAlepizRelation.get(property.objectID);
-                        //if(property.objectName === 'ALEPIZ') console.log('!!!', alepizNames, objectsAlepizNames, ownerOfUnspecifiedAlepizIDs, objectAlepizRelation)
-                        if ((objectsAlepizNames === undefined && ownerOfUnspecifiedAlepizIDs) ||
-                            (Array.isArray(objectsAlepizNames) &&
-                                objectsAlepizNames.some(name => alepizNames.indexOf(name) !== -1))) {
+                        var objectsAlepizIDs = objectAlepizRelation.get(property.objectID);
+                        //if(property.objectName === 'ALEPIZ') console.log('!!!', indexOfOwnNode, objectsAlepizIDs, ownerOfUnspecifiedAlepizIDs, objectAlepizRelation)
+                        if ((objectsAlepizIDs === undefined && ownerOfUnspecifiedAlepizIDs) ||
+                            (Array.isArray(objectsAlepizIDs) && objectsAlepizIDs.indexOf(indexOfOwnNode) !== -1)) {
                             topCounters.add(property);
                             topOCIDs.add(property.OCID);
                             //if(property.objectName === 'ALEPIZ') console.log('!!!! add ALEPIZ')
@@ -429,16 +428,16 @@ function waitingForObjects(callback) {
         if (allTopCounters && allTopCounters.length) {
             recordsFromDBCnt += allTopCounters.length;
 
-            var alepizNames = confServer.get('alepizNames') || [];
-            var ownerOfUnspecifiedAlepizIDs = alepizNames.indexOf(null) !== -1;
+            var cfg = confMyNode.get();
+            var indexOfOwnNode = cfg.indexOfOwnNode;
+            var ownerOfUnspecifiedAlepizIDs = cfg.serviceNobodyObjects;
             var filteredCounters = new Set();
 
             allTopCounters.forEach(function (property) {
-                var objectsAlepizNames = objectAlepizRelation.get(property.objectID);
-                //if(property.objectName === 'ALEPIZ') console.log('!!!', alepizNames, objectsAlepizNames, ownerOfUnspecifiedAlepizIDs, objectAlepizRelation)
-                if ((objectsAlepizNames === undefined && ownerOfUnspecifiedAlepizIDs) ||
-                    (Array.isArray(objectsAlepizNames) &&
-                        objectsAlepizNames.some(name => alepizNames.indexOf(name) !== -1))
+                var objectsAlepizIDs = objectAlepizRelation.get(property.objectID);
+                //if(property.objectName === 'ALEPIZ') console.log('!!!', indexOfOwnNode, objectsAlepizIDs, ownerOfUnspecifiedAlepizIDs, objectAlepizRelation)
+                if ((objectsAlepizIDs === undefined && ownerOfUnspecifiedAlepizIDs) ||
+                    (Array.isArray(objectsAlepizIDs) && objectsAlepizIDs.indexOf(indexOfOwnNode) !== -1)
                 ) {
                     filteredCounters.add(property);
                     //if(property.objectName === 'ALEPIZ') console.log('!!!! add ALEPIZ')
@@ -447,11 +446,12 @@ function waitingForObjects(callback) {
 
             if(filteredCounters.size) {
                 log.info('Getting ', filteredCounters.size, '/', allTopCounters.length,
-                    ' counter values at first time for ', collectorsNames, ' for objects related to: ', alepizNames);
+                    ' counter values at first time for ', collectorsNames,
+                    ' for objects related to nodeID: ', indexOfOwnNode);
                 getCountersValues(filteredCounters);
             } else {
                 log.info('Can\'t find counters without dependents for starting data collection for ', collectorsNames,
-                    ' for Alepiz with names: ', alepizNames);
+                    ' for nodeID: ', indexOfOwnNode);
             }
         } else log.info('Can\'t find counters without dependents for starting data collection for ', collectorsNames);
 

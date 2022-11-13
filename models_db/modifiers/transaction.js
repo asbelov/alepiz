@@ -39,7 +39,7 @@ transaction.end = function(callback) {
 };
 
 transaction.rollback = function(err, callback){
-    log.warn('Rollback transaction. Stack: ', err.stack);
+    log.warn('Rollback transaction. Stack: ', err.stack || err);
     db.exec('ROLLBACK', function(errRollBack) {
         if(errRollBack) log.error('Error while rollback transaction: ', errRollBack.message);
         runDelayedTransaction(callback);

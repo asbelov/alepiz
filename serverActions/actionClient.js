@@ -5,64 +5,50 @@
 const log = require('../lib/log')(module);
 const async = require('async');
 const Conf = require('../lib/conf');
+const conf = new Conf('config/common.json');
 const confActions = new Conf('config/actions.json');
-
+const unique = require('../lib/utils/unique');
 const IPC = require('../lib/IPC');
 const prepareUser = require('../lib/utils/prepareUser');
 const usersRolesRightsDB = require('../models_db/usersRolesRightsDB');
-
-var clientIPC;
-var allClientIPCArray = [],
-    isInitConnections = false,
-    reconnectInProgress = false;
-
+const connectToRemoteNodes = require('../lib/connectToRemoteNodes');
+const path = require("path");
 
 var actionClient = {};
 module.exports = actionClient;
 
-actionClient.connect = function (callback) {
-    if(isInitConnections) return callback();
+var systemUser = conf.get('systemUser') || 'system';
+var clientIPC;
+var allClientIPC = new Map(),
+    connectionInitialized = false;
+
+/**
+ * Connect to the actions server and to the remote Alepiz action server instances
+ * @param {string|null} id the name of the connected services to identify in the log file
+ * @param {function(Error)|function()} callback callback(err)
+ */
+actionClient.connect = function (id, callback) {
+    if(connectionInitialized) return callback();
 
     var cfg = confActions.get();
+    if(!cfg) return callback(new Error('Action server is not configured'));
 
-    cfg.id = 'actionClient';
+    cfg.id = id || 'actions:' + path.basename(module.parent.filename, '.js');
     new IPC.client(cfg, function (err, msg, _clientIPC) {
         if (err) log.warn('IPC client error: ', err.message);
         if (_clientIPC) {
             clientIPC = _clientIPC;
-            if(!reconnectInProgress) log.info('Connected to action server');
-            else return log.info('Reconnected to action server');
+            log.info('Initialized connection to the actions server: ', cfg.serverAddress, ':', cfg.serverPort);
 
-            var remoteServers = Array.isArray(cfg.remoteServers) ? cfg.remoteServers : [],
-                remoteClientIPC = new Map();
-            async.each(remoteServers, function (remoteServerCfg, callback) {
-                remoteServerCfg.id = 'actionClientRmt:' + remoteServerCfg.serverAddress + ':' + remoteServerCfg.serverPort;
-                if (remoteServerCfg.reconnectDelay === undefined) remoteServerCfg.reconnectDelay = 60000;
-                if (remoteServerCfg.connectionTimeout === undefined) remoteServerCfg.connectionTimeout = 2000;
-
-                log.info('Connecting to remote action server ',
-                    remoteServerCfg.serverAddress, ':', remoteServerCfg.serverPort, '...');
-                new IPC.client(remoteServerCfg, function (err, msg, clientIPC) {
-                    if (err) {
-                        // write error only first time
-                        if (!remoteClientIPC.has(remoteServerCfg)) log.warn(remoteServerCfg.id, ': ', err.message);
-                    } else if (clientIPC) {
-                        log.info('Connected to remote action Server ',
-                            remoteServerCfg.serverAddress, ':', remoteServerCfg.serverPort);
-                    }
-                    // After the connection timeout expires, clientIPC will be returned and messages will be
-                    // saved for sending to the remote server in the future.
-                    if (clientIPC) remoteClientIPC.set(remoteServerCfg, clientIPC);
-                    if (typeof callback === 'function') callback();
-                    callback = null; // prevent running callback on reconnect
-                });
-            }, function () {
-                isInitConnections = true;
-                if(remoteClientIPC.size) allClientIPCArray = Array.from(remoteClientIPC.values());
-
-                allClientIPCArray.unshift(clientIPC);
-                if (!reconnectInProgress) callback();
-                reconnectInProgress = true;
+            connectToRemoteNodes('actions', cfg.id, function (err, _allClientIPC) {
+                if(!_allClientIPC) {
+                    log.warn('No remote nodes specified for actions');
+                    _allClientIPC = new Map();
+                }
+                _allClientIPC.set(cfg.serverAddress + ':' + cfg.serverPort, clientIPC);
+                allClientIPC = _allClientIPC;
+                connectionInitialized = true;
+                callback();
             });
         }
     });
@@ -70,74 +56,143 @@ actionClient.connect = function (callback) {
 
 actionClient.disconnect = function (callback) {
     log.info('Disconnecting from action server');
-    allClientIPCArray.forEach(clientIPC => clientIPC.disconnect())
-    allClientIPCArray = [];
+    allClientIPC.forEach(clientIPC => clientIPC.disconnect())
+    allClientIPC.clear();
     clientIPC = null;
     callback();
 };
 
-/*
- Run specific action
-
- param: {
- actionID: action ID,
- executionMode: ajax | server | makeTask,
- user: user name,
- args: {prm1: ..., prm2: ..., ....},
- sessionID: session ID
- }
+/**
+ * Run specific in param action
+ * @param {Object} param: object with action parameters
+ * @param {string} param.actionID: action directory name
+ * @param {string} param.executionMode="ajax"|"server"|"makeTask": one of execution modes
+ * @param {string} param.user: username
+ * @param {number} param.sessionID: session ID
+ * @param {number} param.timestamp: timestamp when the action was started
+ * @param {number} param.slowAjaxTime: print action info if ajax executed slow then slowAjaxTime (ms)
+ * @param {number} param.slowServerTime: print action info if action executed slow then slowServerTime (ms)
+ * @param {Boolean} param.debug: print to log additional debug information for action
+ * @param {Boolean} param.applyToOwnObjects=true|false: if true then the args.o parameter is passed into action without
+ *      objects that are not serviced in this instance of ALEPIZ. (default false)
+ * @param {Boolean} param.runActionOnRemoteServers=true|false: run ajax on remote Alepiz instances (default true).
+ * @param {Boolean} param.runAjaxOnRemoteServers=true|false: run action on remote Alepiz instances (default false).
+ * @param {object} param.args - object with action arguments like {<name>: <value>, ...}
+ * @param {function(Error)|function(null, actionResult:Object)} callback: callback(err, actionResult)
+ * @param callback.actionResult: object like {"<serverAddress>:<serverPort>":<actionResult>, ....} if
+ *      (executionMode = 'server' and runActionOnRemoteServers = true) or
+ *      (executionMode = 'ajax' and  runAjaxOnRemoteServers = true).
+ *      Otherwise this parameter is <actionResult>
  */
 actionClient.runAction = function (param, callback) {
     if (typeof callback !== 'function') {
         return log.error('Error while running action "', param.actionID, '": callback is not a function');
     }
     if (!clientIPC) {
-        actionClient.connect(function () {
+        actionClient.connect('actions', function () {
             log.info('Connecting to action server for run action: ', param);
             actionClient.runAction(param, callback);
         });
         return;
     }
 
+    if(!param.sessionID) param.sessionID = unique.createID();
+    param.timestamp = Date.now();
+
     checkObjectsRights(param.user, param.executionMode, param.args.o, function (err) {
         if (err) return callback(err);
 
-        log.debug('Sending parameters to action server for run action: ', param);
+        //log.debug('Sending parameters to action server for run action: ', param);
         var dataToSend = {
             msg: 'runAction',
             param: param,
         };
 
-        // runActionOnRemoteServers = true only for run action from browser
-        if (param.runActionOnRemoteServers && (param.runAjaxOnRemoteServers || param.executionMode !== 'ajax')
+        // log when ajax or server executed slowly then slowAjaxTime or slowServerTime
+        var slowAjaxTime = Number(param.slowAjaxTime) === parseInt(String(param.slowAjaxTime), 10) &&
+            Number(param.slowAjaxTime) > 1 ? Number(param.slowAjaxTime) : 3000;
+        var slowServerTime = Number(param.slowServerTime) === parseInt(String(param.slowServerTime), 10) &&
+            Number(param.slowServerTime) > 1 ? Number(param.slowServerTime) : 15000;
+
+        // param.runActionOnRemoteServers = true only for run action from browser (from routes/actions.js)
+        if ((param.executionMode === 'ajax' && param.runAjaxOnRemoteServers) ||
+            (param.executionMode === 'server' && param.runActionOnRemoteServers) ||
+            param.executionMode === 'makeTask'
         ) {
-            var results = [];
-            async.each(allClientIPCArray, function (clientIPC, callback) {
+            var actionResults = {}, actionExecutionTimes = [], startExecutionTime = Date.now();
+            async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
                 if (typeof clientIPC.sendAndReceive !== 'function') return callback();
                 // callback(err, actionData) - returned data for ajax or action execution
-                clientIPC.sendAndReceive(dataToSend, function (err, result) {
+                dataToSend.param.hostPort = hostPort;
+                var now = Date.now();
+                clientIPC.sendExt(dataToSend, {
+                    sendAndReceive: param.executionMode === 'ajax',
+                    dontSaveUnsentMessage: param.executionMode === 'ajax',
+                }, function (err, actionResult) {
+                    actionExecutionTimes.push(hostPort + ':' + (Date.now() - now));
                     if(err) return callback(err);
-                    if(result !== undefined) results.push(result);
+                    if(actionResult !== undefined) {
+                        actionResults[hostPort] = actionResult;
+                    }
+
                     callback();
                 });
             }, function(err) {
-                callback(err, results);
+                if(param.user !== systemUser) {
+                    var actionExecutionTime = Date.now() - startExecutionTime;
+                    if (param.executionMode === 'ajax' && actionExecutionTime > slowAjaxTime) {
+                        log.info('The ajax is executed slowly: ', actionExecutionTime, 'ms: ',
+                            actionExecutionTimes.join('ms; '), 'ms: ', param);
+                    } else if (param.executionMode === 'server' && actionExecutionTime > slowServerTime) {
+                        log.info('The action is executed slowly: ', actionExecutionTime, 'ms: ',
+                            actionExecutionTimes.join('ms, '), 'ms: ', param);
+                    }
+                    if(param.debug) {
+                        log.info('Action ', param.actionID, '(', Array.from(allClientIPC.keys()).join(';'),
+                            '), executionMode ', param.executionMode,
+                            ', user: ', param.user, ' returned: ', actionResults,
+                            ': ', param.args, (err ? ': err: ' + err.message : ''));
+                    }
+                }
+
+                callback(err, actionResults);
             });
         } else {
-            // callback(err, actionData) - returned data for ajax or action execution
-            clientIPC.sendAndReceive(dataToSend, callback);
+            startExecutionTime = Date.now();
+            clientIPC.sendAndReceive(dataToSend, function (err, actionResult) {
+                if(param.user !== systemUser) {
+                    var actionExecutionTime = Date.now() - startExecutionTime;
+                    if (param.executionMode === 'ajax' && actionExecutionTime > slowAjaxTime) {
+                        log.info('The ajax is executed slowly: ', actionExecutionTime, 'ms: ', param);
+                    } else if (param.executionMode === 'server' && actionExecutionTime > slowServerTime) {
+                        log.info('The action is executed slowly: ', actionExecutionTime, 'ms: ', param);
+                    }
+                    if(param.debug) {
+                        log.info('Action ', param.actionID, ', executionMode ', param.executionMode,
+                            ', user: ', param.user, ' returned: ', actionResult, ': ', param.args,
+                            (err ? ': err: ' + err.message : ''));
+                    }
+                }
+
+                // actionResult: return ajax data or action execution result
+                callback(err, actionResult);
+            });
+
         }
     });
 };
 
 /**
  * Send message for all action servers for add sessionID to database. Used only for run action from web interface
- * @param {{user: {string}, sessionID: {uint}, actionID: {string}, actionName: {string}}} param -
- *      parameters for creating sessionID
+ * @param {Object} param - parameters for creating sessionID
+ * @param {string} param.user - username
+ * @param {string} param.actionID - action DI (action directory)
+ * @param {string} param.actionName - full action name
+ * @param {number} param.sessionID - unique session ID
  */
 actionClient.addSessionID = function (param) {
     if (!clientIPC) {
-        actionClient.connect(function () {
+        actionClient.connect('actions', function () {
             log.info('Connecting to action server for add sessionID: ', param);
             actionClient.addSessionID(param);
         });
@@ -150,7 +205,7 @@ actionClient.addSessionID = function (param) {
         param: param,
     }
 
-    allClientIPCArray.forEach(clientIPC => {
+    allClientIPC.forEach(clientIPC => {
         if (typeof clientIPC.send === 'function') clientIPC.send(dataToSend);
     });
 };
@@ -167,7 +222,7 @@ actionClient.actionConfig = function (user, func, actionID, config, callback) {
     }
 
     if (!clientIPC) {
-        actionClient.connect(function () {
+        actionClient.connect('actions', function () {
             log.info('Connecting to action server for ', func, '. user: ', user, '; action: ', actionID);
             actionClient.actionConfig(user, func, actionID, config, callback);
         });
@@ -180,6 +235,7 @@ actionClient.actionConfig = function (user, func, actionID, config, callback) {
         user: prepareUser(user),
         actionID: actionID,
         config: config,
+        sessionID: unique.createID(),
     }, callback); // getActionConfig => callback(err, {config:...}; ); setActionConfig => callback(err)
 };
 

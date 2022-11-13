@@ -2,24 +2,31 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var async = require('async');
-var path = require('path');
-var log = require('../../lib/log')(module);
+const async = require('async');
+const path = require('path');
+const log = require('../../lib/log')(module);
 const Conf = require('../../lib/conf');
 const confCollectors = new Conf('config/collectors.json');
 const confSettings = new Conf(confCollectors.get('dir') + '/event-generator/settings.json');
-var runInThread = require('../../lib/runInThread');
+const runInThread = require('../../lib/runInThread');
 
 var collector = {};
 module.exports = collector;
 
-var eventGenerators = [], commonEventGenerator;
-init();
+var eventGenerators = [], commonEventGenerator, initializationInProgress = false;
+init(()=>{ log.info('First initialization was complete'); });
 
 collector.get = function (param, callback) {
     if(typeof param !== 'object') return callback(new Error('Parameters are not set or error'));
 
-    if(!commonEventGenerator) return log.error('Event generator was not initialized: ', param);
+    if(!commonEventGenerator || typeof commonEventGenerator.get !== 'function') {
+        log.error('Event generator was not initialized (get), run initialization: ', param);
+        setTimeout(function () {
+            init(function () {
+                collector.getOnce(param, callback);
+            });
+        }, 100).unref();
+    }
 
     commonEventGenerator.get(param, callback);
     eventGenerators.forEach(eventGenerator => eventGenerator.get(param));
@@ -42,7 +49,14 @@ collector.get = function (param, callback) {
 collector.getOnce = function (param, callback) {
     if(typeof param !== 'object') return callback(new Error('Parameters are not set or error'));
 
-    if(!commonEventGenerator) return log.error('Event generator was not initialized');
+    if(!commonEventGenerator || typeof commonEventGenerator.getOnce !== 'function') {
+        log.error('Event generator was not initialized (getOnce), run initialization: ', param);
+        setTimeout(function () {
+            init(function () {
+                collector.getOnce(param, callback);
+            });
+        }, 100).unref();
+    }
 
     commonEventGenerator.getOnce(param, callback);
     eventGenerators.forEach(eventGenerator => eventGenerator.get(param));
@@ -50,7 +64,9 @@ collector.getOnce = function (param, callback) {
 
 
 collector.removeCounters = function(OCIDs, callback) {
-    if(!OCIDs.length) return callback();
+    if(!OCIDs.length || !commonEventGenerator || typeof commonEventGenerator.removeCounters !== 'function') {
+        return callback();
+    }
 
     commonEventGenerator.removeCounters(OCIDs);
     eventGenerators.forEach(eventGenerator => eventGenerator.removeCounters(OCIDs));
@@ -58,14 +74,19 @@ collector.removeCounters = function(OCIDs, callback) {
 };
 
 collector.destroy = function(callback) {
-    if(commonEventGenerator) commonEventGenerator.destroy();
+    if(!commonEventGenerator|| typeof commonEventGenerator.destroy !== 'function') return callback();
+
+    commonEventGenerator.destroy();
     eventGenerators.forEach(eventGenerator => eventGenerator.destroy());
     commonEventGenerator = null;
     eventGenerators = [];
     callback();
 };
 
-function init() {
+function init(callback) {
+    if(initializationInProgress) return callback();
+
+    initializationInProgress = true;
     var cfg = confSettings.get();
 
     if(Array.isArray(cfg.db) && cfg.db.length) {
@@ -87,5 +108,7 @@ function init() {
         });
     }, function () {
         commonEventGenerator = eventGenerators.shift();
+        initializationInProgress = false;
+        callback();
     });
 }

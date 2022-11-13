@@ -85,8 +85,9 @@ function addNewObjects(user, args, callback){
 
         // add a new objects, its description and order
         //  Top objects has order < 10 objectsFilterDB.js
-        rightsWrapper.addObjects(user, newObjectsNames, description, order, disabled, color,
-            function (err, newObjectsIDs) {
+
+        rightsWrapper.addObjects(user, newObjectsNames, description, order, disabled, color, args.sessionID,
+            args.timestamp, function (err, newObjectsIDs) {
             if (err) {
                 log.error('Error adding new object[s] ', newObjectsNames, ' with description: ', description,
                     ' and sort order ', order, ': ', err.message);

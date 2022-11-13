@@ -11,6 +11,7 @@ const exitHandler = require("../lib/exitHandler");
 const countersDB = require("../models_db/countersDB");
 const historyStorage = require('../models_history/historyStorage');
 var parameters = require('../models_history/historyParameters');
+const setShift = require('../lib/utils/setShift');
 
 // array of minutes for trends. long time (keepTrends time) keeps only trends with time interval 60
 // trends less the 60 will keep as history data (keepHistory time)
@@ -24,7 +25,7 @@ var trendsData = new Map();
 var objectsParameters = new Map();
 var transactionInProgress = 0;
 var transactionDescriptionInProgress = '';
-var transactionsFunctions = [];
+var transactionsFunctions = new Set();
 var callbackOnStop;
 var lastTruncate = Date.now();
 
@@ -268,21 +269,21 @@ function onStop(callback) {
     } else {
         var waitingTimeout = setTimeout(function() {
             log.warn('Continue waiting while last transaction is committed for ' + dbPath +
-                '... Transaction queue: ', transactionsFunctions.length,
+                '... Transaction queue: ', transactionsFunctions.size,
                 (transactionInProgress ?
                     ', last transaction started at ' + (new Date(transactionInProgress)).toLocaleString() +
                     '(' + transactionDescriptionInProgress + ')' :
                     ', no transaction in progress'));
         }, 30000);
         log.warn('Continue waiting while last transaction is committed for ' + dbPath +
-            '... Transaction queue: ', transactionsFunctions.length,
+            '... Transaction queue: ', transactionsFunctions.size,
             (transactionInProgress ?
                 ', last transaction started at ' + (new Date(transactionInProgress)).toLocaleString() +
                 '(' + transactionDescriptionInProgress + ')':
                 ', no transaction in progress'));
 
         // clear transaction queue
-        transactionsFunctions = [];
+        transactionsFunctions.clear();
 
         // function will run after transaction.commit
         callbackOnStop = function(err) {
@@ -555,12 +556,12 @@ functions.getLastRecordTimestampForValue = function (id, value, callback) {
 };
 
 functions.getTransactionsQueueInfo = function(callback) {
-    if(!transactionInProgress && transactionsFunctions.length) {
-        log.warn('Starting ', transactionsFunctions.length, ' halted transactions');
-        functions.beginTransaction(transactionsFunctions.shift());
+    if(!transactionInProgress && transactionsFunctions.size) {
+        log.warn('Starting ', transactionsFunctions.size, ' halted transactions');
+        functions.beginTransaction(setShift(transactionsFunctions));
     }
     return callback(null, {
-        len: transactionsFunctions.length,
+        len: transactionsFunctions.size,
         timestamp: transactionInProgress,
         description: transactionDescriptionInProgress,
     });
@@ -575,11 +576,11 @@ functions.beginTransaction = function(description, callback) {
 
     if(transactionInProgress) {
         /*
-        log.info(Date.now(), ' Adding transaction to queue: ', description, '(', transactionsFunctions.length, ') now processing ',
+        log.info(Date.now(), ' Adding transaction to queue: ', description, '(', transactionsFunctions.size, ') now processing ',
             transactionDescriptionInProgress, ' form ', (new Date(transactionInProgress).toLocaleString()),
             ': ', transactionInProgress);
          */
-        transactionsFunctions.push({
+        transactionsFunctions.add({
             description: description,
             callback: callback,
         });
@@ -609,10 +610,10 @@ functions.commitTransaction = function(err, _callback) {
         }
         clearInterval(commitWatchdog);
 
-        //log.info(Date.now(), ' Finishing transaction: ', transactionDescriptionInProgress, ': ', transactionInProgress, ' (', transactionsFunctions.length, ')');
+        //log.info(Date.now(), ' Finishing transaction: ', transactionDescriptionInProgress, ': ', transactionInProgress, ' (', transactionsFunctions.size, ')');
         transactionInProgress = 0;
         transactionDescriptionInProgress = '';
-        if(transactionsFunctions.length) functions.beginTransaction(transactionsFunctions.shift());
+        if(transactionsFunctions.size) functions.beginTransaction(setShift(transactionsFunctions));
         if(typeof _callback === 'function') _callback(err);
         else {
             log.warn('Commit of transaction is finished after timeout, error: ', err);
@@ -624,7 +625,7 @@ functions.commitTransaction = function(err, _callback) {
         var commitWatchdog = setInterval(function () {
             var error = 'Commit or rollback transaction timeout: ' + transactionDescriptionInProgress + ', started at ' +
                 (new Date(transactionInProgress)).toLocaleString() +
-                ' (' + transactionInProgress + '), queue: ' + transactionsFunctions.length;
+                ' (' + transactionInProgress + '), queue: ' + transactionsFunctions.size;
             log.warn(error);
             //callback(new Error(error));
         }, parameters.timeoutForCommitTransaction);
@@ -675,7 +676,7 @@ functions.delRecords = function (IDs, daysToKeepHistory, daysToKeepTrends, callb
             //log.info(Date.now(), ' Starting del transaction:  ', transactionDescriptionInProgress, ': ', transactionInProgress);
             if(iterateNum === 1) deleteRecordsInProgress = Date.now();
             delRecords(IDsPart, daysToKeepHistory, daysToKeepTrends, function (err) {
-                //log.info(Date.now(), ' Finishing del transaction: ', transactionDescriptionInProgress, ': ', transactionInProgress, ' (', transactionsFunctions.length, '): ', err);
+                //log.info(Date.now(), ' Finishing del transaction: ', transactionDescriptionInProgress, ': ', transactionInProgress, ' (', transactionsFunctions.size, '): ', err);
                 functions.commitTransaction(err, function(err) {
 
                     if(Date.now() - printInfoTime > 60000) {
@@ -713,7 +714,7 @@ functions.delRecords = function (IDs, daysToKeepHistory, daysToKeepTrends, _call
 
         //log.info(Date.now(), ' Starting del transaction:  ', transactionDescriptionInProgress, ': ', transactionInProgress);
         delRecords(IDs, daysToKeepHistory, daysToKeepTrends, function(err) {
-            //log.info(Date.now(), ' Finishing del transaction: ', transactionDescriptionInProgress, ': ', transactionInProgress, ' (', transactionsFunctions.length, '): ', err);
+            //log.info(Date.now(), ' Finishing del transaction: ', transactionDescriptionInProgress, ': ', transactionInProgress, ' (', transactionsFunctions.size, '): ', err);
             functions.commitTransaction(err, callback);
         });
     });
@@ -885,8 +886,12 @@ functions.saveRecordsForObject = function (id, newObjectParameters, recordsForSa
 
         var isNumber = true;
         if (!isNaN(parseFloat(String(record.data))) && isFinite(record.data)) record.data = Number(record.data);
-        else if(typeof record.data === 'boolean') record.data = record.data ? 1 : 0;
-        else isNumber = false;
+        else if (typeof record.data === 'boolean') record.data = record.data ? 1 : 0;
+        else {
+            isNumber = false;
+            if (typeof record.data === 'object') record.data = JSON.stringify(record.data);
+            else if (typeof record.data !== 'string') record.data = String(record.data);
+        }
 
         try {
             db.prepare('INSERT INTO ' + (isNumber ? 'numbers' : 'strings') +
@@ -898,8 +903,8 @@ functions.saveRecordsForObject = function (id, newObjectParameters, recordsForSa
         } catch (err) {
             return callback(new Error('Can\'t insert data into the ' +
                 (isNumber ? 'numbers' : 'strings') +
-                ' table for object id ' + id + ', timestamp: ' + record.timestamp + ', data: ' + record.data +
-                ': ' + err.message));
+                ' table for object id ' + id + ', timestamp: ' + record.timestamp + ', data(' + typeof(record.data) +
+                '): ' + record.data + ': ' + err.message));
         }
 
         // don't save trends for strings and when keepTrends = 0

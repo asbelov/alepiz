@@ -10,19 +10,20 @@ var log = require('../lib/log')(module);
 var async = require('async');
 var IPC = require('../lib/IPC');
 var proc = require('../lib/proc');
+const setShift = require('../lib/utils/setShift')
 var Conf = require('../lib/conf');
 const conf = new Conf('config/common.json');
 const confActions = new Conf('config/actions.json');
 
 
 const actionsDB = require('../models_db/actionsDB');
-const actionsDBSave = require('../models_db/modifiers/modifierWapper').actionsDB;
+const actionsDBSave = require('../models_db/modifiers/actionsDB');
 
 const actionConf = require('../lib/actionsConf');
 var actionClient = require('./actionClient');
 
 var userDB = require('../models_db/usersDB');
-var sessionDB = require('../models_db/modifiers/modifierWapper').auditUsersDB;
+var sessionDB = require('../models_db/modifiers/auditUsersDB');
 var transaction = require('../models_db/modifiers/transaction');
 const thread = require("../lib/threads");
 const path = require("path");
@@ -60,23 +61,23 @@ attachRunAction(cfg.serverNumber || 5, function (err, _runActionSystem) {
 
             if (msg && msg.msg === 'runAction') return addActionToQueue(msg.param, callback);
             if (msg && msg.msg === 'addSessionID') return addCreateSessionToQueue(msg.param);
-            if (msg && msg.msg === 'getActionConfig') return actionsDB.getActionConfig(msg.user, msg.actionID, callback);
+            if (msg && msg.msg === 'getActionConfig') {
+                return actionsDB.getActionConfig(msg.user, msg.actionID, callback);
+            }
             if (msg && msg.msg === 'setActionConfig') {
-                return actionsDBSave.setActionConfig(msg.user, msg.actionID, msg.config, callback);
+                return actionsDBSave.setActionConfig(msg.user, msg.actionID, msg.config, msg.sessionID, callback);
             }
 
             if (socket === -1) {
-                actionClient.connect(function () {
-                    new proc.child({
-                        module: 'actionServer',
-                        onDisconnect: function () {  // exit on a disconnect from parent (then server will be restarted)
-                            if (runActionProcess) runActionProcess.stop();
-                            log.exit('Action server was disconnected from parent unexpectedly. Exiting');
-                            log.disconnect(function () {
-                                process.exit(2)
-                            });
-                        },
-                    });
+                new proc.child({
+                    module: 'actionServer',
+                    onDisconnect: function () {  // exit on a disconnect from parent (then server will be restarted)
+                        if (runActionProcess) runActionProcess.stop();
+                        log.exit('Action server was disconnected from parent unexpectedly. Exiting');
+                        log.disconnect(function () {
+                            process.exit(2)
+                        });
+                    },
                 });
             }
         });
@@ -136,9 +137,6 @@ function attachRunAction(serverNumber, callback) {
     });
 }
 
-/*
-  Add new session ID for each running actions or if no action running
-*/
 /**
  * Add new session ID for each running actions or if no action running
  * @param {{user: {string}, sessionID: {uint}, actionID: {string}, actionName: {string}}} param -
@@ -270,11 +268,7 @@ function runActionFromQueue() {
 }
 
 function runQueue(actionQueue) {
-
-    // action = actionQueue.shift() for Set()
-    var actionQueueIterator = actionQueue.values();
-    var action = actionQueueIterator.next().value
-    actionQueue.delete(action);
+    var action = setShift(actionQueue);
 
     const myRunAction = action.conf.runActionInline ? runAction : runActionThread;
     lastProcessedAction = {

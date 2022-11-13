@@ -146,71 +146,70 @@ function getCollectorNamesWithSameIPAndPort(serverAddress, port) {
 activeCollector.connect = function (collectorName, callback) {
     if(!collectorName) return callback(new Error('Collector name is not set for connect to active collector'));
     // already connected
-    if(collectorsObj[collectorName] && collectorsObj[collectorName].IPC) {
-        return callback(null, collectorsObj[collectorName].IPC);
+    if(collectorsObj[collectorName] && collectorsObj[collectorName].collector) {
+        return callback(null, collectorsObj[collectorName].collector);
     }
 
     connectToCollector(collectorName, function (err, clientIPC, hostPort) {
-        if(err) return callback(err);
-
-        /* if connected */
-        var collector = new Collector(collectorName, clientIPC, hostPort);
+        // can be called several times when reconnect to collector
 
         if(!collectorsObj[collectorName]) collectorsObj[collectorName] = {};
-        collectorsObj[collectorName].IPC = collector;
-        callback(null, collector);
+
+        // initial collector connection
+        collectorsObj[collectorName].collector = {
+            // active and separate collectors return the result in their counterProcessorServer and do not need
+            // to call the callback through network IPC using sendAndReceive function
+            get: function (param) {
+                clientIPC.send({
+                    name: collectorName,
+                    type: 'get',
+                    data: param,
+                });
+            },
+
+            // sending data to collector usually from actions
+            send: function (param, callback) {
+                clientIPC.send({
+                    name: collectorName,
+                    type: 'getOnce',
+                    data: param,
+                }, callback);
+            },
+
+            removeCounters: function (OCIDs, callback) {
+                clientIPC.sendAndReceive({
+                    name: collectorName,
+                    type: 'removeCounters',
+                    data: OCIDs
+                }, callback);
+            },
+
+            throttlingPause: function (throttlingPause, callback) {
+                clientIPC.sendAndReceive({
+                    name: collectorName,
+                    type: 'throttlingPause',
+                    data: throttlingPause
+                }, callback);
+            },
+
+            destroy: function (callback) {
+                clientIPC.sendAndReceive({
+                    name: collectorName,
+                    type: 'destroy',
+                }, callback);
+            },
+
+            sendToServer: function (message) {
+                clientIPC.send(message);
+            },
+
+            // used in counterProcessor.js for sendToServer to send a message no more than once to each server
+            hostPort: hostPort,
+        }
+
+        callback(err, collectorsObj[collectorName].collector);
     });
 };
-
-function Collector(collectorName, clientIPC, hostPort) {
-    // active and separate collectors return the result in their counterProcessorServer and do not need
-    // to call the callback through network IPC
-    this.get = function (param) {
-        clientIPC.send({
-            name: collectorName,
-            type: 'get',
-            data: param,
-        });
-    };
-
-    this.getOnce = function (param, callback) {
-        clientIPC.send({
-            name: collectorName,
-            type: 'getOnce',
-            data: param,
-        }, callback);
-    };
-
-    this.removeCounters = function (OCIDs, callback) {
-        clientIPC.sendAndReceive({
-            name: collectorName,
-            type: 'removeCounters',
-            data: OCIDs
-        }, callback);
-    };
-
-    this.throttlingPause = function (throttlingPause, callback) {
-        clientIPC.sendAndReceive({
-            name: collectorName,
-            type: 'throttlingPause',
-            data: throttlingPause
-        }, callback);
-    };
-
-    this.destroy = function (callback) {
-        clientIPC.sendAndReceive({
-            name: collectorName,
-            type: 'destroy',
-        }, callback);
-    };
-
-    this.sendToServer = function (message) {
-        clientIPC.send(message);
-    };
-
-    // used in counterProcessor.js for sendToServer to send a message no more than once to each server
-    this.hostPort = hostPort;
-}
 
 function connectToCollector(collectorName, callback) {
 
@@ -228,7 +227,9 @@ function connectToCollector(collectorName, callback) {
     }
 
     // already connected
-    if(collectors[serverAddress + ':' + port].IPC) return callback(null, collectors[serverAddress + ':' + port].IPC);
+    if(collectors[serverAddress + ':' + port].clientIPC) {
+        return callback(null, collectors[serverAddress + ':' + port].clientIPC, serverAddress + ':' + port);
+    }
 
     // run IPC system
     new IPC.client({
@@ -245,7 +246,7 @@ function connectToCollector(collectorName, callback) {
         if (err && Date.now() - startTime > 30000) log.warn('IPC client error: ', err.message);
 
         if (clientIPC) {
-            collectors[serverAddress + ':' + port].IPC = clientIPC;
+            collectors[serverAddress + ':' + port].clientIPC = clientIPC;
             callback(err, clientIPC, serverAddress + ':' + port);
         }
     });

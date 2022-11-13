@@ -6,10 +6,14 @@
 const Conf = require('../lib/conf');
 const confSqlite = new Conf('config/sqlite.json');
 
-if(confSqlite.get('directAccessToDBFile') || confSqlite.get('disableServer')) {
+var cfg = confSqlite.get(); // configuration for each module
+
+if(cfg.directAccessToDBFile || cfg.disableServer) {
     module.exports = require('./dbWrapper');
     //log.info('Used direct reading and writing to DB file from ', path.basename(module.parent.filename));
 } else {
     //log.info('Used dbServer for reading and writing to DB from ', path.basename(module.parent.filename));
-    module.exports = require('../serverDB/dbClient');
+    const DB = require('../serverDB/dbClient');
+    cfg.id = 'dbClient';
+    module.exports = new DB(cfg);
 }

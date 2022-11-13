@@ -67,7 +67,7 @@ tasks.startCheckConditions(function (err) {
     });
 
     log.info('Task Server is running. Connecting to action server');
-    actionClient.connect(function () {
+    actionClient.connect('actions:taskServer', function () {
 
         tasksDB.getApprovedTasks(function (err, rows) {
             if (err) return log.error('Can\'t get approved tasks from DB: ' + err.message);

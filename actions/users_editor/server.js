@@ -4,7 +4,7 @@
 var async = require('async');
 var log = require('../../lib/log')(module);
 var checkIDs = require('../../lib/utils/checkIDs');
-var usersDBSave = require('../../models_db/modifiers/modifierWapper').usersDB;
+var usersDBSave = require('../../models_db/modifiers/usersDB');
 var communication = require('../../lib/communication');
 var encrypt = require('../../lib/encrypt');
 var transactionDB = require('../../models_db/modifiers/transaction');
@@ -57,7 +57,8 @@ function addOrUpdateUser(args, callback) {
             usersDBSave.addUser({
                 name: args.userName,
                 fullName: args.fullUserName,
-                password: encrypt(args.userPassword1)
+                password: encrypt(args.userPassword1),
+                sessionID: args.sessionID,
             }, function (err, newUserID) {
                 if (err) return callback(new Error('Can\'t add new user ' + args.userName + ': ' + err.message));
 

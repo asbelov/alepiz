@@ -17,33 +17,21 @@ module.exports = eventGenerator;
 
 const systemUser = conf.get('systemUser') || 'system';
 var isEventProcessedOrNotInitialized = Date.now();
-var db, dbPath, eventsCache = new Map(), repeatEventsCache = new Map(), disabledEventsCache = new Map(),
-    collectorHighPriorityActionsQueue = new Set(), collectorActionsQueue = new Set(),
-    eventNum = 0, prevEventNum = 0, prevErrorTime = 0, processedEventParam = 'You can not view this message';
-/*
-    get data and return it to server
-
-    param - object with collector parameters {
-        <parameter1>: <value>,
-        <parameter2>: <value>,
-        ....
-        $id: <objectCounterID>,
-        $variables: {
-            <variable1>: <variableValue1>,
-            <variable2>: <variableValue2>,
-            ...
-        }
-    }
-
-    where $variables - variables for collector from counter settings
-
-    callback(err, result)
-    result - object {timestamp: <timestamp>, value: <value>} or simple value
-*/
+var db,
+    dbPath,
+    eventsCache = new Map(),
+    repeatEventsCache = new Map(),
+    disabledEventsCache = new Map(),
+    collectorHighPriorityActionsQueue = new Set(),
+    collectorActionsQueue = new Set(),
+    eventNum = 0,
+    prevEventNum = 0,
+    prevErrorTime = 0,
+    processedEventParam = 'You can not view this message';
 
 eventGenerator.init = function (_dbPath, callback) {
     dbPath = _dbPath;
-    var cache = initDB.init(dbPath);
+    var cache = initDB.initDB(dbPath);
 
     db = cache.db;
     eventsCache = cache.eventsCache;
@@ -102,12 +90,8 @@ function processQueue() {
 function eventGeneratorGet(param, callback) {
 
     if(param.action) {
-        try {
-            if(param.action === 'eventEditor') eventActions.eventEditor(db, param);
-            else eventActions.dashboard(db, param);
-        } catch (err) {
-            return callback(err);
-        }
+        if(param.action === 'eventEditor') eventActions.eventEditor(db, param);
+        else eventActions.dashboard(db, param);
         return callback();
     }
 
@@ -126,11 +110,7 @@ function eventGeneratorGet(param, callback) {
         // !!!don't touch this horror
         if(disabledEventsCache.has(OCID)) {
             if(disabledEventsCache.get(OCID).disableUntil < Date.now()) {
-                try {
-                    enableEvents(db, {events: [{OCID: OCID}]});
-                } catch (err) {
-                    log.error(err.message, ' for ', dbPath);
-                }
+                enableEvents(db, {events: [{OCID: OCID}]});
             }
             else {
                 if(isEventDisabled(disabledEventsCache.get(OCID).intervals)) {
@@ -152,13 +132,9 @@ function eventGeneratorGet(param, callback) {
                 ', OCID: ', OCID, ' for ', dbPath);
         }
 
-        try {
-            var newEventID = onEvent(db, OCID, param.$objectID, param.$counterID, param.$variables.OBJECT_NAME,
-                param.$variables.COUNTER_NAME, param.$parentID, param.importance, param.eventDescription,
-                eventTimestamp, param.$dataTimestamp, param.pronunciation);
-        } catch (err) {
-            return callback(err);
-        }
+        var newEventID = onEvent(db, OCID, param.$objectID, param.$counterID, param.$variables.OBJECT_NAME,
+            param.$variables.COUNTER_NAME, param.$parentID, param.importance, param.eventDescription,
+            eventTimestamp, param.$dataTimestamp, param.pronunciation);
 
         var runTaskOnProblem = confSettings.get('runTaskOnProblem');
         if(Number(param.problemTaskID) && runTaskOnProblem) {
@@ -208,18 +184,10 @@ function solveEvent(param, eventTimestamp) {
             ', OCID: ', OCID, ' for ', dbPath);
     } else var dontRunTask = true;
 
-    try {
-        onSolvedEvent(db, OCID, eventTimestamp);
-    } catch (err) {
-        return err
-    }
+    onSolvedEvent(db, OCID, eventTimestamp);
 
     if(disabledEventsCache.has(OCID) && disabledEventsCache.get(OCID).disableUntil < Date.now()) {
-        try {
-            enableEvents(db, {events: [{OCID: OCID}]});
-        } catch (err) {
-            log.error(err.message, ' for ', dbPath);
-        }
+        enableEvents(db, {events: [{OCID: OCID}]});
     }
 
     var runTaskOnSolve = confSettings.get('runTaskOnSolve');
@@ -246,11 +214,7 @@ eventGenerator.removeCounters = function(OCIDs, callback) {
         if(!eventsCache.has(Number(OCID))) return;
 
         log.info('Remove OCID: ', OCID, ' from event-generator collector for ', dbPath);
-        try {
-            onSolvedEvent(db, OCID, Date.now());
-        } catch (err) {
-            log.error(err.message, ' for ', dbPath);
-        }
+        onSolvedEvent(db, OCID, Date.now());
     });
     if(typeof callback == 'function') callback();
 };
@@ -355,8 +319,8 @@ function enableEvents(db, enable) {
         try {
             db.prepare('DELETE FROM disabledEvents WHERE OCID=?').run(OCID);
         } catch (err) {
-            throw(new Error('Can\'t enable event for OCID ' + OCID + ': ' +
-                JSON.stringify(disabledEventsCache.get(OCID)) + ': ' + err.message));
+            return log.warn('Can\'t enable event for OCID ' + OCID + ': ',
+                disabledEventsCache.get(OCID), ': ' + err.message);
         }
     });
 }
@@ -397,8 +361,8 @@ function onEvent(db, OCID, objectID, counterID, objectName, counterName, parentO
             'VALUES ($OCID, $objectID, $counterID, $objectName, $counterName, $parentOCID, ' +
             '$importance, $startTime, $endTime, $data, $data, $timestamp, $pronunciation)').run(queryParameters);
     } catch (err) {
-        throw(new Error('Can\'t add event with OCID: ' + OCID + ' into events table event database: ' +
-            err.message + ' data: ' + JSON.stringify(queryParameters)));
+        return log.warn('Can\'t add event with OCID: ' + OCID + ' into events table event database: ' +
+            err.message + ' data: ', queryParameter);
     }
     // do not save eventID to the eventsCache when event generated by eventsEditor (dataTimestamp = 0)
     if(dataTimestamp) eventsCache.set(OCID, Number(info.lastInsertRowid));
@@ -423,8 +387,8 @@ function onSolvedEvent(db, OCID, timestamp) {
             eventID: eventID,
         });
     } catch(err) {
-        throw(new Error('Can\'t add event end time (' + timestamp + ') with eventID ' + eventID +
-            ', OCID: ' + OCID + ' into events table event database: ' + err.message));
+        return log.warn('Can\'t add event end time (' + timestamp + ') with eventID ' + eventID +
+            ', OCID: ' + OCID + ' into events table event database: ' + err.message);
     }
 }
 

@@ -5,13 +5,14 @@
 /**
  * Created by Alexander Belov on 30.08.2015.
  */
-var log = require('../../lib/log')(module);
-var db = require('../db');
+const log = require('../../lib/log')(module);
+const db = require('../db');
+const unique = require('../../lib/utils/unique');
 
 var unitsDB = {};
 module.exports = unitsDB;
 
-unitsDB.new = function(unit, abbreviation, prefixes, multiplies, onlyPrefixes, callback) {
+unitsDB.new = function(unit, abbreviation, prefixes, multiplies, onlyPrefixes, sessionID, callback) {
     log.debug('New unit parameters: ', unit, abbreviation, prefixes, multiplies, onlyPrefixes);
 
     if(!unit) {
@@ -43,9 +44,12 @@ unitsDB.new = function(unit, abbreviation, prefixes, multiplies, onlyPrefixes, c
     if(Number(onlyPrefixes) !== 0) onlyPrefixes = 1;
     else onlyPrefixes = 0;
 
+    const id = unique.createHash(unit + abbreviation + prefixes + multiplies + onlyPrefixes + sessionID);
+
     db.run(
-        'INSERT INTO countersUnits (name, abbreviation, prefixes, multiplies, onlyPrefixes) VALUES ' +
-        '($name, $abbreviation, $prefixes, $multiplies, $onlyPrefixes)', {
+        'INSERT INTO countersUnits (id, name, abbreviation, prefixes, multiplies, onlyPrefixes) VALUES ' +
+        '($id, $name, $abbreviation, $prefixes, $multiplies, $onlyPrefixes)', {
+            $id: id,
             $name: unit,
             $abbreviation: abbreviation,
             $prefixes: prefixes,

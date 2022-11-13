@@ -14,6 +14,6 @@
     "dbPath": "db",
     "dbFile": "events.db",
     "saveRepeatEventsCacheInterval": 15,
-    "runTaskOnProblem": true,
-    "runTaskOnSolve": true
+    "runTaskOnProblem": false,
+    "runTaskOnSolve": false
 }

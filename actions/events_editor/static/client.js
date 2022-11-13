@@ -647,7 +647,7 @@ var JQueryNamespace = (function ($) {
             var color = importanceList[event.importance].color;
             return '<a href="#!" class="collection-item black-text truncate tooltipped" style="background-color: ' +
                 color + ';" id="' + event.counterID + '" data-events-list="' + color +
-                '" data-tooltip="#' + event.counterID + ' ' + escapeHtml(event.description) + '">' +
+                '" data-tooltip="#' + String(event.counterID).slice(-5) + ' ' + escapeHtml(event.description) + '">' +
                 escapeHtml(event.name.replace(/^[A-Z]: /, '')) + '</a>';
         }).join('');
 
@@ -835,7 +835,8 @@ var JQueryNamespace = (function ($) {
             rows.forEach(function (row) {
                 if(row.debug) {
                     countersWithDebug.push('<a style="color:yellow" href="/?a=%2Factions%2Fcounter_settings&cid=' +
-                        row.id + '" target="_blank">' + (num++) + '. #' + row.id + ' ' + escapeHtml(row.name) + '</a><br>');
+                        row.id + '" target="_blank">' + (num++) + '. #' + String(row.id).slice(-5) + ' ' +
+                        escapeHtml(row.name) + '</a><br>');
                 }
             });
 
@@ -846,8 +847,12 @@ var JQueryNamespace = (function ($) {
             showCountersWithDebugElm.unbind('click').click(function (e) {
                 e.preventDefault();
                 if(!countersWithDebug.length) M.toast({html: 'No counters with debug mode enabled', displayLength: 1000});
-                else M.toast({html: '<span><span>Counters list with debug mode enabled:</span><br>' + countersWithDebug.join('') +
-                        '</span><button class="btn-flat toast-action" onClick="M.Toast.dismissAll();">X</button>', displayLength: 10000}    );
+                else {
+                    M.toast({html: '<span><span>Counters list with debug mode enabled:</span><br>' +
+                            countersWithDebug.join('') +
+                            '</span><button class="btn-flat toast-action" onClick="M.Toast.dismissAll();">X</button>',
+                        displayLength: 10000}    );
+                }
             });
         });
     }

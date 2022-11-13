@@ -3,7 +3,7 @@
  */
 
 var log = require('../lib/log')(module);
-var counterSaveDB = require('../models_db/modifiers/modifierWapper').countersDB;
+var counterSaveDB = require('../models_db/modifiers/countersDB');
 var countersDB = require('../models_db/countersDB');
 var rightsDB = require('../models_db/usersRolesRightsDB');
 var prepareUser = require('../lib/utils/prepareUser');
@@ -55,6 +55,8 @@ rightsWrapper.deleteCounter = function(user, counterID, counterName, callback) {
                 });
 
                 // on delete counter
+                log.info('Sending message to the server and history for remove counter ',
+                    counterName, '(', counterID, '); OCIDs: ', objectsCountersIDs);
                 server.sendMsg({
                     removeCounters: objectsCountersIDs,
                     description: 'Counter' + counterName + '(' + counterID + ') was removed by user ' + user
@@ -161,6 +163,7 @@ rightsWrapper.saveCounter = function(user, counterData, callback) {
     var counterParameters = counterData.counterParameters;
     var updateEvents = counterData.updateEvents;
     var variables = counterData.variables;
+    var sessionID = counterData.sessionID;
 
     checkIDs(initObjectsIDs, function(err, checkedIDs) {
         if (err && (!Array.isArray(checkedIDs) || !checkedIDs.length)) {
@@ -232,13 +235,13 @@ rightsWrapper.saveCounter = function(user, counterData, callback) {
                 if(err) return callback(err);
 
                 // callback(err, counterID)
-                saveCounter(objectsIDs, counter, counterParameters, updateEvents, variables, callback);
+                saveCounter(objectsIDs, counter, counterParameters, updateEvents, variables, sessionID, callback);
             });
         });
     });
 };
 
-function saveCounter(objectsIDs, counter, counterParameters, updateEvents, variables, callback) {
+function saveCounter(objectsIDs, counter, counterParameters, updateEvents, variables, sessionID, callback) {
 
     collectors.checkParameters(counter.collectorID, counterParameters, variables,
         function(err, preparedCounterParameters){
@@ -257,6 +260,8 @@ function saveCounter(objectsIDs, counter, counterParameters, updateEvents, varia
                         if(err) return callback(err);
 
                         // on update counters and counter not disabled
+                        log.info('Sending message to the server and history for update counter ',
+                            counter.name, '(', counter.counterID, ')');
                         if(!counter.disabled) {
                             server.sendMsg({
                                 update: {
@@ -274,11 +279,12 @@ function saveCounter(objectsIDs, counter, counterParameters, updateEvents, varia
                                 if(err) return callback(new Error('Can\'t get objects counters IDs for counter ' +
                                     counter.name + ' for stop collect data for disabled counter: ' + err.message));
 
+                                var OCIDs = rows.map(row => row.id);
                                 // when disable counter (and possible on update parameters)
+                                log.info('Sending message to the server and history for remove disabled counter ',
+                                    counter.name, '(', counter.counterID, '); OCIDs: ', OCIDs);
                                 if(rows.length) server.sendMsg({
-                                    removeCounters: rows.map(function (row) {
-                                        return row.id;
-                                    }),
+                                    removeCounters: OCIDs,
                                     description: 'Counter ' + counter.name + ' was updated in database'
                                 });
                                 callback(err, counter.counterID);
@@ -287,7 +293,7 @@ function saveCounter(objectsIDs, counter, counterParameters, updateEvents, varia
                     });
                 });
             } else {
-                insertCounter(objectsIDs, counter, counterParameters, updateEvents, variables,
+                insertCounter(objectsIDs, counter, counterParameters, updateEvents, variables, sessionID,
                     function(err, counterID) {
                     if(err) return transaction.rollback(err, callback);
 
@@ -295,6 +301,8 @@ function saveCounter(objectsIDs, counter, counterParameters, updateEvents, varia
                         if(err) return callback(err);
 
                         // on create a new not disabled counter
+                        log.info('Sending message to the server and history for add new counter ',
+                            counter.name, '(', counter.counterID, ')');
                         if(!counter.disabled) server.sendMsg({
                             update: {
                                 topObjects: true,
@@ -354,8 +362,8 @@ function updateCounter(objectsIDs, counter, counterParameters, updateEvents, var
     })
 }
 
-function insertCounter(objectsIDs, counter, counterParameters, updateEvents, variables, callback) {
-    counterSaveDB.insertCounter(counter, function(err, counterID) {
+function insertCounter(objectsIDs, counter, counterParameters, updateEvents, variables, sessionID, callback) {
+    counterSaveDB.insertCounter(counter, sessionID, function(err, counterID) {
         if(err) return callback(new Error('Error inserting counter into counters table: ' + err.message +
         ': ' + JSON.stringify(counter)));
 
@@ -551,6 +559,8 @@ function updateObjectsCountersRelations(counterID, objectsIDs, counterName, call
 
                     if(objectsCountersIDsForDeleting.length) {
                         // on delete some objectsCountersIDs
+                        log.info('Sending message to the server and history for remove object links for the counter ',
+                            counterName, '(', counterID, '); OCIDs: ', objectsCountersIDsForDeleting);
                         server.sendMsg({
                             removeCounters: objectsCountersIDsForDeleting,
                             description: 'This objects to counter ' + counterName +

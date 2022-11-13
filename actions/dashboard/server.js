@@ -2,31 +2,38 @@
  * Copyright © 2019. Alexander Belov. Contacts: <asbel@alepiz.com>
  * Created on 2019-6-10 16:59:55
 */
-var log = require('../../lib/log')(module);
-var activeCollector = require('../../server/activeCollector'); // for insert
-var communication = require('../../lib/communication');
-var prepareUser = require('../../lib/utils/prepareUser');
-var usersDB = require('../../models_db/usersDB');
+const log = require('../../lib/log')(module);
+const activeCollector = require('../../server/activeCollector'); // for insert
+const communication = require('../../lib/communication');
+const prepareUser = require('../../lib/utils/prepareUser');
+const usersDB = require('../../models_db/usersDB');
+const Conf = require('../../lib/conf');
+const confActions = new Conf('config/actions.json');
+const confMyNode = new Conf('config/node.json');
 
-
-var collectorName = 'event-generator';
+const collectorName = 'event-generator';
 
 module.exports = function(args, callback) {
     log.debug('Starting action server "', args.actionName, '" with parameters', args);
 
     var action = args.action;
     if(!action) return callback(new Error('Action not specified'));
-    if(['enableEvents', 'addAsHint', 'addAsHintForObject', 'addAsComment', 'solveProblem', 'disableEvents', 'removeTimeIntervals'].indexOf(action) === -1)
+    if(['enableEvents', 'addAsHint', 'addAsHintForObject', 'addAsComment', 'solveProblem', 'disableEvents',
+        'removeTimeIntervals'].indexOf(action) === -1) {
         callback(new Error('Unknown action: ' + JSON.stringify(args)));
+    }
 
-    var eventsIDs = getSelectedEventsIDs(args);
-    if(!eventsIDs.length) return callback(new Error('No events are selected for action ' + action));
+    var eventIDs = getSelectedEventsIDs(args);
+    if(!eventIDs.length) return callback();
 
     var cfg = args.actionCfg;
     if(!cfg || !cfg.restrictions) return callback(new Error('Can\'t find "restrictions" in action configuration'));
     var user = prepareUser(args.username);
     usersDB.getUsersInformation(user, function(err, rows) {
-        if (err) return callback(new Error('Can\'t get user information for ' + args.username + '(' + user + '): ' + err.message));
+        if (err) {
+            return callback(new Error('Can\'t get user information for ' + args.username + '(' + user + '): ' +
+                err.message));
+        }
         if (rows.length < 1) {
             return callback(new Error('Error while getting user information for ' + args.username + '(' + user +
                 '): received data for ' + rows.length + ' users'));
@@ -60,8 +67,8 @@ module.exports = function(args, callback) {
 
             log.info('Connect to collector "', collectorName, '" is completed');
 
-            collector.getOnce({
-                eventsIDs: eventsIDs,
+            collector.send({
+                eventsIDs: eventIDs,
                 action: action,
                 user: args.username,
                 subject: args.subject || null,
@@ -69,9 +76,12 @@ module.exports = function(args, callback) {
                 comment: args.message || null,
                 disableUntil: args.disableUntil || null,
                 intervals: args.disableTimeInterval || null,
-                timeIntervalsForRemove: args.timeIntervalsForRemove || null, // for remove time intervals '<from>-<to>,<from>-<to>,...'
+                // for remove time intervals '<from>-<to>,<from>-<to>,...'
+                timeIntervalsForRemove: args.timeIntervalsForRemove || null,
             }, function (err) {
                 if (err) return callback(err);
+
+                if(cfg.dontSendMessage || confMyNode.get('dontSendMessageFromDashboard')) return callback();
 
                 if (action === 'enableEvents' && (!args.recipients || !args.comment)) {
                     log.info('No recipients or no comment for enabled event. Email will not be sent');
@@ -102,22 +112,36 @@ module.exports = function(args, callback) {
 };
 
 function getSelectedEventsIDs(args) {
+    const hostPort = (args.hostPort ?
+            args.hostPort :
+            confActions.get('serverAddress') + ':' + confActions.get('serverPort'))
+        + ':';
 
-    var eventsIDs = {}, action = args.action;
-    Object.keys(args).forEach(function (key) {
-        if(key.indexOf('selectDisabledEvent_') === 0 && args[key])
-            return eventsIDs[key.replace('selectDisabledEvent_', '')] = true;
+    var eventIDs = new Set(),
+        notEnableEventAction = args.action !== 'enableEvents';
+    for(var key in args) {
 
-        if(action !== 'enableEvents') {
-            if(key.indexOf('selectCurrentEvent_') === 0 && args[key]) return eventsIDs[key.replace('selectCurrentEvent_', '')] = true;
-            if(key.indexOf('selectHistoryEvent_') === 0 && args[key]) return eventsIDs[key.replace('selectHistoryEvent_', '')] = true;
-            if(key.indexOf('selectHistoryCommentedEvent_') === 0 && args[key]) return eventsIDs[key.replace('selectHistoryCommentedEvent_', '')] = true;
+        // example of selected event: 'selectCurrentEvent_127.0.0.1:10164:51095': 'on'
+        // event not selected
+        if(!args[key]) continue;
+
+        if(key.indexOf('selectDisabledEvent_' + hostPort) === 0) {
+            eventIDs.add(
+                parseInt(key.replace('selectDisabledEvent_' + hostPort, '')));
+        } else if(notEnableEventAction) {
+            if(key.indexOf('selectCurrentEvent_' + hostPort) === 0) {
+                eventIDs.add(
+                    parseInt(key.replace('selectCurrentEvent_' + hostPort, '')));
+            } else if(key.indexOf('selectHistoryEvent_' + hostPort) === 0) {
+                eventIDs.add(
+                    parseInt(key.replace('selectHistoryEvent_' + hostPort, '')));
+            } else if(key.indexOf('selectHistoryCommentedEvent_' + hostPort) === 0) {
+                eventIDs.add(
+                    parseInt(key.replace('selectHistoryCommentedEvent_' + hostPort, '')));
+            }
         }
-    });
+    }
 
-    return Object.keys(eventsIDs).filter(function (id) {
-        return Number(id) === parseInt(id, 10) && Number(id);
-    }).map(function (id) {
-        return Number(id);
-    });
+    log.info('Number of events selected for the ', hostPort, ' ', eventIDs.size);
+    return Array.from(eventIDs);
 }

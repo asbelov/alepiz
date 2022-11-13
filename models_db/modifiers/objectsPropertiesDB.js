@@ -3,9 +3,10 @@
  */
 
 
-var async = require('async');
-var log = require('../../lib/log')(module);
-var db = require('../db');
+const async = require('async');
+const log = require('../../lib/log')(module);
+const db = require('../db');
+const unique = require('../../lib/utils/unique');
 
 var objectsPropertiesDB = {};
 module.exports = objectsPropertiesDB;
@@ -43,16 +44,25 @@ objectsPropertiesDB.updateProperties = function(objectID, properties, callback) 
     });
 };
 
+/**
+ * Insert new properties for specific objectID
+ * @param {Number} objectID - object ID
+ * @param {Array} properties - array of objects with properties: [{name:, value:, mode:, description:. }, ...]
+ * @param {function(Error|undefined)} callback - callback(err)
+ */
 objectsPropertiesDB.insertProperties = function(objectID, properties, callback) {
     log.debug('Inserting properties for objectsIDs: ', objectID, ' properties: ', properties);
 
-    var stmt = db.prepare('INSERT INTO objectsProperties (objectID, name, value, mode, description) ' +
-        'VALUES ($objectID, $name, $value, $mode, $description)', function(err) {
+    var stmt = db.prepare('INSERT INTO objectsProperties (id, objectID, name, value, mode, description) ' +
+        'VALUES ($id, $objectID, $name, $value, $mode, $description)', function(err) {
         if (err) return callback(err);
 
         // eachSeries used for possible transaction rollback if error occurred
         async.eachSeries(properties, function(property, callback) {
+            const id = unique.createHash(objectID.toString(36) + property.name + String(property.value) +
+                property.mode + property.description);
             stmt.run( {
+                $id: id,
                 $objectID: objectID,
                 $name: property.name,
                 $value: String(property.value), // for convert integer to TEXT correctly

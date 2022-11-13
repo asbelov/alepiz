@@ -207,7 +207,7 @@ WHERE objectsCounters.id = ?', function (err) {
 
 /**
  * Get Alepiz IDs and Alepiz names using SELECT * FROM alepizIDs
- * @param {function} callback - callback(err, rows), where rows: [{id, name}, ....]
+ * @param {function(Error)|function(null, Array)} callback - callback(err, rows), where rows: [{id, name}, ....]
  */
 objectsDB.getAlepizIDs = function (callback) {
     db.all('SELECT * FROM alepizIDs', callback);
@@ -242,10 +242,9 @@ objectsDB.getObjectsAlepizRelationByObjectIDs = function (objectIDs, callback) {
 /**
  * Get all object relationships to Alepiz instances
  * @param {function(Error)|function(null, Array)} callback - callback(err, rows), where rows is array like
- *  [{objectID:, alepizName:}, ....]
+ *  [{objectID:, alepizID:}, ....]
  */
 objectsDB.getObjectsAlepizRelation = function (callback) {
-    db.all('SELECT objectsAlepizRelation.objectID AS objectID, alepizIDs.name AS alepizName \
-        FROM objectsAlepizRelation \
-        JOIN alepizIDs ON objectsAlepizRelation.alepizID = alepizIDs.id', callback);
+    db.all('SELECT objectsAlepizRelation.objectID AS objectID, objectsAlepizRelation.alepizID AS alepizID \
+        FROM objectsAlepizRelation', callback);
 }

@@ -6,43 +6,44 @@
 var alepizProcessActionNamespace = (function($) {
 
     var bodyElm,
-        runActionBtnElm,
+        runActionFloatingBtn,
+        runActionBtn,
         makeTaskBtnElm,
-        makeTaskBtnAddElm,
+        makeTaskFloatingBtnElm,
         iframeDOMElm;
 
     function init() {
         bodyElm = $("body");
-        runActionBtnElm = $('#runActionBtn');
+        runActionFloatingBtn = $('#runActionFloatingBtn');
+        runActionBtn = $('#runActionBtn');
         makeTaskBtnElm = $('#makeTaskBtn');
-        makeTaskBtnAddElm = $('#makeTaskBtnAdd');
+        makeTaskFloatingBtnElm = $('#makeTaskFloatingBtn');
         iframeDOMElm = document.getElementById('actionObject');
 
         // Floating Action Button (FAB) control make possible open and close FAB menu on mouse over and on click
-        M.FloatingActionButton.init(runActionBtnElm[0], {
+        M.FloatingActionButton.init(runActionFloatingBtn[0], {
             hoverEnabled: true,
         });
 
-        runActionBtnElm.click(processIframeInputsData);
+        runActionBtn.click(processIframeInputsData);
         makeTaskBtnElm.click(processIframeInputsData);
-        makeTaskBtnAddElm.click(processIframeInputsData);
-
+        makeTaskFloatingBtnElm.click(processIframeInputsData);
     }
 
     function initActionBtn() {
         var activeAction = alepizActionsNamespace.getActiveActionsConf();
 
-        runActionBtnElm.addClass('hide');
+        runActionFloatingBtn.addClass('hide');
         makeTaskBtnElm.addClass('hide');
-        makeTaskBtnAddElm.addClass('hide');
+        makeTaskFloatingBtnElm.addClass('hide');
 
         // show "run action" button
-        if(activeAction.launcher && activeAction.rights.run) runActionBtnElm.removeClass('hide');
+        if(activeAction.launcher && activeAction.rights.run) runActionFloatingBtn.removeClass('hide');
 
         // show one of "make task" buttons
         if(activeAction.launcher && activeAction.rights.makeTask) {
             if(activeAction.launcher && activeAction.rights.run) makeTaskBtnElm.removeClass('hide');
-            else makeTaskBtnAddElm.removeClass('hide');
+            else makeTaskFloatingBtnElm.removeClass('hide');
         }
     }
 
@@ -58,9 +59,8 @@ var alepizProcessActionNamespace = (function($) {
     function processIframeInputsData(dontOpenLogWindows){
         var activeAction = alepizActionsNamespace.getActiveActionsConf();
 
-        // if button id attr is makeTaskBtn, then run action for makeTask, else execute action
-        if(this.id === 'makeTaskBtn' || this.id === 'makeTaskBtnAdd') var executionMode = 'makeTask';
-        else executionMode = 'server';
+        // if button id attr is makeTask*Btn, then run action for makeTask, else execute action
+        var executionMode = this.id === 'makeTaskBtn' || this.id === 'makeTaskFloatingBtn' ? 'makeTask' : 'server';
 
         // else run action
         var callbackBeforeExec = activeAction.callbackBeforeExec;

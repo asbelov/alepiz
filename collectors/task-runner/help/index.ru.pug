@@ -36,9 +36,40 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                     p.
                         Сборщик возвращает объект, преобразованный в строку и содержащий результаты выполнения каждого
                         действия в задаче в формате
-                        {&lt;taskActionID1&gt;:&lt;value1&gt;, &lt;taskActionID2&gt;:&lt;value2&gt;, ...}, где в
-                        качестве параметра taskActionID выступает идентификатор действия из таблицы БД db.db
-                        tasksActions, а в качестве значения value - значение, возвращаемое действием.
-                        Например, {"158":"204591","159":"204591"}. В случае работы нескольких связанных экземпляров
-                        ALEPIZ аозвращается массив объектов, где каждый элемент - объект, возвращаемый одним из
-                        экземпляров ALEPIZ.
+                    pre.
+                        {
+                            "&lt;serverAddress1&gt;:&lt;serverPort1&gt;": {
+                                "&lt;actionID1&gt;:&lt;taskActionID1&gt;":&lt;value1&gt;,
+                                "&lt;actionID2&gt;:&lt;taskActionID2&gt;":&lt;value2&gt;, ...
+                            },
+                            "&lt;serverAddress2&gt;:&lt;serverPort2&gt;": {
+                                "&lt;actionID1&gt;:&lt;taskActionID1&gt;":&lt;value1&gt;,
+                                "&lt;actionID2&gt;:&lt;taskActionID2&gt;":&lt;value2&gt;, ...
+                            },....
+                        }
+                    p где:
+                    ul.browser-default
+                        li.
+                            &lt;serverAddress1&gt;:&lt;serverPort1&gt; - serverAddress и serverPort сервера,
+                            от которого пришли данные
+                        ul.browser-default
+                            li.
+                                actionID - идентификатор действия (название каталога действия)
+                            li.
+                                taskActionID - идентификатор действия из таблицы БД db.db
+                            li.
+                                tasksActions, а в качестве значения value - значение, возвращаемое действием.
+                    p Например:
+                    pre.
+                        {
+                            "192.168.1.1:10166": {
+                                "objects_creator:158":"204591",
+                                "objects_properties:159":"59968",
+                                "objects_properties:160":"59969"
+                            },{
+                            "192.168.100.1:10166": {
+                                "objects_creator:158":"304591",
+                                "objects_properties:159":"69968",
+                                "objects_properties:160":"69969"
+                            }
+                        }

@@ -242,19 +242,20 @@ var JQueryNamespace = (function ($) {
                         encodeURIComponent(externalObjectNames.map(o => o.name).join(',')) +
                         '" target="_blank">"' + escapeHtml(externalObjectNames.map(o => o.name).join(', ')) +
                     '"</a></b></li>') : '') +
-                    externalObjectNames.map(o => {
+                    externalObjectNames.map(obj => {
                         return '<li>object:&nbsp;&nbsp; <b>' + '<a href="/?a=%2Factions%2Fimport_export&c=' +
-                            encodeURIComponent(o.name) +
-                            '" target="_blank">"' + escapeHtml(o.name) + '"</a> (#' + o.id +
-                            ')</b> for ' + o.where + '</li>';
+                            encodeURIComponent(obj.name) +
+                            '" target="_blank">"' + escapeHtml(obj.name) + '"</a> (#' + String(obj.id).slice(-5) +
+                            ')</b> for ' + obj.where + '</li>';
                     }).join('') +
-                    externalCounterNames.map(o => {
+                    externalCounterNames.map(counter => {
                         return '<li>counter: <b>' +
-                            (o.id ?
-                                '<a href="/?a=%2Factions%2Fcounter_settings&cid=' + o.id +
-                                '" target="_blank">"' + escapeHtml(o.name) + '"</a> (#' + o.id + ')' :
+                            (counter.id ?
+                                '<a href="/?a=%2Factions%2Fcounter_settings&cid=' + counter.id +
+                                '" target="_blank">"' + escapeHtml(counter.name) +
+                                '"</a> (#' + String(counter.id).slice(-5) + ')' :
                                 '<span class="red-text">Not selected</span>') +
-                            '</b> for ' + o.where + '</li>';
+                            '</b> for ' + counter.where + '</li>';
                     }).join('')
                 )
                 var modalExportExternalEntitiesInfoInstance =

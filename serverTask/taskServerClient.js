@@ -6,71 +6,60 @@
 const log = require('../lib/log')(module);
 const async = require('async');
 const IPC = require("../lib/IPC");
-const tasks = require('../lib/tasks');
 const Conf = require('../lib/conf');
+const connectToRemoteNodes = require("../lib/connectToRemoteNodes");
+const path = require("path");
 const confTaskServer = new Conf('config/taskServer.json');
+
 
 
 var taskServer = {};
 module.exports = taskServer;
 
 var clientIPC;
-var allClientIPCArray = [],
-    isInitConnections = false,
-    reconnectInProgress = false;
-
-taskServer.connect = function (callback) {
-    if(isInitConnections) return callback();
+var allClientIPC = new Map(),
+    connectionInitialized = false;
+/**
+ * Connect to the task server and to the remote Alepiz task server instances
+ * @param {string|null} id the name of the connected services to identify in the log file
+ * @param {function(Error)|function()} callback callback(err)
+ */
+taskServer.connect = function (id, callback) {
+    if(connectionInitialized) return callback();
 
     var cfg = confTaskServer.get();
     if(!cfg) return callback(new Error('Task server is not configured'));
 
-    cfg.id = 'taskClient';
+    cfg.id = id || 'tasks:' + path.basename(module.parent.filename, '.js');
     new IPC.client(cfg, function (err, msg, _clientIPC) {
         if (err) log.warn('IPC client error: ', err.message);
         else if (_clientIPC) {
             clientIPC = _clientIPC;
+            log.info('Initialized connection to the tasks server: ', cfg.serverAddress, ':', cfg.serverPort);
 
-            if(!reconnectInProgress) log.info('Connected to task server');
-            else return log.info('Reconnected to task server');
-
-            var remoteServers = Array.isArray(cfg.remoteServers) ? cfg.remoteServers : [],
-                remoteClientIPC = new Map();
-            async.each(remoteServers, function (remoteServerCfg, callback) {
-                remoteServerCfg.id = 'taskClientRmt:' + remoteServerCfg.serverAddress + ':' + remoteServerCfg.serverPort;
-                if (remoteServerCfg.reconnectDelay === undefined) remoteServerCfg.reconnectDelay = 60000;
-                if (remoteServerCfg.connectionTimeout === undefined) remoteServerCfg.connectionTimeout = 2000;
-
-                log.info('Connecting to remote task server ',
-                    remoteServerCfg.serverAddress, ':', remoteServerCfg.serverPort, '...');
-                new IPC.client(remoteServerCfg, function (err, msg, clientIPC) {
-                    if (err) {
-                        // write error only first time
-                        if (!remoteClientIPC.has(remoteServerCfg)) log.warn(remoteServerCfg.id, ': ', err.message);
-                    } else if (clientIPC) {
-                        log.info('Connected to remote task Server ',
-                            remoteServerCfg.serverAddress, ':', remoteServerCfg.serverPort);
-                    }
-                    // After the connection timeout expires, clientIPC will be returned and messages will be
-                    // saved for sending to the remote server in the future.
-                    if (clientIPC) remoteClientIPC.set(remoteServerCfg, clientIPC);
-                    if (typeof callback === 'function') callback();
-                    callback = null; // prevent running callback on reconnect
-                });
-            }, function () {
-                isInitConnections = true;
-                if(remoteClientIPC.size) {
-                    allClientIPCArray = Array.from(remoteClientIPC.values());
-                    allClientIPCArray.unshift(clientIPC);
+            connectToRemoteNodes('tasks', cfg.id,function (err, _allClientIPC) {
+                if(!_allClientIPC) {
+                    log.warn('No remote nodes specified for tasks');
+                    _allClientIPC = new Map();
                 }
-                if (!reconnectInProgress) callback();
-                reconnectInProgress = true;
+                _allClientIPC.set(cfg.serverAddress + ':' + cfg.serverPort, clientIPC);
+                allClientIPC = _allClientIPC;
+                connectionInitialized = true;
+                callback();
             });
+
         }
     });
 };
 
-// call from lib/server.js
+/**
+ * When calculating the result from the counter, check it for the fulfillment of the condition for run the task.
+ * Call from server/child/getCountersValue.js:processCounterResult()
+ * @param {number} OCID OCID
+ * @param {null|number|string|boolean|undefined} result counter calculation result
+ * @param {string} objectName object name for log
+ * @param {string} counterName counter name for log
+ */
 taskServer.checkCondition = function(OCID, result, objectName, counterName) {
     clientIPC.send({
         OCID: OCID, // single object counters ID
@@ -80,7 +69,10 @@ taskServer.checkCondition = function(OCID, result, objectName, counterName) {
     });
 }
 
-// call from actions/task_maker/server.js
+/**
+ * Cancel the task from the Task maker action
+ * @param {number} taskID task ID
+ */
 taskServer.cancelTask = function(taskID) {
     log.info('Cancel task ', taskID);
     clientIPC.send({
@@ -88,7 +80,13 @@ taskServer.cancelTask = function(taskID) {
     });
 }
 
-// call from actions/task_maker/server.js
+/**
+ * Add a new task from Task maker action
+ * @param {number} taskID task ID
+ * @param {number} runType 0 - run permanently, 1 run once, timestamp - run by schedule
+ * @param {Object} workflow workflow
+ * @param {Array} [conditionOCIDs] array of objects counters IDs
+ */
 taskServer.addTask = function(taskID, runType, workflow, conditionOCIDs) {
     if(runType > 100) log.info('Add task ', taskID, '; run at: ', new Date(runType).toLocaleString());
     else log.info('Add task ', taskID, '; runType: ', runType, '; conditionOCIDs: ', conditionOCIDs)
@@ -101,22 +99,35 @@ taskServer.addTask = function(taskID, runType, workflow, conditionOCIDs) {
     });
 }
 
+/**
+ * Run the task
+ * @param {object} param
+ * @param {string} param.userName username
+ * @param {number} param.taskID task ID
+ * @param {object} param.variables object with variables for use in actions when run from
+ *  task-runner collector or eventGenerator
+ *  {<name>: <value>, ...}
+ * @param {Array} param.filterSessionIDs run only filtered actions from the task (array of the sessionIDs)
+ * @param {number} param.mySessionID sessionID for the task (for group task action in audit)
+ * @param {string} param.runTaskFrom function description from which run the task (for log)
+ * @param {function(Error)|function(null, Object)} callback callback(err, taskResults) where taskResults is the
+ *  object like {"<host1>:<Port1>": <taskResultFromAlepizInstance1>, "<host2>:<Port2>": <taskResultFromAlepizInstance2>, ...}
+ *  and <taskResultFromAlepizInstance> is an object like {"<actionID1>:<tasksActionsID>": <actionResult1>, ....}
+ */
 taskServer.runTask = function (param, callback) {
     if(!clientIPC) {
-        taskServer.connect(function(err) {
+        taskServer.connect('taskServer:runTask', function(err) {
             if(err) return callback(err);
             taskServer.runTask(param, callback);
         });
         return;
     }
 
-    if (!allClientIPCArray.length) return tasks.runTask(param, callback);
-
-    var taskResults = [];
-    async.each(allClientIPCArray, function (clientIPC, callback) {
+    var taskResults = {};
+    async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
         if (typeof clientIPC.sendAndReceive !== 'function') return callback();
         clientIPC.sendAndReceive(param, function(err, taskResult) {
-            taskResults.push(taskResult);
+            taskResults[hostPort] = taskResult;
             callback(err);
         });
     }, function(err) {

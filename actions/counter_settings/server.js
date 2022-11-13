@@ -185,7 +185,9 @@ module.exports = function(args, callback) {
             disabled: (args.disabled ? 1 : 0),
             debug: (args.debug ? 1 : 0),
             taskCondition: (args.taskCondition ? 1 : 0),
-            updateVariablesRef: args.updateVariablesRef //= oldCounterName: update variables references when counter name is changed
+            updateVariablesRef: args.updateVariablesRef, //= oldCounterName: update variables references when counter name is changed
+            sessionID: args.sessionID,
+            timestamp: args.timestamp,
         },
         counterParameters: collectorParameters,
         updateEvents: updateEvents,

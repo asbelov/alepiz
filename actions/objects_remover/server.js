@@ -8,7 +8,7 @@
 
 var async = require('async');
 var rightsWrapper = require('../../rightsWrappers/objectsDB');
-var rawObjectsDB = require('../../models_db/modifiers/modifierWapper').objectsDB;
+var rawObjectsDB = require('../../models_db/modifiers/objectsDB');
 var log = require('../../lib/log')(module);
 var server = require('../../server/counterProcessor');
 var history = require('../../models_history/history');
@@ -74,7 +74,7 @@ module.exports = function(args, callback) {
             }
 
             log.info('Sending message to server for stopping collect data for objects: ',
-                objectNamesForRemove, '; OCIDs: ', OCIDs);
+                objectNamesForRemove.join(', '), '; OCIDs: ', OCIDs);
             server.sendMsg({
                 removeCounters: OCIDs,
                 description: 'Objects was removed from database by user ' + args.username +

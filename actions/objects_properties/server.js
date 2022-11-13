@@ -90,7 +90,8 @@ module.exports = function(args, callback) {
                         if(Number(updatedObjectsIDs.indexOf(obj.id)) !== -1) objectNames.push(obj.name);
                     });
 
-                    log.info('Objects: ', objectNames.join(', '), ', properties: ', filteredChangesInProperties);
+                    log.info('Objects: ', objectNames.join(', '), ', properties: ', filteredChangesInProperties,
+                        ', sending message to the server for update');
                     server.sendMsg({
                         update: {
                             topObjects: true,

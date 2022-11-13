@@ -25,36 +25,33 @@ function init(cache, _enableEvents, _onSolvedEvent, _onEvent) {
 function dashboard(db, param) {
     //log.info('Run event action: ', param);
 
-    var events = [];
     try {
         var stmt = db.prepare('SELECT id, OCID, counterID FROM events WHERE id=?');
     } catch (err) {
-        throw(new Error('Can\'t prepare query to get event information from events table: ' + err.message + '. Events IDs ' +
-            JSON.stringify(param.eventsIDs)));
+        return log.warn('Can\'t prepare query to get event information from events table: ' + err.message +
+            '. Events IDs ', param.eventsIDs);
     }
 
+    param.events = [];
     param.eventsIDs.forEach(eventID => {
         try {
             var row = stmt.get(eventID);
+            if(row) param.events.push(row);
         } catch (err) {
-            throw(new Error('Can\'t get event information from events table: ' + err.message + '. Events IDs ' +
-               JSON.stringify(param.eventsIDs)));
+            return log.warn('Can\'t get event information from events table: ' + err.message + '. Events IDs ',
+                param.eventsIDs);
         }
-        if(row) events.push(row);
     });
 
     // events: [{id: eventID, OCID: OCID or NULL, counterID: counterID or NULL}, { ..... }]
-    param.events = events;
-    if(!Array.isArray(param.events) || !param.events.length) {
-        log.warn('Events were not found in database for ', param);
-        //throw(new Error('Events were not found in database for ' + JSON.stringify(param)));
-        return;
+    if(!param.events.length) {
+        return log.warn('Events were not found in database for ', param);
     }
 
     log.info('Executing action ', param.action, ' for ', param.events.length, ' events: ', param.subject);
 
     if(param.action === 'enableEvents') return enableEvents(db, param);
-    if(!param.comment) throw(new Error('Comment is not set for ' + JSON.stringify(param)));
+    if(!param.comment) return log.warn('Comment is not set for ', param);
     if(!param.recipients) param.recipients = null;
     if(!param.subject) param.subject = null;
 
@@ -78,7 +75,7 @@ function dashboard(db, param) {
     }
 
     // we checked action name in dashboard server.js. This code will never run
-    throw(new Error('Unknown action: ' + JSON.stringify(param)));
+    return log.warn('Unknown action: ', param);
 }
 
 /*
@@ -134,7 +131,7 @@ function eventEditor(db, param) {
                 null, param.importance, event.counterName, timestamp, 0, null);
 
             if(!eventID) {
-                throw(new Error('Error while add a new event. EventID is not returned for OCID ' + event.OCID));
+                return log.warn('Error while add a new event. EventID is not returned for OCID ' + event.OCID);
             }
 
             events.push({
@@ -188,14 +185,14 @@ function addRemoveHint(db, hint) {
 
     hint.events.forEach(function (event) {
         if ((forObject && !event.OCID) || (!forObject && !event.counterID)) {
-            throw(new Error('Can\'t add hint: OCID or counterID not defined' + JSON.stringify(hint)));
+            return log.warn('Can\'t add hint: OCID or counterID not defined', hint);
         }
 
         try {
             db.prepare('DELETE FROM hints WHERE ' + (forObject ? 'OCID=?' : 'counterID=?'))
                 .run(forObject ? event.OCID : event.counterID);
         } catch (err) {
-            throw(new Error('Can\'t delete previous hint: ' + err.message + ':' + JSON.stringify(hint)));
+            return log.warn('Can\'t delete previous hint: ' + err.message + ':', hint);
         }
 
         // only delete hint
@@ -213,7 +210,7 @@ function addRemoveHint(db, hint) {
                 comment: hint.comment
             });
         } catch (err) {
-            throw(new Error('Can\'t add hint: ' + err.message + ':' + JSON.stringify(hint)));
+            return log.warn('Can\'t add hint: ' + err.message + ':', hint);
         }
     });
 }
@@ -229,7 +226,7 @@ events: [{
  */
 function removeTimeIntervals(db, timeIntervals) {
     log.info('Removing time intervals: ', timeIntervals);
-    if(!timeIntervals.timeIntervalsForRemove) throw(new Error('Time intervals for removing is not set'));
+    if(!timeIntervals.timeIntervalsForRemove) return log.warn('Time intervals for removing is not set');
     var timeIntervalsForRemove = timeIntervals.timeIntervalsForRemove.split(',');
 
     timeIntervals.events.forEach(function (event) {
@@ -237,9 +234,11 @@ function removeTimeIntervals(db, timeIntervals) {
             var rows = db.prepare('SELECT * FROM disabledEvents WHERE OCID=?').all(event.OCID);
         } catch (err) {
             if (err || rows.length !== 1) {
-                throw(new Error('Can\'t get disabled event data for OCID ' + event.OCID +
+                return log.warn('Can\'t get disabled event data for OCID ' + event.OCID +
                     ' for removing time intervals ' + timeIntervals.timeIntervalsForRemove + ': ' +
-                    (err ? err.message : 'can\'t find or find not unique event in disabled events table: ' + JSON.stringify(rows))));
+                    (err ?
+                        err.message :
+                        'can\'t find or find not unique event in disabled events table: ' + JSON.stringify(rows)));
             }
         }
         var newTimeIntervals = rows[0].intervals.split(';').filter(function (interval) {
@@ -252,9 +251,9 @@ function removeTimeIntervals(db, timeIntervals) {
                 intervals: newTimeIntervals
             });
         } catch (err) {
-            throw(new Error('Can\'t update time interval to ' + newTimeIntervals +
-                ' for event ' + JSON.stringify(rows[0]) + ' while removing time intervals ' +
-                timeIntervals.timeIntervalsForRemove + ': ' + err.message));
+            return log.warn('Can\'t update time interval to ' + newTimeIntervals +
+                ' for event ', rows[0], ' while removing time intervals ' +
+                timeIntervals.timeIntervalsForRemove + ': ' + err.message);
         }
         rows[0].intervals = newTimeIntervals;
         disabledEventsCache.set(Number(event.OCID), rows[0]);
@@ -288,7 +287,7 @@ function transactionAddCommentsOrDisableEvents(db, param) {
             addCommentsOrDisableEvents(db, param);
         } catch (err) {
             //if (!db.inTransaction) throw err; // (transaction was forcefully rolled back)
-            throw err;
+            return log.warn(err.message);
         }
     });
 
@@ -304,7 +303,7 @@ function addCommentsOrDisableEvents(db, param) {
 
         if(!param.disableUntil || Number(param.disableUntil) !== parseInt(String(param.disableUntil), 10) ||
             param.disableUntil < Date.now() + 120000)
-            throw(new Error('Disable time limit is not set or incorrect for ' + JSON.stringify(param)));
+            return log.warn('Disable time limit is not set or incorrect for ', param);
 
         if (param.intervals) {
             var intervals = param.intervals.split(';');
@@ -313,7 +312,7 @@ function addCommentsOrDisableEvents(db, param) {
                 if (fromTo.length !== 2 ||
                     Number(fromTo[0]) !== parseInt(fromTo[0], 10) || Number(fromTo[0]) < 0 || Number(fromTo[0] > 86400000) ||
                     Number(fromTo[1]) !== parseInt(fromTo[1], 10) || Number(fromTo[1]) < 0 || Number(fromTo[1] > 86400000)) {
-                    throw(new Error('Invalid time interval "' + intervals[i] + '" for disable events: ' + JSON.stringify(param)));
+                    return log.warn('Invalid time interval "' + intervals[i] + '" for disable events: ', param);
                 }
             }
         } else param.intervals = null;
@@ -329,7 +328,7 @@ function addCommentsOrDisableEvents(db, param) {
             comment: param.comment
         });
     } catch (err) {
-        throw(new Error('Can\'t add comment: ' + err.message + ': ' + JSON.stringify(param)));
+        return log.warn('Can\'t add comment: ' + err.message + ': ', param);
     }
 
     param.commentID = info.lastInsertRowid;
@@ -368,7 +367,7 @@ function addCommentsOrDisableEvents(db, param) {
                     commentID: param.commentID
                 });
             } catch (err) {
-                throw(new Error('Can\'t disable event: ' + err.message + ': ' + JSON.stringify(param)));
+                return log.warn('Can\'t disable event: ' + err.message + ': ', param);
             }
 
             disabledEventsCache.set(eventOCID, param);
@@ -426,7 +425,7 @@ function deletePreviousCommentAndUpdateEventCommentID(db, eventID, newCommentID)
     try {
         var row = db.prepare('SELECT * FROM events WHERE id=?').get(eventID);
     } catch (err) {
-        throw(new Error('Can\'t get previous commentID while add new comment: ' + err.message));
+        return log.warn('Can\'t get previous commentID while add new comment: ', err.message);
     }
 
     try {
@@ -435,7 +434,7 @@ function deletePreviousCommentAndUpdateEventCommentID(db, eventID, newCommentID)
             commentID: newCommentID,
         });
     } catch (err) {
-        throw(new Error('Can\'t update events table for add comment: ' + err.message));
+        return log.warn('Can\'t update events table for add comment: ' + err.message);
     }
     if (!row || !row.commentID) return;
     var prevCommentID = row.commentID;
@@ -443,7 +442,7 @@ function deletePreviousCommentAndUpdateEventCommentID(db, eventID, newCommentID)
     try {
         var rows = db.prepare('SELECT * FROM events WHERE commentID=?').all(prevCommentID);
     } catch (err) {
-        throw(new Error('Can\'t get previous commentID while add new comment: ' + err.message));
+        return log.warn('Can\'t get previous commentID while add new comment: ' + err.message);
     }
     if (rows.length) return;
 

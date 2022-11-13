@@ -218,6 +218,6 @@ var JQueryNamespace = (function ($) {
     }
 
     function createChipName(name, id) {
-         return  name + ' (#' + id + ')';
+         return  name + ' (#' + String(id).slice(-5) + ')';
     }
 })(jQuery); // end of jQuery name space

@@ -4,7 +4,7 @@
 
 var log = require('../lib/log')(module);
 var objectsDB = require('../models_db/objectsDB');
-var objectsDBSave = require('../models_db/modifiers/modifierWapper').objectsDB;
+var objectsDBSave = require('../models_db/modifiers/objectsDB');
 var rightsDB = require('../models_db/usersRolesRightsDB');
 var prepareUser = require('../lib/utils/prepareUser');
 var checkIDs = require('../lib/utils/checkIDs');
@@ -12,15 +12,18 @@ var checkIDs = require('../lib/utils/checkIDs');
 var rightsWrapper = {};
 module.exports = rightsWrapper;
 
-/*
- renaming objects with IDs in initIDs to names in newObjectsNamesStr
- user - user name
- objects - [{id: XX, name: "newObjectName1"}, {..},.... ]
- callback(err)
+/**
+ *  Rename objects
+ * @param {string} user username
+ * @param {Array} objects array of objects like [{id: ID1, name: "newObjectName1"}, {id: ID2, name: "newObjectName2"},... ]
+ *  objects with an ID objects.id will be renamed to name in objects.name
+ * @param {function(Error)|function(null, result: Boolean)} callback callback(error, result), where the result is
+ * true when the objects have been renamed, or
+ * false if the objects have not been renamed, because the objects parameter is not an array or an empty array
  */
 rightsWrapper.renameObjects = function(user, objects, callback){
 
-    if(!Array.isArray(objects) || !objects.length) return callback();
+    if(!Array.isArray(objects) || !objects.length) return callback(null, false);
 
     var initIDs = objects.map(function(obj){return obj.id});
 
@@ -55,18 +58,23 @@ rightsWrapper.renameObjects = function(user, objects, callback){
     });
 };
 
-/*
- add new objects into a database. Check for existing objects names from newObjectNames array in database
- before inserting and, if found, return error. If no newObjectsNames specified, callback(null, [])
-
- user - user name
- newObjectNames - array of new objects names
- description - description for new object names
- order - sort position for new objects. Top objects has order < 10 objectsFilterDB.js
- callback(err, newObjectsIDs, newObjects),
- newObjectsIDs - array of a new objects IDs;
+/**
+ * add new objects into a database. Check for existing objects names from newObjectNames array in database
+ *  before inserting and, if found, return error. If no newObjectsNames specified return callback(null, [])
+ * @param {string} user username not used
+ * @param {Array} newObjectsNames array of the new object names
+ * @param {string} newDescription object description
+ * @param {number} newOrder object sort order in the object list
+ * @param {0|1} disabled is object disabled
+ * @param {string|null} color object color
+ * @param {number} sessionID sessionID for create unique objectID
+ * @param {number} createdTimestamp timestamp when object was created
+ * @param {function(Error)|function(null, newObjectsIDs:Array, newObjectName:Object)} callback
+ *  callback(err, newObjectsIDs, newObjectName), where newObjectsIDs - array with
+ *  new object IDs, newObjectName - object like {<objectName1>: <objectID1>, ...}
  */
-rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOrder, disabled, color, callback){
+rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOrder, disabled,
+                                    color, sessionID, createdTimestamp, callback) {
     if(!newObjectsNames || !newObjectsNames.length) return callback(null, []);
 
     //user = prepareUser(user);
@@ -83,29 +91,29 @@ rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOr
             return callback(new Error('Some object names already exists in database: ' + existingObjectsNames));
         }
 
-        var [objectsColor, objectsShade] = typeof color === 'string' ? color.split(':') : ['', ''];
-        color = ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue', 'light-blue', 'cyan', 'teal',
-            'green', 'light-green', 'lime', 'yellow', 'amber', 'orange', 'deep-orange', 'brown', 'grey', 'blue-grey',
-            'black', 'white', 'transparent'].indexOf((objectsColor || '').toLowerCase()) !== -1 ?
-            objectsColor + ':' +
-            (/^(lighten)|(darken)|(accent)-[1-4]$/.test((objectsShade || '').toLowerCase()) ? objectsShade : '') :
-            null;
+        color = getColor(color);
 
         // add a new objects, its description and order
-        objectsDBSave.addObjects(newObjectsNames, newDescription, newOrder, (disabled ? 1 : 0), color, callback);
+        objectsDBSave.addObjects(newObjectsNames, newDescription, newOrder, (disabled ? 1 : 0), color, sessionID,
+            createdTimestamp, callback);
     });
 };
 
-/*
- Update description and sort position for objects with IDs
- user - username
- IDs - array of objects IDs
- description - object description one for all
- order - object sort position in a objects menu, one for all.  Top objects has order < 10 objectsFilterDB.js
- callback(err)
- undefined description or order are not updated
+/**
+ * Check user permission to the objects and update object parameters for specific object IDs
+ * @param {string} user username not used
+ * @param {Array} initIDs array of the  object IDs
+ * @param {string} description object description. Will not be updated if not defined
+ * @param {number} order object sort order in the object list. Will not be updated if not defined
+ * @param {0|1} disabled is object disabled. Will not be updated if not defined
+ * @param {string|null} color object color. Will not be updated if not defined
+ * @param {number} sessionID sessionID for create unique objectID. Not used
+ * @param {function(Error)|function(null, updateData: Object, objectNames: Array)} callback
+ *  callback(err, updateData, objectNames) where updateData - object with data which was really updated.
+ *  objectNames - array with updated object names for print to log
  */
-rightsWrapper.updateObjectsInformation = function (user, initIDs, description, order, disabled, color, callback){
+rightsWrapper.updateObjectsInformation = function (user, initIDs, description, order,
+                                                   disabled, color, sessionID, callback) {
 
     if(!initIDs.length) return callback();
 
@@ -113,15 +121,7 @@ rightsWrapper.updateObjectsInformation = function (user, initIDs, description, o
     if(disabled !== undefined) updateData.$disabled = Number(disabled) ? 1 : 0;
     if(order !== undefined) updateData.$sortPosition = order;
     if(description !== undefined) updateData.$description = description;
-    if(color !== undefined) {
-        var [objectsColor, objectsShade] = typeof color === 'string' ? color.split(':') : ['', ''];
-        updateData.$color = ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue', 'light-blue', 'cyan', 'teal',
-            'green', 'light-green', 'lime', 'yellow', 'amber', 'orange', 'deep-orange', 'brown', 'grey', 'blue-grey',
-            'black', 'white', 'transparent'].indexOf((objectsColor || '').toLowerCase()) !== -1 ?
-            objectsColor + ':' +
-            (/^(lighten)|(darken)|(accent)-[1-4]$/.test((objectsShade || '').toLowerCase()) ? objectsShade : '') :
-            null;
-    }
+    if(color !== undefined) updateData.$color = getColor(color)
     if(!Object.keys(updateData).length) return callback();
 
     checkIDs(initIDs, function(err, checkedIDs) {
@@ -175,6 +175,21 @@ rightsWrapper.updateObjectsInformation = function (user, initIDs, description, o
         });
     });
 };
+
+/**
+ * Checking color and shade and return checked color string like "<color>:<shade>"
+ * @param {string} color init color string like "<color>:<shade>"
+ * @returns {string|null} checked color string like "<color>:<shade>"
+ */
+function getColor (color) {
+    var [objectsColor, objectsShade] = typeof color === 'string' ? color.split(':') : ['', ''];
+    return ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue', 'light-blue', 'cyan', 'teal',
+        'green', 'light-green', 'lime', 'yellow', 'amber', 'orange', 'deep-orange', 'brown', 'grey', 'blue-grey',
+        'black', 'white', 'transparent'].indexOf((objectsColor || '').toLowerCase()) !== -1 ?
+        objectsColor + ':' +
+        (/^(lighten)|(darken)|(accent)-[1-4]$/.test((objectsShade || '').toLowerCase()) ? objectsShade : '') :
+        null;
+}
 
 
 /**
@@ -454,10 +469,7 @@ rightsWrapper.addObjectsAlepizRelation = function (user, objectIDs, alepizIDs, c
             var newObjectsAlepizRelations = [], objectsAlepizRelationsForRemove = [];
             rows.forEach(row => {
                 if(!newObjectIDsSet.has(row.objectID) || !newAlepizIDsSet.has(row.alepizID)) {
-                    objectsAlepizRelationsForRemove.push({
-                        $objectID: row.objectID,
-                        $alepizID: row.alepizID,
-                    });
+                    objectsAlepizRelationsForRemove.push(row.objectID);
                 }
                 objectIDsSet.add(row.objectID);
                 alepizIDsSet.add(row.alepizID);
@@ -467,22 +479,22 @@ rightsWrapper.addObjectsAlepizRelation = function (user, objectIDs, alepizIDs, c
                 alepizIDs.forEach(alepizID => {
                     if(!objectIDsSet.has(objectID) || !alepizIDsSet.has(alepizID)) {
                         newObjectsAlepizRelations.push({
-                            $objectID: objectID,
-                            $alepizID: alepizID,
+                            objectID: objectID,
+                            alepizID: alepizID,
                         });
                     }
                 });
             });
             objectsDBSave.deleteObjectsAlepizRelation(objectsAlepizRelationsForRemove, function (err) {
                 if(err) {
-                    return callback('Can\'t remove objectsAlepizRelations: ' + err.message +
-                        ': ', JSON.stringify(objectsAlepizRelationsForRemove));
+                    return callback(new Error('Can\'t remove objectsAlepizRelations: ' + err.message +
+                        ': ' + JSON.stringify(objectsAlepizRelationsForRemove)));
                 }
 
                 objectsDBSave.addObjectsAlepizRelation(newObjectsAlepizRelations, function (err) {
                     if(err) {
-                        return callback('Can\'t add objectsAlepizRelations: ' + err.message +
-                            ': ', JSON.stringify(newObjectsAlepizRelations));
+                        return callback(new Error('Can\'t add objectsAlepizRelations: ' + err.message +
+                            ': ' + JSON.stringify(newObjectsAlepizRelations)));
                     }
 
                     callback(null, newObjectsAlepizRelations, objectsAlepizRelationsForRemove);

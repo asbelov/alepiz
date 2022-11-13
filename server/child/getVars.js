@@ -14,7 +14,6 @@ const getVarFromExpression = require("./getVarFromExpression");
 
 const Conf = require('../../lib/conf');
 const conf = new Conf('config/common.json');
-const confServer = new Conf('config/server.json');
 
 
 module.exports = getVars;
@@ -76,8 +75,6 @@ function getVars(param, callback) {
         }
     }
 
-    var alepizNames = confServer.get('alepizNames');
-
     // add static data from current and parent objects to variable list
     variables.PARENT_OBJECT_NAME = param.parentObjectName === undefined ? '' : param.parentObjectName;
     variables.PARENT_COUNTER_NAME = param.parentCounterName === undefined ? '' : param.parentCounterName;
@@ -85,7 +82,7 @@ function getVars(param, callback) {
     variables.PARENT_VALUE = param.parentObjectValue === undefined ? '' : param.parentObjectValue;
     variables.COUNTER_NAME = param.counterName === undefined ? '' : param.counterName;
     variables.ALEPIZ_NAME = param.cache.alepizInstance.name || '';
-    variables.ALEPIZ_ID = param.cache.alepizInstance.id || 0;
+    variables.ALEPIZ_ID = param.cache.alepizInstance.id !== undefined ? param.cache.alepizInstance.id : -1;
 
     param.variablesDebugInfo = {};
 

@@ -17,7 +17,7 @@ module.exports = function(args, callback) {
     log.debug('Starting action \"'+args.actionName+'\" with parameters', args);
 
     try {
-        taskServer.connect(function (err) {
+        taskServer.connect('taskMaker:server', function (err) {
             if(err) return callback(err);
             saveTask(args, callback);
         });
@@ -215,6 +215,7 @@ function updateTask(args, taskID, actions, actionsIDsObj, filterSessionIDs, work
                     groupID: newTaskGroup,
                     actionsOrder: actionsOrder,
                     taskID: taskID,
+                    sessionID: args.sessionID,
                 }, actions, function(err, taskID) {
                     if(err) return transactionsDB.rollback(err, callback);
 

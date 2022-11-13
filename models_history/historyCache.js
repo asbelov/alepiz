@@ -95,6 +95,12 @@ historyCache.addCallbackToCacheService = function (callback) {
     cacheServiceCallback = callback;
 }
 
+/** Set or get cacheServiceIsRunning variable
+ *
+ * @param {number} [val] - if val defined (must be a unix time), then set cacheServiceIsRunning variable to val.
+ *  Else return cacheServiceIsRunning value
+ *  @return {number} cacheServiceIsRunning value
+ */
 historyCache.cacheServiceIsRunning = function(val) {
     if(val !== undefined) cacheServiceIsRunning = val;
     return cacheServiceIsRunning;
@@ -161,11 +167,13 @@ function createNewCacheObject(id) {
     });
 }
 
-/*
-    add new record to the end of cache
-
-    id: object ID
-    newRecord: {timestamp: ..., record: ...}
+/**
+ * add new record to the end of cache
+ *
+ * @param {number} id OCID - new data ID
+ * @param {Object} newRecord new record {timestamp: ..., data: ...}
+ * @param {number} newRecord.timestamp new record timestamp
+ * @param {number|string|boolean} newRecord.data new record data
  */
 historyCache.add = function (id, newRecord){
     // the record was checked on the client side using the history.add () function
@@ -302,7 +310,10 @@ historyCache.del = function (IDs, daysToKeepHistory, daysToKeepTrends, callback)
  */
 
     storage.delRecords(IDs, daysToKeepHistory, daysToKeepTrends, function (err) {
-        if(err) return callback(err);
+        if(err) {
+            if(typeof callback === 'function') return callback(err);
+            else return log.error(err.message);
+        }
 
         // remove records from cache after commit transaction
         IDs.forEach(function (id) {
@@ -337,7 +348,7 @@ historyCache.del = function (IDs, daysToKeepHistory, daysToKeepTrends, callback)
             }
         });
 
-        callback();
+        if(typeof callback === 'function') callback();
     });
 };
 
@@ -1003,9 +1014,8 @@ function cacheService(callback) {
 
 /** Dumps the cached historical data to a file before exiting.
  * The data from the dump file will be loaded into the cache on next startup
- * @type {function(callback, boolean): void}
  * @param {function(void): void} callback - Called when done
- * @param {boolean|undefined} [isScheduled=undefined] - the function is called when the history is scheduled to restart
+ * @param {boolean} [isScheduled] - the function is called when the history is scheduled to restart
  */
 
 historyCache.dumpData = function(callback, isScheduled) {

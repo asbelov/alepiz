@@ -2,9 +2,10 @@
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var log = require('../../lib/log')(module);
-var db = require('../db');
-var async = require('async');
+const log = require('../../lib/log')(module);
+const db = require('../db');
+const async = require('async');
+const unique = require('../../lib/utils/unique');
 
 var countersDB = {};
 module.exports = countersDB;
@@ -48,7 +49,7 @@ countersDB.updateCounter = function(counter, callback) {
             $keepHistory: counter.keepHistory,
             $keepTrends: counter.keepTrends,
             $counterID: counter.counterID,
-            $modifyTime: Date.now(),
+            $modifyTime: counter.timestamp,
             $description: counter.description,
             $disabled: counter.disabled,
             $debug: counter.debug,
@@ -62,23 +63,34 @@ countersDB.updateCounter = function(counter, callback) {
     );
 };
 
-/*
-    Inserting a new counter into the database
-
-    counter: counter object, see SQL query for details
-    callback(err, counterID)
-
-    counterID: counter ID of inserted counter
-
+/**
+ * Inserting a new counter into the database
+ * @param {Object} counter - object with a counter parameters
+ * @param {string} counter.name - counter name
+ * @param {string} counter.collectorID - collector name (collector directory)
+ * @param {number} counter.groupID - group ID
+ * @param {number} counter.unitID - unit ID
+ * @param {number} counter.sourceMultiplier - source multiplier
+ * @param {number} counter.keepHistory - days to keep historical data
+ * @param {number} counter.keepTrends - days to keep trends
+ * @param {string} counter.description counter description
+ * @param {0|1} counter.disabled - is counter disabled
+ * @param {0|1} counter.debug - need to debug counter
+ * @param {number} counter.taskCondition - counter taskCondition
+ * @param {number} sessionID - unique sessionID
+ * @param {function(Error) | function(null, counterID:number)} callback - callback(err, counterID) where counterID is a new
+ * counter ID
  */
-countersDB.insertCounter = function(counter, callback) {
-    log.info('Inserting new counter into the database: ', counter);
+countersDB.insertCounter = function(counter, sessionID, callback) {
+    const id = unique.createHash(JSON.stringify(counter) + sessionID);
+    log.info('Inserting new counter ', id, ' into the database: ', counter);
 
     db.run(
-        'INSERT INTO counters (name, collectorID, groupID, unitID, sourceMultiplier, keepHistory, keepTrends, ' +
+        'INSERT INTO counters (id, name, collectorID, groupID, unitID, sourceMultiplier, keepHistory, keepTrends, ' +
         'modifyTime, created, description, disabled, debug, taskCondition) ' +
-        'VALUES ($name, $collectorID, $groupID, $unitID, $sourceMultiplier, $keepHistory, $keepTrends, ' +
+        'VALUES ($id, $name, $collectorID, $groupID, $unitID, $sourceMultiplier, $keepHistory, $keepTrends, ' +
         '$modifyTime, $created, $description, $disabled, $debug, $taskCondition)', {
+            $id: id,
             $name: counter.name,
             $collectorID: counter.collectorID,
             $groupID: counter.groupID,
@@ -86,8 +98,8 @@ countersDB.insertCounter = function(counter, callback) {
             $sourceMultiplier: counter.sourceMultiplier,
             $keepHistory: counter.keepHistory,
             $keepTrends: counter.keepTrends,
-            $modifyTime: Date.now(),
-            $created: Date.now(),
+            $modifyTime: counter.timestamp,
+            $created: counter.timestamp,
             $description: counter.description,
             $disabled: counter.disabled,
             $debug: counter.debug,
@@ -143,25 +155,26 @@ countersDB.updateCounterParameters = function(counterID, counterParameters, call
     );
 };
 
-/*
-    Insert counter parameters from database
-
-    counterID: counter ID
-    counterParameters: counter parameters  {name1: value, name2: value:...}
-    callback(err)
+/**
+ * Insert counter parameters from database for specific counterID
+ * @param {Number} counterID - counter ID
+ * @param {Object} counterParameters - objects with a counter parameters like {<name>: <value>, ....}
+ * @param {function(Error|undefined)} callback - callback(err)
  */
-
-
 countersDB.insertCounterParameters = function(counterID, counterParameters, callback) {
     log.info('Inserting counter parameters into the database for counterID: ', counterID, ': ', counterParameters);
 
-    var stmt = db.prepare('INSERT INTO counterParameters (name, value, counterID) VALUES ($name, $value, $counterID)',
+    var stmt = db.prepare(
+        'INSERT INTO counterParameters (id, name, value, counterID) VALUES ($id, $name, $value, $counterID)',
         function(err) {
             if (err) return callback(err);
 
             // eachOfSeries used for possible transaction rollback if error occurred
             async.eachOfSeries(counterParameters, function(value, name, callback) {
+                const id = unique.createHash(counterID.toString(36) + name + value);
+
                 stmt.run({
+                    $id: id,
                     $counterID: counterID,
                     $name: name,
                     $value: value === null ? null : String(value),
@@ -221,10 +234,14 @@ countersDB.saveObjectsCountersIDs = function(objectsCountersIDs, callback) {
 
     log.info('Inserting object to counter relations into the database: ', objectsCountersIDs);
 
-    var stmt = db.prepare('INSERT INTO objectsCounters (objectID, counterID) VALUES ($objectID, $counterID)', function(err) {
+    var stmt = db.prepare('INSERT INTO objectsCounters (id, objectID, counterID) VALUES ($id, $objectID, $counterID)',
+        function(err) {
         if (err) return callback(err);
         async.eachSeries(objectsCountersIDs, function(obj, callback) {
+            const id = unique.createHash(obj.objectID.toString(36) + obj.counterID.toString(36));
+
             stmt.run({
+                $id: id,
                 $objectID: obj.objectID,
                 $counterID: obj.counterID
             }, function(err) {
@@ -244,7 +261,6 @@ countersDB.saveObjectsCountersIDs = function(objectsCountersIDs, callback) {
  * @param {Array} objectsCountersIDs is not an OCID, there is an array of object IDs and counter IDs
  * [{objectID:...,  counterID:...}, ... ]
  * @param {function} callback - callback(err)
- * @returns {*}
  */
 countersDB.deleteObjectCounterID = function(objectsCountersIDs, callback) {
     if(!objectsCountersIDs.length) return callback();
@@ -269,28 +285,31 @@ countersDB.deleteObjectCounterID = function(objectsCountersIDs, callback) {
     });
 };
 
-/*
-    Insert update events for counter
-
-    counterID: counter ID
-    updateEvents: array of objects with update events
-    [{objectID:<parent object ID>, expression:<string with expression>, mode: <0|1|2|3|4>, objectFilter}, {..}, ...]
-    callback(err)
+/**
+ * Insert update events for specific counterID
+ * @param {Number} counterID - counter ID
+ * @param {Array} updateEvents -Array of objects with update event data.
+ * [{counterID:, objectID:, expression:, mode:, objectFilter:, description:, updateEventOrder:}, ...] where
+ * counterID, objectID is a parentCounterID ans parentObjectID, mode: <0|1|2|3|4>
+ * @param {function(Error)|function()} callback - callback(err)
  */
 countersDB.insertUpdateEvents = function(counterID, updateEvents, callback) {
     if(!updateEvents.length) return callback();
 
     log.info('Insert update events for ', counterID, ':', updateEvents);
 
-    var stmt = db.prepare('INSERT INTO countersUpdateEvents (counterID, parentCounterID, parentObjectID, expression, ' +
+    var stmt = db.prepare('INSERT INTO countersUpdateEvents (id, counterID, parentCounterID, parentObjectID, expression, ' +
         'mode, objectFilter, description, updateEventOrder) ' +
-        'VALUES ($counterID, $parentCounterID, $parentObjectID, $expression, $mode, $objectFilter, ' +
+        'VALUES ($id, $counterID, $parentCounterID, $parentObjectID, $expression, $mode, $objectFilter, ' +
         '$description, $updateEventOrder)',
         function(err) {
             if (err) return callback(err);
 
             async.eachSeries(updateEvents, function(updateEvent, callback) {
+                const id = unique.createHash(counterID.toString(36) + JSON.stringify(updateEvent));
+
                 stmt.run({
+                    $id: id,
                     $counterID: counterID,
                     $parentCounterID: updateEvent.counterID,
                     $parentObjectID: updateEvent.objectID,
@@ -356,30 +375,57 @@ countersDB.deleteUpdateEvents = function(counterID, updateEvents, callback) {
 
     callback(err)
  */
+/**
+ * Inserting new variables for specific counterID (historical or expression)
+ * @param {Number} counterID - counter ID
+ * @param {Object} variables - Object with variables, like {<variableName>:{variableParameters}, ...} See example bellow
+ * @param {function(Error|undefined)} callback - callback(err)
+ * @example
+ * Historical variable:
+ * {
+ *     objectID:,
+ *     parentCounterName:,
+ *     function:,
+ *     functionParameters:,
+ *     objectName:,
+ *     description:,
+ *     variableOrder:
+ * }
+ *
+ * Expression variable:
+ * {
+ *     expression:,
+ *     description:,
+ *     variableOrder:
+ * }
+ */
 countersDB.insertVariables = function(counterID, variables, callback) {
     log.info('Insert variables for ', counterID, ': ', variables);
 
     var stmt = db.prepare(
-        'INSERT INTO variables (counterID, name, objectID, parentCounterName, function, functionParameters, objectName, ' +
+        'INSERT INTO variables (id, counterID, name, objectID, parentCounterName, function, functionParameters, objectName, ' +
         'description, variableOrder) ' +
-        'VALUES ($counterID, $name, $objectID, $parentCounterName, $function, $functionParameters, $objectName,' +
+        'VALUES ($id, $counterID, $name, $objectID, $parentCounterName, $function, $functionParameters, $objectName,' +
         '$description, $variableOrder)',
         function(err) {
             if (err) return callback(err);
 
             var stmtExpression = db.prepare(
-                'INSERT INTO variablesExpressions (counterID, name, expression, description, variableOrder) ' +
-                'VALUES ($counterID, $name, $expression, $description, $variableOrder)',
+                'INSERT INTO variablesExpressions (id, counterID, name, expression, description, variableOrder) ' +
+                'VALUES ($id, $counterID, $name, $expression, $description, $variableOrder)',
 
                 function(err) {
                     if (err) return callback(err);
 
                     // eachSeries used for transaction
                     async.eachSeries(Object.keys(variables), function(name, callback) {
+                        const id = unique.createHash(counterID.toString(36) + name + JSON.stringify(variables[name]));
+
                         if (variables[name].expression) {
 
                             log.debug('Inserting variable expression ' + name, variables[name]);
                             stmtExpression.run({
+                                $id: id,
                                 $counterID: counterID,
                                 $name: name,
                                 $expression: variables[name].expression,
@@ -390,6 +436,7 @@ countersDB.insertVariables = function(counterID, variables, callback) {
 
                             log.debug('Inserting variable ' + name, variables[name]);
                             stmt.run({
+                                $id: id,
                                 $counterID: counterID,
                                 $name: name,
                                 $objectID: variables[name].objectID || null,
