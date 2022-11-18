@@ -7,7 +7,7 @@ const async = require('async');
 const log = require('../../lib/log')(module);
 const objectDB = require('../../models_db/objectsDB');
 const counterDB = require('../../models_db/countersDB');
-const history = require('../../models_history/history');
+const history = require('../../serverHistory/historyClient');
 
 var collector = {};
 module.exports = collector;

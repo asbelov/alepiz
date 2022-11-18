@@ -10,7 +10,7 @@ var async = require('async');
 var log = require('../../lib/log')(module);
 var rightsWrappersCountersDB = require('../../rightsWrappers/countersDB');
 var units = require('../../models_db/countersUnitsDB');
-var history = require('../../models_history/history');
+var history = require('../../serverHistory/historyClient');
 
 module.exports = function(args, callback) {
     log.debug('Starting ajax with parameters', args);

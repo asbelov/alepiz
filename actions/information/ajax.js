@@ -7,7 +7,7 @@ var log = require('../../lib/log')(module);
 var objectsPropertiesDB = require('../../models_db/objectsPropertiesDB');
 var objectsDB = require('../../rightsWrappers/objectsDB');
 var countersDB = require('../../models_db/countersDB');
-var history = require('../../models_history/history');
+var history = require('../../serverHistory/historyClient');
 const fromHuman = require('../../lib/utils/fromHuman');
 const toHuman = require('../../lib/utils/toHuman');
 

@@ -10,7 +10,7 @@ var prepareUser = require('../lib/utils/prepareUser');
 var checkIDs = require('../lib/utils/checkIDs');
 var collectors = require('../lib/collectors');
 var transaction = require('../models_db/modifiers/transaction');
-var history = require('../models_history/history');
+var history = require('../serverHistory/historyClient');
 var async = require('async');
 var server = require('../server/counterProcessor');
 

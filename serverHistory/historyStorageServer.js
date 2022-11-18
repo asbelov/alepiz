@@ -9,8 +9,8 @@ const Database = require('better-sqlite3');
 const fs = require("fs");
 const exitHandler = require("../lib/exitHandler");
 const countersDB = require("../models_db/countersDB");
-const historyStorage = require('../models_history/historyStorage');
-var parameters = require('../models_history/historyParameters');
+const historyStorage = require('./historyStorage');
+var parameters = require('./historyParameters');
 const setShift = require('../lib/utils/setShift');
 
 // array of minutes for trends. long time (keepTrends time) keeps only trends with time interval 60
@@ -20,7 +20,7 @@ var transProcessArgID = historyStorage.transProcessArgID;
 var getDbPaths = historyStorage.getDbPaths;
 
 var db;
-var functions = {};
+var historyStorageServer = {};
 var trendsData = new Map();
 var objectsParameters = new Map();
 var transactionInProgress = 0;
@@ -44,7 +44,7 @@ if(require.main !== module) {
     var isTransactionProcess = false;
     var dbPath = getDbPaths(parameters)[0];
     dbOpen();
-    module.exports = functions;
+    module.exports = historyStorageServer;
 } else {
     isTransactionProcess = threads.workerData && threads.workerData[0];
     dbPath = threads.workerData && threads.workerData[1];
@@ -218,7 +218,7 @@ function onMessage(message, callback) {
         return;
     }
 
-    if (!message || !message.funcName || !functions[message.funcName] || !message.arguments)
+    if (!message || !message.funcName || !historyStorageServer[message.funcName] || !message.arguments)
         return log.error('Incorrect message: ', message);
 
     var storageFunctionArguments = message.arguments.slice();
@@ -234,7 +234,7 @@ function onMessage(message, callback) {
 
         callback(err, result);
     });
-    functions[message.funcName].apply(this, storageFunctionArguments);
+    historyStorageServer[message.funcName].apply(this, storageFunctionArguments);
 }
 
 function onStop(callback) {
@@ -316,7 +316,7 @@ SELECT * FROM table LIMIT 3 OFFSET 4 will skip first 4 and get next 3 records
 
 recordsType: [0|1|2]: 0 - number and string, 1 number, 2 - string
  */
-functions.getRecordsFromStorageByIdx = function (id, offset, cnt, firstTimestamp, maxRecordsCnt, recordsType, callback) {
+historyStorageServer.getRecordsFromStorageByIdx = function (id, offset, cnt, firstTimestamp, maxRecordsCnt, recordsType, callback) {
 
     var startTime = Date.now();
     var timeStampCondition = firstTimestamp ? 'AND timestamp < $firstTimestamp ' : '';
@@ -392,7 +392,7 @@ recordsType: [0|1|2]: 0 - number and string, 1 number, 2 - string
 callback(err, records), where
 records: [{data:.., timestamp:..}, ....], sorted by ascending timestamp
 */
-functions.getRecordsFromStorageByTime = function (id, timeFrom, timeTo, maxRecordsCnt, recordsType, callback) {
+historyStorageServer.getRecordsFromStorageByTime = function (id, timeFrom, timeTo, maxRecordsCnt, recordsType, callback) {
 
     var startTime = Date.now();
     if(recordsType < 2) {
@@ -529,7 +529,7 @@ function getTableName(id, timeFrom, timeTo, maxRecordsCnt, recordsType, callback
     return callback('numbers');
 }
 
-functions.getLastRecordTimestampForValue = function (id, value, callback) {
+historyStorageServer.getLastRecordTimestampForValue = function (id, value, callback) {
     if (!isNaN(parseFloat(value)) && isFinite(value)) var table = 'numbers';
     else table = 'strings';
 
@@ -555,10 +555,10 @@ functions.getLastRecordTimestampForValue = function (id, value, callback) {
     callback(null, row ? row.timestamp : undefined);
 };
 
-functions.getTransactionsQueueInfo = function(callback) {
+historyStorageServer.getTransactionsQueueInfo = function(callback) {
     if(!transactionInProgress && transactionsFunctions.size) {
         log.warn('Starting ', transactionsFunctions.size, ' halted transactions');
-        functions.beginTransaction(setShift(transactionsFunctions));
+        historyStorageServer.beginTransaction(setShift(transactionsFunctions));
     }
     return callback(null, {
         len: transactionsFunctions.size,
@@ -567,7 +567,7 @@ functions.getTransactionsQueueInfo = function(callback) {
     });
 }
 
-functions.beginTransaction = function(description, callback) {
+historyStorageServer.beginTransaction = function(description, callback) {
     if(typeof description === 'object' && typeof description.callback === 'function') {
         callback = description.callback;
         description = description.description;
@@ -600,7 +600,7 @@ functions.beginTransaction = function(description, callback) {
     callback();
 };
 
-functions.commitTransaction = function(err, _callback) {
+historyStorageServer.commitTransaction = function(err, _callback) {
 
     function callback(err) {
         if(err) log.warn('Error in transaction "', transactionDescriptionInProgress, '": ', err);
@@ -613,7 +613,7 @@ functions.commitTransaction = function(err, _callback) {
         //log.info(Date.now(), ' Finishing transaction: ', transactionDescriptionInProgress, ': ', transactionInProgress, ' (', transactionsFunctions.size, ')');
         transactionInProgress = 0;
         transactionDescriptionInProgress = '';
-        if(transactionsFunctions.size) functions.beginTransaction(setShift(transactionsFunctions));
+        if(transactionsFunctions.size) historyStorageServer.beginTransaction(setShift(transactionsFunctions));
         if(typeof _callback === 'function') _callback(err);
         else {
             log.warn('Commit of transaction is finished after timeout, error: ', err);
@@ -649,7 +649,7 @@ functions.commitTransaction = function(err, _callback) {
     }
 };
 
-functions.delRecords = function (IDs, daysToKeepHistory, daysToKeepTrends, callback) {
+historyStorageServer.delRecords = function (IDs, daysToKeepHistory, daysToKeepTrends, callback) {
     if (!callback) {
         callback = daysToKeepHistory;
         daysToKeepHistory = 0;
@@ -670,14 +670,14 @@ functions.delRecords = function (IDs, daysToKeepHistory, daysToKeepTrends, callb
         ++iterateNum;
         deletedObjectsNum += IDsPart.length;
 
-        functions.beginTransaction('Delete records IDs: ' + IDsPart.join(', '), function (err) {
+        historyStorageServer.beginTransaction('Delete records IDs: ' + IDsPart.join(', '), function (err) {
             if (err) return callback(err);
 
             //log.info(Date.now(), ' Starting del transaction:  ', transactionDescriptionInProgress, ': ', transactionInProgress);
             if(iterateNum === 1) deleteRecordsInProgress = Date.now();
             delRecords(IDsPart, daysToKeepHistory, daysToKeepTrends, function (err) {
                 //log.info(Date.now(), ' Finishing del transaction: ', transactionDescriptionInProgress, ': ', transactionInProgress, ' (', transactionsFunctions.size, '): ', err);
-                functions.commitTransaction(err, function(err) {
+                historyStorageServer.commitTransaction(err, function(err) {
 
                     if(Date.now() - printInfoTime > 60000) {
                         log.info('Deleting ', Math.round(deletedObjectsNum * 100 / IDs.length),
@@ -855,9 +855,10 @@ function delRecords(IDs, daysToKeepHistory, daysToKeepTrends, _callback) {
 }
 
 
-functions.saveRecordsForObject = function (id, newObjectParameters, recordsForSave, callback) {
+historyStorageServer.saveRecordsForObject = function (id, newObjectParameters, recordsForSave, callback) {
     if (!id) return callback(new Error('Undefined ID while saving records to storage DB'));
 
+    id = Number(id);
     var objectParametersObj = objectsParameters.get(Number(id));
 
     objectsParameters.set(Number(id), newObjectParameters);
@@ -1001,7 +1002,7 @@ function createStorage (id, objectParameters) {
     }
 }
 
-functions.removeZombiesFromStorage = function (callback) {
+historyStorageServer.removeZombiesFromStorage = function (callback) {
     log.info('Removing zombies objects from storage');
 
     try {
@@ -1024,7 +1025,7 @@ functions.removeZombiesFromStorage = function (callback) {
             if (OCIDs.indexOf(row.id) === -1) zombiesOCIDs.push(row.id);
         });
 
-        functions.delRecords(zombiesOCIDs, function (err) {
+        historyStorageServer.delRecords(zombiesOCIDs, function (err) {
             if (err) {
                 return callback(new Error('Error removing zombies objects from the storage: ' +
                     err.message));
@@ -1036,7 +1037,7 @@ functions.removeZombiesFromStorage = function (callback) {
     });
 };
 
-functions.config = function(action, name, value, callback) {
+historyStorageServer.config = function(action, name, value, callback) {
     if(action === 'get') {
         if(typeof(name) !== 'string') {
             return callback(new Error('Can\'t get incorrect or undefined parameter name from config table'));

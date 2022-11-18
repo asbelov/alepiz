@@ -10,7 +10,7 @@ const collectorsCfg = require("../lib/collectors");
 const async = require("async");
 const path = require("path");
 const runInThread = require("../lib/runInThread");
-const history = require("../models_history/history");
+const history = require("../serverHistory/historyClient");
 const IPC = require("../lib/IPC");
 const proc = require("../lib/proc");
 
@@ -172,7 +172,6 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                                     collectorsObj[message.name].get(message.data, function (err, result) {
                                         //if(Number(message.data.id$) === 155101) log.warn('Add record ', message.data.$id, ':', result, ': ', message);
                                         //log.warn('Add record ', message.data.$id, ':', result, ': ', message);
-
                                         if(message.data.$variables) {
                                             var preparedResult = history.add(message.data.$id, result)
                                             counterProcessorServer.processCounterResult({

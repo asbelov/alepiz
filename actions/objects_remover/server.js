@@ -11,7 +11,7 @@ var rightsWrapper = require('../../rightsWrappers/objectsDB');
 var rawObjectsDB = require('../../models_db/modifiers/objectsDB');
 var log = require('../../lib/log')(module);
 var server = require('../../server/counterProcessor');
-var history = require('../../models_history/history');
+var history = require('../../serverHistory/historyClient');
 var ajax = require('./ajax');
 
 module.exports = function(args, callback) {

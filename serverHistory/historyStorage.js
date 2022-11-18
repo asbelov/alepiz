@@ -132,19 +132,6 @@ storage.initStorage = function (initParameters, callback) {
     });
 };
 
-storage.restartStorageModifierProcess = function(callback) {
-    storageModifyingProcess.sendAndReceiveToAll({
-        restart: 'storage modifier',
-        waitForCallback: true,
-    }, callback);
-}
-
-storage.restartStorageQueryProcesses = function(callback) {
-    storageQueryingProcesses.sendToAll({
-        restart: 'storage query processor'
-    }, callback);
-}
-
 storage.stop = function(callback) {
     // use series to be able to fetch data while waiting while transactional processes are closing the DB
     async.series([

@@ -8,14 +8,15 @@ const calc = require('../../lib/calc');
 const variablesReplace = require('../../lib/utils/variablesReplace');
 const initCache = require('./initCache');
 //const profiling = require('../lib/profiling');
-
-const history = require('../../models_history/history');
+const history = require('../../serverHistory/historyClient');
 const debugCounters = require('../../serverDebug/debugCounters');
 const taskServer = require('../../serverTask/taskServerClient');
-
 const thread = require('../../lib/threads');
 const getVars = require('./getVars');
 const connectingCollectors = require('./connectingCollectors');
+const Conf = require("../../lib/conf");
+
+const confServer = new Conf('config/server.json');
 
 const serverName = thread.workerData[0];
 const childID = thread.workerData[1];
@@ -41,7 +42,7 @@ history.connect(childID, function () {
             onDestroy: destroyCollectors,
         });
     });
-}, true);
+}, confServer.get('dontConnectToRemoteHistoryInstances'));
 
 //profiling.init(60);
 

@@ -2,12 +2,12 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
+var log = require('../lib/log')(module);
 var async = require('async');
 var countersDB = require('../models_db/countersDB'); // for init housekeeper
-var log = require('../lib/log')(module);
-var cache = require('../models_history/historyCache');
-var storage = require('../models_history/historyStorage');
-var parameters = require('../models_history/historyParameters');
+var cache = require('./historyCache');
+var storage = require('./historyStorage');
+var parameters = require('./historyParameters');
 
 var houseKeeper = {};
 module.exports = houseKeeper;
@@ -84,7 +84,8 @@ houseKeeper.run = function (initParameters) {
                 if (err) log.error(err.message);
 
                 // receiver from all storage result like
-                // [  { id: 1617401838425, timestamp: 1617402139730, result: '0' },  { id: 1617401838436, timestamp: 1617402139730, result: '0' },  [length]: 2]
+                // [  { id: 1617401838425, timestamp: 1617402139730, result: '0' },
+                // { id: 1617401838436, timestamp: 1617402139730, result: '0' },  [length]: 2]
                 if(Array.isArray(initProcessedDataCnt) && initProcessedDataCnt.length) {
                     var processedDataCnt = Number(initProcessedDataCnt[0].result);
                 }
@@ -109,7 +110,8 @@ houseKeeper.run = function (initParameters) {
                             ' objects. There were  ', prevProcessedDataCnt.processedDataCnt, ' objects.',
                             (!prevProcessedDataCnt.processedDataCnt ? '' :
                                 // convert speed from obj/milliseconds to obj/minutes
-                                (' Speed: ' + Math.ceil((processedDataCnt - prevProcessedDataCnt.processedDataCnt) * 60000 /
+                                (' Speed: ' + Math.ceil((processedDataCnt - prevProcessedDataCnt.processedDataCnt) *
+                                    60000 /
                                     (Date.now() - prevProcessedDataCnt.timestamp)) + ' objects/min.')),
                             ' Transaction queue length: ', transQueue.len,
                             (transQueue.timestamp ?
@@ -123,11 +125,13 @@ houseKeeper.run = function (initParameters) {
                             prevProcessedDataCnt.processedDataCnt === processedDataCnt &&
                             Date.now() - prevProcessedDataCnt.timestamp > parameters.housekeeperWaitTimeout) {
                             isHouseKeeperRunning = houseKeeperLastCheckTime = 0;
-                            log.warn('Housekeeper is halted at ', (new Date(prevProcessedDataCnt.timestamp)).toLocaleString(),
+                            log.warn('Housekeeper is halted at ',
+                                (new Date(prevProcessedDataCnt.timestamp)).toLocaleString(),
                                 ' but processed ', processedDataCnt, '/', data.length, ' objects. Restarting from ',
                                 processedDataCnt - 1);
                             if (cache.terminateHousekeeper) { // terminate house keeper;
-                                return log.warn('Do not start a new housekeeper after halt because a termination request was received.');
+                                return log.warn('Do not start a new housekeeper after halt because a termination ',
+                                    'request was received.');
                             }
 
                             houseKeeper.run();
@@ -142,7 +146,8 @@ houseKeeper.run = function (initParameters) {
                                 timestamp: Date.now(),
                             };
 
-                            storage.config('set', 'processedDataCnt', (processedDataCnt >= data.length ? 0 : processedDataCnt), function (err) {
+                            storage.config('set', 'processedDataCnt',
+                                (processedDataCnt >= data.length ? 0 : processedDataCnt), function (err) {
                                 if (err) log.error(err.message);
                             });
                         }
@@ -151,7 +156,9 @@ houseKeeper.run = function (initParameters) {
                 }, parameters.housekeeperWatchdogCheckInterval);
 
                 async.eachOfLimit(data,200, function(housekeeperParams, idx, callback) {
-                    if(cache.terminateHousekeeper) return callback(new Error('Receiving message for terminate housekeeper'));
+                    if(cache.terminateHousekeeper) {
+                        return callback(new Error('Receiving message for terminate housekeeper'));
+                    }
                     if(idx < processedDataCnt) return callback();
 
                     var trends = housekeeperParams.trends;
@@ -166,8 +173,9 @@ houseKeeper.run = function (initParameters) {
                     if(err) {
                         log.warn('Housekeeper finished with error: ', err.message, '; processed ',
                             processedDataCnt, '/', data.length, ' objects');
+                    } else {
+                        log.info('Housekeeper finished successfully, processed ', data.length, ' objects');
                     }
-                    else log.info('Housekeeper finished successfully, processed ', data.length, ' objects');
 
                     storage.config('set', 'processedDataCnt', (err ? processedDataCnt - 50 : 0), function (err) {
                         if (err) log.error(err.message);
@@ -178,7 +186,8 @@ houseKeeper.run = function (initParameters) {
                             return log.warn('Terminating housekeeper');
                         } // terminate house keeper;
 
-                        // last start of housekeeper was more then housekeeperInterval. run housekeeper again immediately
+                        // last start of housekeeper was more then housekeeperInterval.
+                        // run housekeeper again immediately
                         if(Date.now() - isHouseKeeperRunning > parameters.housekeeperInterval) {
                             isHouseKeeperRunning = houseKeeperLastCheckTime = 0;
                             houseKeeper.run();

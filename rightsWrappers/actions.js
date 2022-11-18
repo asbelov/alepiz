@@ -151,7 +151,8 @@ rightsWrapper.checkForObjectsCompatibility = function (cfg, objectsNames, callba
     });
     if(!objectsNames || !objectsNames.length) {
         if (cfg.showWhenNoObjectsSelected) return callback();
-        return callback(new Error('Action "' + actionID + '" don\'t showing while no one objects are selected according to showWhenNoObjectsSelected parameter'));
+        return callback(new Error('Action "' + actionID +
+            '" don\'t showing while no one objects are selected according to showWhenNoObjectsSelected parameter'));
     }
 
     checkForObjectsPropertiesCompatibility(cfg, objectsNames, function (err) {

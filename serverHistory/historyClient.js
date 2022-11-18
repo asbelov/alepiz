@@ -5,22 +5,20 @@
  * Created by Alexander Belov on 16.10.2016.
  */
 
-const path = require('path');
 const log = require('../lib/log')(module);
+const async = require('async');
 const IPC = require('../lib/IPC');
-const proc = require('../lib/proc');
-const parameters = require('../models_history/historyParameters');
-const cache = require('../models_history/historyCache');
-const functions = require('../models_history/historyFunctions');
-const historyGet = require('../models_history/historyFunctionsGet');
-const historyStorageServer = require("../models_history/historyStorageServer");
+const parameters = require('./historyParameters');
+const historyGet = require('./historyFunctionsGet');
+const functions = require('./historyFunctions');
 const countersDB = require('../models_db/countersDB');
 const Conf = require('../lib/conf');
 const connectToRemoteNodes = require("../lib/connectToRemoteNodes");
 const confHistory = new Conf('config/history.json');
 parameters.init(confHistory.get());
 
-if(parameters.directAccessToDBFile) historyGet.initFunctions(getByIdx, getByTime);
+// used for historyFunction in history.get() for getting historical data
+historyGet.initFunctions(getByIdx, getByTime);
 
 var history = {
     getByIdx: getByIdx,
@@ -31,23 +29,23 @@ module.exports = history;
 var clientIPC,
     allClientIPC = new Map(),
     connectionInitialized = false,
-    truncateWatchDogInterval,
-    restartInProgress = false,
     usedToSaveDataToHistory = false;
-var houseKeeperData = new Map();
+var dontKeepHistoryOCIDs = new Set();
 
-/** Skip to send data to history when keepHistory = 0.
- * For this set the global Map houseKeeperData.set(<OCID with keepHistory = 0>, 0)
- * every parameters.reloadKeepHistoryInterval time.
+/** Don't send data to history when keepHistory = 0.
+ * For this we get getKeepHistoryAndTrends from database and define the global
+ * Set dontKeepHistoryOCIDs(<OCID with keepHistory = 0>) for all keepHistory = 0 counters
+ * every parameters.reloadKeepHistoryInterval time interval.
+ * @return void
  */
 function getHouseKeeperData() {
     if (!usedToSaveDataToHistory) return;
     countersDB.getKeepHistoryAndTrends(function (err, rows) {
         if (err) return log.error('Can\'t get information about data keeping period');
 
-        houseKeeperData.clear()
+        dontKeepHistoryOCIDs.clear();
         rows.forEach(function (row) {
-            if (row.history === 0) houseKeeperData.set(row.OCID, 0);
+            if (row.history === 0) dontKeepHistoryOCIDs.add(row.OCID);
         });
 
         setTimeout(getHouseKeeperData, parameters.reloadKeepHistoryInterval);
@@ -58,10 +56,10 @@ function getHouseKeeperData() {
  *
  * @param {string|null} id the name of the connected services to identify in the log file
  * @param {function(void)} callback on connect return callback(). Error is not returned.
- * @param {Boolean} [notConnectToRemoteInstances=false] if true, then not connect to remote Alepiz instances.
+ * @param {Boolean} [dontConnectToRemoteInstances=false] if true, then not connect to remote Alepiz instances.
  *  used in server for history.add()
  */
-history.connect = function(id, callback, notConnectToRemoteInstances = false) {
+history.connect = function(id, callback, dontConnectToRemoteInstances = false) {
     if(connectionInitialized) return callback();
 
     if(id) {
@@ -76,7 +74,10 @@ history.connect = function(id, callback, notConnectToRemoteInstances = false) {
             log.info('Initialized connection to the history server: ',
                 parameters.serverAddress, ':', parameters.serverPort);
 
-            if(notConnectToRemoteInstances) return callback();
+            if(dontConnectToRemoteInstances) {
+                allClientIPC.set(parameters.serverAddress + ':' + parameters.serverPort, clientIPC);
+                return callback();
+            }
 
             connectToRemoteNodes('history', (id || ''),function (err, _allClientIPC) {
                 if(!_allClientIPC) {
@@ -105,16 +106,17 @@ for(var funcName in functions) {
 
     // for use funcName in closure
     (function (tmp_funcName) {
-        history[tmp_funcName] = function (/* id, parameter1, parameter2, ..., callback */) {
+        history[tmp_funcName] = function (/* (id, parameter1, parameter2, ..., callback) */) {
             var args = Array.prototype.slice.call(arguments); // create array from objects of arguments
-
+            //log.warn('!!!!func: ', args)
             if(!args || args.length < 2) {
                 return log.error('Try to run function with name "', tmp_funcName, '" with unexpected parameters "',
                     args, '"');
             }
 
-            var id = args.splice(0, 1)[0];
-            var callback = args.splice(-1, 1)[0];
+            var id = args.shift();
+            var callback = args.pop();
+            //if(id === 155362) log.warn('!!!func: ', id, ': ', tmp_funcName, '(', args.join(', '), ')');
 
             if (typeof callback !== 'function')
                 return log.error('Error getting value of the function ', tmp_funcName, '(', args,
@@ -123,16 +125,7 @@ for(var funcName in functions) {
             if (Number(id) !== parseInt(id, 10) || !Number(id))
                 return callback(new Error('Try to run function ' + tmp_funcName + '(' + args.join(', ') +
                     ') for object in history with not integer objectCounterID: ' + id));
-
-            if(parameters.directAccessToDBFile) functions[tmp_funcName](Number(id), args, callback);
-            else {
-                clientIPC.sendAndReceive({
-                    msg: 'func',
-                    id: Number(id),
-                    funcName: tmp_funcName,
-                    parameters: args
-                }, callback);
-            }
+            functions[tmp_funcName](Number(id), args, callback);
         }
     })(funcName);
 }
@@ -141,51 +134,6 @@ for(var funcName in functions) {
  * @returns {array} - return array of objects [{name: ..., description:...}, {}, ...]
  */
 history.getFunctionList = function() { return functionsArray; };
-
-/** Starting history server and IPC system
- * @param {objects} initParameters - history parameters. Look into the historyParameters.js for default parameters
- * @param {function(Error):void} callback - Called when done
- */
-history.start = function (initParameters, callback) {
-    //parameters.init(initParameters);
-
-    var historyProcess = new proc.parent({
-        childrenNumber: 1,
-        childProcessExecutable: path.join(__dirname, 'historyServer.js'),
-        killTimeout: 1900000,
-        restartAfterErrorTimeout: 10000,
-        onStart: function(err) {
-            if(err) return callback(new Error('Can\'t run history server: ' + err.message));
-            //truncateWalWatchdog(parameters, callback);
-            historyProcess.sendAndReceive({type: 'initParameters', data: initParameters}, function(err) {
-                initParameters['__restart'] = true;
-                if(truncateWatchDogInterval) clearInterval(truncateWatchDogInterval);
-                truncateWatchDogInterval = null;
-                if(typeof callback === 'function') callback(err);
-                restartInProgress = true;
-            });
-        },
-        module: 'history',
-    }, function(err, historyProcess) {
-        if(err) return callback(new Error('Can\'t initializing history server: ' + err.message));
-
-        history.stop = historyProcess.stop;
-        historyProcess.start();
-    });
-};
-
-/** Dumps the cached historical data to a file before exiting.
- * The data from the dump file will be loaded into the cache on next startup
- * @param {function(void): void} callback - Called when done
- * @param {boolean} [isScheduled] - the function is called when the history is scheduled to restart
- */
-history.dump = cache.dumpData;
-
-/** Set or get cacheServiceIsRunning variable
- *
- * @param {number} [val] - if val defined (must be a unix time), then set cacheServiceIsRunning variable to val. Else return cacheServiceIsRunning value
- */
-history.cacheServiceIsRunning = cache.cacheServiceIsRunning;
 
 /** Add new data to history storage and return value like {timestamp:…, value:…}
  *
@@ -260,7 +208,7 @@ history.add = function(initID, data) {
     }
 
     // send data to history only if counter.keepHistory != 0
-    if(houseKeeperData.get(id) !== 0) {
+    if(!dontKeepHistoryOCIDs.has(id)) {
         clientIPC.send({
             msg: 'add',
             id: id,
@@ -281,7 +229,7 @@ history.add = function(initID, data) {
  * @param {array} IDs - array of history IDs (OCIDs) for remove
  * @param {function(Error)|function()} callback - callback(err)
  */
-history.del = function(IDs, callback){
+history.del = function(IDs, callback) {
     if(typeof callback !== 'function') {
         return log.error('Error deleting object ',IDs,' from history: callback is not a function');
     }
@@ -289,17 +237,28 @@ history.del = function(IDs, callback){
         return callback(new Error('Try to delete data objects from history with not an array objects IDs'));
     }
 
-    clientIPC.send( {
-        msg: 'del',
-        IDs: IDs
-    }, callback);
+    if(!IDs.length) return callback();
+
+    allClientIPC.forEach(clientIPC => {
+        if(!clientIPC.isConnected()) return;
+
+        clientIPC.sendExt({
+            msg: 'del',
+            IDs: IDs
+        }, {
+            dontSaveUnsentMessage: true,
+        })
+    });
+
+    callback();
 };
 
 /** Get last value for specified history IDs (OCIDs)
  *
  * @param {array} IDs - array of history IDs (OCIDs)
- * @param {function(null, object)|function(Error): void} callback - called when done. Return Error or records with last values for IDs
- * like {id1: {timestamp:..., data:..., param:...}, id2: {timestamp:..., data:..., param:...}, ....}
+ * @param {function(null, object)|function(Error): void} callback - called when done. Return Error or records
+ * with last values for IDs like
+ * {id1: {timestamp:..., data:..., err:...}, id2: {timestamp:..., data:..., err:...}, ....}
  */
 history.getLastValues = function(IDs, callback) {
     if(typeof callback !== 'function') {
@@ -311,13 +270,28 @@ history.getLastValues = function(IDs, callback) {
         return callback(new Error('Try to get data by function "getLastValues" when objectCounterIDs is not an array: '+ IDs));
     }
 
-    clientIPC.sendExt( {
-        msg: 'getLastValues',
-        IDs: IDs,
-    }, {
-        sendAndReceive: true,
-        dontSaveUnsentMessage: true,
-    }, callback);
+    var results = {};
+    async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
+        if(!clientIPC.isConnected()) return callback();
+
+        clientIPC.sendExt( {
+            msg: 'getLastValues',
+            IDs: IDs,
+        }, {
+            sendAndReceive: true,
+            dontSaveUnsentMessage: true,
+        }, function(err, result) {
+            if(err) log.warn('Can\'t get last values from ', hostPort, ': ', err.message)
+
+            if(typeof result === 'object' && Object.keys(result).length) {
+                for(var id in result) results[id] = result[id];
+            }
+
+            callback();
+        });
+    }, function() {
+        callback(null, results);
+    });
 };
 
 /** Get the specified amount of data from history for the specified history identifier (OCID)
@@ -347,41 +321,35 @@ function getByIdx (id, offset, cnt, maxRecordsCnt, callback) {
         return callback(new Error('Try to get data by function "getByIdx" for object from history with not integer ' +
             '"cnt" parameter: '+cnt));
     }
+    var results = [], isGotAllRequiredRecords;
+    async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
+        if(!clientIPC.isConnected()) return callback();
 
-    clientIPC.sendExt( {
-        msg: 'getByIdx',
-        id: Number(id),
-        last: Number(offset),
-        cnt: Number(cnt),
-        maxRecordsCnt: Number(maxRecordsCnt),
-        recordsType: 0,
-    }, {
-        sendAndReceive: true,
-        dontSaveUnsentMessage: true,
-    }, function(err, result) {
-        if(err && !result)  return callback(err);
-        if(!result) return callback();
-
-        var recordsFromCache = result.records;
-        var param = result.param;
-        var isGotAllRequiredRecords = result.all;
-
-        if(typeof param !== 'object') return callback(err, recordsFromCache, isGotAllRequiredRecords);
-
-        historyStorageServer.getRecordsFromStorageByIdx(Number(id), param.storageOffset, param.storageCnt,
-            param.storageTimestamp, Number(maxRecordsCnt), 0, function(err, recordsFromStorage) {
-
-            if (err) return callback(err);
-            if(!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
-                return callback(err, recordsFromCache, false);
+        clientIPC.sendExt({
+            msg: 'getByIdx',
+            id: Number(id),
+            last: Number(offset),
+            cnt: Number(cnt),
+            maxRecordsCnt: Number(maxRecordsCnt),
+            recordsType: 0,
+        }, {
+            sendAndReceive: true,
+            dontSaveUnsentMessage: true,
+        }, function (err, result) {
+            if (err && !result) {
+                log.warn('Can\'t getByIdx from ', hostPort, ': ', err.message);
+                return callback();
             }
+            if (!result) return callback();
 
-            Array.prototype.push.apply(recordsFromStorage, recordsFromCache);
-            if(recordsFromStorage.length) {
-                recordsFromStorage[0].recordsFromCache = recordsFromCache.length;
-            }
-            callback(null, cache.thinOutRecords(recordsFromStorage, Number(maxRecordsCnt)), true);
+            isGotAllRequiredRecords = isGotAllRequiredRecords === undefined ?
+                Boolean(result.all) : isGotAllRequiredRecords && Boolean(result.all);
+            // result.records is [{timestamp:, data:}, ...]
+            Array.prototype.push.apply(results, result.records);
+            callback();
         });
+    }, function () {
+        callback(null, results, isGotAllRequiredRecords);
     });
 }
 
@@ -420,7 +388,11 @@ function getByTime (id, time, interval, maxRecordsCnt, callback) {
             '"interval" parameter: '+interval));
     }
 
-    clientIPC.sendExt( {
+    var results = [], isGotAllRequiredRecords;
+    async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
+        if(!clientIPC.isConnected()) return callback();
+
+        clientIPC.sendExt( {
         msg: 'getByTime',
         id: Number(id),
         time: Number(time),
@@ -431,43 +403,20 @@ function getByTime (id, time, interval, maxRecordsCnt, callback) {
         sendAndReceive: true,
         dontSaveUnsentMessage: true,
     }, function(err, result) {
-        if(err && !result) return callback(err);
-        if(!result) return callback();
-
-        var recordsFromCache = result.records;
-        var param = result.param;
-        var isGotAllRequiredRecords = result.all;
-
-        if(typeof param !== 'object') return callback(err, recordsFromCache, isGotAllRequiredRecords);
-
-        historyStorageServer.getRecordsFromStorageByTime(Number(id), param.timeFrom, param.storageTimeTo,
-            Number(maxRecordsCnt), 0,function(err, recordsFromStorage) {
-//          log.debug(id, ': !!! records form storage err: ', err, '; time: ', (new Date(timeFrom)).toLocaleString(), '-', (new Date(storageTimeTo)).toLocaleString(), ';', timeFrom,'-', storageTimeTo, ': ', recordsFromStorage);
-
-            if (err) return callback(err);
-            if(!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
-                return callback(err, recordsFromCache, false);
+            if (err && !result) {
+                log.warn('Can\'t getByTime from ', hostPort, ': ', err.message);
+                return callback();
             }
+            if (!result) return callback();
 
-            var isDataFromTrends = recordsFromStorage.length ? recordsFromStorage[0].isDataFromTrends : false;
-            if(recordsFromCache.length &&
-                recordsFromStorage[recordsFromStorage.length-1].timestamp >= recordsFromCache[0].timestamp) {
-                log.warn('Timestamp in last record from storage: ', recordsFromStorage[recordsFromStorage.length-1],
-                    ' more than timestamp in first record from cache: ', recordsFromCache[0], '; storage: ...',
-                    recordsFromStorage.slice(-5), '; cache: ', recordsFromCache.slice(0, 5), '...');
-
-                var lastRecord = recordsFromStorage.pop(), firstCachedRecordTimestamp = recordsFromCache[0].timestamp;
-                while(lastRecord && lastRecord.timestamp >= firstCachedRecordTimestamp) {
-                    lastRecord = recordsFromStorage.pop();
-                }
-            }
-            Array.prototype.push.apply(recordsFromStorage, recordsFromCache);
-            if(recordsFromStorage.length) {
-                recordsFromStorage[0].isDataFromTrends = isDataFromTrends;
-                recordsFromStorage[0].recordsFromCache = recordsFromCache.length;
-            }
-            callback(null, cache.thinOutRecords(recordsFromStorage, Number(maxRecordsCnt)), true);
+            isGotAllRequiredRecords = isGotAllRequiredRecords === undefined ?
+                Boolean(result.all) : isGotAllRequiredRecords && Boolean(result.all);
+            // result.records is [{timestamp:, data:}, ...]
+            Array.prototype.push.apply(results, result.records);
+            callback();
         });
+    }, function () {
+        callback(null, results, isGotAllRequiredRecords);
     });
 }
 
@@ -476,7 +425,7 @@ function getByTime (id, time, interval, maxRecordsCnt, callback) {
  *
  * @param {number} id - history ID (OCID)
  * @param {number|string} value - desired value
- * @param {function(null, number)|function(Error): void } callback - called when done. Return Error or
+ * @param {function(null, timestamp: number)|function(Error): void } callback - called when done. Return Error or
  * timestamp for desired value
  */
 history.getByValue = function(id, value, callback){
@@ -492,17 +441,22 @@ history.getByValue = function(id, value, callback){
             'undefined or not number or not string value parameter: '+ JSON.stringify(value)));
     }
 
-    clientIPC.sendExt( {
+    var minTimestamp;
+    async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
+        if(!clientIPC.isConnected()) return callback();
+
+        clientIPC.sendExt( {
         msg: 'getByValue',
         id: Number(id),
         value: value
-    }, {
-        sendAndReceive: true,
-        dontSaveUnsentMessage: true,
-    }, function(err, result) {
-
-        if(err !== null || !result) return callback(err, result);
-
-        historyStorageServer.getLastRecordTimestampForValue(Number(id), value, callback);
+        }, {
+            sendAndReceive: true,
+            dontSaveUnsentMessage: true,
+        }, function(err, timestamp) {
+            if(err) log.warn('Can\'t getByValue from ', hostPort, ': ', err.message);
+            if(timestamp && (!minTimestamp || timestamp < minTimestamp)) minTimestamp = timestamp;
+        });
+    }, function () {
+        callback(null, minTimestamp);
     });
 };

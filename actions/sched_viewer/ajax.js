@@ -5,7 +5,7 @@
 var async = require('async');
 var path = require('path');
 var log = require('../../lib/log')(module);
-var history = require('../../models_history/history');
+var history = require('../../serverHistory/historyClient');
 var usersRolesRightsDB = require('../../models_db/usersRolesRightsDB');
 var countersDB = require('../../models_db/countersDB');
 var actionsConf = require('../../lib/actionsConf');
@@ -123,15 +123,16 @@ module.exports = function(args, callback) {
                                                     log.warn('Can\'t get history data for service state for objectID ' + objectID + ': ' + err.message);
                                                     return callback();
                                                 }
-                                                if (!serviceStateData || !serviceStateData.length) {
+                                                var _serviceStateData;
+                                                if (!Array.isArray(serviceStateData) || !serviceStateData.length) {
                                                     log.warn('History data for counter ' + serviceStateName + ' not found');
-                                                }
+                                                } else _serviceStateData = serviceStateData[0].data;
 
                                                 historyData[objectID] = {
                                                     name: object.name,
                                                     start: startData,
                                                     stop: stopData,
-                                                    state: serviceStateData[0].data,
+                                                    state: _serviceStateData,
                                                 };
                                                 callback();
                                             });

@@ -3,7 +3,7 @@
  */
 
 var log = require('../lib/log')(module);
-var history = require('../models_history/historyFunctionsGet');
+var history = require('./historyFunctionsGet');
 
 var functions = {};
 module.exports = functions;

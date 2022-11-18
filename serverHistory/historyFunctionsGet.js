@@ -2,36 +2,14 @@
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var log = require('../lib/log')(module);
-const parameters = require("./historyParameters");
-const historyCache = require('./historyCache');
+//var log = require('../lib/log')(module);
 
 var getByIdx = function () {};
 var getByTime = function () {};
 
 function initFunctions(_getByIdx, _getByTime) {
-    getByIdx = function (id, offset, cnt, maxRecordsCnt, recordsType, callback) {
-        parameters.directAccessToDBFile ?
-            _getByIdx(id, offset, cnt, maxRecordsCnt, callback) :
-            historyCache.getByIdx(id, offset, cnt, maxRecordsCnt, recordsType, callback);
-    }
-
-    getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, recordsType, callback) {
-        parameters.directAccessToDBFile ?
-            _getByTime(id, timeShift, timeInterval, maxRecordsCnt, callback) :
-            historyCache.getByTime(id, timeShift, timeInterval, maxRecordsCnt, recordsType, callback);
-    }
-
-    getLastValue = function (id, callback)  {
-        if(parameters.directAccessToDBFile) {
-            log.info('get nodata: ', id)
-            _getByIdx(id, 0, 1, 0, function(err, records) {
-                log.info('get nodata: ', id, '; err: ', err, ': res: ', records)
-                callback(err, records);
-            });
-        }
-        else historyCache.getLastValue(id, callback);
-    }
+    getByIdx = _getByIdx;
+    getByTime = _getByTime;
 }
 
 var historyGet = {
@@ -44,8 +22,7 @@ module.exports = historyGet;
 
 
 function getLastValue (id, callback) {
-    if(parameters.directAccessToDBFile) getByIdx(id, 0, 1, 0, 0, callback);
-    else historyCache.getLastValue(id, callback);
+    getByIdx(id, 0, 1, 0, callback);
 }
 
 
@@ -100,10 +77,10 @@ function getFromHistory(id, shift, num, recordsType, callback) {
         isRequiredAllRecords = true;
     }
 
-    getFromHistory(id, shift, num, 0, recordsType, function (err, rawRecords, isGotAllRecords) {
-        //if(id === 155103) log.info(id, ': shift: ', shift, '; num: ', num, '; isRequiredAllRecords: ', isRequiredAllRecords, '; rawRecords: ', rawRecords, '; isGotAllRecords: ', isGotAllRecords);
+    getFromHistory(id, shift, num, 0, function (err, rawRecords, isGotAllRecords) {
+        //if(id === 155103) log.warn(id, ': shift: ', shift, '; num: ', num, '; isRequiredAllRecords: ', isRequiredAllRecords, '; rawRecords: ', rawRecords, '; isGotAllRecords: ', isGotAllRecords);
+        //if(id === 155362) log.warn(id, ': shift: ', shift, '; num: ', num, '; isRequiredAllRecords: ', isRequiredAllRecords, '; rawRecords: ', rawRecords, '; isGotAllRecords: ', isGotAllRecords);
         if(err) {
-            increaseStorageRetrievingDataIncomplete();
             Array.isArray(rawRecords) ? rawRecords.push(err.message) : rawRecords = err.message;
             return callback(err, null, rawRecords);
         }
@@ -125,13 +102,11 @@ function getFromHistory(id, shift, num, recordsType, callback) {
 
         // when recordsType is null, return received records in any cases
         if(recordsType === null || !isRequiredAllRecords) {
-            increaseStorageRetrievingDataComplete();
             return callback(null, records, records);
         }
 
         // used in a history functions, if not got all required records, return nothing
         if(!isGotAllRecords) {
-            increaseStorageRetrievingDataIncomplete();
             rawRecords.push('No data from the database');
             return callback(null, null, rawRecords);
         }
@@ -139,24 +114,15 @@ function getFromHistory(id, shift, num, recordsType, callback) {
         if(!isTime) {
             // return less the 90% of requirement records
             if(!num || records.length / num < 0.9) {
-                increaseStorageRetrievingDataIncomplete();
                 rawRecords.push('records: ' + records.length + '; num: ', num);
                 return callback(null, null, rawRecords);
             }
-           increaseStorageRetrievingDataComplete();
             return callback(null, records, records);
         } else {
             if(records.length < 2) {
-                increaseStorageRetrievingDataIncomplete();
                 rawRecords.push('Returned ' + records.length + ' records');
                 return callback(null, null, rawRecords);
             }
-            /*
-                        if(records.length === 1) {
-                            increaseStorageRetrievingDataComplete();
-                            return callback(null, records, records);
-                        }
-            */
 
             // calculating an avg time interval between the record timestamps
             for(var i = 2, avgTimeInterval = records[1].timestamp - records[0].timestamp; i < records.length; i++) {
@@ -170,21 +136,11 @@ function getFromHistory(id, shift, num, recordsType, callback) {
             // checking for the last record timestamp is near the timeFrom timestamp
             // r.timestamp = 14:05:00, avgInterval = 30, timeFrom = 14:04:25
             if(records[0].timestamp - avgTimeInterval * 1.2 > timeFrom) {
-                increaseStorageRetrievingDataIncomplete()
                 rawRecords.push('avgInterval + 20%: ' + Math.round(avgTimeInterval * 1.2 / 1000) +
                     '; timestamp - timeFrom: ' + Math.round((records[0].timestamp - timeFrom) / 1000));
                 return callback(null, null, rawRecords);
             }
-            increaseStorageRetrievingDataComplete();
             return callback(null, records, records);
         }
     });
-}
-
-function increaseStorageRetrievingDataComplete() {
-    if(!parameters.directAccessToDBFile) ++historyCache.storageRetrievingDataComplete;
-}
-
-function increaseStorageRetrievingDataIncomplete() {
-    if(!parameters.directAccessToDBFile) ++historyCache.storageRetrievingDataIncomplete;
 }

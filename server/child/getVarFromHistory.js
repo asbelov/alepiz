@@ -5,7 +5,7 @@
 const async = require("async");
 const fromHuman = require('../../lib/utils/fromHuman');
 const variablesReplace = require('../../lib/utils/variablesReplace');
-const history = require("../../models_history/history");
+const history = require("../../serverHistory/historyClient");
 
 /**
  * List of historical function names to check if the function name exists
