@@ -4,7 +4,7 @@
 */
 
 const path = require('path');
-//var log = require('../../lib/log')(module);
+const log = require('../../lib/log')(module);
 const Database = require('better-sqlite3');
 const objectsDB = require('../../models_db/objectsDB');
 const countersDB = require('../../models_db/countersDB');
@@ -128,9 +128,17 @@ collector.removeCounters = function(OCIDs, callback) {
 function init(param, callback) {
     if(eventDB) return callback();
 
-    var dbPath = path.join(__dirname, '..', '..',
-		confSettings.get('dbPath'),
-        confSettings.get('dbFile'));
+    var cfg = confSettings.get(), dbPath;
+
+    if(Array.isArray(cfg.db) && cfg.db.length) {
+        var dbPathObj = cfg.db[0];
+        if (dbPathObj && dbPathObj.path && dbPathObj.file) {
+            if(dbPathObj.relative) dbPath = path.join(__dirname, '..', '..', dbPathObj.path, dbPathObj.file);
+            else dbPath = path.join(dbPathObj.path, dbPathObj.file);
+        } else log.error('Can\'t create DB path from ', cfg.db, ': ', dbPathObj);
+    } else if (cfg.dbPath && cfg.dbFile) {
+        dbPath = path.join(__dirname, '..', '..', cfg.dbPath, cfg.dbFile);
+    }
 
     try {
         eventDB = new Database(dbPath, {readonly: true, fileMustExist: true});

@@ -793,38 +793,50 @@ var JQueryNamespace = (function ($) {
         $("[timestampForLastValue]:contains(' + noDataInCache + ')").text(loadingDataFromCache);
         $("[lastValue]:contains(' + noDataInCache + ')").text(loadingDataFromCache);
         bodyElm.css("cursor", "wait");
-        $.post(serverURL, {func: 'getObjectsCountersValues', IDs: OCIDs.join(',')}, function (records) {
-            bodyElm.css("cursor", "auto");
-            if(records) {
-                Object.keys(records).forEach(function (id) {
-                    var record = records[id];
-                    if(record.timestamp ) {
-                        var t = new Date(Number(record.timestamp));
-                        if (t.getDate() !== (new Date).getDate()) { // compare two days of month
-                            var month = t.getMonth() + 1;
-                            var date = t.getDate();
-                            var timeStr = String(date < 10 ? '0' + date : date) + '.' + String(month < 10 ? '0' + month : month) + '.' + String((t.getYear() - 100));
-                        } else timeStr = timestampToTimeStr(record.timestamp);
-                    } else timeStr = '';
-                    $('#OCID-time-' + id).html(timeStr);
+        //$.post(serverURL, {func: 'getObjectsCountersValues', IDs: OCIDs.join(',')}, function (records) {
+        $.ajax({
+            type: 'POST',
+            timeout: 10000,
+            url: serverURL,
+            data: {
+                func: 'getObjectsCountersValues',
+                IDs: OCIDs.join(','),
+            },
+            error: ajaxError,
+            success: function (records) {
+                bodyElm.css("cursor", "auto");
+                if (records) {
+                    Object.keys(records).forEach(function (id) {
+                        var record = records[id];
+                        if (record.timestamp) {
+                            var t = new Date(Number(record.timestamp));
+                            if (t.getDate() !== (new Date).getDate()) { // compare two days of month
+                                var month = t.getMonth() + 1;
+                                var date = t.getDate();
+                                var timeStr = String(date < 10 ? '0' + date : date) + '.' +
+                                    String(month < 10 ? '0' + month : month) + '.' + String((t.getYear() - 100));
+                            } else timeStr = timestampToTimeStr(record.timestamp);
+                        } else timeStr = '';
+                        $('#OCID-time-' + id).html(timeStr);
 
-                    var value = !isNaN(parseFloat(record.data)) && isFinite(record.data) ? record.data * counterObj[id].multiplier : record.data;
+                        var value = !isNaN(parseFloat(record.data)) && isFinite(record.data) ?
+                            record.data * counterObj[id].multiplier : record.data;
 
-                    if(record.data === undefined) {
-                        if(record.err && record.err.message) value = record.err.message;
-                        else value = noDataInCache;
-                    }
-                    else if (counterObj[id]) value = formatValue(value, unitsObj[counterObj[id].unitID]);
+                        if (record.data === undefined) {
+                            if (record.err && record.err.message) value = record.err.message;
+                            else value = noDataInCache;
+                        } else if (counterObj[id]) value = formatValue(value, unitsObj[counterObj[id].unitID]);
 
-                    $('#OCID-' + id).html(value).attr('data-tooltip', value);
+                        $('#OCID-' + id).html(value).attr('data-tooltip', value);
+                    });
+                }
+                $("[timestampForLastValue]:contains(' + loadingDataFromCache + ')").text(noDataInCache);
+                $("[lastValue]:contains(' + loadingDataFromCache + ')").text(noDataInCache);
+                M.Tooltip.init(document.querySelectorAll('div[latestData]'), {
+                    enterDelay: 1000
                 });
+                drawHistory(callback);
             }
-            $("[timestampForLastValue]:contains(' + loadingDataFromCache + ')").text(noDataInCache);
-            $("[lastValue]:contains(' + loadingDataFromCache + ')").text(noDataInCache);
-            M.Tooltip.init(document.querySelectorAll('div[latestData]'), {
-                enterDelay: 1000
-            });
-            drawHistory(callback);
         });
     }
 
@@ -888,6 +900,7 @@ var JQueryNamespace = (function ($) {
 
                     var objectsCountersValues = data.history;
                     //var isDataFromTrends = data.isDataFromTrends;
+                    var isGotAllRequiredRecords = data.isGotAllRequiredRecords;
                     dataInfo = {};
                     if (!objectsCountersValues || !Object.keys(objectsCountersValues).length) {
                         /*
@@ -925,6 +938,7 @@ var JQueryNamespace = (function ($) {
                                     dataInfo[objectCounterNames] = objectsCountersValues[ocid][0];
                                     dataInfo[objectCounterNames].recordsNum = objectsCountersValues[ocid].length;
                                     dataInfo[objectCounterNames].ID = ocid;
+                                    dataInfo[objectCounterNames].isGotAllRequiredRecords = isGotAllRequiredRecords[ocid];
                                     if(dataInfo[objectCounterNames].isDataFromTrends ||
                                         (dataInfo[objectCounterNames].notTrimmedRecordsNum &&
                                         dataInfo[objectCounterNames].notTrimmedRecordsNum !== dataInfo[objectCounterNames].recordsNum)) {

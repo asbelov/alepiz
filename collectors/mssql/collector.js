@@ -41,7 +41,7 @@ collector.get = function(param, callback) {
 
     for(var key in param) {
         if(!param.hasOwnProperty(key)) continue;
-        if(typeof param[key] === 'string' && param[key].indexOf(';') !== -1) {
+        if(typeof param[key] === 'string' && param[key].indexOf(';') !== -1 && key !== 'query') {
             return callback(new Error('Parameter ' + key + ' contain incorrect symbol ";"' + JSON.stringify(param)));
         }
     }

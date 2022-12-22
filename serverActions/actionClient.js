@@ -114,7 +114,7 @@ actionClient.runAction = function (param, callback) {
         var slowServerTime = Number(param.slowServerTime) === parseInt(String(param.slowServerTime), 10) &&
             Number(param.slowServerTime) > 1 ? Number(param.slowServerTime) : 15000;
 
-        // param.runActionOnRemoteServers = true only for run action from browser (from routes/actions.js)
+        // param.runActionOnRemoteServers set to true only when action was running from browser (from routes/actions.js)
         if ((param.executionMode === 'ajax' && param.runAjaxOnRemoteServers) ||
             (param.executionMode === 'server' && param.runActionOnRemoteServers) ||
             param.executionMode === 'makeTask'
@@ -126,8 +126,9 @@ actionClient.runAction = function (param, callback) {
                 dataToSend.param.hostPort = hostPort;
                 var now = Date.now();
                 clientIPC.sendExt(dataToSend, {
-                    sendAndReceive: param.executionMode === 'ajax',
-                    dontSaveUnsentMessage: param.executionMode === 'ajax',
+                    sendAndReceive: param.executionMode === 'ajax' ||
+                        (param.executionMode === 'server' && param.returnActionResult),
+                    dontSaveUnsentMessage: param.executionMode === 'ajax' || param.executionMode === 'server',
                 }, function (err, actionResult) {
                     actionExecutionTimes.push(hostPort + ':' + (Date.now() - now));
                     if(err) return callback(err);

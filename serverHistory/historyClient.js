@@ -8,12 +8,12 @@
 const log = require('../lib/log')(module);
 const async = require('async');
 const IPC = require('../lib/IPC');
-const parameters = require('./historyParameters');
 const historyGet = require('./historyFunctionsGet');
 const functions = require('./historyFunctions');
 const countersDB = require('../models_db/countersDB');
 const Conf = require('../lib/conf');
 const connectToRemoteNodes = require("../lib/connectToRemoteNodes");
+const parameters = require('./historyParameters');
 const confHistory = new Conf('config/history.json');
 parameters.init(confHistory.get());
 
@@ -23,6 +23,7 @@ historyGet.initFunctions(getByIdx, getByTime);
 var history = {
     getByIdx: getByIdx,
     getByTime: getByTime,
+    getLastValues: getLastValues,
 };
 module.exports = history;
 
@@ -92,6 +93,15 @@ history.connect = function(id, callback, dontConnectToRemoteInstances = false) {
         }
     });
 };
+
+history.getSocketStatus = function() {
+    var socketStatus = {};
+    allClientIPC.forEach((clientIPC, hostPort) => {
+        socketStatus[hostPort] = clientIPC.getSocketStatus();
+    });
+
+    return socketStatus;
+}
 
 // creating array with function names
 var functionsArray = [];
@@ -174,9 +184,9 @@ history.add = function(initID, data) {
             // checking timestamp
             var timestamp = Number(data.timestamp);
             if(!timestamp || timestamp !== parseInt(String(timestamp), 10) ||
-                timestamp < 1477236595310 || timestamp > now + 60000) { // 1477236595310 01/01/2000
+                timestamp < 1477236595310 || timestamp > now + 60000) { // 1477236595310 = 01/01/2000
                 log.warn('Try to add data to history with invalid timestamp or very old timestamp or timestamp ' +
-                    'from a future: ', id, ', data: ', data, '; now: ', now);
+                    'from a future for id: ', id, '; data: ', data, '; now: ', now, '; now - timestamp = ', now - timestamp);
                 timestamp = now;
             }
 
@@ -260,20 +270,20 @@ history.del = function(IDs, callback) {
  * with last values for IDs like
  * {id1: {timestamp:..., data:..., err:...}, id2: {timestamp:..., data:..., err:...}, ....}
  */
-history.getLastValues = function(IDs, callback) {
+function getLastValues(IDs, callback) {
     if(typeof callback !== 'function') {
-        return log.error('Error getting last values for objectsCountersIDs ',IDs,' from history: callback is not a function');
+        return log.error('Error getting last values for objectsCountersIDs ', IDs,
+            ' from history: callback is not a function');
     }
 
     if(typeof IDs === 'number') IDs = [IDs];
     if(!Array.isArray(IDs)) {
-        return callback(new Error('Try to get data by function "getLastValues" when objectCounterIDs is not an array: '+ IDs));
+        return callback(new Error('Try to get data by function "getLastValues" ' +
+            'when objectCounterIDs is not an array: ' + IDs));
     }
 
     var results = {};
     async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
-        if(!clientIPC.isConnected()) return callback();
-
         clientIPC.sendExt( {
             msg: 'getLastValues',
             IDs: IDs,
@@ -284,7 +294,9 @@ history.getLastValues = function(IDs, callback) {
             if(err) log.warn('Can\'t get last values from ', hostPort, ': ', err.message)
 
             if(typeof result === 'object' && Object.keys(result).length) {
-                for(var id in result) results[id] = result[id];
+                for(var id in result) {
+                    if(result[id] && result[id].timestamp) results[id] = result[id];
+                }
             }
 
             callback();
@@ -292,7 +304,7 @@ history.getLastValues = function(IDs, callback) {
     }, function() {
         callback(null, results);
     });
-};
+}
 
 /** Get the specified amount of data from history for the specified history identifier (OCID)
  *
@@ -363,8 +375,9 @@ function getByIdx (id, offset, cnt, maxRecordsCnt, callback) {
  * from <time> parameter
  * @param {number} maxRecordsCnt - the maximum number of values from history that can be obtained.
  * If more values are obtained, the values will be obtained from trends or averaged.
- * @param {function(null, array)|function(Error): void } callback - called when done. Return Error or an array of records like
- * [{timestamp:..., data:...}, {timestamp:..., data:...}, ...]
+ * @param {function(null, array, isGotAllRequiredRecords: Boolean)|function(Error): void } callback -
+ * called when done. Return Error or an array of records like [{timestamp:..., data:...}, {timestamp:..., data:...}, ...]
+ * If all required records were found in the history, isGotAllRequiredRecords will be true. Otherwise false
  */
 function getByTime (id, time, interval, maxRecordsCnt, callback) {
 
@@ -393,16 +406,16 @@ function getByTime (id, time, interval, maxRecordsCnt, callback) {
         if(!clientIPC.isConnected()) return callback();
 
         clientIPC.sendExt( {
-        msg: 'getByTime',
-        id: Number(id),
-        time: Number(time),
-        interval: Number(interval),
-        maxRecordsCnt: Number(maxRecordsCnt),
-        recordsType: 0,
-    }, {
-        sendAndReceive: true,
-        dontSaveUnsentMessage: true,
-    }, function(err, result) {
+            msg: 'getByTime',
+            id: Number(id),
+            time: Number(time),
+            interval: Number(interval),
+            maxRecordsCnt: Number(maxRecordsCnt),
+            recordsType: 0,
+        }, {
+            sendAndReceive: true,
+            dontSaveUnsentMessage: true,
+        }, function(err, result) {
             if (err && !result) {
                 log.warn('Can\'t getByTime from ', hostPort, ': ', err.message);
                 return callback();

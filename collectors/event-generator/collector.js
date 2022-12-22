@@ -21,11 +21,13 @@ collector.get = function (param, callback) {
 
     if(!commonEventGenerator || typeof commonEventGenerator.get !== 'function') {
         log.error('Event generator was not initialized (get), run initialization: ', param);
-        setTimeout(function () {
+        var t = setTimeout(function () {
             init(function () {
-                collector.getOnce(param, callback);
+                collector.get(param, callback);
             });
-        }, 100).unref();
+        }, 100);
+        t.unref();
+        return;
     }
 
     commonEventGenerator.get(param, callback);
@@ -51,11 +53,13 @@ collector.getOnce = function (param, callback) {
 
     if(!commonEventGenerator || typeof commonEventGenerator.getOnce !== 'function') {
         log.error('Event generator was not initialized (getOnce), run initialization: ', param);
-        setTimeout(function () {
+        var t = setTimeout(function () {
             init(function () {
                 collector.getOnce(param, callback);
             });
-        }, 100).unref();
+        }, 100);
+        t.unref();
+        return;
     }
 
     commonEventGenerator.getOnce(param, callback);

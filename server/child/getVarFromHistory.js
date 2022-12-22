@@ -58,7 +58,7 @@ function getVarFromHistory(historyVariable, variables, getVariableValue, param, 
 
             funcParameters.unshift(OCID);
 
-            // add callback function as last parameter to history function
+            // add callback as last parameter to history function
             (function (_historyVariable, _param, _callback) {
                 funcParameters.push(function (err, _result) {
                     funcParameters.pop(); // remove callback for debugging
@@ -69,8 +69,8 @@ function getVarFromHistory(historyVariable, variables, getVariableValue, param, 
                     var variablesDebugInfo = {
                         timestamp: Date.now(),
                         name: _historyVariable.name,
-                        expression: variableObjectName + '(' + _historyVariable.parentCounterName + '): ' + _historyVariable.function + '(' +
-                            funcParameters.join(', ') + ')',
+                        expression: variableObjectName + '(' + _historyVariable.parentCounterName + '): ' +
+                            _historyVariable.function + '(' + funcParameters.join(', ') + ')',
                         variables: variables,
                         functionDebug: _result ? _result.records : undefined,
                         result: JSON.stringify(result),

@@ -7,7 +7,11 @@ var async = require('async');
 var countersDB = require('../models_db/countersDB'); // for init housekeeper
 var cache = require('./historyCache');
 var storage = require('./historyStorage');
-var parameters = require('./historyParameters');
+const parameters = require('./historyParameters');
+const Conf = require("../lib/conf");
+const confHistory = new Conf('config/history.json');
+parameters.init(confHistory.get());
+
 
 var houseKeeper = {};
 module.exports = houseKeeper;
@@ -26,8 +30,7 @@ var watchdogInterval
  running in a child history process.
  */
 
-houseKeeper.run = function (initParameters) {
-    if(initParameters) parameters.init(initParameters);
+houseKeeper.run = function () {
 
     if(cache.terminateHousekeeper) {
         return log.warn('Prevent starting new housekeeper procedure, because receive message for terminating');

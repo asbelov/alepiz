@@ -35,11 +35,14 @@ var cache = {
 // init history and debugCounters communication
 history.connect(childID, function () {
     debugCounters.connect(function () {
-        childThread = new thread.child({
-            module: 'getCountersValue-' + serverName,
-            onMessage: processMessage,
-            onStop: destroyCollectors,
-            onDestroy: destroyCollectors,
+        taskServer.connect(childID, function(err) {
+            if(err) log.error('Can\'t connect to the task server: ', err.message);
+            childThread = new thread.child({
+                module: 'getCountersValue-' + serverName,
+                onMessage: processMessage,
+                onStop: destroyCollectors,
+                onDestroy: destroyCollectors,
+            });
         });
     });
 }, confServer.get('dontConnectToRemoteHistoryInstances'));
@@ -88,7 +91,7 @@ function processMessage(message, callback) {
         return;
     }
 
-    // we can't process messages while cache is not initializing. Push messages in message cache
+    // We can't process messages until the cache is initialized. Adding message to the message cache
     if (!cacheAndCollectorsInitialized) {
         messageCache.add(message);
         return;
@@ -162,7 +165,14 @@ function destroyCollectors(callback) {
         });
     }, callback); // error is not returned
 }
-// dont return without sending execution result to the parent
+/**
+ * Send execution result to the parent on error or interrupt counter calculation.
+ * Dont call return without sending execution result to the parent
+ *
+ * @param {Object} param object with parentOCID and OCID
+ * @param {number} param.parentOCID parent OCID
+ * @param {number} param.OCID OCID
+ */
 function sendCompleteExecutionResult(param) {
     childThread.send({
         parentOCID: param.parentOCID,
@@ -170,6 +180,22 @@ function sendCompleteExecutionResult(param) {
     });
 }
 
+/**
+ * Processing counter result, received from another active collector
+ *
+ * @param {Object} message message from another active collector
+ * @param {0|1} message.updateEventState update event state
+ * @param {number} message.parentOCID parent OCID
+ * @param {number} message.OCID OCID
+ * @param {string} message.collector collector name
+ * @param {number} message.counterID counter ID
+ * @param {Array} message.removeCounter Array of the OCIDs for remove
+ * @param {Object} message.parentVariables Object with variables from parent counter like
+ * {<variableName1>: <variableValue1>, ....}
+ * @param {number|string} message.parentObjectValue value from parent counter
+ * @param {string} message.updateEventExpression update event expression
+ * @param {number} message.updateEventMode update event mode
+ */
 function getVariablesAndCheckUpdateEvents(message) {
 
     var counterParameters = [],

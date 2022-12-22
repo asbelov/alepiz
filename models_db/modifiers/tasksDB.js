@@ -38,7 +38,7 @@ tasksDB.addTask = function(userID, timestamp, name, groupID, sessionID, callback
     });
 };
 
-tasksDB.updateTask = function(taskID, name, groupID, callback) {
+tasksDB.updateTask = function(userID, taskID, name, groupID, callback) {
     if(!name) name = null;
 
     db.run('UPDATE tasks SET name=$name, groupID=$groupID WHERE id=$taskID', {

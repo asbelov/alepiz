@@ -14,16 +14,10 @@ function initFunctions(_getByIdx, _getByTime) {
 
 var historyGet = {
     initFunctions: initFunctions,
-    getLastValue: getLastValue,
     get: getFromHistory,
 };
 
 module.exports = historyGet;
-
-
-function getLastValue (id, callback) {
-    getByIdx(id, 0, 1, 0, callback);
-}
 
 
 /*

@@ -408,7 +408,7 @@ functions.nodata = function(id, parameters, callback, prevResult) {
                 ')" function for objectID: ' + id + ': parameter mast be a pure time interval without "#"'));
     }
     // get last history record
-    history.getLastValue(id, function (err, records) {
+    history.get(id, 0, '#1', 0, function (err, records) {
         if(err) {
             return callback(new Error('Error occurred while getting data from history for "nodata('+ (period || '') +
                 ')" function for objectID: '+ id +': ' + err.message));
@@ -416,8 +416,7 @@ functions.nodata = function(id, parameters, callback, prevResult) {
 
         var result = records && records[0] ? Date.now() - records[0].timestamp : Date.now();
 
-        // it's strange workaround and it tou understand, why sometimes we get
-        // large values as nodata result, but all data is present in history, remove this f...cking code
+        // some times nodata returned large value
         if(result > 3600000) { // 1 hour
             // try to get nodata again after 30 sec
             if(!prevResult) return setTimeout(functions.nodata, 30000, id, parameters, callback, result);
@@ -464,7 +463,7 @@ functions.regexp =  function(id, parameters, callback) {
     } catch (err) {
         return callback(new Error('Incorrect regular expression "'+pattern+'" in "regexp('+parameters.join(', ')+')" function for objectID: '+ id + ': ' + err.message))
     }
-     
+
     history.get(id, shift, num, 2,function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "regexp('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
 

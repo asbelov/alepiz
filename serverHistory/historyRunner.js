@@ -4,6 +4,11 @@
 
 const proc = require('../lib/proc');
 const path = require('path');
+const parameters = require('./historyParameters');
+const Conf = require("../lib/conf");
+const confHistory = new Conf('config/history.json');
+parameters.init(confHistory.get());
+
 
 var historyRunner = {
     start: historyStart,
@@ -15,10 +20,9 @@ module.exports = historyRunner;
 
 
 /** Starting history server as separate process
- * @param {objects} initParameters - history parameters. Look into the historyParameters.js for default parameters
  * @param {function(Error):void} callback - Called when done
  */
-function historyStart(initParameters, callback) {
+function historyStart(callback) {
 
     var historyProcess = new proc.parent({
         childrenNumber: 1,
@@ -27,8 +31,7 @@ function historyStart(initParameters, callback) {
         restartAfterErrorTimeout: 10000,
         onStart: function(err) {
             if(err) return callback(new Error('Can\'t run history server: ' + err.message));
-            historyProcess.sendAndReceive({type: 'initParameters', data: initParameters}, function(err) {
-                initParameters['__restart'] = true;
+            historyProcess.sendAndReceive({type: 'init'}, function(err) {
                 if(typeof callback === 'function') callback(err);
             });
         },

@@ -10,8 +10,11 @@ const fs = require("fs");
 const exitHandler = require("../lib/exitHandler");
 const countersDB = require("../models_db/countersDB");
 const historyStorage = require('./historyStorage');
-var parameters = require('./historyParameters');
 const setShift = require('../lib/utils/setShift');
+var parameters = require('./historyParameters');
+const Conf = require('../lib/conf');
+const confHistory = new Conf('config/history.json');
+parameters.init(confHistory.get());
 
 // array of minutes for trends. long time (keepTrends time) keeps only trends with time interval 60
 // trends less the 60 will keep as history data (keepHistory time)
@@ -35,43 +38,31 @@ var slowRecords = {
     recordsNum: 0,
 };
 
-// if(module.parent) {} === if(require.main !== module) {}
-if(require.main !== module) {
-    const Conf = require('../lib/conf');
-    const confHistory = new Conf('config/history.json');
-    parameters.init(confHistory.get());
+var isTransactionProcess = threads.workerData && threads.workerData[0];
+var dbPath = threads.workerData && threads.workerData[1];
 
-    var isTransactionProcess = false;
-    var dbPath = getDbPaths(parameters)[0];
-    dbOpen();
-    module.exports = historyStorageServer;
-} else {
-    isTransactionProcess = threads.workerData && threads.workerData[0];
-    dbPath = threads.workerData && threads.workerData[1];
-
-    new threads.child({
-        module: 'historyStorage',
-        cleanUpCallbacksPeriod: 86400000,
-        onMessage: onMessage,
-        onStop: onStop,
-        onDestroy: function () {
-            if(db && typeof db.close === 'function') {
-                try {
-                    db.close();
-                    log.exit('Storage DB closed successfully');
-                } catch (err) {
-                    log.exit('Error while close storage DB: ' + err.message);
-                }
+new threads.child({
+    module: 'historyStorage',
+    cleanUpCallbacksPeriod: 86400000,
+    onMessage: onMessage,
+    onStop: onStop,
+    onDestroy: function () {
+        if(db && typeof db.close === 'function') {
+            try {
+                db.close();
+                log.exit('Storage DB closed successfully');
+            } catch (err) {
+                log.exit('Error while close storage DB: ' + err.message);
             }
-        },
-        onDisconnect: function () {  // exit on disconnect from parent (then server will be restarted)
-            log.exit('History storage process ' + process.pid + ' was disconnected from server unexpectedly. Exiting');
-            onStop(function () {
-                log.disconnect(function () { process.exit(2) });
-            });
-        },
-    });
-}
+        }
+    },
+    onDisconnect: function () {  // exit on disconnect from parent (then server will be restarted)
+        log.exit('History storage process ' + process.pid + ' was disconnected from server unexpectedly. Exiting');
+        onStop(function () {
+            log.disconnect(function () { process.exit(2) });
+        });
+    },
+});
 
 function dbOpen() {
     if(!isTransactionProcess && !fs.existsSync(dbPath)) return setTimeout(dbOpen, 30000);
@@ -196,30 +187,12 @@ function addSlowRecord(receiveTime, recordsNum) {
 }
 
 function onMessage(message, callback) {
-    if (message && message.restart) {
-        log.warn('Receiving message for restart history ', message.restart,' for ', dbPath,'...');
-        onStop(function (err) {
-            if(message.waitForCallback) callback();
+    // initialization storage
+    if(message && message.init) return init(callback);
 
-            if(err) log.error('Error when preparing to stop history ', message.restart,' for ', dbPath,': ', err.message);
-            else log.warn('History ', message.restart ,' for ', dbPath, ' successfully stopped.');
-
-            log.disconnect(function () {
-                exitHandler.exit(12, 10000); // process.exit(12)
-            });
-        });
-        return;
-    }
-
-    // init parameters
-    if(message && typeof message.parameters === 'object') {
-        parameters = message.parameters;
-        init(callback);
-        return;
-    }
-
-    if (!message || !message.funcName || !historyStorageServer[message.funcName] || !message.arguments)
+    if (!message || !message.funcName || !historyStorageServer[message.funcName] || !message.arguments) {
         return log.error('Incorrect message: ', message);
+    }
 
     var storageFunctionArguments = message.arguments.slice();
     storageFunctionArguments.push(function () {

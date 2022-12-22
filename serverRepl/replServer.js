@@ -156,7 +156,7 @@ function replication(remoteDBs) {
 
                         if (remoteDB.clientIPC.printNotConnectedBefore ||
                             remoteDB.clientIPC.printNotConnectedBefore === undefined) {
-                            log.warn('Connected to ', hostPort, ' and running replication');
+                            log.info('Connected to ', hostPort, ' and running replication');
                         }
                         remoteDB.clientIPC.printNotConnectedBefore = false;
 

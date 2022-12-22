@@ -10,10 +10,14 @@ const fs = require('fs');
 const async = require('async');
 const path = require('path');
 
-const parameters = require('./historyParameters');
 const log = require('../lib/log')(module);
 const storage = require('./historyStorage');
 const countersDB = require('../models_db/countersDB'); // for init housekeeper
+const parameters = require('./historyParameters');
+const Conf = require("../lib/conf");
+const confHistory = new Conf('config/history.json');
+parameters.init(confHistory.get());
+
 
 var historyCache = {};
 module.exports = historyCache;
@@ -62,16 +66,15 @@ load unsaved data from dump files
 load records to cache from storage
 starting cache service for save data to storage
  */
-historyCache.init = function (initParameters, callback) {
+historyCache.init = function (callback) {
 
-    parameters.init(initParameters);
     terminateCacheService = 0;
     cacheServiceIsRunning = 0;
 
     loadDataFromDumpToCache(dumpPath, function(err) {
         if(err) return callback(err); // only if can\'t close dump file
 
-        storage.initStorage(parameters, function(err) {
+        storage.initStorage(function(err) {
             if(err) return callback(err);
 
             setInterval(cacheService, parameters.cacheServiceInterval * 1000); // sec
@@ -151,14 +154,16 @@ function loadDataFromDumpToCache(dumpPath, callback) {
 
                 var loadedRecords = 0, unsavedRecords = 0;
                 for (var id in loadedCacheObj) {
-                    var records = loadedCacheObj[id].records;
-                    if(loadedCacheObj[id] && Array.isArray(records) && records.length) {
-                        loadedCacheObj[id].firstValue = records[0];
-                        loadedCacheObj[id].lastValue = records[records.length - 1];
-                        loadedCacheObj[id].records = new Set(records);
-                        cache.set(Number(id), loadedCacheObj[id]);
-                        loadedRecords += loadedCacheObj[id].records.size;
-                        unsavedRecords += loadedCacheObj[id].records.size - loadedCacheObj[id].savedCnt;
+                    if (loadedCacheObj[id]) {
+                        var records = loadedCacheObj[id].records;
+                        if (Array.isArray(records) && records.length) {
+                            loadedCacheObj[id].firstValue = records[0];
+                            loadedCacheObj[id].lastValue = records[records.length - 1];
+                            loadedCacheObj[id].records = new Set(records);
+                            cache.set(Number(id), loadedCacheObj[id]);
+                            loadedRecords += loadedCacheObj[id].records.size;
+                            unsavedRecords += loadedCacheObj[id].records.size - loadedCacheObj[id].savedCnt;
+                        }
                     }
                 }
 
@@ -239,7 +244,7 @@ historyCache.add = function (id, newRecord){
  * @param {Array} IDs array of object IDs
  * @param {number} daysToKeepHistory number of days to keep history
  * @param {number} daysToKeepTrends number of days to keep trends
- * @param {function(Error)|function(void)} callback callback(err)
+ * @param {function(Error)|function(void)} [callback] callback(err)
  */
 historyCache.del = function (IDs, daysToKeepHistory, daysToKeepTrends, callback){
 
@@ -361,12 +366,11 @@ historyCache.getLastValues = function(IDs, callback) {
     }
 
     var lastValues = {}, errors = [];
-    //log.debug('Getting last values for ', IDs);
     async.each(IDs, function (id, callback) {
         if(lastValues[id]) return callback();
 
         lastValues[id] = {};
-        historyCache.getLastValue(id,function (err, record/*, isGotAllRequiredRecords, param*/) {
+        getLastValue(id,function (err, record/*, isGotAllRequiredRecords*/) {
             if(err) {
                 if(!historyCache.terminateHousekeeper) {
                     log.warn('Can\'t get last value for ', id, ': ', err.message);
@@ -377,10 +381,9 @@ historyCache.getLastValues = function(IDs, callback) {
 
             //log.debug('Value for ', id, ': ', record, '; err: ', err);
 
-            if(record && record.length) {
-                lastValues[id].timestamp = record[0].timestamp;
-                lastValues[id].data = record[0].data;
-                //if(param) lastValues[id].param = param;
+            if(record) {
+                lastValues[id].timestamp = record.timestamp;
+                lastValues[id].data = record.data;
             }
             callback();
         });
@@ -389,7 +392,7 @@ historyCache.getLastValues = function(IDs, callback) {
     });
 }
 
-historyCache.getLastValue = function (id, callback) {
+function getLastValue (id, callback) {
     if(typeof callback !== 'function') {
         return log.error('[getLastValue]: callback is not a function: ', (new Error()).stack);
     }
@@ -397,10 +400,35 @@ historyCache.getLastValue = function (id, callback) {
     id = Number(id);
     var cacheObj = cache.get(id);
 
-    if(cacheObj && cacheObj.lastValue) return callback(null, cacheObj.lastValue, true);
+    if(cacheObj && cacheObj.lastValue) {
+        //log.info('Get last value for ', id,' from history cache: ', cacheObj.lastValue);
+        ++recordsFromCacheCnt;
+        return callback(null, cacheObj.lastValue, true);
+    }
 
-    //log.warn('Can\'t get last value for ', id,' from history cache: ', cache.get(id));
-    historyCache.getByIdx(id, 0, 1, 0, 0, callback);
+    if(!cacheObj) {
+        createNewCacheObject(id);
+        cacheObj = cache.get(id);
+    }
+    storage.getRecordsFromStorageByIdx(id, 0, 1, 0, 0, 0, function(err, recordsFromStorage) {
+        if (err) return callback(err);
+        if(!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
+            //log.info('Can\'t get last value for ', id,' from history cache: ', cacheObj, ' and storage ', recordsFromStorage);
+            return callback(null, null, false);
+        }
+
+        recordsFromStorageCnt += recordsFromStorage.length;
+        calculateCacheSize(cacheObj, recordsFromStorage);
+
+        // add received record to the cache
+        if(!cacheObj.records.size) {
+            cacheObj.records.add(recordsFromStorage[0]);
+            cacheObj.savedCnt = 1;
+            cacheObj.lastValue = cacheObj.firstValue = recordsFromStorage[0];
+        }
+        //log.info('Get last value for ', id,' from history storage: ', recordsFromStorage[0]);
+        callback(null, recordsFromStorage[0], true);
+    });
 }
 /*
     get requested records by position
@@ -491,8 +519,6 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
 
         recordsFromStorageCnt += recordsFromStorage.length;
         calculateCacheSize(cacheObj, recordsFromStorage);
-        // used too many resources
-        //addDataToCache(cacheObj, recordsFromStorage);
 
         Array.prototype.push.apply(recordsFromStorage, recordsFromCache);
         if(recordsFromStorage.length) {
@@ -517,22 +543,24 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
         return log.error('[getByTime]: callback is not a function', (new Error()).stack);
     }
 
-    if(recordsType === undefined) recordsType = 0;
+    // return last value
+    if (timeInterval === 0) return historyCache.getByIdx(id, 0, 1, 0, 0, callback);
+
+    if (recordsType === undefined) recordsType = 0;
     id = Number(id); timeShift = Number(timeShift); timeInterval = Number(timeInterval);
-    if (id !== parseInt(String(id), 10) || !id) return callback(new Error('[getByTime] incorrect ID ' + id));
+    if (id !== parseInt(String(id), 10) || !id) {
+        return callback(new Error('[getByTime] incorrect ID ' + id));
+    }
+
     if (timeShift !== parseInt(String(timeShift), 10) || timeShift < 0) {
         return callback(new Error('[getByTime] incorrect "timeShift" parameter (' + timeShift +
             ') for objectID ' + id));
     }
+
     if (timeInterval !== parseInt(String(timeInterval), 10) || timeInterval < 0) {
-        return callback(new Error('[getByTime] incorrect "timeInterval" parameter (' + timeInterval + ') for objectID ' + id));
+        return callback(new Error('[getByTime] incorrect "timeInterval" parameter (' + timeInterval +
+            ') for objectID ' + id));
     }
-
-    // return last value
-    if(timeInterval === 0) return historyCache.getByIdx(id, 0, 1, 0, 0, callback);
-
-    // return empty array for small-time interval
-    //if(timeInterval < 60000) return callback(null, []);
 
     if (timeShift > 1477236595310) { // check for timestamp: 1477236595310 = 01/01/2000
         var timeFrom = timeShift;
@@ -551,53 +579,41 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
     timestamps: 10 14 17 19 |23 25 28 29| 33 35 37 42
     timeFrom=20, timeTo=31
      */
-    if(cacheObj && cacheObj.records) {
-        var recordsArray = Array.from(cacheObj.records);
+    var recordsFromCache = [];
+    if (cacheObj && cacheObj.records && cacheObj.records.size && cacheObj.firstValue && cacheObj.lastValue) {
         // last record timestamp in cache less than required timestamp in timeFrom.
         // History have no data for required time interval
-        if(cacheObj.records.size && cacheObj.lastValue && timeFrom > cacheObj.lastValue.timestamp) {
+        if (timeFrom > cacheObj.lastValue.timestamp) {
             return callback(null, [], false);
         }
+
         // checking for present required records in cache.
         // timestamps: [10:00, 10:05, 10:10, 10:15, 10:20].
         // timeTo 10:05 - present;
         // timeTo 09:50 - not present in cache
-        if(cacheObj.records.size && cacheObj.firstValue && timeTo > cacheObj.firstValue.timestamp) {
-            var lastRecordIdxInCache =
-                findRecordIdx(recordsArray, timeTo, 0, cacheObj.records.size - 1);
-            var firstRecordIdxInCache =
-                findRecordIdx(recordsArray, timeFrom, 0, lastRecordIdxInCache);
-            // findRecordIdx find the nearest record position to timestamp.
-            // But first record timestamp must be more than timeFrom and last record timestamp must be less than timeTo.
-            if (recordsArray[firstRecordIdxInCache].timestamp < timeFrom) ++firstRecordIdxInCache;
-            if (lastRecordIdxInCache && recordsArray[lastRecordIdxInCache].timestamp > timeTo) {
-                --lastRecordIdxInCache;
-            }
+        if (timeTo > cacheObj.firstValue.timestamp) {
 
-            // lastRecordIdxInCache + 1 because slice is not include last element to result
-            // var recordsFromCache = cacheObj.records.slice(firstRecordIdxInCache, lastRecordIdxInCache + 1);
-            // Don't use slice or splice, copy every record from cache to a new array for save unchanged
-            // all record objects in the Set()
-            for(var recordsFromCache = [], i = firstRecordIdxInCache; i <= lastRecordIdxInCache; i++) {
-                recordsFromCache.push({
-                    timestamp: recordsArray[i].timestamp,
-                    data: recordsArray[i].data
-                });
+            for (let record of cacheObj.records) {
+                if (record.timestamp > timeFrom && record.timestamp < timeTo) {
+                    recordsFromCache.push({
+                        timestamp: record.timestamp,
+                        data: record.data,
+                    });
+                    ++recordsFromCacheCnt;
+                }
+                if(record.timestamp >= timeTo) break;
             }
-            recordsFromCacheCnt += recordsFromCache.length;
-            if(recordsFromCache.length) {
+            if (recordsFromCache.length) {
                 recordsFromCache[0].isDataFromTrends = false;
                 recordsFromCache[0].recordsFromCache = recordsFromCache.length;
             }
 
-            //log.debug(id, ': !!! records form cache: ', recordsFromCache, '; firstRecordIdxInCache: ', firstRecordIdxInCache, '; lastRecordIdxInCache: ', lastRecordIdxInCache, '; ', cacheObj);
-            if (firstRecordIdxInCache) { // firstRecordIdxInCache !== 0
+            if (cacheObj.firstValue.timestamp <= timeFrom) {
                 calculateCacheSize(cacheObj, 0, recordsFromCache);
                 return callback(null, recordsFromCache, true);
             }
-        } else recordsFromCache = [];
+        }
     } else {
-        recordsFromCache = [];
         // create new cache object cache[id] and make reference cacheObj = cache.get(id)
         createNewCacheObject(id);
         // since we are creating a new object, we need to get it from the Set again
@@ -612,7 +628,7 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
 //            log.debug(id, ': !!! records form storage err: ', err, '; time: ', (new Date(timeFrom)).toLocaleString(), '-', (new Date(storageTimeTo)).toLocaleString(), ';', timeFrom,'-', storageTimeTo, ': ', recordsFromStorage);
 
             if (err) return callback(err);
-            if(!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
+            if (!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
                 return callback(err, recordsFromCache, false);
             }
 
@@ -620,13 +636,11 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
 
             var isDataFromTrends = recordsFromStorage.length ? recordsFromStorage[0].isDataFromTrends : false;
 
-            if(!isDataFromTrends) {
+            if (!isDataFromTrends) {
                 calculateCacheSize(cacheObj, recordsFromStorage);
-                // used too many resources
-                //addDataToCache(cacheObj, recordsFromStorage);
             }
 
-            if(recordsFromCache.length &&
+            if (recordsFromCache.length &&
                 recordsFromStorage[recordsFromStorage.length-1].timestamp >= recordsFromCache[0].timestamp) {
                 log.warn('Timestamp in last record from storage: ', recordsFromStorage[recordsFromStorage.length-1],
                     ' more than timestamp in first record from cache: ', recordsFromCache[0], '; storage: ...',
@@ -646,103 +660,12 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
     });
 };
 
-/*
- find nearest !!! to timestamp record in a sorted by timestamp records array. used also in historyCache.js
-
- !!! first and last is always set to 0 and records.length-1 at first start, but it needed in recursion
-
- records: array with records [{timestamp:..., data:..}, ...]
- timestamp: time in ms from 1970
- first: first record position in a cache for search. Set it to 0;
- last:  last record position in a cache for search. Set it to records.length-1;
-
- return position to a nearest to timestamp element
-
- records: 10 13 17 18 20 25 30 31 35
- timestamp = 14, first = 0, last = 8
- 1. f=0, l=8: m = 4 (20)
- 2. f=0, l=4: m = 2 (17)
- 3. f=0, l=2: m = 1 (13)
- 4. f=1,l=2: - return f=1 (13)
-
- timestamp = 27, first = 0, last = 8
- 1. f=0, l=8: m = 4 (20)
- 2. f=4, l=8: m = 6 (30)
- 3. f=4, l=6: m = 5 (25)
- 4. f=5,l=6: - return f=5 (25)
-
- timestamp = 37, first = 0, last = 8
- 1. f=0, l=8: m = 4 (20)
- 2. f=4, l=8: m = 6 (30)
- 3. f=4, l=6: m = 5 (25)
- 4. f=5,l=6: - return f=5 (25)
-
- */
-function findRecordIdx(recordsArray, timestamp, first, last) {
-
-    if(recordsArray[first].timestamp >= timestamp) return first;
-    if(recordsArray[last].timestamp <= timestamp) return last;
-
-    if(first+1 === last) {
-        if(timestamp - recordsArray[first].timestamp < recordsArray[last].timestamp - timestamp) return first;
-        else return last;
-    }
-
-    var middle = first + parseInt(String((last - first) / 2), 10);
-
-    if(recordsArray[middle].timestamp < timestamp) return findRecordIdx(recordsArray, timestamp, middle, last);
-    else return findRecordIdx(recordsArray, timestamp, first, middle);
-}
-
-
-/*
- fill cache to requested cache size
-
- cacheObj: cache.get(id)
- records: records, returned from storage [{data:.., timestamp:..}, ...]
- // used too many resources
- */
-/*
-function addDataToCache(cacheObj, recordsFromStorage) {
-
-    if(cacheObj.cachedRecords === undefined){
-        cacheObj.cachedRecords = parameters.initCachedRecords;
-    }
-
-    // returns if the cache has the required number of records
-    if(cacheObj.cachedRecords <= cacheObj.records.size) return;
-
-
-    //calculate missing records in cache and add records to the cache
-    //===============================================================
-    //records are added to the end of the cache array (cacheObj.records):
-    //storage: 1 2 3 4 5 6 7
-    //cache:                  8 9 10 11 12
-    //cacheObj.cachedRecords = 9; cacheObj.records.length = 5; recordsFromStorage.length = 7;
-    //slice(begin: 2, end: 7): begin = 7 - (9-5) - 1= 2
-    var begin = recordsFromStorage.length - (cacheObj.cachedRecords - cacheObj.records.size) -1;
-    if(begin < 0) begin = 0;
-    // Add part of recordsFromStorage to the beginning of the cache.records.
-    // The set does not allow adding entries to the beginning.
-    // Therefore, we convert Set to an array.
-    // Adding entries to the beginning of the array.
-    // And convert the sorted by timestamp array back to Set
-    var recordsArray = Array.from(cacheObj.records);
-    var recordsForAddToCache = recordsFromStorage.slice(begin);
-    Array.prototype.unshift.apply(recordsArray, recordsForAddToCache);
-    cacheObj.records = new Set(recordsArray.sort((a, b) => a.timestamp - b.timestamp));
-    cacheObj.firstValue = recordsArray[0]
-    cacheObj.lastValue = recordsArray[recordsArray.length - 1];
-    cacheObj.savedCnt += recordsForAddToCache.length;
-}
- */
-
 function calculateCacheSize(cacheObj, recordsFromStorage, recordsFromCache) {
 
     // if it was necessary to get records from the storage, add the number of received records from the storage
-    // to the cache size
-    if(recordsFromStorage && recordsFromStorage.lengths) {
-        cacheObj.cachedRecords += recordsFromStorage.length;
+    //  plus 10% to the cache size
+    if(recordsFromStorage && recordsFromStorage.length) {
+        cacheObj.cachedRecords += recordsFromStorage.length + Math.round(recordsFromStorage.length / 10);
         return cacheObj.cachedRecords;
     }
 
@@ -763,7 +686,7 @@ function calculateCacheSize(cacheObj, recordsFromStorage, recordsFromCache) {
  * @param {function(Error)|function(): void} [callback] - call when done. Can return error
  */
 function cacheService(callback) {
-    if(cacheServiceIsRunning > 0 && cacheServiceIsRunning < 100) return; // waiting for scheduled restart
+    if(cacheServiceIsRunning > 0 && cacheServiceIsRunning < 100) return;
     historyCache.getTransactionsQueueInfo(function (err, transQueue) {
         log.info('Saving cache data to database... Transaction queue length: ', transQueue.len,
             (transQueue.timestamp ?
@@ -842,7 +765,6 @@ function cacheService(callback) {
                         return callback();
                     }
 
-                    // it is not a scheduled restart
                     if (cacheServiceIsRunning > 100 && parameters.cacheServiceTimeout &&
                         Date.now() - cacheServiceIsRunning > parameters.cacheServiceTimeout) { // 1 hour
                         log.warn('Cache service was running at ' + (new Date(cacheServiceIsRunning)).toLocaleString() +
@@ -1010,7 +932,7 @@ function cacheService(callback) {
                         // in other cases terminateCacheService equal to Date.now()
                         if (terminateCacheService === 1) log.exit('Saving cache to database was terminated');
                         else terminateCacheService = 0;
-                        if (cacheServiceIsRunning > 100) cacheServiceIsRunning = 0; // it is not a scheduled restart
+                        if (cacheServiceIsRunning > 100) cacheServiceIsRunning = 0;
                         callback();
                         if (typeof cacheServiceCallback === 'function') {
                             cacheServiceCallback();

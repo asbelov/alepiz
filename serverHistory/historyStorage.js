@@ -2,12 +2,17 @@
  * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var async = require('async');
-var path = require('path');
+const async = require('async');
+const path = require('path');
 
-var log = require('../lib/log')(module);
-var threads = require('../lib/threads');
-const Database = require("better-sqlite3");
+const log = require('../lib/log')(module);
+const threads = require('../lib/threads');
+const createDB = require('./historyCreateDB');
+const setShift = require('../lib/utils/setShift');
+const parameters = require('./historyParameters');
+const Conf = require("../lib/conf");
+const confHistory = new Conf('config/history.json');
+parameters.init(confHistory.get());
 
 
 var storage = {};
@@ -17,9 +22,8 @@ module.exports = storage;
 // trends less the 60 will keep as history data (keepHistory time)
 const trendsTimeIntervals = [10, 30, 60];
 const transProcessArgID = 'trans';
-var selectQueryQueue = [], queriesInProgress = 0;
+var selectQueryQueue = new Set(), queriesInProgress = 0;
 var storageQueryingProcesses, storageModifyingProcess;
-var parameters = {};
 
 function getDbPaths(_parameters) {
     if(!_parameters) _parameters = parameters;
@@ -42,31 +46,31 @@ storage.getDbPaths = getDbPaths;
 storage.trendsTimeIntervals = trendsTimeIntervals;
 storage.transProcessArgID = transProcessArgID;
 
-storage.initStorage = function (initParameters, callback) {
-
-    parameters = initParameters;
+storage.initStorage = function (callback) {
 
     var dbPaths = getDbPaths();
-    async.eachSeries(dbPaths, initDB, function (err) {
+    async.eachSeries(dbPaths, function (dbPath, callback) {
+        createDB(dbPath, trendsTimeIntervals, callback);
+    }, function (err) {
         if(err) return callback(err);
 
 
         // print warning when queue exist every 30 sec
         setInterval(function () {
-            if (selectQueryQueue.length > parameters.queriesMaxQueueLength) {
-                log.warn('Too many queries in queue (', selectQueryQueue.length,
+            if (selectQueryQueue.size > parameters.queriesMaxQueueLength) {
+                log.warn('Too many queries in queue (', selectQueryQueue.size,
                     ') for getting data from history at same time. ' +
                     'Queries are queued.');
 
                 // try to process queue.
                 // dontPushToQueue set to 1 or true when query was pushed to queue and now
                 // query don't queued
-                childFunc.apply(this, selectQueryQueue.shift());
+                childFunc.apply(this, setShift(selectQueryQueue));
             }
         }, 120000);
 
         log.info('Starting main storage process for processing transaction...');
-        var initStorageModifyingProcess = new threads.parent({
+        new threads.parent({
             childProcessExecutable: path.join(__dirname, 'historyStorageServer.js'),
             args: [transProcessArgID, '%:childID:%'],
             killTimeout: 1800000, // waiting for finishing all transactions
@@ -84,20 +88,16 @@ storage.initStorage = function (initParameters, callback) {
                     return callback(new Error('Can\'t run main storage process for processing transaction: ' + err.message));
                 }
 
-                log.info('Sending parameters to main storage process for processing transaction...');
-                var paramsForTransfer = {};
-                // remove functions from parameters for transfer to worker thread
-                for(var key in parameters) {
-                    if(typeof parameters[key] !== 'function') paramsForTransfer[key] = parameters[key];
-                }
+                log.info('Initialization main storage process for processing transaction...');
+
                 _storageModifyingProcess.sendAndReceiveToAll({
-                    parameters: paramsForTransfer,
+                    init: true,
                 }, function(err) {
                     if (err) log.error('Error sending parameters to storage processes for processing transaction: ', err.message);
-                    storageModifyingProcess = initStorageModifyingProcess;
+                    storageModifyingProcess = _storageModifyingProcess;
 
                     log.info('Starting storage processes for getting data from DB...');
-                    var initStorageQueryingProcesses = new threads.parent({
+                    new threads.parent({
                         childProcessExecutable: path.join(__dirname, 'historyStorageServer.js'),
                         killTimeout: 60000,
                         restartAfterErrorTimeout: 200,
@@ -114,19 +114,17 @@ storage.initStorage = function (initParameters, callback) {
                                 return callback(new Error('Can\'t run storage processes for getting data from DB: ' + err.message));
                             }
 
-                            log.info('Sending parameters to storage processes for for getting data from DB...');
+                            log.info('Initialization storage processes for for getting data from DB...');
                             _storageQueryingProcesses.sendAndReceiveToAll({
-                                parameters: paramsForTransfer,
+                                init: true,
                             }, function(err) {
                                 if (err) log.error('Error sending parameters to storage processes for for getting data from DB: ', err.message);
-                                storageQueryingProcesses = initStorageQueryingProcesses;
+                                storageQueryingProcesses = _storageQueryingProcesses;
                                 callback();
                             });
                         });
                     });
                 });
-
-
             });
         });
     });
@@ -175,20 +173,20 @@ function childFunc() {
      limiting queries number to parameters.queriesMaxQueueLength
      if queries number more then parameters.queriesMaxQueueLength push query to queue
      */
-    if (/*(!dontPushToQueue && queriesInProgress > parameters.queriesMaxQueueLength) ||*/
-        // can be when history server is restarting
-        !storageModifyingProcess || !storageQueryingProcesses) {
+    /*(!dontPushToQueue && queriesInProgress > parameters.queriesMaxQueueLength) ||*/
+    // !storageModifyingProcess || !storageQueryingProcesses can be when history server is restarting
+    if (!storageModifyingProcess || !storageQueryingProcesses) {
 
         // add last parameter (dontPushToQueue):
         if(dontPushToQueue === 0) args.push(1); // 1|0 for modifying DB
         else args.push(true); // true|false for querying DB
 
-        selectQueryQueue.push(args);
+        selectQueryQueue.add(args);
 
         /*if(!storageModifyingProcess || !storageQueryingProcesses)*/
         setTimeout(function() {
-            if (selectQueryQueue.length) childFunc.apply(this, selectQueryQueue.shift());
-        }, 2000)
+            if (selectQueryQueue.size) childFunc.apply(this, setShift(selectQueryQueue));
+        }, 2000).unref();
 
         return;
     }
@@ -209,103 +207,13 @@ function childFunc() {
         if(err) return callback(err);
 
         // get one query result, run to process one query from queue
-        if (selectQueryQueue.length) childFunc.apply(this, selectQueryQueue.shift());
+        if (selectQueryQueue.size) childFunc.apply(this, setShift(selectQueryQueue));
 
         //if(funcName === 'config') { log.info('Func: ', funcName, ' send: ', args); log.info('Func: ', funcName, ' receive: ', data); }
         callback(null, data);
     });
 }
 
-function initDB(dbPath, callback) {
-    //log.info('Open storage file ', dbPath, '...');
-
-    try {
-        var db = new Database(dbPath, {timeout: Number(parameters.dbLockTimeout) || 5000});
-    } catch (err) {
-        return log.throw('Can\'t open DB ', dbPath, ': ', err.message);
-    }
-
-    try {
-        db.prepare('CREATE TABLE IF NOT EXISTS objects (' +
-            'id INTEGER PRIMARY KEY ASC,' +
-            'type INTEGER,' + // 0 - number, 1 - string
-            'cachedRecords INTEGER,' +
-            'trends TEXT)').run();
-    } catch (err) {
-        return callback(new Error('Can\'t create objects table in storage DB: ' + err.message))
-    }
-
-    try {
-        db.prepare('CREATE TABLE IF NOT EXISTS numbers (' +
-            'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
-            'objectID INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
-            'timestamp INTEGER NOT NULL,' +
-            'data REAL NOT NULL)').run();
-    } catch (err) {
-        return callback(new Error('Can\'t create numbers table in storage DB: ' + err.message));
-    }
-
-    try {
-        db.prepare('CREATE INDEX IF NOT EXISTS objectID_timestamp_numbers_index on numbers(objectID, timestamp)').run();
-    } catch (err) {
-        return callback(new Error('Can\'t create objects-timestamp index in numbers table in storage DB: ' + err.message));
-    }
-
-    try {
-        db.prepare('CREATE TABLE IF NOT EXISTS strings (' +
-            'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
-            'objectID INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
-            'timestamp INTEGER NOT NULL,' +
-            'data TEXT NOT NULL)').run();
-    } catch (err) {
-        return callback(new Error('Can\'t create strings table in storage DB: ' + err.message));
-    }
-
-    try {
-        db.prepare('CREATE INDEX IF NOT EXISTS objectID_timestamp_strings_index on strings(objectID, timestamp)').run();
-    } catch (err) {
-        return callback(new Error('Can\'t create objects-timestamp index in strings table in storage DB: ' + err.message));
-    }
-
-    try {
-        db.prepare('CREATE TABLE IF NOT EXISTS config (' +
-            'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
-            'name TEXT NOT NULL UNIQUE,' +
-            'value TEXT)').run();
-    } catch (err) {
-        return callback(new Error('Can\'t create config table in storage DB: ' + err.message));
-    }
-
-    for (var i = 0; i < trendsTimeIntervals.length; i++) {
-        var timeInterval = trendsTimeIntervals[i];
-        try {
-            db.prepare('CREATE TABLE IF NOT EXISTS trends' + timeInterval + 'min (' +
-                'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
-                'objectID INTEGER NOT NULL REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
-                'timestamp INTEGER NOT NULL,' +
-                'data REAL NOT NULL)').run();
-        } catch (err) {
-            return callback(new Error('Can\'t create trends' + timeInterval + 'min table in storage DB: ' + err.message));
-        }
-
-        try {
-            db.prepare('CREATE INDEX IF NOT EXISTS objectID_timestamp_trends' + timeInterval +
-                'min_index on trends' + timeInterval + 'min(objectID, timestamp)').run();
-        } catch (err) {
-            return callback(new Error('Can\'t create objects-timestamp index in trends' + timeInterval +
-                'min table in storage DB: ' + err.message));
-        }
-    }
-
-    try {
-        db.close();
-        log.info('Close storage DB file in main history process');
-    } catch (err) {
-        callback(new Error('Can\'t close storage DB: ' + err.message));
-    }
-
-    callback();
-}
 /*
 // create new unique message ID
 function getNewMessageID() {

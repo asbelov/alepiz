@@ -2,7 +2,7 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var snmp = require ("net-snmp");
+var snmp = require("net-snmp");
 var dns = require('dns');
 var log = require('../../lib/log')(module);
 

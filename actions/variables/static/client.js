@@ -35,12 +35,14 @@ var JQueryNamespace = (function ($) {
 
         // !!! objectsSelector callback will be called only when object selector is changed. It's not called when object selector is init
         objectsSelectorElm.objectsSelector(objects, function() {
-            setCountersGroupsSelector(filterGroupIDElm, null, objectsSelectorElm.val().length ? 0 : 1, function() {
+            setCountersGroupsSelector(filterGroupIDElm, null,
+                objectsSelectorElm.val().length ? 0 : 1, function() {
                 initCountersSelector(showVariablesLog);
             });
         });
 
-        setCountersGroupsSelector(filterGroupIDElm, filterGroupIDElm.val(), objects.length ? 0 : 1, function(){
+        setCountersGroupsSelector(filterGroupIDElm, filterGroupIDElm.val(), objects.length ? 0 : 1,
+            function() {
             initCountersSelector(showVariablesLog);
         });
 
@@ -119,7 +121,8 @@ var JQueryNamespace = (function ($) {
             else selectHTML = '';
 
             groups.forEach(function (group) {
-                if ((!activeGroupID && mode && group.isDefault === mode) || group.id === Number(activeGroupID)) var selected = ' selected';
+                if ((!activeGroupID && mode && group.isDefault === mode) ||
+                    group.id === Number(activeGroupID)) var selected = ' selected';
                 else selected = '';
 
                 if (group.isDefault === 1) $('#defaultGroup').val(group.id);
@@ -147,7 +150,7 @@ var JQueryNamespace = (function ($) {
             //console.log(variablesInfo);
 
             if(typeof variablesInfo === 'object' && !Array.isArray(variablesInfo)) {
-                loadDataInfoElm.text('Counter debugger service was disabled in configuration or waiting while enabled. ');
+                loadDataInfoElm.text('Counter debugger service was disabled in configuration or waiting while enabled.');
                 variablesInfo = [];
             } else {
                 loadDataInfoElm.text('Loading ' + (variablesInfo ? variablesInfo.length : 0) +
@@ -181,12 +184,14 @@ var JQueryNamespace = (function ($) {
                             '&nbsp;variables; Unresolved variables: ' + unresolvedVariables+ '</div>' +
                             '<div class="collapsible-body">' +
                             Object.keys(variables[name].variables).sort().map(function (_name) {
-                                var value = variables[name].variables[_name] === '' ? '""' : variables[name].variables[_name];
+                                var value = variables[name].variables[_name] === '' ? '""' :
+                                    variables[name].variables[_name];
                                 return escapeHtml(_name + ' = ' + value);
                             }).join('<br/>') +
                             '</div></li>';
                     }
-                    var functions = Array.isArray(variables[name].functionDebug) && variables[name].functionDebug.length ? (variables[name].functionDebug.map(function (f) {
+                    var functions = Array.isArray(variables[name].functionDebug) &&
+                    variables[name].functionDebug.length ? (variables[name].functionDebug.map(function (f) {
                         if(f.name) {
                             return escapeHtml(f.name + '(' + (
                                 f.parameters.map(function (p) {
@@ -194,7 +199,8 @@ var JQueryNamespace = (function ($) {
                                 }).join(', ')
                             ) + '); result: ' + f.result);
                         } else if(f.timestamp) {
-                            return (new Date(f.timestamp)).toLocaleString().replace(/\.\d\d\d\d,/, '') + ': ' + escapeHtml(f.data);
+                            return (new Date(f.timestamp)).toLocaleString().replace(/\.\d\d\d\d,/,
+                                '') + ': ' + escapeHtml(f.data);
                         } else if(typeof f === 'string' || typeof f === 'number' || typeof f === 'boolean') {
                             return f;
                         } else if(typeof f === 'object') {
@@ -203,21 +209,24 @@ var JQueryNamespace = (function ($) {
 
                     }).join('<br/>')) : 'none';
 
-                    if(variables[name].important) var color = ' style="background-color:#f0ffff"';
+                    if(variables[name].important) var color = ' style="background-color:rgb(240, 255, 255)"';
                     else color = '';
-                    return '<tr' + color+ '><td>' + new Date(variables[name].timestamp).toLocaleString() + '.' + (variables[name].timestamp % 1000) + '</td><td>' +
+                    return '<tr' + color + '><td>' + new Date(variables[name].timestamp).toLocaleString() + '.' +
+                        (variables[name].timestamp % 1000) + '</td><td>' +
                         escapeHtml(variables[name].name)+ '</td><td>' +
                         escapeHtml(variables[name].expression) + '</td><td>' +
-                        escapeHtml( typeof variables[name].result === 'object' ? JSON.stringify(variables[name].result) : variables[name].result) + '</td><td>' +
+                        escapeHtml( typeof variables[name].result === 'object' ?
+                            JSON.stringify(variables[name].result) : variables[name].result) + '</td><td>' +
                         variablesHTML+ '</td><td>' +
                         functions + '</td></tr>'
                 }).join('');
 
                 return {
                     timestamp: timestamp,
-                    HTML: dateTimeStr ? ('<li><div class="collapsible-header">' + dateTimeStr + ': Calculate variables: ' +
-                        escapeHtml(Object.keys(variables).join('; ')) +
-                        '</div><div class="collapsible-body"><table class="bordered highlight responsive-table" style="word-break: break-word;">' +
+                    HTML: dateTimeStr ? ('<li><div class="collapsible-header">' + dateTimeStr +
+                        ': Calculate variables: ' + escapeHtml(Object.keys(variables).join('; ')) +
+                        '</div><div class="collapsible-body"><table class="bordered highlight responsive-table" ' +
+                            'style="word-break: break-word;">' +
                         '<thead>' +
                         '<tr>' +
                         '<th style="width:10%">Time</th>' +
@@ -225,7 +234,7 @@ var JQueryNamespace = (function ($) {
                         '<th style="width:20%">Expression</th>' +
                         '<th style="width:10%">Result</th>' +
                         '<th style="width:30%">Variables</th>' +
-                        '<th style="width:20%">Functions</th>' +
+                        '<th style="width:20%">Data\\Functions</th>' +
                         '</tr>' +
                         '</thead><tbody>' + body + '</tbody></table></div></li>') : ''
                 }

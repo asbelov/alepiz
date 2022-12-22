@@ -343,7 +343,7 @@ rightsWrapper.addTask = function(initUser, task, actions, callback) {
             return;
         }
 
-        tasksDBSave.updateTask(taskID, name, groupID, function (err) {
+        tasksDBSave.updateTask(userID, taskID, name, groupID, function (err) {
             if(err) {
                 return callback(new Error('Can\'t update task #' + taskID + '"' + name +
                     '", groupID: "' + groupID + '": ' + err.message));

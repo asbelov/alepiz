@@ -1,0 +1,36 @@
+{
+    "description": "Sending SMS via SMS provider",
+    "address": "SMS phone number",
+    "re": "^+\\d{11}$",
+    "default": {
+        "transport": {
+            "protocol": "http|https",
+            "method": "GET|POST",
+            "host": "go.sms.com",
+            "port": 443,
+            "path": "/service/send_sms",
+            "user": "userName",
+            "pass": "userPass",
+            "family": 4,
+            "localAddress": "192.168.0.1",
+            "timeout": 30000,
+            "proxyHost": "proxy.mydomain.com",
+            "proxyProtocol": "http|https",
+            "proxyPort": 3128,
+            "proxyUser": "proxyUserName",
+            "proxyPass": "proxyUserPassword",
+            "phonesDiv": ",",
+            "phonePrefix": 8,
+            "phoneLen": 10,
+            "response": "phone=\"%:PHONE:%\" sms_res_count=\"1\""
+        },
+        "message": {
+            "user": "userName",
+            "pass": "password",
+            "action": "post_sms",
+            "sender": "%:SENDER_PHONE:%",
+            "message": "%:TEXT:%",
+            "target":  "%:PHONES:%"
+        }
+    }
+}

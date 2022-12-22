@@ -238,6 +238,11 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
                 // if actionCfg.runActionOnRemoteServers === false, then do not run action on remote server
                 runActionOnRemoteServers: actionCfg.runActionOnRemoteServers === undefined ||
                     Boolean(actionCfg.runActionOnRemoteServers) !== false,
+                // when runActionOnRemoteServers set to true by default actions running from browser
+                // does not return the action result.
+                // If you want get action result (f.e. to callbackAfterExec(result, callback)) set
+                // the returnActionResult parameter to true. default false
+                returnActionResult: actionCfg.returnActionResult,
                 // if true, then data will be an array of all results returned from the current and remote servers
                 runAjaxOnRemoteServers: actionCfg.runAjaxOnRemoteServers,
                 slowAjaxTime: actionCfg.slowAjaxTime,

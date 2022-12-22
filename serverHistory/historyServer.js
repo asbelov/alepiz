@@ -7,13 +7,17 @@ const proc = require("../lib/proc");
 const cache = require("./historyCache");
 const storage = require("./historyStorage");
 const housekeeper = require("./historyHousekeeper");
-const parameters = require("./historyParameters");
 const IPC = require("../lib/IPC");
 const server = require('../server/counterProcessor');
+const parameters = require('./historyParameters');
+const Conf = require("../lib/conf");
+const confHistory = new Conf('config/history.json');
+parameters.init(confHistory.get());
+
 
 var serverIPC, stopHistoryInProgress = false;
 
-var historyProcess = new proc.child({
+new proc.child({
     module: 'history',
     onDestroy: function() {
         cache.dumpData();
@@ -37,33 +41,31 @@ var historyProcess = new proc.child({
 });
 
 function processMessages(message, callback) {
-    if (message.type === 'initParameters') {
-        var sleepTime = message.data.__restart ? 2000 : 0;
-        return setTimeout(function () {
-            cache.init(message.data, function (err) {
-                if (err) log.error('History init error: ', err.message, '; init parameters: ', message.data);
+    if (message.type === 'init') {
+        cache.init(function (err) {
+            if (err) return log.throw('History init error: ', err.message);
 
-                // init houseKeeper at 30 minutes after start every 1 hour
-                housekeeper.run(parameters);
-                log.info('Init housekeeper for run every ', Math.ceil(message.data.housekeeperInterval / 60000), 'min');
-                setInterval(function () {
-                    housekeeper.run();
-                }, message.data.housekeeperInterval);
+            // init houseKeeper at 30 minutes after start every 1 hour
+            housekeeper.run();
+            log.info('Init housekeeper for run every ',
+                Math.ceil(parameters.housekeeperInterval / 60000), 'min');
+            setInterval(function () {
+                housekeeper.run();
+            }, parameters.housekeeperInterval);
 
-                // starting IPC after all history functions are initializing
-                log.info('Starting history storage IPC...');
-                parameters.id = 'history';
-                serverIPC = new IPC.server(parameters, function(err, msg, socket, messageCallback) {
-                    if(err) log.error(err.message);
+            // starting IPC after all history functions are initializing
+            log.info('Starting history storage IPC...');
+            parameters.id = 'history';
+            serverIPC = new IPC.server(parameters, function(err, msg, socket, messageCallback) {
+                if(err) log.error(err.message);
 
-                    if(socket === -1) {
-                        server.sendMsg({throttlingPause: 120000});
-                        log.info('Starting history server process and initializing IPC');
-                        callback(err);
-                    } else if(msg) processIPCMessages(msg, socket, messageCallback);
-                });
+                if(socket === -1) {
+                    server.sendMsg({throttlingPause: 120000});
+                    log.info('Starting history server process and initializing IPC');
+                    callback(err);
+                } else if(msg) processIPCMessages(msg, socket, messageCallback);
             });
-        }, sleepTime);
+        });
     } else if (message.type === 'makeDump') cache.dumpData(callback);
 }
 

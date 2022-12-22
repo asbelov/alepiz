@@ -46,6 +46,12 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                             Если полный путь не указан, то выполняемый файл ищется в каталоге с действием Alepiz, в котором
                             используется launcher.
                         li.
+                            host - имя или IP адрес хоста, на котором необходимо выполнить программу. У пользователя,
+                            из под которого запускается сервис ALEPIZ должны быть права на удаленный запуск программ.
+                            Для запуска программы на удаленном хосте используется команда:
+                        pre.
+                            powershell.exe Invoke-Command -ComputerName &lt;host&gt; &lt;executable&gt; &lt;programArgs&gt;
+                        li.
                             cwd - рабочий каталог, в который будет осуществлен переход перед запуском программы.
                             Может быть указан абсолютный путь относительно корневого каталога Alepiz.
                             Если не указан, то это корневой каталог Alepiz.
@@ -93,4 +99,3 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         &lt;input type=&quot;hidden&quot; id=&quot;programArgs&quot; value=&quot;[\&quot;-a 1\&quot;, \&quot;-b 2\&quot;, \&quot;-c\&quot;]&quot;&gt;
                         или
                         &lt;input type=&quot;text&quot; name=cwd value=&quot;C:\\windows&quot;&gt;
-

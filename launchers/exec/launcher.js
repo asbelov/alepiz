@@ -7,23 +7,23 @@ var path = require('path');
 var cp = require('child_process');
 
 /*
-param = {
-    executable: path to executable
-    timeout: timeout, while waiting for end of execution
-    cwd - working dir
-    stdinData: if set, then write stdinData to the stdin of the executable
-    dontLogStdout: if set, then did not log stdout
-    dontLogStderr: if set then did not log stderr
-    returnStdout: if set, then return stdout in callback
-    returnStderr: if set, then return stdout in callback
-    returnCode: if set, then return exit code in callback
-    env: <object> Environment key-value pairs. Default process.env
+ param = {
+ executable: path to executable
+ timeout: timeout, while waiting for end of execution
+ cwd - working dir
+ stdinData: if set, then write stdinData to the stdin of the executable
+ dontLogStdout: if set, then did not log stdout
+ dontLogStderr: if set then did not log stderr
+ returnStdout: if set, then return stdout in callback
+ returnStderr: if set, then return stdout in callback
+ returnCode: if set, then return exit code in callback
+ env: <object> Environment key-value pairs. Default process.env
 
-    args:
-        programArgs - array or stringified array of command line arguments
-        cwd - working dir
-        stdinData: if set, then write stdinData to the stdin of the executable
-}
+ args:
+ programArgs - array or stringified array of command line arguments
+ cwd - working dir
+ stdinData: if set, then write stdinData to the stdin of the executable
+ }
  */
 module.exports = function(param, args, callback) {
     var executable = param.executable;
@@ -31,8 +31,10 @@ module.exports = function(param, args, callback) {
     var timeout = param.timeout || 0;
     var stdinData = param.stdinData || args.stdinData;
     var callbackAlreadyRunning = false,
-        startTime = Date.now(), exitTimer;
+        startTime = Date.now(),
+        exitTimer;
     var initProgramArgs = param.programArgs || args.programArgs || [];
+    var host = param.host ? param.host : "127.0.0.1";
 
     if (!path.isAbsolute(workingDir)) workingDir = path.join(__dirname, '..', '..', workingDir);
 
@@ -54,7 +56,11 @@ module.exports = function(param, args, callback) {
         }
     } else programArgs = [];
 
-    log.info('[exec]: starting ', executable, ' ', programArgs.join(' '));
+    log.info('[exec]: starting on ', host, ': ', executable, ' ', programArgs.join(' '));
+    if (host !== '127.0.0.1') {
+        programArgs = [`Invoke-Command -ComputerName ${host} {${executable} ${programArgs.join(' ')}}`];
+        executable = "powershell.exe";
+    }
 
     // one time I got exception when call cp.spawn()
     var proc;
@@ -69,7 +75,6 @@ module.exports = function(param, args, callback) {
         callbackAlreadyRunning = true;
         return callback(new Error('[exec] internal error while running ' + executable + ': ' + e.message));
     }
-
     if (!proc || typeof proc.on !== 'function' ||
         (stdinData && (!proc.stdin || typeof proc.stdin.write !== 'function'))) {
         callbackAlreadyRunning = true;
@@ -93,13 +98,13 @@ module.exports = function(param, args, callback) {
         var str = data.toString();
         fullStdout += str;
         //log.warn('!!', str.replace(/\n/gm, '\\n'));
-        if(param.dontLogStdout) return;
+        if (param.dontLogStdout) return;
         if (str.indexOf('\n') !== -1) {
             var arr = str.split('\n');
             arr[0] = lastPartOfStdout + arr[0];
             lastPartOfStdout = arr.pop();
             arr.forEach(str => {
-                if(str.trim()) log.info('[exec] ', executable, ': ', str);
+                if (str.trim()) log.info('[exec] ', executable, ': ', str);
             });
         } else lastPartOfStdout += str;
     });
@@ -108,13 +113,13 @@ module.exports = function(param, args, callback) {
         var str = data.toString();
         fullStderr += str;
         //log.warn('!!!', str.replace(/\n/gm, '\\n'));
-        if(param.dontLogStderr) return;
+        if (param.dontLogStderr) return;
         if (str.indexOf('\n') !== -1) {
             var arr = str.split('\n');
             arr[0] = lastPartOfStderr + arr[0];
             lastPartOfStderr = arr.pop();
             arr.forEach(str => {
-                if(str.trim()) log.error('[exec] ', executable, ': ', str);
+                if (str.trim()) log.error('[exec] ', executable, ': ', str);
             });
         } else lastPartOfStderr += str;
     });
@@ -132,9 +137,8 @@ module.exports = function(param, args, callback) {
     // when stdout was not closed but process was exiting
     proc.on('exit', function(code) {
         var timeLeft = timeout - (Date.now() - startTime);
-        exitTimer = setTimeout(function () {
-            log.warn('[exec] ', executable, ': stdout was not closed, but the process was completed. ',
-                'Stop waiting for stdout to close by timeout');
+        exitTimer = setTimeout(function() {
+            log.warn('[exec] ', executable, ': stdout was not closet. exiting by timeout');
             finishing(code);
         }, timeLeft < 0 ? 0 : timeLeft).unref();
     });
