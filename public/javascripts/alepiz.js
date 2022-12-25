@@ -490,7 +490,9 @@ alepizMainNamespace = (function($) {
             searchObjectsAddElm.val('').trigger('keyup');
         });
 
-        actionReloadBtnElm.click(reload);
+        actionReloadBtnElm.click(function () {
+            reload(true);
+        });
 
 
         objectGroupIconElm.click(function () {
@@ -621,9 +623,9 @@ alepizMainNamespace = (function($) {
         });
     }
 
-    function reload() {
+    function reload(reqForUpdate) {
         initActionsAndObjectsListsFromBrowserURL(function() {
-            alepizDrawActionNamespace.getActionHTMLAndShowActionButtons(true, function(html){
+            alepizDrawActionNamespace.getActionHTMLAndShowActionButtons(reqForUpdate, function(html){
                 alepizDrawActionNamespace.drawAction(html);
                 setTimeout(alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList, 300);
             });

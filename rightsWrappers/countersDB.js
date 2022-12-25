@@ -139,15 +139,7 @@ rightsWrapper.getCounterByID = function(user, id, callback) {
                 if(err) return callback(err);
                 if(!counter) return callback();
 
-                countersDB.getObjectCounterIDForCounter(checkedID, function(err, rows) { //rows [{id: <OCID1>, objectID:..}, ...]
-                    if(err) return callback(new Error('Can\'t get objectCounterID for counterID ' + checkedID + ': ' + err.message));
-
-                    if(!rows || !rows[0] || !rows[0].id)
-                        return callback(new Error('Can\'t get objectCounterID for counterID ' + checkedID +
-                            ': object to counter relations not found'));
-
-                    callback(null, counter);
-                });
+                callback(null, counter);
             });
         });
     });

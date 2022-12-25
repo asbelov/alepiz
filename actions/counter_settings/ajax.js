@@ -33,7 +33,8 @@ module.exports = function(args, callback) {
 
     if(func === 'getCounterByID') return rightsWrappersCountersDB.getCounterByID(args.username, args.id, callback);
 
-    if(func === 'getCounterParameters') return rightsWrappersCountersDB.getCounterParameters(args.username, args.id, callback);
+    if(func === 'getCounterParameters')
+        return rightsWrappersCountersDB.getCounterParameters(args.username, args.id, callback);
 
     if(func === 'getCollectors') return collectors.getConfiguration(null, callback);
 
@@ -51,9 +52,10 @@ module.exports = function(args, callback) {
 
     if(func === 'getVariables') return rightsWrappersCountersDB.getVariables(args.username, args.id, callback);
 
-    if(func === 'getVariablesForParentCounterName') return rightsWrappersCountersDB.getVariablesForParentCounterName(args.username, args.counterName, callback);
+    if(func === 'getVariablesForParentCounterName')
+        return rightsWrappersCountersDB.getVariablesForParentCounterName(args.username, args.counterName, callback);
 
-    if(func === 'getHistoryFunctions') { return callback(null, history.getFunctionList()); }
+    if(func === 'getHistoryFunctions') return callback(null, history.getFunctionList());
 
     if(func === 'getCountersForObjects') {
         var groupID = (!args.groupID || args.groupID === '0' ? null : [Number(args.groupID)]);
@@ -77,22 +79,31 @@ module.exports = function(args, callback) {
             args.sessionID, callback);
     }
 
-    if(func === 'editCounterUnit')
-        return unitsDBSave.edit(args.oldUnitID, args.unit, args.abbreviation, args.prefixes, args.multiplies, args.onlyPrefixes, callback);
+    if(func === 'editCounterUnit') {
+        return unitsDBSave.edit(args.oldUnitID, args.unit, args.abbreviation, args.prefixes, args.multiplies,
+            args.onlyPrefixes, callback);
+    }
 
     if(func === 'removeCounterUnit') return unitsDBSave.remove(args.unit, callback);
 
     if(func === 'getFunctionsDescription') return callback(null, getFunctionsDescription());
 
-    if(func === 'getParentCountersVariables') return rightsWrappersCountersDB.getParentCountersVariables(args.username, [args.id], [], callback);
+    if(func === 'getParentCountersVariables') {
+        return rightsWrappersCountersDB.getParentCountersVariables(args.username, [args.id],
+            [], callback);
+    }
 
     if(func === 'getFilesList') return getLogFileList(args, callback);
 
     if(func === 'getFilePart' || func === 'getFileSize') return logViewerAjax(args, callback);
 
-    if(func === 'getObjectsByNames') return rightsWrappersObjectsDB.getObjectsIDs(args.username, args.objectNames.split('\r'), callback);
+    if(func === 'getObjectsByNames') {
+        return rightsWrappersObjectsDB.getObjectsIDs(args.username, args.objectNames.split('\r'), callback);
+    }
 
-    if(func === 'getCountersByNames') return counterDB.getCountersIDsByNames(args.counterNames.split('\r'), callback);
+    if(func === 'getCountersByNames') {
+        return counterDB.getCountersIDsByNames(args.counterNames.split('\r'), callback);
+    }
 
     callback(new Error('Unknown function ' + func));
 };
@@ -130,7 +141,8 @@ function getLogFileList(args, callback) {
 
         var result = filesObjArray
             .filter(f => f.isFile() && new RegExp('^' + args.IDs + '\\.\\d{6}$').test(f.name))
-            .sort((a, b) => Number(b.name.split('.')[1]) - Number(a.name.split('.')[1]))
+            .sort((a, b) =>
+                Number(b.name.split('.')[1]) - Number(a.name.split('.')[1]))
             .map(f => '\r' + logPath + '\r' + f.name)
             .join('\n');
 

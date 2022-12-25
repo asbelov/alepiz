@@ -78,6 +78,7 @@ actionClient.disconnect = function (callback) {
  * @param {Boolean} param.runActionOnRemoteServers=true|false: run ajax on remote Alepiz instances (default true).
  * @param {Boolean} param.runAjaxOnRemoteServers=true|false: run action on remote Alepiz instances (default false).
  * @param {object} param.args - object with action arguments like {<name>: <value>, ...}
+ * @param {Boolean} param.updateAction reload ajax.js and server.js
  * @param {function(Error)|function(null, actionResult:Object)} callback: callback(err, actionResult)
  * @param callback.actionResult: object like {"<serverAddress>:<serverPort>":<actionResult>, ....} if
  *      (executionMode = 'server' and runActionOnRemoteServers = true) or

@@ -38,13 +38,14 @@ if(serverNumber < 1 || module.parent) {
 /**
  * Execute action or run ajax or add action to a new task
  *
- * @param {Object} param: object with action parameters
- * @param {string} param.actionID: action directory name
- * @param {string} param.executionMode="ajax"|"server"|"makeTask": action execution mode
- * @param {string} param.user: username
- * @param {number} param.sessionID: action session ID
- * @param {number} param.timestamp: timestamp when the action was started
- * @param {Object} param.args: object with action arguments, like {<name>: <value>, ...}
+ * @param {Object} param object with action parameters
+ * @param {string} param.actionID action directory name
+ * @param {string} param.executionMode="ajax"|"server"|"makeTask" action execution mode
+ * @param {string} param.user username
+ * @param {number} param.sessionID action session ID
+ * @param {number} param.timestamp timestamp when the action was started
+ * @param {Object} param.args object with action arguments, like {<name>: <value>, ...}
+ * @param {Boolean} param.updateAction reload ajax.js and server.js
  * @param {function(Error)|function(null, *)} callback: callback(err, actionResult), where actionResult is result
  *  returned by action or data for ajax
  */

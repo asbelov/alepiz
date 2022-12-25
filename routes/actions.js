@@ -109,7 +109,7 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
                 result.action.link += '_' + String(sessionID);
                 result.action.sessionID = sessionID;
 
-                log.info('Init a new action ' + (req.body.actionUpdate === '1' ? 'with full reload' : '' ) +
+                log.info('Init a new action' + (req.body.actionUpdate === '1' ? ' with full reload' : '' ) +
                     '. Parameters: ', result);
 
                 var actionHomePage = path.join(__dirname, '..', actionLink, result.action.homePage);

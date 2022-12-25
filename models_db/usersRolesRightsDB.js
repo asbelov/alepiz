@@ -143,8 +143,10 @@ rightsDB.checkCounterID = function(p, callback) {
     if(!p.id) return callback();
 
     db.all('SELECT objectID FROM objectsCounters WHERE counterID=?', p.id, function(err, rows) {
-
         if(err) return callback(new Error('Can\'t get objects IDs for counter ID: ' + p.id + ': ' + err.message));
+
+        // Cant find objects linked to the counter
+        if(!rows.length) return callback(null, p.id);
 
         p.IDs = rows.map(function (row) {
             return row.objectID;

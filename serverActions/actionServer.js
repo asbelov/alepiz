@@ -20,7 +20,6 @@ const actionsDB = require('../models_db/actionsDB');
 const actionsDBSave = require('../models_db/modifiers/actionsDB');
 
 const actionConf = require('../lib/actionsConf');
-var actionClient = require('./actionClient');
 
 var userDB = require('../models_db/usersDB');
 var sessionDB = require('../models_db/modifiers/auditUsersDB');
@@ -255,7 +254,8 @@ function runActionFromQueue() {
                 callback();
             });
         }, function () {
-            setTimeout(runActionFromQueue, 0).unref();
+            var t = setTimeout(runActionFromQueue, 0);
+            t.unref();
         });
         return
     }
@@ -279,6 +279,7 @@ function runQueue(actionQueue) {
         ++processedInQueue;
         action.callback(err, data);
         lastProcessedAction = {};
-        setTimeout(runActionFromQueue, 0).unref();
+        var t = setTimeout(runActionFromQueue, 0);
+        t.unref();
     });
 }

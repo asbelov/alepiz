@@ -37,7 +37,7 @@ fix error, when overlay closing sideNav menu
 }
 
 .btn-list-control {
-    color: #ee6e73;
+    color: #ee6e73 !important;;
 }
 
 .run-action.btn {
