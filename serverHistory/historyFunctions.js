@@ -32,7 +32,12 @@ functions.avg = function(id, parameters, callback) {
         }
 
         var result = sum / count;
-        log.debug('FUNC: avg(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: avg(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
 
         callback(null, {
             data: result,
@@ -94,7 +99,12 @@ functions.change = function(id, parameters, callback) {
                 result = last.toUpperCase() === first.toUpperCase() ? 0: 1;
         } else result = last === first ? 0: 1;
 
-        log.debug('FUNC: [abs]change(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: [abs]change(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
         callback(null, {
             data: result,
             records: rawRecords
@@ -206,7 +216,12 @@ functions.count = function(id, parameters, callback) {
             }
         }
 
-        log.debug('FUNC: count(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: count(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
         callback(null, {
             data: result,
             records: rawRecords
@@ -263,7 +278,12 @@ functions.delta = function(id, parameters, callback) {
         });
 
         var result = min !== null && max !== null ? max - min : 0;
-        log.debug('FUNC: delta(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: delta(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
         callback(null, {
             data: result,
             records: rawRecords
@@ -305,7 +325,12 @@ functions.last = function(id, parameters, callback) {
         //if(!records[0]) return callback(new Error('Error in records returned for "last('+parameters.join(', ')+')" function for objectID: '+ id + ': ' + JSON.stringify(records)));
 
         var result = records[records.length - 1].data;
-        log.debug('FUNC: last(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: last(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
         callback(null, {
             data: result,
             records: rawRecords
@@ -339,7 +364,12 @@ functions.max = function(id, parameters, callback) {
             if(result === null || result < record.data) result = record.data;
         });
 
-        log.debug('FUNC: max(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: max(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
         callback(null, {
             data: result,
             records: rawRecords
@@ -377,7 +407,12 @@ functions.min = function(id, parameters, callback) {
             if(result === null || result > record.data) result = record.data;
         });
 
-        log.debug('FUNC: min(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: min(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
         callback(null, {
             data: result,
             records: rawRecords
@@ -409,7 +444,14 @@ functions.nodata = function(id, parameters, callback, prevResult) {
     }
     // get last history record
     history.get(id, 0, '#1', 0, function (err, records) {
-        if(err) {
+        log.debug('nodata: history.get(', id, ', 0, #1, 0) parameters: ', parameters, '; records: ', records,
+            ', err: ', err, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
+            if(err) {
             return callback(new Error('Error occurred while getting data from history for "nodata('+ (period || '') +
                 ')" function for objectID: '+ id +': ' + err.message));
         }
@@ -431,7 +473,12 @@ functions.nodata = function(id, parameters, callback, prevResult) {
         }
 
         if(period) result = result > period ? 1 : 0;
-        log.debug('FUNC: nodata() = ', result, '; records: ', records);
+        log.debug('FUNC: nodata() = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
         callback(null, {
             data: result,
             records: records
@@ -478,7 +525,12 @@ functions.regexp =  function(id, parameters, callback) {
             }
         }
 
-        log.debug('FUNC: regexp(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: regexp(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
         callback(null, {
             data: result,
             records: rawRecords
@@ -526,7 +578,12 @@ functions.sum = function(id, parameters, callback){
             result += record.data;
         });
 
-        log.debug('FUNC: sum(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: sum(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
         callback(null, {
             data: result,
             records: rawRecords
@@ -582,7 +639,12 @@ functions.outliersBrd = function(id, parameters, callback) {
             Q3 = I3 !== I3_ceil ? numericRecords[I3_ceil].data : ( numericRecords[I3_floor].data + numericRecords[I3_ceil].data ) / 2,
             result = borderType === 'min' ? Q1 - (Q3 - Q1) * 1.5 : Q3 + (Q3 - Q1) * 1.5;
 
-        log.debug('FUNC: outliersBrd(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: outliersBrd(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
 
         callback(null, {
             data: result,
@@ -662,7 +724,12 @@ functions.lastRob = function(id, parameters, callback) {
         }
 
 
-        log.debug('FUNC: lastRob(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: lastRob(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
 
         callback(null, {
             data: result,
@@ -752,7 +819,12 @@ functions.avgTF = function(id, parameters, callback) {
         }
 
         var result = sum / count;
-        log.debug('FUNC: avgTF(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: avgTF(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
 
         callback(null, {
             data: result,
@@ -822,7 +894,12 @@ functions.avgMed = function(id, parameters, callback) {
         }
 
         var result = sum / count;
-        log.debug('FUNC: avgMedustness(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: avgMedustness(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
 
         callback(null, {
             data: result,
@@ -952,7 +1029,12 @@ functions.avgNear = function(id, parameters, callback) {
         }
 
         var result = count ? sum / count : null;
-        log.debug('FUNC: avgNear(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: avgNear(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
         callback(null, {
             data: result,
             records: records || rawRecords
@@ -1040,7 +1122,12 @@ functions.forecast = function(id, parameters, callback){
         if(!records) return callback(null, {records: rawRecords});
 
         var result = linearApprox(records, forecastTime);
-        log.debug('FUNC: forecast(', parameters.join(', '), ') = ', result, '; records: ', records);
+        log.debug('FUNC: forecast(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
 
         callback(null, {
             data: result,
@@ -1080,7 +1167,13 @@ functions.timeLeft = function(id, parameters, callback){
         if(!records) return callback(null, {records: rawRecords});
 
         var result = Math.round(linearApprox(records, null, threshold));
-        log.debug('FUNC: timeLeft(', parameters.join(', '), ') = ', result, '(', (new Date(result)).toLocaleString(), '); records: ', records);
+        log.debug('FUNC: timeLeft(', parameters.join(', '), ') = ', result, '(',
+            (new Date(result)).toLocaleString(), '); records: ', records, {
+                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                vars: {
+                    "RECEIVED_OCID": id
+                }
+            });
 
         callback(null, {
             data: result,

@@ -37,7 +37,7 @@ function callbackBeforeExec(callback) {
     });
 }
 
-function callbackAfterExec(callback) {
+function callbackAfterExec(parameterNotUsed, callback) {
     JQueryNamespace.init(callback);
 }
 

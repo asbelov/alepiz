@@ -41,7 +41,7 @@ function connectingCollectors(callback) {
             callbacks = [];
         }
 
-        log.debug('Collectors: ', collectorsObj);
+        //log.debug('Collectors: ', collectorsObj); collectorsObj is too big
 
         async.each(Object.keys(collectorsObj), function (collectorName, callback) {
 

@@ -38,12 +38,15 @@ var parameters = {
     reloadKeepHistoryInterval: 300000, // every 5min reload KeepHistory settings. Send data to history only if KeepHistory !== 0
 
     init: function (initParameters) {
+        var parametersForLog = {};
         for (var parameter in initParameters) {
             if (!initParameters.hasOwnProperty(parameter)) continue;
-            if (parameters.hasOwnProperty(parameter)) parameters[parameter] = initParameters[parameter];
+            if (parameters.hasOwnProperty(parameter)) {
+                parametersForLog[parameter] = parameters[parameter] = initParameters[parameter];
+            }
         }
 
-        log.debug('Init history with parameters: ', parameters);
+        log.debug('Init history with parameters: ', parametersForLog);
     }
 };
 

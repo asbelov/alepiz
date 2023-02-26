@@ -184,34 +184,6 @@ actionClient.runAction = function (param, callback) {
     });
 };
 
-/**
- * Send message for all action servers for add sessionID to database. Used only for run action from web interface
- * @param {Object} param - parameters for creating sessionID
- * @param {string} param.user - username
- * @param {string} param.actionID - action DI (action directory)
- * @param {string} param.actionName - full action name
- * @param {number} param.sessionID - unique session ID
- */
-actionClient.addSessionID = function (param) {
-    if (!clientIPC) {
-        actionClient.connect('actions', function () {
-            log.info('Connecting to action server for add sessionID: ', param);
-            actionClient.addSessionID(param);
-        });
-        return;
-    }
-
-    log.debug('Sending parameters to action server for add sessionID: ', param);
-    var dataToSend = {
-        msg: 'addSessionID',
-        param: param,
-    }
-
-    allClientIPC.forEach(clientIPC => {
-        if (typeof clientIPC.send === 'function') clientIPC.send(dataToSend);
-    });
-};
-
 /*
  load and save user action configuration
  */

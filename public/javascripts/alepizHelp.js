@@ -9,7 +9,7 @@
         $('#helpBtn').click(function (e) {
             e.preventDefault();  // prevent default
 
-            var activeAction = alepizActionsNamespace.getActiveActionsConf();
+            var activeAction = alepizActionsNamespace.getActiveActionConf();
             if(activeAction) var activeActionLink = activeAction.link;
 
             var helpWindowWidth = Math.floor(screen.width - screen.width / 3);

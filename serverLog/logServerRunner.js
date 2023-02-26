@@ -18,12 +18,12 @@ var logServer = {
 
 module.exports = logServer;
 
-logServer.start = function (_callback) {
-    var callback = function(err, isLogServerExit) {
-        if(typeof _callback === 'function') return _callback(err, isLogServerExit);
-        if(err) log.error(err.message);
-    };
-
+/**
+ * Starting log server
+ *
+ * @param {function(Error)|function()} callback callback(err) function will be called after the log server is started
+ */
+logServer.start = function (callback) {
     new thread.parent({
         childrenNumber: 1,
         childProcessExecutable: path.join(__dirname, 'logServer.js'),
@@ -36,7 +36,15 @@ logServer.start = function (_callback) {
         logServerProcess.start(function (err) {
             if(err) return callback(new Error('Can\'t run logServer: ' + err.message));
 
+            /**
+             * Stopping log server
+             * @param {function()} callback callback(err) function will be called after the log server is stopped
+             */
             logServer.stop = logServerProcess.stop;
+
+            /**
+             * Killing log server
+             */
             logServer.kill = logServerProcess.kill;
 
             log.info('logServer was started');

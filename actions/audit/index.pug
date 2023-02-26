@@ -1,0 +1,42 @@
+//
+    Copyright © 2023. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 22.02.2023, 23:52:38
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/jquery/jquery.min.js')
+        script(src='/jquery-ui/jquery-ui.min.js')
+        script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/escapeHTML.js')
+        script(src='/javascripts/alepizActionLogViewer.js')
+        script.
+            var parameters = {
+                action: !{JSON.stringify(action)},
+                objects: !{JSON.stringify(objects)}
+            };
+
+    body
+        script(src='/javascripts/objectsSelector.js')
+        script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+        main
+        div#auditBody
+            div(style="padding: 0 10px 0 10px")#actionListHead
+            div(style="overflow: auto;padding: 0 10px 0 10px")#actionList
+            div(data-direction="vertical" style="width:100%; height:24px; padding-top:11px").resizer#resizer
+                div(style="width:100%; height:2px; background-color: #cbd5e0;")
+            div(style="overflow: auto;padding: 0 10px 0 10px")#actionLog
+
+        div#modalRunConfirm.modal
+            div.modal-content
+                h4 Action run confirmation
+                p Do you really want to run action for objects:
+                    span#selectedObjectsNames
+                    span ? Action will do nothing. Press F12 after run to view action result.
+            div.modal-footer
+                a(href='#!')#modalRunConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                a(href='#!')#modalRunConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+            // end example of action

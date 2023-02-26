@@ -31,7 +31,7 @@ var alepizProcessActionNamespace = (function($) {
     }
 
     function initActionBtn() {
-        var activeAction = alepizActionsNamespace.getActiveActionsConf();
+        var activeAction = alepizActionsNamespace.getActiveActionConf();
 
         runActionFloatingBtn.addClass('hide');
         makeTaskBtnElm.addClass('hide');
@@ -57,7 +57,7 @@ var alepizProcessActionNamespace = (function($) {
     * show result of action execution
  */
     function processIframeInputsData(dontOpenLogWindows){
-        var activeAction = alepizActionsNamespace.getActiveActionsConf();
+        var activeAction = alepizActionsNamespace.getActiveActionConf();
 
         // if button id attr is makeTask*Btn, then run action for makeTask, else execute action
         var executionMode = this.id === 'makeTaskBtn' || this.id === 'makeTaskFloatingBtn' ? 'makeTask' : 'server';
@@ -103,7 +103,7 @@ var alepizProcessActionNamespace = (function($) {
             var ajaxUrl = activeAction.link + '_' + alepizMainNamespace.getSessionID() + '/'+execMode;
             var timeout = Number(activeAction.timeout) * 1000;
             $("body").css("cursor", "progress");
-            if(dontOpenLogWindows !== true) alepizAuditNamespace.openLogWindow('force');
+            if(dontOpenLogWindows !== true) alepizAuditNamespace.openLogWindow();
             else {
                 M.toast({
                     html: 'Executing action "' + activeAction.name + '"... Open log window for details',
@@ -176,13 +176,14 @@ var alepizProcessActionNamespace = (function($) {
         //
         // returnObj = {
         //      data: <any data, for sending to the callbackAfterExec function at client side>
-        //      message: <message, which displayed at the log modal window>
         //      sessionID: new sessionID
         // }
-        function processingResult(returnObj) {
-            if(returnObj.sessionID) alepizMainNamespace.setSessionID(returnObj.sessionID);
+        function processingResult(returnedObj) {
+            if(returnedObj.sessionID) alepizMainNamespace.setSessionID(returnedObj.sessionID);
 
-            if(returnObj.actionError) log.error(returnObj.actionError);
+            if(returnedObj.actionError) log.error(returnedObj.actionError);
+
+            alepizAuditNamespace.printMessageThatActionFinished(returnedObj);
 
             var cleanElmIDs = activeAction.cleanInputIDs ? activeAction.cleanInputIDs.replace(/\s*[,;]\s*/g, ',') : null;
             if(cleanElmIDs) {
@@ -202,7 +203,7 @@ var alepizProcessActionNamespace = (function($) {
             var callbackAfterExec = activeAction.callbackAfterExec;
             if (callbackAfterExec) {
                 try {
-                    iframeDOMElm.contentWindow[callbackAfterExec](returnObj, function (err) {
+                    iframeDOMElm.contentWindow[callbackAfterExec](returnedObj, function (err) {
                         if (err) return log.error(err.message);
                         reloadObjectsAndActionListsAfterActionExecution()
                     });

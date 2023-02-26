@@ -40,7 +40,6 @@ const updateEventsMode = {
  *      updateEventExpression,
  *      variablesDebugInfo: {},
  *      counterID: number,
- *      taskCondition: (number|number|{number}|*),
  *      collector: ({string}|*),
  *      counterName: ({string}|*),
  *      parentObjectName: ({string}|*),
@@ -50,7 +49,7 @@ const updateEventsMode = {
  *      OCID,
  *      objectID: number,
  *      parentOCID: ({number}|*),
- *      countersObjects: {},
+ *      countersObjects: {}
  *  }}
  * @param callback {function}
  * @private
@@ -224,7 +223,6 @@ function getCounterParameters(param, variables, callback) {
         $objectID: param.objectID,
         $parentID: param.parentOCID,
         $variables: variables,
-        $taskCondition: param.taskCondition,
     };
 
     if (!param.countersObjects || !param.countersObjects.counters ||

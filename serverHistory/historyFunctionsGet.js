@@ -2,7 +2,7 @@
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-//var log = require('../lib/log')(module);
+const log = require('../lib/log')(module);
 
 var getByIdx = function () {};
 var getByTime = function () {};
@@ -72,8 +72,13 @@ function getFromHistory(id, shift, num, recordsType, callback) {
     }
 
     getFromHistory(id, shift, num, 0, function (err, rawRecords, isGotAllRecords) {
-        //if(id === 155103) log.warn(id, ': shift: ', shift, '; num: ', num, '; isRequiredAllRecords: ', isRequiredAllRecords, '; rawRecords: ', rawRecords, '; isGotAllRecords: ', isGotAllRecords);
-        //if(id === 155362) log.warn(id, ': shift: ', shift, '; num: ', num, '; isRequiredAllRecords: ', isRequiredAllRecords, '; rawRecords: ', rawRecords, '; isGotAllRecords: ', isGotAllRecords);
+        log.debug('getFromHistory(id: ', id, ', shift: ', shift, ', num: ', num, ', maxRecordCnt: 0): rawRecords: ',
+            rawRecords, ', isGotAllRecords: ', isGotAllRecords, ', err: ', err, {
+                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                vars: {
+                    "RECEIVED_OCID": id
+                }
+            });
         if(err) {
             Array.isArray(rawRecords) ? rawRecords.push(err.message) : rawRecords = err.message;
             return callback(err, null, rawRecords);

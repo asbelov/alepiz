@@ -15,6 +15,7 @@ alepizMainNamespace = (function($) {
         alepizActionsNamespace.init();
         alepizObjectsNamespace.init();
         alepizAuditNamespace.init();
+        alepizActionLogViewerNamespace.init($('#modal-log-content'));
         log.init();
         alepizAuthSystem.init();
         initJQueryElements();

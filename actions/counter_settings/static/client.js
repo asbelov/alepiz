@@ -54,7 +54,16 @@ function callbackBeforeExec(callback) {
 }
 
 function callbackAfterExec(counterData, callback) {
-    var counterID = counterData ? Number(counterData[Object.keys(counterData)[0]].counter.counterID) : null;
+    var counterID = null
+    if(counterData && typeof counterData === 'object') {
+        for(var hostPort in counterData) {
+            var obj = counterData[hostPort];
+            if(obj && obj.counter && obj.counter.counterID) {
+                counterID = obj.counter.counterID;
+                break;
+            }
+        }
+    }
 
     // waiting while onChangeObjects with initCountersSelector() is executed for set returned counterID
     // to select#counterIDSelector element for a new counter

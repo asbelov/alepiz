@@ -6,11 +6,7 @@
  * Created by Alexander Belov on 12.02.2017.
  */
 
-function onScrollIframe() {
-    JQueryNamespace.onScrollIframe();
-}
-
-var JQueryNamespace = (function ($) {
+var dataBrowserNamespace = (function ($) {
     $(function () {
 
         bodyElm = $('body');
@@ -1546,3 +1542,7 @@ var JQueryNamespace = (function ($) {
     };
 
 })(jQuery); // end of jQuery name space
+
+function onScrollIframe() {
+    dataBrowserNamespace.onScrollIframe();
+}

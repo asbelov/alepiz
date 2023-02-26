@@ -54,13 +54,13 @@ function processMessage(message, callback) {
 
     if (!message) {
         if (typeof callback === 'function') {
-            log.info('Receiving empty message with callback');
+            log.warn('Receiving empty message with callback');
             callback();
-        } else log.info('Receiving empty message without callback');
+        } else log.warn('Receiving empty message without callback');
         return;
     }
 
-    // init cache
+    // init or update cache
     if (message.countersObjects || message.variablesHistory || message.variablesExpressions || message.objectsProperties) {
         cache = initCache(message, cache);
 
@@ -83,8 +83,11 @@ function processMessage(message, callback) {
             // cache initializing. processing cached messages
             if (!cacheAndCollectorsInitialized) {
                 cacheAndCollectorsInitialized = true;
-                messageCache.forEach(processMessage);
-                messageCache.clear();
+                if(messageCache.size) {
+                    log.info('Processing ', messageCache.size, ' messages, which received before cache initialization');
+                    messageCache.forEach(processMessage);
+                    messageCache.clear();
+                }
             }
         });
 
@@ -97,18 +100,20 @@ function processMessage(message, callback) {
         return;
     }
 
-
+    // received request to calculate counter for OCID (if present message.removeCounters, then update counters first)
     if ('OCID' in message) {
         //profiling.start('Full cycle', message);
         getVariablesAndCheckUpdateEvents(message);
         return;
     }
 
+    // received result from parent active collector
     if ('result' in message) {
         processCollectorResult(message.err, message.result, message.parameters, message.collectorName);
         return;
     }
 
+    // received request for remove counters without calculation
     // message: { removeCounters: [<OCID1>, OCID2, ...] }
     if (message.removeCounters && message.removeCounters.length) {
         var OCIDs = message.removeCounters; // array of OCIDs
@@ -118,7 +123,9 @@ function processMessage(message, callback) {
 
             log.debug('Collector ', name, ' has a removeCounters method, executing removeCounters for OCIDs: ', OCIDs);
             collector.removeCounters(OCIDs, function (err) {
-                if (err) return log.error('Error executing ', name, '.removeCounters method for OCIDs ', OCIDs, ': ', err.message);
+                if (err) {
+                    return log.error('Error executing ', name, '.removeCounters method for OCIDs ', OCIDs, ': ', err.message);
+                }
                 callback();
                 //log.debug('Counters with OCID ', OCIDs, ' are removed for collector ', name);
             });
@@ -132,9 +139,12 @@ function processMessage(message, callback) {
         async.eachOf(collectorsObj, function (collector, name, callback) {
             if (typeof collector.throttlingPause !== 'function') return callback();
 
-            log.debug('Collector ', name, ' has a throttlingPause method, executing throttlingPause ', message.throttlingPause);
+            log.debug('Collector ', name, ' has a throttlingPause method, executing throttlingPause ',
+                message.throttlingPause);
             collector.throttlingPause(message.throttlingPause, function (err) {
-                if (err) return log.error('Error executing ', name, '. message.throttlingPause method: ', err.message);
+                if (err) {
+                    return log.error('Error executing ', name, '. message.throttlingPause method: ', err.message);
+                }
                 callback();
             });
         }, function () {
@@ -181,7 +191,7 @@ function sendCompleteExecutionResult(param) {
 }
 
 /**
- * Processing counter result, received from another active collector
+ * Starting counter calculation
  *
  * @param {Object} message message from another active collector
  * @param {0|1} message.updateEventState update event state
@@ -208,7 +218,7 @@ function getVariablesAndCheckUpdateEvents(message) {
         var counterID = OCIDObj.counterID;
         var counter = countersObjects.counters.get(counterID);
     } catch (e) {
-        log.error('Can\'t get counter data: ', e.message, ', msg: ', message);
+        log.error('Can\'t get cached counter data: ', e.message, ', for counter: ', message);
         return sendCompleteExecutionResult({
             parentOCID: message.parentOCID,
             OCID: message.OCID,
@@ -232,9 +242,7 @@ function getVariablesAndCheckUpdateEvents(message) {
         log.options('Collector "', message.collector, '" undefined or object "get" is not a function (',
             collectorsObj[message.collector] || ('collectors list: ' + Object.keys(collectorsObj).join(', ')),
             '), objectCounterID: ', message.OCID, ': ', counterParameters, {
-                filenames: ['counters/' + message.counterID, 'counters.log'],
-                emptyLabel: true,
-                noPID: true,
+                filenames: ['counters/' + message.counterID, 'counters'],
                 level: 'E'
             });
 
@@ -257,7 +265,6 @@ function getVariablesAndCheckUpdateEvents(message) {
         parentVariables: message.parentVariables,
         prevUpdateEventState: updateEventState,
         parentObjectValue: message.parentObjectValue,
-        countersObjects: countersObjects,
         variablesDebugInfo: {},
         //updateEventExpression: counter.updateEventExpression,
         //updateEventMode: counter.updateEventMode,
@@ -272,8 +279,8 @@ function getVariablesAndCheckUpdateEvents(message) {
         objectID: objectID,
         counterID: counterID,
         collector: counter.collector,
-        taskCondition: counter.taskCondition,
         debug: counter.debug,
+        countersObjects: {}, // will set letter after print debug info
         cache: {
             variablesHistory: cache.variablesHistory.get(counterID) || new Map(),
             variablesExpressions: cache.variablesExpressions.get(counterID) || new Map(),
@@ -283,22 +290,16 @@ function getVariablesAndCheckUpdateEvents(message) {
     };
 
     //profiling.start('1. get variables values', message);
-    //log.info(cache.variablesHistory.get(Number(counter.counterID)))
-    //log.info(cache.variablesExpressions.get(Number(counter.counterID)))
-    //log.info(cache.objectsProperties.get(Number(counter.objectID)))
-    /*
-    message = {
-        parentVariables
-        updateEventState
-        parentObjectValue
-        OCID
-        parentOCID
-        updateEventExpression
-        updateEventMode
-        removeCounter
-    }
-     */
-    getVars(param, function (err, noNeedToCalculateCounter, variables, variablesDebugInfo, preparedCollectorParameters) {
+
+    log.debug('getVariablesAndCheckUpdateEvents for OCID ', param.OCID, ' counter parameters: ', param, {
+        expr: '%:RECEIVED_OCID:% == %:OCID:%',
+        vars: {
+            "RECEIVED_OCID": param.OCID
+        }
+    });
+
+    param.countersObjects = countersObjects;
+    getVars(param,function (err, noNeedToCalculateCounter, variables, variablesDebugInfo, preparedCollectorParameters) {
 
         if (param.debug) {
             debugCounters.add('v', param.OCID, variablesDebugInfo,
@@ -310,7 +311,7 @@ function getVariablesAndCheckUpdateEvents(message) {
 
         // send UPDATE_EVENT_STATE anyway if previous updateEventState is not equal to new updateEventState,
         // because after the child may have nothing to send to the server
-        //was if (param.parentOCID && param.updateEventExpression && variables.UPDATE_EVENT_STATE !== undefined) {
+        // was if (param.parentOCID && param.updateEventExpression && variables.UPDATE_EVENT_STATE !== undefined) {
         if (param.parentOCID && param.updateEventExpression &&
             updateEventState !== variables.UPDATE_EVENT_STATE &&
             variables.UPDATE_EVENT_STATE !== undefined) {
@@ -319,15 +320,25 @@ function getVariablesAndCheckUpdateEvents(message) {
                 OCID: param.OCID,
                 updateEventState: variables.UPDATE_EVENT_STATE,
             });
-            //if(counterID === 211 || counterID === 257) log.warn(param.counterName, ' send: updateEventState: ', updateEventState ,'=>', variables.UPDATE_EVENT_STATE, ': ', noNeedToCalculateCounter, ': ', param.parentOCID, '-', param.OCID, ': ', param.updateEventExpression);
+
+            log.debug('getVariablesAndCheckUpdateEvents for OCID ', param.OCID,
+                '\n send: updateEventState: ', updateEventState ,'=>', variables.UPDATE_EVENT_STATE,
+                ',\n noNeedToCalculateCounter: ',  noNeedToCalculateCounter,
+                ',\n parentOCID-OCID: ', param.parentOCID, '-', param.OCID,
+                ',\n updateEventExpression: ', param.updateEventExpression,
+                ',\n vars: ', variables,
+                ',\n variablesDebugInfo: ', variablesDebugInfo,
+                ',\n preparedCollectorParameters: ', preparedCollectorParameters, {
+                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    vars: {
+                        "RECEIVED_OCID": param.OCID
+                    }
+                });
         }
 
-        //if(counterID === 211 || counterID === 257) log.warn(param.counterName, ': updateEventState: ', updateEventState ,'=>', variables.UPDATE_EVENT_STATE, ': ', noNeedToCalculateCounter, ': ', param.parentOCID, '-', param.OCID, ': ', param.updateEventExpression);
         if (err) {
-            log.options(err.message, {
-                filenames: ['counters/' + param.counterID, 'counters.log'],
-                emptyLabel: true,
-                noPID: true,
+            log.options(err.message, ',\n variablesDebugInfo: ', variablesDebugInfo, {
+                filenames: ['counters/' + param.counterID, 'counters'],
                 level: 'I'
             });
             return sendCompleteExecutionResult(param);
@@ -348,9 +359,7 @@ function getVariablesAndCheckUpdateEvents(message) {
                             ', unresolved variables: ',
                             variablesDebugInfo.UPDATE_EVENT_STATE.unresolvedVariables.join(', '),
                             ', OCID: ', param.OCID, {
-                                filenames: ['counters/' + param.counterID, 'counters.log'],
-                                emptyLabel: true,
-                                noPID: true,
+                                filenames: ['counters/' + param.counterID, 'counters'],
                                 level: 'I'
                             });
 
@@ -371,9 +380,7 @@ function getValue(param) {
             param.objectName,
             '(', param.counterName, '): collector: "', param.collector,
             '"; param: ', param, {
-                filenames: ['counters/' + param.counterID, 'counters.log'],
-                emptyLabel: true,
-                noPID: true,
+                filenames: ['counters/' + param.counterID, 'counters'],
                 level: 'E'
             });
         return sendCompleteExecutionResult(param);
@@ -387,14 +394,29 @@ function getValue(param) {
     try {
         if (param.removeCounter && collectorsObj[param.collector] &&
             typeof collectorsObj[param.collector].removeCounters === 'function') {
-            //log.info(param.removeCounter, ' now processed but required for update. Removing...');
+
+            log.debug('getValue for OCID ', param.OCID, ': ', param.removeCounter,
+                ' now processed but required for update. Removing...', {
+                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    vars: {
+                        "RECEIVED_OCID": param.OCID
+                    }
+                });
+
             collectorsObj[param.collector].removeCounters([param.OCID], function (err) {
                 if (err) {
                     log.error('Error executing removeCounter method for ', param.counterName ,
                         '(', param.objectName, ', collector:', param.collector, '): ', err.message);
                 }
 
-                //log.info('Getting data for ', param.removeCounter, ' after removing...');
+                log.debug('getValue for OCID ', param.OCID, 'Getting data for ', param.removeCounter,
+                    ' after removing...', {
+                        expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                        vars: {
+                            "RECEIVED_OCID": param.OCID
+                        }
+                    });
+
                 collectorsObj[param.collector].get(param.collectorParameters, function (err, result) {
                     processCollectorResult(err, result, param, param.collector);
                 });
@@ -409,9 +431,7 @@ function getValue(param) {
             param.OCID,
             ': ', param.objectName,
             '(', param.counterName, '): ', err.stack, {
-                filenames: ['counters/' + param.counterID, 'counters.log'],
-                emptyLabel: true,
-                noPID: true,
+                filenames: ['counters/' + param.counterID, 'counters'],
                 level: 'E'
             });
         return sendCompleteExecutionResult(param);
@@ -444,15 +464,24 @@ function processCollectorResult(err, result, param, collectorName) {
         }
     }
 
-    //if(Number(param.OCID) === 3428) log.warn('Getting record ', result, ': ', param);
+    var taskCondition = cache.countersObjects.counters.get(param.counterID) &&
+        cache.countersObjects.counters.get(param.counterID).taskCondition;
 
     // result was saved to the history in activeCollector.js for active and separate collectors
     // for decrees number of transfers of result value
     var preparedResult = collectorsObj[param.collector].active || collectorsObj[param.collector].separate ?
         result : history.add(param.OCID, result);
 
-    if (param.taskCondition) {
-        taskServer.checkCondition(param.OCID, preparedResult, param.objectName, param.counterName);
+    log.debug('processCollectorResult for OCID ', param.OCID, ' return ', result, '(', preparedResult, '); param: ', param,
+        '; taskCondition: ', taskCondition, '; err: ', err, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": param.OCID
+            }
+        });
+
+    if (taskCondition && preparedResult) {
+        taskServer.checkCondition(param.OCID, param.objectName, param.counterName);
     }
 
     if (!preparedResult || preparedResult.value === undefined || preparedResult.value === null) {
@@ -462,9 +491,7 @@ function processCollectorResult(err, result, param, collectorName) {
                 param.objectName,
                 '(', param.counterName, '): ',
                 (err.stack || JSON.stringify(err)), '; Parameters: ', param.collectorParameters, {
-                    filenames: ['counters/' + param.counterID, 'counters.log'],
-                    emptyLabel: true,
-                    noPID: true,
+                    filenames: ['counters/' + param.counterID, 'counters'],
                     level: 'E'
                 });
         } // else return nothing, skip it
@@ -475,9 +502,7 @@ function processCollectorResult(err, result, param, collectorName) {
             '(', param.counterName,
             '); result: ', result, '; Error: ', err.message,
             '; Parameters: ', param.collectorParameters, {
-                filenames: ['counters/' + param.counterID, 'counters.log'],
-                emptyLabel: true,
-                noPID: true,
+                filenames: ['counters/' + param.counterID, 'counters'],
                 level: 'W'
             });
     }
@@ -495,61 +520,31 @@ function processCollectorResult(err, result, param, collectorName) {
     if (!dependedCounters || !dependedCounters.size) {
         // send process ID to server
 
-
-        /*
-        log.options('Received value[s] ', preparedResult.value, ' from: ',
-            param.objectName,
-            '(', param.counterName, '), depended on counters not found', {
-                filenames: ['counters/' + param.counterID, 'counters.log'],
-                emptyLabel: true,
-                noPID: true,
-                level: 'D'
+        log.debug('processCollectorResult for OCID ', param.OCID, ' no dependent counters found', {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": param.OCID
+            }
         });
-         */
+
         return sendCompleteExecutionResult(param);
     }
-
-    /*
-    message = {
-        parentVariables
-        updateEventState
-        parentObjectValue
-        OCID
-        parentOCID
-        updateEventExpression
-        updateEventMode
-        removeCounter
-    }
-     */
-/*
-    // !!!!!
-    // Need to get previous updateEventState from the server. Here you can only get updateEventState of the parent counter
-    // and checking that the collection for this OCID is no longer running or it does not have a parameter runCollectorSeparately
-
-    if(dependedCounters.length === 1 && (!Array.isArray(preparedResult.value) || preparedResult.value.length === 1)) {
-        var parentValue = Array.isArray(preparedResult.value) ? preparedResult.value[0] : preparedResult.value;
-
-        // can be received from collector JavaScript
-        if (typeof parentValue === 'object') parentValue = JSON.stringify(parentValue);
-        else if(parentValue instanceof Set) parentValue = JSON.stringify(Array.from(parentValue));
-        else if(parentValue instanceof Map) parentValue = JSON.stringify(Object.fromEntries(parentValue));
-
-        var message = dependedCounters[0];
-        message.updateEventState = ???
-        message.parentVariables = param.collectorParameters.$variables;
-        message.parentObjectValue = parentValue;
-if(param.OCID === 155273) log.warn(param.counterName, ' recalculate: updateEventState: ', param.collectorParameters.$variables.UPDATE_EVENT_STATE);
-        return getVariablesAndCheckUpdateEvents(message);
-    }
- */
 
     var returnedMessage = {
         parentOCID: param.parentOCID ? param.parentOCID : undefined,
         OCID: param.OCID,
         variables: param.collectorParameters.$variables,
-        dependedCounters: dependedCounters,
         value: preparedResult.value,
+        dependedCounters: dependedCounters,
     };
+
+    log.debug('processCollectorResult for OCID ', param.OCID, ' dependent counters found, return to parent: ',
+        returnedMessage, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": param.OCID
+            }
+        });
 
     //profiling.stop('3. get depended counters', param);
     //profiling.start('4. send data to server', param);
@@ -579,9 +574,7 @@ function getCountersForDependedCounters(parentCounterID, parentObjectID, parentO
                     log.options(variables.OBJECT_NAME, '(', variables.COUNTER_NAME,
                         '): object filter "', updateEvent.objectFilter,
                         '" in update event contain an unresolved variables: ', res.unresolvedVariables, {
-                            filenames: ['counters/' + parentCounterID, 'counters.log'],
-                            emptyLabel: true,
-                            noPID: true,
+                            filenames: ['counters/' + parentCounterID, 'counters'],
                             level: 'W'
                         });
                     continue;
@@ -595,9 +588,7 @@ function getCountersForDependedCounters(parentCounterID, parentObjectID, parentO
                 log.options(variables.OBJECT_NAME, '(', variables.COUNTER_NAME,
                     '): object filter "', updateEvent.objectFilter,
                     '" in update event is not a regular expression: ', e.message, {
-                        filenames: ['counters/' + parentCounterID, 'counters.log'],
-                        emptyLabel: true,
-                        noPID: true,
+                        filenames: ['counters/' + parentCounterID, 'counters'],
                         level: 'W'
                     });
                 continue;

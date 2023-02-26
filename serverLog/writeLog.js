@@ -4,8 +4,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const createConfig = require('./createConfig');
-const auditDB = require('../lib/auditDB');
+const createMessage = require('./createMessage');
 
 var logFD = new Map();
 
@@ -16,23 +15,46 @@ closeUnusedLogFiles();
 
 var dateSuffix = setDateSuffix();
 
-function writeLog(data) {
+/**
+ * Write log message to the log file
+ * @param {Object|string} messageObj object with data for create log message and log file name
+ * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} messageObj.level log level
+ * @param {string} messageObj.messageBody pure the log message
+ * @param {Object} messageObj.cfg configuration from config/log.json for current log label
+ * @param {string} [messageObj.label] log message label
+ * @param {number} [messageObj.timestamp] log message timestamp
+ * @param {number} [messageObj.sessionID] sessionID for action
+ * @param {Object} [messageObj.options] log options
+ */
+function writeLog(messageObj) {
+    if(!messageObj) return;
+
+    if (!messageObj.messageBody) return;
+
     // get default configuration
-    var cfg = createConfig(data.label);
-    const logDir = cfg.dir || 'logs';
+    var cfg = messageObj.cfg;
+    const logDir = String(cfg.dir) || 'logs';
 
+    var date = messageObj.timestamp ? new Date(messageObj.timestamp) : new Date();
+    var message = cfg.logLevel === 'D' ? messageObj.messageBody.replace(/[\r\n]/g, '\n\t') : messageObj.messageBody.replace(/[\r\n]/g, '');
+    message = createMessage.createHeader(messageObj.level, messageObj.label, messageObj.sessionID, date) +
+        (messageObj.additionalLabel ? messageObj.additionalLabel : '') +
+        messageObj.messageBody;
+    if(cfg.logToConsole) console.log(message);
 
-    if(cfg.logToConsole) console.log(data.message);
-    var message = data.message.replace(/([\r\n])|(\x1B\[\d+m)/g, '') + '\n';
-
+    message = message
+        .replace(/[\r\n]/g, (cfg.wrapLines ? '' : '\n\t'))
+        .replace(/\x1B\[\d+m/g, '') + '\n';
 
     var mainLogFile =
-        path.join(String(logDir), String(data.level === 'EXIT' ?
+        path.join(logDir, String(messageObj.level === 'EXIT' ?
             (cfg.exitLogFileName || 'exit.log') : (cfg.file || 'log.log') + dateSuffix));
 
-    var logFiles = (data.options && Array.isArray(data.options.filenames) ? data.options.filenames : [mainLogFile]);
+    var logFiles = (messageObj.options && Array.isArray(messageObj.options.filenames) ?
+        messageObj.options.filenames.map(filePath => path.join(logDir, filePath + '.log' + dateSuffix)) :
+        [mainLogFile]);
 
-    if(data.level === 'W' || data.level === 'E') {
+    if(messageObj.level === 'W' || messageObj.level === 'E') {
         logFiles.push(path.join(String(logDir), (cfg.errorLogFileName || 'error.log') + dateSuffix))
     }
 
@@ -41,16 +63,13 @@ function writeLog(data) {
         stream.fd.write(message);
         stream.timestamp = Date.now();
     });
-
-    auditDB.insertRecords(data, function(err){
-        if(err) return writeLog({
-            message: 'Error while add log records to audit: ' + err.message,
-            level: 'E',
-            label: 'log',
-        });
-    });
 }
 
+/**
+ * Open stream for log file
+ * @param {string} logFilePath path to the log file
+ * @returns {stream} stream log file stream
+ */
 function openLog(logFilePath) {
     if(!logFD.has(logFilePath)) {
         try {
@@ -80,7 +99,7 @@ function setDateSuffix() {
     timer.unref();
 
     var now = new Date();
-    var month = now.getMonth()+1;
+    var month = now.getMonth() + 1;
     var date = now.getDate();
     dateSuffix = '.' + String((now.getYear() - 100)) + String(month < 10 ? '0' + month : month) +
         String(date < 10 ? '0' + date: date)
@@ -88,6 +107,9 @@ function setDateSuffix() {
     return dateSuffix;
 }
 
+/**
+ * Close unused opened log files at 00:03:00
+ */
 function closeUnusedLogFiles() {
     if(logFD.size) {
         const now = new Date(), dayOfMonth = now.getDate();

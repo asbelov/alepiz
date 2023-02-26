@@ -18,8 +18,7 @@ var log = (function($) {
 
     function getHumanLogLevel(level) {
         var humanLevel;
-        if(level === 'S') humanLevel = { text: 'Silly', color: 'grey'};
-        else if(level === 'D') humanLevel = { text: 'Debug', color: 'green'};
+        if(level === 'D') humanLevel = { text: 'Debug', color: 'green'};
         else if(level === 'I') humanLevel = { text: 'Information', color: 'black'};
         else if(level === 'W') humanLevel = { text: 'Warning', color: 'blue'};
         else if(level === 'E') humanLevel = { text: 'Error', color: 'red'};
@@ -32,8 +31,13 @@ var log = (function($) {
         if(!args) return;
 
         var sessionID = alepizMainNamespace.getSessionID();
+        var activeActionLink = $('li[data-action-link].active').attr('data-action-link') || '';
 
-        $.post('/log' + (sessionID ? '/' + String(sessionID) : '/0'), {level: level, args: JSON.stringify(args)}, function() {
+        $.post('/log' + (sessionID ? '/' + String(sessionID) : '/0'), {
+            level: level,
+            args: JSON.stringify(args),
+            actionLink: activeActionLink,
+        }, function() {
 
             var header = getHumanLogLevel(level);
             modalLogHeaderElm.text(header.text).removeClass().addClass(header.color + '-text');
@@ -59,7 +63,6 @@ var log = (function($) {
 
     return {
         init: init,
-        silly:          function() { _log('S', Array.prototype.slice.call(arguments)) },
         debug:          function() { _log('D', Array.prototype.slice.call(arguments)) },
         info:           function() { _log('I', Array.prototype.slice.call(arguments)) },
         warn:           function() { _log('W', Array.prototype.slice.call(arguments)) },

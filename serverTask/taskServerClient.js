@@ -18,14 +18,16 @@ module.exports = taskServer;
 
 var clientIPC;
 var allClientIPC = new Map(),
-    connectionInitialized = false;
+    connectionInitialized = 0;
 /**
  * Connect to the task server and to the remote Alepiz task server instances
  * @param {string|null} id the name of the connected services to identify in the log file
  * @param {function(Error)|function()} callback callback(err)
  */
 taskServer.connect = function (id, callback) {
-    if(connectionInitialized) return callback();
+    if(connectionInitialized === 2) return callback();
+    if(connectionInitialized === 1) return setTimeout(taskServer.connect, 100, id, callback);
+    connectionInitialized = 1;
 
     var cfg = confTaskServer.get();
     if(!cfg) return callback(new Error('Task server is not configured'));
@@ -44,7 +46,7 @@ taskServer.connect = function (id, callback) {
                 }
                 _allClientIPC.set(cfg.serverAddress + ':' + cfg.serverPort, clientIPC);
                 allClientIPC = _allClientIPC;
-                connectionInitialized = true;
+                connectionInitialized = 2;
                 callback();
             });
 
@@ -56,14 +58,12 @@ taskServer.connect = function (id, callback) {
  * When calculating the result from the counter, check it for the fulfillment of the condition for run the task.
  * Call from server/child/getCountersValue.js:processCounterResult()
  * @param {number} OCID OCID
- * @param {null|number|string|boolean|undefined} result counter calculation result
  * @param {string} objectName object name for log
  * @param {string} counterName counter name for log
  */
-taskServer.checkCondition = function(OCID, result, objectName, counterName) {
+taskServer.checkCondition = function(OCID, objectName, counterName) {
     clientIPC.send({
         OCID: OCID, // single object counters ID
-        result: Boolean(result), // taskServer.js:queueCondition(): if(result) OCIDs.push(OCID);
         objectName: objectName,
         counterName: counterName,
     });
@@ -104,11 +104,11 @@ taskServer.addTask = function(taskID, runType, workflow, conditionOCIDs) {
  * @param {object} param
  * @param {string} param.userName username
  * @param {number} param.taskID task ID
- * @param {object} param.variables object with variables for use in actions when run from
+ * @param {object} [param.variables] object with variables for use in actions when run from
  *  task-runner collector or eventGenerator
  *  {<name>: <value>, ...}
- * @param {Array} param.filterSessionIDs run only filtered actions from the task (array of the sessionIDs)
- * @param {number} param.mySessionID sessionID for the task (for group task action in audit)
+ * @param {Array} [param.filterSessionIDs] run only filtered actions from the task (array of the sessionIDs)
+ * @param {number} [param.mySessionID] sessionID for the task (for group task action in audit)
  * @param {string} param.runTaskFrom function description from which run the task (for log)
  * @param {function(Error)|function(null, Object)} callback callback(err, taskResults) where taskResults is the
  *  object like {"<host1>:<Port1>": <taskResultFromAlepizInstance1>, "<host2>:<Port2>": <taskResultFromAlepizInstance2>, ...}

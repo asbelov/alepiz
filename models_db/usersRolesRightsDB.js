@@ -4,29 +4,34 @@
 
 var async = require('async');
 var db = require('./db');
-var log = require('../lib/log')(module);
 var Conf = require('../lib/conf');
 const conf = new Conf('config/common.json');
-var systemUser = conf.get('systemUser') || 'system';
+
+//var systemUser = conf.get('systemUser') || 'system';
 var reloadRightsInterval = ( conf.get('reloadRightsIntervalSec') || 180 ) * 1000;
+var lastTimeWhenLoadedObjectRightsFromDB = 0;
+var lastTimeWhenLoadedActionsRightsFromDB = 0;
 
 var rightsDB = {};
 module.exports = rightsDB;
 
-var objectsRights, callbacksQueue = new Set();
+var objectsRights = new Map(),
+    actionsRights = new Set(),
+    objectRightsCallbacksQueue = new Set(),
+    actionsRightsCallbacksQueue = new Set();
 
-// reload rights from DB every reloadRightsIntervalSec milliseconds
 // TODO: it's used for load changes from DB to cache, but it is not a good way
-setInterval(function() {
-    loadObjectsRights(function(err) {
-        if(err) log.error(err.message);
-    })
-}, reloadRightsInterval);
-
+/**
+ * Load object rights to cache
+ * @param {function(err)|function()} callback callback(err)
+ */
 function loadObjectsRights(callback) {
 
-    callbacksQueue.add(callback);
-    if(callbacksQueue.size > 1) return;
+    if(Date.now() - lastTimeWhenLoadedObjectRightsFromDB < reloadRightsInterval) return callback();
+    lastTimeWhenLoadedObjectRightsFromDB = Date.now();
+
+    objectRightsCallbacksQueue.add(callback);
+    if(objectRightsCallbacksQueue.size > 1) return;
 
     db.all('\
 SELECT users.name AS user, rightsForObjects.objectID AS objectID, rightsForObjects.view AS view, \
@@ -36,98 +41,96 @@ JOIN usersRoles ON users.id=usersRoles.userID \
 JOIN rightsForObjects ON rightsForObjects.roleID=usersRoles.roleID \
 WHERE isDeleted=0', function(err, rows) {
         if(err) {
-            callbacksQueue.forEach(function (callback) {
+            objectRightsCallbacksQueue.forEach(function (callback) {
                 callback(new Error('Can\'t read rights for objects data from DB: ' + err.message));
             });
-            callbacksQueue.clear();
+            objectRightsCallbacksQueue.clear();
             return;
         }
 
-        var _objectsRights = {};
-
         rows.forEach(function (row) {
-            if(!_objectsRights[row.user]) _objectsRights[row.user] = {};
-            if(row.objectID === null) row.objectID = 0;
+            if(!objectsRights.has(row.user)) objectsRights.set(row.user, new Map());
+            var userObjectID = objectsRights.get(row.user);
 
-            if(!_objectsRights[row.user][row.objectID]) {
-                _objectsRights[row.user][row.objectID] = {
+            if(!userObjectID.has(row.objectID)) {
+                userObjectID.set(row.objectID, {
                     view: !!row.view,
                     change: !!row.change,
                     makeTask: !!row.makeTask,
                     changeInteractions: !!row.changeInteractions
-                };
+                });
             } else {
-                _objectsRights[row.user][row.objectID] = {
-                    view: !!row.view || _objectsRights[row.user][row.objectID].view,
-                    change: !!row.change || _objectsRights[row.user][row.objectID].change,
-                    makeTask: !!row.makeTask || _objectsRights[row.user][row.objectID].makeTask,
-                    changeInteractions: !!row.changeInteractions || _objectsRights[row.user][row.objectID].changeInteractions
-                };
+                userObjectID.set(row.objectID, {
+                    view: !!row.view || userObjectID.get(row.objectID).view,
+                    change: !!row.change || userObjectID.get(row.objectID).change,
+                    makeTask: !!row.makeTask || userObjectID.get(row.objectID).makeTask,
+                    changeInteractions: !!row.changeInteractions || userObjectID.get(row.objectID).changeInteractions
+                });
             }
         });
 
-        objectsRights = _objectsRights;
-
-        callbacksQueue.forEach(function (callback) {
-            callback();
-        });
-        callbacksQueue.clear();
+        objectRightsCallbacksQueue.forEach(callback => callback());
+        objectRightsCallbacksQueue.clear();
         //log.info('Loading objects rights from DB to cache is complete. Loaded ', rows.length, ' roles.');
     });
 }
 
-/*
- Checking user rights for specific objects IDs
- look at checkObjectsRightsWrapper description for other p.* values
- p.IDs - objects IDs for check, can be an array of objects IDs or array of objects, like [{id:.., name:..., ...}, {}]
- p.user - user name
- p.checkView  - check rights to view object (default, if nothing set to check)
- p.checkChange - check rights to change object
- p.checkMakeTask - check rights to make task with objects
- p.checkChangeInteractions - check rights for change interactions for objects
- p.errorOnNoRights - generate an error when the user does not have rights to some objects
- callback(err, ids): ids is an array of the object ids
+/**
+ * Checking user rights for specific objects IDs
+ * @param {Object} param parameters
+ * @param {string} param.user username
+ * @param {Array} param.IDs array of the object IDs for check rights.
+ *  Can be an array of objects IDs or array of objects, like [{id:.., name:..., ...}, {}]
+ * @param {boolean} param.checkView check rights to view object (default, if nothing set to check)
+ * @param {boolean} param.checkChange check rights to change object
+ * @param {boolean} param.checkChangeInteractions check rights for change interactions for objects
+ * @param {boolean} param.errorOnNoRights generate an error when the user does not have rights to some objects
+ * @param {function(err)|function(null, Array)} callback callback(err, checkedObjectsIDs) where
+ *  checkedObjectsIDs is an array of the object IDs
  */
-rightsDB.checkObjectsIDs = function(p, callback) {
+rightsDB.checkObjectsIDs = function(param, callback) {
 
-    if(objectsRights) var myLoadObjectsRights = function(callback) { callback() };
-    else myLoadObjectsRights = loadObjectsRights;
-
-    myLoadObjectsRights(function (err) {
+    loadObjectsRights(function (err) {
         if(err) return callback(err);
 
-        var user = p.user;
-        var errOnNoRights = p.errorOnNoRights ? new Error('You are not allowed to make operation with some of selected objects: ' + p.IDs.join(', ')) : null;
-        if(!objectsRights[user]) return callback(errOnNoRights, []);
+        var user = param.user;
+        var errOnNoRights = param.errorOnNoRights ?
+            new Error('You are not allowed to make operation with some of selected objects: ' + param.IDs.join(', ')) :
+            null;
 
-        if(!p.checkView && !p.checkChange && !p.checkMakeTask && !p.checkChangeInteractions) p.checkView = true;
+        if(!objectsRights.has(user)) return callback(errOnNoRights, []);
 
-        var uncheckedObjectsIDs = p.IDs;
-        var checkedObjectsIDs = [];
-
-        // some optimisation for users with default rights only
-        if(uncheckedObjectsIDs.length > 2 && Object.keys(objectsRights[user]).length === 1 && objectsRights[user][0]) {
-            uncheckedObjectsIDs = [p.IDs[0]];
-            checkedObjectsIDs = p.IDs.splice(1);
+        if(!param.checkView && !param.checkChange && !param.checkMakeTask && !param.checkChangeInteractions) {
+            param.checkView = true;
         }
 
-        for(var i = 0; i < uncheckedObjectsIDs.length; i++) {
+        var uncheckedObjectIDs = param.IDs;
+        var checkedObjectIDs = [];
+        var userObjectsRights = objectsRights.get(user);
 
-            if(typeof uncheckedObjectsIDs[i] === 'object' && uncheckedObjectsIDs[i].id) var objectID = uncheckedObjectsIDs[i].id;
-            else objectID = uncheckedObjectsIDs[i];
+        // some optimisation for users with default rights only (objectID === null)
+        if(uncheckedObjectIDs.length > 2 && userObjectsRights.size === 1 && userObjectsRights.get(null)) {
+            uncheckedObjectIDs = [param.IDs[0]];
+            checkedObjectIDs = param.IDs.splice(1);
+        }
 
-            var rights = objectsRights[user][objectID] ? objectsRights[user][objectID] : objectsRights[user][0];
+        for(var i = 0; i < uncheckedObjectIDs.length; i++) {
+
+            var objectID = typeof uncheckedObjectIDs[i] === 'object' && uncheckedObjectIDs[i].id ?
+                uncheckedObjectIDs[i].id : uncheckedObjectIDs[i];
+
+            var rights = userObjectsRights.get(objectID) || userObjectsRights.get(null);
             var hasRights = true;
 
-            if(p.checkView && !rights.view) hasRights = false;
-            if(p.checkChange && !rights.change) hasRights = false;
-            if(p.checkMakeTask && !rights.makeTask) hasRights = false;
-            if(p.checkChangeInteractions && !rights.changeInteractions) hasRights = false;
+            if(param.checkView && !rights.view) hasRights = false;
+            if(param.checkChange && !rights.change) hasRights = false;
+            if(param.checkMakeTask && !rights.makeTask) hasRights = false;
+            if(param.checkChangeInteractions && !rights.changeInteractions) hasRights = false;
 
-            if(!hasRights && p.errorOnNoRights) return callback(errOnNoRights);
-            if(hasRights) checkedObjectsIDs.push(uncheckedObjectsIDs[i]);
+            if(!hasRights && param.errorOnNoRights) return callback(errOnNoRights);
+            if(hasRights) checkedObjectIDs.push(uncheckedObjectIDs[i]);
         }
-        callback(null, checkedObjectsIDs);
+        callback(null, checkedObjectIDs);
     })
 };
 
@@ -192,7 +195,6 @@ actionFolder: Folder in actions menu for actions
 
 callback(err, rights), where
 rights: {view: <1|0>, run: <1|0>, makeTask: <1|0>}
-*/
 rightsDB.checkActionRights = function(user, actionID, actionFolder, callback){
 
     // user 'system' has all rights for all actions
@@ -223,13 +225,33 @@ END',
         callback
     );
 };
+*/
 
+/**
+ * Get rights for all actions for users
+ * @param {function(err)|function(null, Set)} callback callback(err, actionsRights), where actionsRights is an Set()
+ * of the objects like
+ * [{username: <username>, actionName: <actionID or actionFolder or null>, view: [0|1], run: [0|1], makeTask: [0|1]}, ...]
+ */
+rightsDB.getRightsForActions = function(callback) {
+    if(Date.now() - lastTimeWhenLoadedActionsRightsFromDB < reloadRightsInterval) {
+        return callback(null, actionsRights);
+    }
+    lastTimeWhenLoadedActionsRightsFromDB = Date.now();
 
-rightsDB.checkAuditsRights = function(user, sessionID, callback){
-    db.get('\
-SELECT auditUsers.timestamp AS timestamp, auditUsers.actionID AS actionID, auditUsers.actionName AS actionName \
-FROM auditUsers \
-JOIN users ON users.id=auditUsers.userID \
-WHERE users.name=? AND auditUsers.sessionID=?',
-        [user, sessionID], callback);
-};
+    actionsRightsCallbacksQueue.add(callback);
+    if(actionsRightsCallbacksQueue.size > 1) return;
+
+    db.all('\
+SELECT users.name AS username, rightsForActions.actionName AS actionName, rightsForActions.view AS view, \
+rightsForActions.run AS run, rightsForActions.makeTask AS makeTask \
+FROM rightsForActions \
+JOIN usersRoles ON usersRoles.roleID=rightsForActions.roleID \
+JOIN users ON users.id=usersRoles.userID \
+WHERE users.isDeleted = 0', function(err, rows) {
+        if(Array.isArray(rows) && rows.length) actionsRights = new Set(rows);
+
+        actionsRightsCallbacksQueue.forEach(callback => callback(err, actionsRights));
+        actionsRightsCallbacksQueue.clear();
+    });
+}

@@ -2,9 +2,9 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
+var log = require('../lib/log')(module);
 var prepareUser = require('../lib/utils/prepareUser');
 var rightsDB = require('../models_db/usersRolesRightsDB');
-var log = require('../lib/log')(module);
 var objectsDB = require('../models_db/objectsDB');
 var objectsProperties = require('../models_db/objectsPropertiesDB');
 var Conf = require('../lib/conf');
@@ -13,113 +13,119 @@ const confActions = new Conf('config/actions.json');
 
 var systemUser = conf.get('systemUser') || 'system';
 
-
 var rightsWrapper = {};
 module.exports = rightsWrapper;
-/*
-Checking user rights for specific action
-  initUser - unchecked username from req.session.username
-  actionID - action ID (directory name for action) or actions folder from Actions menu
-  executionMode - one of:
-     null - don't check, only return rights
-    'server' (run action);
-    'ajax' (view action);
-    'makeTask' (create task using this action)
-  callback(err) - if no err, then user has requirement right for action
- */
-rightsWrapper.checkActionRights = function (initUser, actionID, executionMode, callback) {
-    var user = prepareUser(initUser);
 
-    // user 'system' has all rights for all actions
-    if(user === systemUser) return callback(null, {view: 1, run: 1, makeTask: 1});
+/**
+ * Check user rights for specific action
+ * @param {string} username username
+ * @param {string} actionIDOrFolder action ID (action dir name) or actions folder from Actions menu
+ * @param {string|null} executionMode one of:
+ *      null - don't check, only return rights
+ *     'server' (run action);
+ *     'ajax' (view action);
+ *     'makeTask' (create task with specific action)
+ * @param {function(Error)|function(null, Object)} callback callback(err, rights) err when err or no rights. rights is
+ * object like {view: 0|1, run: 0|1, makeTask: 0|1,}
+ */
+rightsWrapper.checkActionRights = function (username, actionIDOrFolder, executionMode, callback) {
+    username = prepareUser(username);
+
+    // the user 'system' has full rights to all actions
+    if(username === systemUser) return callback(null, {view: 1, run: 1, makeTask: 1});
 
     var actionsLayout = confActions.get('layout');
     for (var actionFolder in actionsLayout) {
-        if (Object.keys(actionsLayout[actionFolder]).indexOf(actionID) !== -1) break;
+        if (Object.keys(actionsLayout[actionFolder]).indexOf(actionIDOrFolder) !== -1) break;
     }
 
-    if(!actionFolder) return callback(new Error('Can\'t find action folder for action ' + actionID + ', user: ' + user));
+    if(!actionFolder) {
+        return callback(new Error('Can\'t find action folder for action ' + actionIDOrFolder + ', user: ' + username));
+    }
 
-    rightsDB.checkActionRights(user, actionID, actionFolder, function(err, rightsRows) {
+    rightsDB.getRightsForActions(function(err, setWithActionsRights) {
         if(err) {
-            return callback(new Error('Can\'t check rights for action "' + actionID + '", action folder "' +
-                actionFolder + '", user "' + user + '": ' + err.message));
+            return callback(new Error('Error getting rights for all actions for check rights for action "' +
+                actionIDOrFolder + '", action folder "' + actionFolder + '", user "' + username + '": ' + err.message));
         }
 
-        if(!rightsRows.length) {
-            return callback(new Error('Can\'t find user "' + user + '" for checking rights for action "' + actionID + '"'));
-        }
-
-        var rights = {
+        var rights  = {
             view: 0,
             run: 0,
             makeTask: 0,
             priority: 0,
         };
-        // when the user has more than one role, the query will return more than one row
-        // priority:
-        //      1 if the action does not exist in the rightsAction table,
-        //      2 if this is an action group,
-        //      3 if this is an action.
-        rightsRows.forEach(function (row) {
-            // if the priority of the row is higher than the priority of rights, then replace the rights to the row
-            if(rights.priority < row.priority) rights = row;
-            else if(rights.priority === row.priority) {
-                // if the priority of the row is equal to the priority of the rights, then set the lowest of the found rights
-                for (var key in rights) {
-                    if(rights[key] > row[key]) rights[key] = row[key];
+
+        setWithActionsRights.forEach(row => {
+            if(username !== row.username) return;
+
+            // low priority: default user rights to all actions are set
+            var currentPriority = 1;
+            // medium priority: the user rights to a actions in the action folder are set
+            if (row.actionName === actionFolder) currentPriority = 2;
+            // high priority: the user rights to specific action are set
+            else if (row.actionName === actionIDOrFolder) currentPriority = 3;
+
+            if(rights.priority < currentPriority) {
+                rights = {
+                    view: row.view,
+                    run: row.run,
+                    makeTask: row.makeTask,
+                    priority: currentPriority,
+                }
+            } else if(rights.priority === currentPriority) {
+                rights = {
+                    view: row.view || rights.view,
+                    run: row.run || rights.view,
+                    makeTask: row.makeTask || rights.view,
+                    priority: currentPriority,
                 }
             }
         });
 
+        log.debug('Execution mode: ',executionMode, '; user: ', username, '; rights: ', rights);
         delete rights.priority;
-
-        //log.debug('Execution mode: ',executionMode, '; user: ', user, '; rights: ', rights);
 
         if(executionMode === null) return callback(null, rights);
 
         if(executionMode === 'ajax') {
-            if (!rights.view) return callback(new Error('User "' + user + '" doesn\'t have rights for view action "' + actionID + '"'));
+            if (!rights.view) return callback(new Error('User "' + username + '" doesn\'t have rights for view action "' + actionIDOrFolder + '"'));
             else return callback(null, rights);
         }
         if(executionMode === 'server') {
-            if (!rights.run) return callback(new Error('User "' + user + '" doesn\'t have rights for run action "' + actionID + '"'));
+            if (!rights.run) return callback(new Error('User "' + username + '" doesn\'t have rights for run action "' + actionIDOrFolder + '"'));
             else return callback(null, rights);
         }
         if(executionMode === 'makeTask') {
-            if (!rights.makeTask) return callback(new Error('User "' + user + '" doesn\'t have rights for create task with action "' + actionID + '"'));
+            if (!rights.makeTask) return callback(new Error('User "' + username + '" doesn\'t have rights for create task with action "' + actionIDOrFolder + '"'));
             else return callback(null, rights);
         }
 
-        callback(new Error('Can\'t check rights for action "'+actionID+'", user "'+user+'": unknown execution mode ' + executionMode));
+        callback(new Error('Can\'t check rights for action "' + actionIDOrFolder + '", user "' + username +
+            '": unknown execution mode ' + executionMode));
     });
 };
 
-/*
- checking action for compatibility with selected objects according action configuration parameters:
- dontShowForObjects, dontShowForObjectsInGroups, showOnlyForObjects, showOnlyForObjectsInGroups
-
- checking is case-insensitive
-
- cfg: action configuration
- objectsNames - array of objects names for checking compatibility
-
- callback(err)
-
- if err, then error occurred or checkResult is false
-
- function check compatibility using algorithm:
- 1. check, is dontShowForObjects contains selected objects.
- if yes, then check not passed
- if no then continue
- 2. check, is some of selected objects are included in objects in dontShowForObjectsInGroups.
- if yes then check not passed
- if no then continue
- 3. check, is showOnlyForObjects contains selected objects or
- is some of selected objects are included in objects in showForObjectsInGroups
- if no then check not passed
+/**
+ * checking action for compatibility with selected objects according action configuration parameters:
+ *  dontShowForObjects, dontShowForObjectsInGroups, showOnlyForObjects, showOnlyForObjectsInGroups
+ *  checking is case-insensitive
+ * @param {Object} cfg action configuration
+ * @param {Array|string} objectsNames array or stringified array of yhe object names for check action compatibility
+ * @param {function(Error)|function()} callback callback(err) if err, then error occurred or checkResult is false
+ *
+ * @example
+ * function check compatibility using algorithm:
+ *  1. check, is dontShowForObjects contains selected objects.
+ *    if yes, then check not passed
+ *    if no then continue
+ *  2. check, is some of selected objects are included in objects in dontShowForObjectsInGroups.
+ *    if yes then check not passed
+ *    if no then continue
+ *  3. check, is showOnlyForObjects contains selected objects or
+ *    is some of selected objects are included in objects in showForObjectsInGroups
+ *  if no then check not passed
  */
-
 rightsWrapper.checkForObjectsCompatibility = function (cfg, objectsNames, callback){
 
     if(!cfg || !cfg.actionID)
@@ -229,6 +235,12 @@ rightsWrapper.checkForObjectsCompatibility = function (cfg, objectsNames, callba
     }
 };
 
+/**
+ * Check for object properties compatibility with specific action
+ * @param {Object} cfg action configuration
+ * @param {Array} objectsNames array of yhe object names for check action compatibility
+ * @param {function(Error)|function()} callback callback(err) if err, then error occurred or checkResult is false
+ */
 function checkForObjectsPropertiesCompatibility(cfg, objectsNames, callback) {
     var actionID = cfg.actionID,
         dontShowForObjectsWithProperties = cfg.dontShowForObjectsWithProperties ?

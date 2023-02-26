@@ -11,7 +11,7 @@ const Conf = require('../../lib/conf');
 const confActions = new Conf('config/actions.json');
 const confMyNode = new Conf('config/node.json');
 
-const collectorName = 'event-generator';
+const eventGenerator = 'event-generator';
 
 module.exports = function(args, callback) {
     log.debug('Starting action server "', args.actionName, '" with parameters', args);
@@ -62,10 +62,10 @@ module.exports = function(args, callback) {
         }
 
 
-        activeCollector.connect(collectorName, function (err, collector) {
+        activeCollector.connect(eventGenerator, function (err, collector) {
             if (err) return callback(err);
 
-            log.info('Connect to collector "', collectorName, '" is completed');
+            log.info('Connect to collector "', eventGenerator, '" is completed');
 
             collector.send({
                 eventsIDs: eventIDs,
@@ -83,13 +83,13 @@ module.exports = function(args, callback) {
 
                 if(cfg.dontSendMessage || confMyNode.get('dontSendMessageFromDashboard')) return callback();
 
-                if (action === 'enableEvents' && (!args.recipients || !args.comment)) {
-                    log.info('No recipients or no comment for enabled event. Email will not be sent');
+                if (!args.recipients) {
+                    log.info('There are no recipients. The email will not be sent');
                     return callback();
                 }
 
-                if (!args.recipients) {
-                    log.info('No recipients. Email will not be sent');
+                if (action === 'enableEvents' && !args.comment) {
+                    log.info('There are no comment for enabled event. The email will not be sent');
                     return callback();
                 }
 

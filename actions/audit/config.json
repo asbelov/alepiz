@@ -1,0 +1,14 @@
+{
+    "name": "Audit",
+    "description": "Audit of actions",
+    "homePage": "index",
+    "ajaxServer": "ajax.js",
+    "execMethod": "post",
+    "staticDir": "static",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": true,
+    "onChangeObjectMenuEvent": "callback:onChangeObjects",
+    "outputFormat": "text",
+    "icon": "settings",
+    "applyToOwnObjects": true
+}

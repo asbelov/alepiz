@@ -14,17 +14,21 @@ module.exports = browserLog;
 // then skip to record it
 var countOfLogMessagesFromBrowser = new Map();
 
-/*
- Receive log message from client (browser) and log it, using standard module audit
-
- level S|D|I|W|E - log level
- argsStr - stringify array of objects for log
+/**
+ * Receive log message from browser and log it, using standard log module
+ * @param {'D'|'I'|'W'|'E'} level log level
+ * @param {string} argsStr stringified array of log arguments
+ * @param {number} sessionID session ID
+ * @param {function(Error)|function()} callback callback(err)
  */
 browserLog.log = function (level, argsStr, sessionID, callback){
-    if(!argsStr || !level || (level !== 'S' && level !== 'D' && level !== 'I' && level !== 'W' && level !== 'E'))
-        return callback(new Error('Browser request error: log arguments not specified or invalid'));
+    log.debug('Receiving log record from browser:\nlevel: ', level, '\nargs: ', argsStr, '\nsessionID: ', sessionID);
 
-    //log.debug('Receiving log record from browser: level: ', level, ', args: ', argsStr);
+    if(!argsStr || !level || (level !== 'D' && level !== 'I' && level !== 'W' && level !== 'E')) {
+        return callback(new Error('Browser request error: log arguments (' + argsStr +
+            ') not specified or invalid log level: ' + level));
+    }
+
 
 
     if(!countOfLogMessagesFromBrowser.has(sessionID)) countOfLogMessagesFromBrowser.set(sessionID, 1);
@@ -33,21 +37,26 @@ browserLog.log = function (level, argsStr, sessionID, callback){
         countOfLogMessagesFromBrowser.set(sessionID, ++n);
     }
 
-    if(countOfLogMessagesFromBrowser.has(sessionID) >
+    if(countOfLogMessagesFromBrowser.get(sessionID) >
         (Number(confLog.get('maxRecordsReturnedFromBrowserForOneSession') || 50))) {
-        return callback(new Error('Too many log messages received from the browser'));
+        return callback(new Error('Too many log messages (' + countOfLogMessagesFromBrowser.get(sessionID) +
+            ') received from the browser'));
     }
 
-    try{
+    try {
         var args = JSON.parse(argsStr);
     } catch(err){
-        return callback(new Error('Can\'t parse log arguments received from browser: '+err.message));
+        return callback(new Error('Can\'t parse log arguments (' + argsStr + ') received from browser: ' + err.message));
     }
 
     log.raw(level, args, module);
     callback();
 };
 
+/**
+ * Cleanup data for log session
+ * @param {number} sessionID session ID
+ */
 browserLog.deleteSession = function(sessionID){
     countOfLogMessagesFromBrowser.delete(sessionID);
 };

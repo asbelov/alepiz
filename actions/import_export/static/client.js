@@ -10,10 +10,6 @@ function callbackBeforeExec(callback) {
     JQueryNamespace.beforeExec(callback);
 }
 
-function callbackAfterExec(data, callback) {
-    JQueryNamespace.afterExec(data, callback);
-}
-
 var JQueryNamespace = (function ($) {
     $(function () {
         importExportTabSelectorElm = $('#importExportTabSelector');
@@ -28,7 +24,6 @@ var JQueryNamespace = (function ($) {
     return {
         onChangeObjects: _onChangeObjects,
         beforeExec: _beforeExec,
-        afterExec: _afterExec
     };
 
     function _onChangeObjects (_objects) {
@@ -37,10 +32,6 @@ var JQueryNamespace = (function ($) {
 
     function _beforeExec(callback) {
         importExportEditor.save();
-        callback();
-    }
-
-    function _afterExec(data, callback) {
         callback();
     }
 

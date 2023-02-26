@@ -201,7 +201,6 @@ function createNewCacheObject(id) {
 historyCache.add = function (id, newRecord){
     // the record was checked on the client side using the history.add () function
 
-    //log.debug('Adding data to history: id ', id, ' newRecord: ', newRecord);
     id = Number(id);
     ++historyAddOperationsCnt;
 
@@ -234,9 +233,14 @@ historyCache.add = function (id, newRecord){
             cacheObj.firstValue = recordsArray[0];
             cacheObj.lastValue = recordsArray[recordsArray.length - 1];
         }
-    }
 
-    //log.debug('Inserting newRecord for new object to history. id: ', id, ' newRecord: ', newRecord);
+        log.debug('cache: add(id: ', id, ', newRecord: ', newRecord, '): cache[',id,']: ', cacheObj, {
+                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                vars: {
+                    "RECEIVED_OCID": id
+                }
+            });
+    }
 };
 
 /**
@@ -277,6 +281,13 @@ historyCache.del = function (IDs, daysToKeepHistory, daysToKeepTrends, callback)
         IDs.forEach(function (id) {
             id = Number(id);
             var cacheObj = cache.get(id);
+            log.debug('cache: del(id:', id, '): cache[',id,']: ', cacheObj, {
+                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    vars: {
+                        "RECEIVED_OCID": id
+                    }
+                });
+
             if(cacheObj && cacheObj.records) {
                 if (!daysToKeepHistory) {
                     cache.delete(id)
@@ -343,11 +354,28 @@ historyCache.getByValue = function(id, value, callback) {
                 requiredTimestamp = record.timestamp;
             }
         });
+        log.debug('from cache: getByValue(id: ', id, ', value: ', value, '): cache[',id,']: ', cacheObj,
+            ', requiredTimestamp: ', requiredTimestamp, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
 
         if(requiredTimestamp) return callback(null, requiredTimestamp);
     }
 
-    storage.getLastRecordTimestampForValue(id, value, callback);
+    storage.getLastRecordTimestampForValue(id, value, function(err, requiredTimestamp) {
+        log.debug('from storage: getByValue(id: ', id, ', value: ', value, '): cache[', id ,']: ', cacheObj,
+            ', requiredTimestamp: ', requiredTimestamp, ', err: ', err, {
+                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                vars: {
+                    "RECEIVED_OCID": id
+                }
+            });
+
+        callback(err, requiredTimestamp);
+    });
 };
 
 
@@ -379,8 +407,6 @@ historyCache.getLastValues = function(IDs, callback) {
                 errors.push(id + ': ' + err.message);
             }
 
-            //log.debug('Value for ', id, ': ', record, '; err: ', err);
-
             if(record) {
                 lastValues[id].timestamp = record.timestamp;
                 lastValues[id].data = record.data;
@@ -403,6 +429,13 @@ function getLastValue (id, callback) {
     if(cacheObj && cacheObj.lastValue) {
         //log.info('Get last value for ', id,' from history cache: ', cacheObj.lastValue);
         ++recordsFromCacheCnt;
+        log.debug('from cache: getLastValue(id: ', id, '): cacheObj.lastValue: ', cacheObj.lastValue, {
+                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                vars: {
+                    "RECEIVED_OCID": id
+                }
+            });
+
         return callback(null, cacheObj.lastValue, true);
     }
 
@@ -411,6 +444,14 @@ function getLastValue (id, callback) {
         cacheObj = cache.get(id);
     }
     storage.getRecordsFromStorageByIdx(id, 0, 1, 0, 0, 0, function(err, recordsFromStorage) {
+        log.debug('from storage: getLastValue(id: ', id, '): recordsFromStorage: ', recordsFromStorage,
+            ', err: ', err,
+            {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
         if (err) return callback(err);
         if(!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
             //log.info('Can\'t get last value for ', id,' from history cache: ', cacheObj, ' and storage ', recordsFromStorage);
@@ -467,6 +508,15 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
 
         if(recordsFromCache.length === cnt) {
             calculateCacheSize(cacheObj, 0, recordsFromCache);
+            log.debug('from cache: getByIdx(id: ', id, ', offset: ', offset,', cnt: ', cnt,
+                ', maxRecordsCnt: ',maxRecordsCnt, ', recordsType: ', recordsType,
+                '): recordsFromCache: ', recordsFromCache, {
+                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    vars: {
+                        "RECEIVED_OCID": id
+                    }
+                });
+
             return callback(null, recordsFromCache, true);
         }
     } else {
@@ -512,7 +562,18 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
 
     storage.getRecordsFromStorageByIdx(id, storageOffset, storageCnt, storageTimestamp, maxRecordsCnt, recordsType,
         function(err, recordsFromStorage) {
-        if (err) return callback(err);
+            log.debug('from cache and storage: getByIdx(id: ', id, ', offset: ', offset, ', cnt: ', cnt,
+                ', maxRecordsCnt: ',maxRecordsCnt, ', recordsType: ',recordsType,
+                '): \nrecordsFromCache: ', recordsFromCache,
+                '\nrecordsFromStorage: ', recordsFromStorage, '\nerr: ', err,
+                {
+                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    vars: {
+                        "RECEIVED_OCID": id
+                    }
+                });
+
+            if (err) return callback(err);
         if(!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
             return callback(err, recordsFromCache, false);
         }
@@ -538,7 +599,6 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
     callback(err, records, isGotAllRequiredRecords(true|false)), where records: [{data:.., timestamp:..}, ....]
  */
 historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, recordsType, callback) {
-    //log.debug('[getByTime]: ',id, ', ', timeShift, ', ', timeInterval, ', ', maxRecordsCnt);
     if (typeof callback !== 'function') {
         return log.error('[getByTime]: callback is not a function', (new Error()).stack);
     }
@@ -573,7 +633,6 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
 
     var cacheObj = cache.get(id);
 
-    //log.debug('[getByTime]: ',id, ', ', timeFrom, ' - ', timeTo, ': ', cacheObj);
     /*
     id:         0  1  2  3   4  5  6  7   8  9  10 11
     timestamps: 10 14 17 19 |23 25 28 29| 33 35 37 42
@@ -610,6 +669,16 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
 
             if (cacheObj.firstValue.timestamp <= timeFrom) {
                 calculateCacheSize(cacheObj, 0, recordsFromCache);
+                //id, timeShift, timeInterval, maxRecordsCnt, recordsType
+                log.debug('from cache: getByTime(id: ', id, ', timeShift: ', timeShift, ', timeInterval: ', timeInterval,
+                    ', maxRecordsCnt: ', maxRecordsCnt, ', recordsType: ', recordsType,
+                    '): recordsFromCache: ', recordsFromCache, {
+                        expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                        vars: {
+                            "RECEIVED_OCID": id
+                        }
+                    });
+
                 return callback(null, recordsFromCache, true);
             }
         }
@@ -625,7 +694,16 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
     var storageTimeTo = recordsFromCache.length ? recordsFromCache[0].timestamp - 1 : timeTo;
     storage.getRecordsFromStorageByTime(id, timeFrom, storageTimeTo, maxRecordsCnt, recordsType,
         function(err, recordsFromStorage) {
-//            log.debug(id, ': !!! records form storage err: ', err, '; time: ', (new Date(timeFrom)).toLocaleString(), '-', (new Date(storageTimeTo)).toLocaleString(), ';', timeFrom,'-', storageTimeTo, ': ', recordsFromStorage);
+            log.debug('from cache: getByTime(id: ', id, ', timeShift: ', timeShift, ', timeInterval: ', timeInterval,
+                ', maxRecordsCnt: ', maxRecordsCnt, ', recordsType: ', recordsType, '): ',
+                '\nrecordsFromCache: ', recordsFromCache,
+                '\nrecordsFromStorage: ', recordsFromStorage, '\nerr: ', err,
+                {
+                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    vars: {
+                        "RECEIVED_OCID": id
+                    }
+                });
 
             if (err) return callback(err);
             if (!Array.isArray(recordsFromStorage) || !recordsFromStorage.length) {
@@ -758,10 +836,22 @@ function cacheService(callback) {
                 // records: [{data:, timestamp:},...]}
                 async.eachOfSeries(Object.fromEntries(cache), function (cacheObj, id, callback) {
                     if (terminateCacheService) return callback();
-                    //log.info('ID: ', id, cacheObj);
+                    log.debug('cacheService() for cache[', id, ']: ', cacheObj, {
+                            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                            vars: {
+                                "RECEIVED_OCID": id
+                            }
+                        });
+
                     // don't save history for keepHistory = 0
                     if(!houseKeeperData[id] || !houseKeeperData[id].history) {
-                        //log.info ('Skipping to save obj ', id, ': ', houseKeeperData[id])
+                        log.debug('cacheService() skip to save for cache[', id, ']: ', cacheObj,
+                            ', houseKeeperData[', id ,']', houseKeeperData[id], {
+                            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                            vars: {
+                                "RECEIVED_OCID": id
+                            }
+                        });
                         return callback();
                     }
 
@@ -850,8 +940,12 @@ function cacheService(callback) {
                             ]
 
                         */
-                        //console.log('savedData:', savedData);
-                        //log.info('savedData:', savedData);
+                        log.debug('cacheService() savedData for cache[', id, ']: ', savedData, {
+                                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                                vars: {
+                                    "RECEIVED_OCID": id
+                                }
+                            });
                         if (savedData && savedData[0] && savedData[0].result) {
                             if(savedData[0].result.savedRecords) {
                                 savedRecords += savedData[0].result.savedRecords;
@@ -876,7 +970,7 @@ function cacheService(callback) {
 
                             // removing records from cache after commit transactions
                             // and calculate records number
-                            cache.forEach((cacheObj) => {
+                            cache.forEach((cacheObj, id) => {
                                 if (!cacheObj.records instanceof Set) return;
                                 allRecordsInCacheWas += cacheObj.records.size;
 
@@ -885,9 +979,7 @@ function cacheService(callback) {
 
                                 var recordsForRemoveFromCache = unnecessaryCachedRecordsCnt > cacheObj.savedCnt ?
                                     cacheObj.savedCnt : unnecessaryCachedRecordsCnt;
-                                //log.info('ID: ', id, ' recordsLen:', cacheObj.records.size, ' cachedRecords:', cacheObj.cachedRecords, ' savedCnt:', cacheObj.savedCnt, ' unnecessary:', unnecessaryCachedRecordsCnt, ' removed:', recordsForRemoveFromCache)
                                 if (recordsForRemoveFromCache) {
-
                                     allUnnecessaryRecordsCnt += recordsForRemoveFromCache;
 
                                     // [0,1,2,3,4,5]; recordsForRemoveFromCache = 3
@@ -909,6 +1001,20 @@ function cacheService(callback) {
                                 }
 
                                 allRecordsInCache += cacheObj.records.size;
+
+                                log.debug('cacheService() save result after remove records:' +
+                                    '\nallRecordsInCache: ', allRecordsInCache,
+                                    '\nrecordsLen: ', cacheObj.records.size,
+                                    '\ncachedRecords: ', cacheObj.cachedRecords,
+                                    '\nsavedCnt: ', cacheObj.savedCnt,
+                                    '\nunnecessary: ', unnecessaryCachedRecordsCnt,
+                                    '\nremoved: ', recordsForRemoveFromCache,
+                                    '\ncacheObj: ', cacheObj, {
+                                        expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                                        vars: {
+                                            "RECEIVED_OCID": id
+                                        }
+                                    });
                             });
                         }
 
@@ -946,11 +1052,11 @@ function cacheService(callback) {
 }
 
 
-/** Dumps the cached historical data to a file before exiting.
+/**
+ * Dumps the cached historical data to a file before exiting.
  * The data from the dump file will be loaded into the cache on next startup
  * @param {function(void): void} [callback] - Called when done
  */
-
 historyCache.dumpData = function(callback) {
 
     if(!callback || cache.size < 10) { // on fast destroy or small cache don\'t overwrite dump file
@@ -983,6 +1089,12 @@ historyCache.dumpData = function(callback) {
     if(typeof callback === 'function') callback();
 };
 
+/**
+ * Get information about transaction queue
+ * @param {function(Error, {})|function(null, Object)} callback callback(err, transQueue), where
+ * transQueue is object like {len: <queue length>, timestamp: <time when last transaction was started>,
+ * description:<';' separated transaction descriptions>}
+ */
 historyCache.getTransactionsQueueInfo = function(callback) {
     storage.getTransactionsQueueInfo(function (err, transQueueArr) {
         //log.info('getTransactionsQueueInfo: ', transQueueArr);
@@ -1002,68 +1114,3 @@ historyCache.getTransactionsQueueInfo = function(callback) {
         return callback(null, transQueue);
     });
 };
-
-/** Thin out records: decrease count of returned records to maxRecordsNum records
- * @param {Array} allRecords: array of records [{timestamp:..., data:...}, ...]
- * @param {uint} maxRecordsNum: required maximum number of records
- * @return thin out array of records [{timestamp:..., data:...}, ...]
- */
-historyCache.thinOutRecords = function (allRecords, maxRecordsNum) {
-
-    if(!allRecords || !allRecords.length) return [];
-    var recordsCnt = allRecords.length;
-
-    maxRecordsNum = parseInt(String(maxRecordsNum), 10);
-
-    var stepTimestamp = (Number(allRecords[recordsCnt - 1].timestamp) -
-        Number(allRecords[0].timestamp)) / (maxRecordsNum - 1);
-    if(!maxRecordsNum || maxRecordsNum === 1 || stepTimestamp < 1 || recordsCnt <= maxRecordsNum) return allRecords;
-
-    var nextTimestamp = Number(allRecords[0].timestamp); // also adding first record to returned array
-    var avgRecords = [], avgData = null, avgTimestamp = null;
-
-    allRecords.forEach(function (record) {
-        // if record.data is number
-        if(!isNaN(parseFloat(record.data)) && isFinite(record.data)) {
-            if(avgData === null) {
-                avgData = Number(record.data);
-                avgTimestamp = Number(record.timestamp);
-            } else {
-                avgData = (avgData + Number(record.data)) / 2;
-                avgTimestamp = Math.round((avgTimestamp + Number(record.timestamp)) / 2);
-            }
-
-            if(Number(record.timestamp) >= nextTimestamp) {
-                avgRecords.push({
-                    data: avgData,
-                    timestamp: avgTimestamp
-                });
-                nextTimestamp += stepTimestamp;
-                avgData = null; avgTimestamp = null;
-            }
-        } else { // if record.data not a number
-            if(avgData !== null) avgRecords.push({ // add previous numbers to array
-                data: avgData,
-                timestamp: avgTimestamp
-            });
-            avgRecords.push(record); // add record to array
-            nextTimestamp += stepTimestamp;
-            avgData = null; avgTimestamp = null;
-        }
-    });
-
-    if(avgData !== null) avgRecords.push({ // add last record to array
-        data: avgData,
-        timestamp: avgTimestamp
-    });
-
-    // add isDataFromTrends and recordsFromCache information
-    if(typeof avgRecords[0] === 'object') {
-        for(var key in allRecords[0]) {
-            if(key !== 'data' && key !== 'timestamp') avgRecords[0][key] = allRecords[0][key];
-        }
-        avgRecords[0].notTrimmedRecordsNum = allRecords.length;
-    }
-
-    return avgRecords;
-}

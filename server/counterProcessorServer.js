@@ -41,7 +41,7 @@ var collectorsNames = [];
 
 var startMemUsageTime = 0,
     stopServerInProgress = 0,
-    childrenThreads,
+    getCountersValueThreads,
     activeCollectors = new Set(),
     runCollectorSeparately = new Map(),
     /** What OCIDs is being processed now: Map[OCID: { isActiveCollector (true|false), timestamp: <startProcessingTime>}]
@@ -140,7 +140,7 @@ function stopServer(callback) {
 
     // if the server is killed by timeout, there will still be a saved update event state
     storeUpdateEventsData.saveUpdateEventsStatus(updateEventsStatusFilePath, updateEventsStatus);
-    childrenThreads.stopAll(function(err) {
+    getCountersValueThreads.stopAll(function(err) {
         if(err) {
             log.error('Error stopping children: ', err.message, '. Exiting for ', serverName, '...');
         } else {
@@ -167,7 +167,7 @@ function runChildren(callback) {
         recordsFromDBCnt = _recordsFromDBCnt;
         log.info('Starting ', childrenNumber, ' children for server: ', serverName,
             '. CPU cores number: ', os.cpus().length);
-        childrenThreads = new threads.parent({
+        getCountersValueThreads = new threads.parent({
             childProcessExecutable: path.join(__dirname, 'child', 'getCountersValue.js'),
             onMessage: processChildMessage,
             childrenNumber: childrenNumber,
@@ -184,7 +184,7 @@ function runChildren(callback) {
             childrenProcesses.startAll(function (err) {
                 if(err) return callback(err);
 
-                log.info('Sending cache data first time:',
+                log.info('Sending cache data to the child at first time:',
                     (cache.variablesHistory.size ? ' history for counters: ' + cache.variablesHistory.size : ''),
                     (cache.variablesExpressions.size ? ' expressions for counters: ' + cache.variablesExpressions.size : ''),
                     (cache.objectsProperties.size ? ' properties for objects: ' + cache.objectsProperties.size : ''),
@@ -212,9 +212,13 @@ function runChildren(callback) {
     });
 }
 
-/** Process result from parent active or separate collector
+/** Process result returned from parent active or separate collector
  *
- * @param message - message = {err, result, parameters, collectorName}
+ * @param {Object} message - message = {err, result, parameters, collectorName}
+ * @param {Error} message.err
+ * @param {Object} message.result {timestamp:.., value:...}
+ * @param {Object} message.parameters
+ * @param {string} message.collectorName
  */
 function processCounterResult (message) {
     var OCID = Number(message.parameters.$id);
@@ -222,7 +226,7 @@ function processCounterResult (message) {
         isActive: true,
         timestamp: Date.now(),
     }); // active collector
-    childrenThreads.send(message);
+    getCountersValueThreads.send(message);
 }
 
 
@@ -279,11 +283,13 @@ function updateCache() {
     }
 
     // Update cache for || Reload all data to cache for (added for simple search)
-    /*
-    log.info((updateMode ? 'Update' : 'Reload all data to') + ' cache for: ', objectsAndCountersForUpdate.length,
-        '; counters for remove: ', countersForRemove.size, '; update mode: ', updateMode);
+    log.debug((updateMode ? 'Update' : 'Reload all data to') + ' cache for: ', objectsAndCountersForUpdate.length,
+        (updateMode ? // updateMode is possible null
+        '; historyVars: ' + updateMode.getHistoryVariables.length +
+        '; variablesExpressions: ' + updateMode.getVariablesExpressions.length +
+        '; objectProps: ' + updateMode.geObjectsProperties.length : '') +
+        '; update mode: ', updateMode);
 
-     */
     serverCache(updateMode,
         function(err, cache, __counterObjectNames, _objectAlepizRelation, _recordsFromDBCnt) {
         if(err) {
@@ -297,8 +303,7 @@ function updateCache() {
         if(cache) {
             cache.fullUpdate = !updateMode;
 
-            /*
-             log.info('Sending cache data first time:',
+             log.debug('Sending cache data to the child:',
                 (cache.variablesHistory.size ? ' history for counters: ' + cache.variablesHistory.size : ''),
                 (cache.variablesExpressions.size ? ' expressions for counters: ' + cache.variablesExpressions.size : ''),
                 (cache.objectsProperties.size ? ' properties for objects: ' + cache.objectsProperties.size : ''),
@@ -306,9 +311,8 @@ function updateCache() {
                 (cache.countersObjects.counters ? ', counters: ' + cache.countersObjects.counters.size : ''),
                 (cache.countersObjects.objectName2OCID ?
                     ', objectName2OCID: ' + cache.countersObjects.objectName2OCID.size : ''));
-             */
 
-            childrenThreads.sendToAll(cache, function (err) {
+            getCountersValueThreads.sendToAll(cache, function (err) {
                 if (err) log.error('Error sending cache: ', err.message);
             });
 
@@ -359,7 +363,7 @@ function removeCounters(countersForRemove, callback) {
     log.info('Remove counters reason: ', countersForRemove.description, '. OCIDs: ', countersForRemove.removeCounters);
     var OCIDs = countersForRemove.removeCounters;
 
-    childrenThreads.sendAndReceive({removeCounters: OCIDs}, function() {
+    getCountersValueThreads.sendAndReceive({removeCounters: OCIDs}, function() {
         // remove OCIDs from updateEventsStatus Map
         // remove processed active collectors for add it again with new parameters
         OCIDs.forEach(function (OCID) {
@@ -464,7 +468,7 @@ function waitingForObjects(callback) {
 function processServerMessage(message) {
 
     if (message.throttlingPause) {
-        childrenThreads.sendToAll(message);
+        getCountersValueThreads.sendToAll(message);
     }
 
     // message: { removeCounters: [<OCID1>, OCID2, ...], description: ....}
@@ -491,6 +495,16 @@ function processServerMessage(message) {
     //log.error('Server received incorrect message: ', message);
 }
 
+/**
+ * Process data received from the child thread
+ * @param {Object} message data received from the child thread
+ * @param {number} message.OCID object counter ID
+ * @param {number} message.parentOCID object counter ID of the parent counter
+ * @param {} message.updateEventState update event state
+ * @param {} message.value counter value
+ * @param {} message.dependedCounters
+ * @param {Object} message.variables variables from parent object {name1: val1, name2: val2, ....}. can be skipped
+ */
 function processChildMessage(message) {
     if(!message) return;
 
@@ -538,12 +552,14 @@ function processChildMessage(message) {
 
         getCountersValues(dependedCounters, message.variables, false, cfg);
 
-        setTimeout(callback, cfg.sleepTimeAfterValueProcessed || 0).unref();
+        var t = setTimeout(callback, cfg.sleepTimeAfterValueProcessed || 0);
+        t.unref();
     }, function () {});
 }
 
 /**
- * Return string "<counterName> (<objectName>)" or "OCID: <OCID>" if cache is not ready for log
+ * Used for log
+ * Return string "<counterName> (<objectName>)" or "OCID: <OCID>" if cache does not ready
  * @param {Number} OCID - objectCounter ID
  * @returns {string} - string "<counterName> (<objectName>)" or "OCID: <OCID>" if cache is not ready
  */
@@ -556,11 +572,12 @@ function getCounterAndObjectName(OCID) {
     }
 }
 
-/*
- get values for specific counters
-
- counters - Set({parentOCID:, OCID:, collector:, updateEventExpression:, updateEventMode:}, ....]
- parentVariables - variables from parent object {name1: val1, name2: val2, ....}. can be skipped
+/**
+ * Prepare parameters and send data to the child for getting values for specific counters
+ * @param {Set} counters Set({parentOCID:, OCID:, collector:, updateEventExpression:, updateEventMode:}, ....)
+ * @param {Object} [parentVariables] variables from parent object {name1: val1, name2: val2, ....}. can be skipped
+ * @param {boolean} [forceToGetValueAgain] get value again even for active collector
+ * @param {object} [cfg] server configuration from server.json
  */
 function getCountersValues(counters, parentVariables, forceToGetValueAgain, cfg) {
 
@@ -617,8 +634,9 @@ function getCountersValues(counters, parentVariables, forceToGetValueAgain, cfg)
         var updateEventKey = counter.parentOCID + '-' + counter.OCID;
         counter.parentVariables = parentVariables;
         counter.updateEventState = updateEventsStatus.get(updateEventKey);
-        childrenThreads.send(counter);
+        getCountersValueThreads.send(counter);
 
-        setTimeout(callback, cfg.sleepTimeAfterValueProcessed || 0).unref();
+        var t = setTimeout(callback, cfg.sleepTimeAfterValueProcessed || 0);
+        t.unref();
     }, function() {});
 }

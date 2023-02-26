@@ -10,7 +10,6 @@ const Conf = require('../lib/conf');
 const conf = new Conf('config/common.json');
 const confTaskServer = new Conf('config/taskServer.json');
 
-const cfg = confTaskServer.get();
 
 const async = require('async');
 const tasksDB = require('../models_db/tasksDB');
@@ -19,23 +18,22 @@ const actionClient = require('../serverActions/actionClient');
 
 
 var serverIPC,
-    childProc,
-    conditionsQueue = new Map(),
-    receivedConditionsCnt = 0,
-    processingConditions = 0,
+    conditionsQueue = new Set(),
     systemUser = conf.get('systemUser') || 'system',
-    waitingConditionsTime = cfg.waitingConditionsTime || 30000,
     scheduledTasks = new Map();
+
+processConditionsQueue();
 
 tasks.startCheckConditions(function (err) {
     if(err) return log.warn('Error starting to check conditions: ', err.message);
 
+    const cfg = confTaskServer.get();
     cfg.id = 'taskServer';
     serverIPC = new IPC.server(cfg, function (err, message, socket, callback) {
         if(err) log.error(err.message);
 
         if (socket === -1) { // server starting listening
-            childProc = new thread.child({
+            new thread.child({
                 module: 'taskServer',
                 onDisconnect: destroy,
                 onDestroy: destroy,
@@ -62,7 +60,7 @@ tasks.startCheckConditions(function (err) {
             if(Number(message.cancelTaskID)) return cancelTask(Number(message.cancelTaskID));
 
             // add condition for OCID to queue and process queue after
-            if(Number(message.OCID)) queueCondition(Number(message.OCID));
+            if(Number(message.OCID)) queueCondition(message);
         }
     });
 
@@ -120,11 +118,18 @@ tasks.startCheckConditions(function (err) {
     });
 });
 
+/**
+ * Destroy task server (disconnect from log server) and exit
+ */
 function destroy() {
     log.exit('Task server was stopped or destroyed or client was disconnected. Saving task information and exiting');
     log.disconnect(function () { process.exit(2) });
 }
 
+/**
+ * Stop task server (Stop IPC system)
+ * @param {function()} callback callback()
+ */
 function stop(callback) {
     serverIPC.stop(function(err) {
         if (err) log.exit('Can\'t stop IPC system: ' + err.message);
@@ -133,6 +138,12 @@ function stop(callback) {
     });
 }
 
+/**
+ * Add scheduled task
+ * @param {number} taskID task ID
+ * @param {number} timestamp time to run the scheduled task
+ * @param {object} workflow workflow
+ */
 function scheduleTask(taskID, timestamp, workflow) {
     var runTime = timestamp - Date.now();
     if(runTime < 30000) {
@@ -160,6 +171,14 @@ function scheduleTask(taskID, timestamp, workflow) {
     }, runTime));
 }
 
+/**
+ * Add condition task
+ * @param {number} taskID task ID
+ * @param {Object} message message object
+ * @param {Array} message.conditionOCIDs Array with condition OCIDs
+ * @param {0|1} message.runType 0 - run permanently, 1 - run once
+ * @param {Object} message.workflow workflow
+ */
 function addConditionTask(taskID, message) {
     log.info('Queuing task ', taskID,', runType: ', message.runType,' for waiting conditions ', message.conditionOCIDs);
     tasks.runTask({
@@ -167,13 +186,16 @@ function addConditionTask(taskID, message) {
         taskID: taskID,
         conditionOCIDs: message.conditionOCIDs,
         runType: message.runType,
-        variables: message.variables,
     }, function (err) {
         if(err) log.error('Error running task ', taskID, ', by conditions : ', err.message);
         sendMessage(taskID, message.workflow, err);
     });
 }
 
+/**
+ * Canceling scheduled task or task with condition
+ * @param {number} taskID task ID
+ */
 function cancelTask(taskID) {
     if(scheduledTasks.has(taskID)) {
         clearTimeout(scheduledTasks.get(taskID));
@@ -185,25 +207,44 @@ function cancelTask(taskID) {
     }
 }
 
-function queueCondition(OCID, result, objectName, counterName) {
-    log.info('Queuing task condition for ', OCID, '; result: ', result, ': ', objectName, ' (', counterName, ')');
-    conditionsQueue.set(OCID, result);
-    receivedConditionsCnt++;
-    if (processingConditions) return;
+/**
+ * Add condition for OCID to queue and process queue every cfg.waitingConditionsTime (30 sec)
+ *
+ * @param {Object} message message object
+ * @param {number} message.OCID OCID
+ * @param {string} message.objectName object name for log
+ * @param {string} message.counterName counter name for log
+ */
+function queueCondition(message) {
+    const OCID = Number(message.OCID);
 
-    processingConditions = Date.now();
-    setTimeout(function() {
-        var OCIDs = [];
-        for(var [OCID, result] of conditionsQueue) {
-            if(result) OCIDs.push(OCID);
-        }
-        conditionsQueue.clear();
-        log.info('Checking task condition for OCIDs: ', OCIDs);
-        tasks.checkCondition(OCIDs);
-        processingConditions = 0;
-    }, waitingConditionsTime);
+    log.info('Queuing task condition for ', OCID, ': ', message.objectName, ' (', message.counterName, ')');
+    conditionsQueue.add(OCID);
 }
 
+/**
+ * Process queued conditions every cfg.waitingConditionsTime (30 sec)
+ */
+function processConditionsQueue() {
+    var processingConditionsInProgress = setTimeout(function() {
+        if(conditionsQueue.size) {
+            const OCIDs = Array.from(conditionsQueue);
+            conditionsQueue.clear();
+            log.info('Checking task condition for OCIDs: ', OCIDs);
+            tasks.checkCondition(OCIDs);
+        }
+        processConditionsQueue();
+    }, parseInt(confTaskServer.get('waitingConditionsTime'), 10) || 30000);
+    processingConditionsInProgress.unref();
+}
+
+/**
+ * Send message after task executed
+ * @param {number} taskID task ID
+ * @param {Object} workflow workflow
+ * @param {Error} [error] Error
+ * @param {function(Error) | function()} [callback] callback(err)
+ */
 function sendMessage(taskID, workflow, error, callback) {
     async.each(workflow, function (obj, callback) {
         if(typeof(obj.action) === 'string' && obj.action.toLowerCase() === 'execute') {

@@ -2,18 +2,17 @@
  * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
+const log = require('../lib/log')(module);
 const express = require('express');
 const path = require('path');
 const async = require('async');
-const log = require('../lib/log')(module);
 const Conf = require('../lib/conf');
 const confActions = new Conf('config/actions.json');
 const prepareUser = require('../lib/utils/prepareUser');
 const rightsWrapper = require('../rightsWrappers/actions');
 const actions = require('../lib/actionsConf');
-const browserLog = require('../lib/browserLog'); // used for delete messages counter for session
+const browserLog = require('../serverAudit/browserLog'); // used for delete messages counter for session
 const unique = require('../lib/utils/unique');
-const userDB = require('../models_db/usersDB');
 const actionClient = require('../serverActions/actionClient');
 const objectFilterDB = require("../models_db/objectsFilterDB");
 
@@ -26,20 +25,24 @@ var actionsForUpdate = new Map(); // {<actionLink>: {updateAjax: true|false, upd
 // Initializing action, load and save user action configuration
 router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
 
-    module.sessionID = undefined;
+    browserLog.deleteSession(module.sessionID);
+    delete module.sessionID;
+
     var actionID = req.params.action;
-    var user = prepareUser(req.session.username);
+    var username = prepareUser(req.session.username);
     var func = req.body.func;
     actions.getConfiguration(actionID, function(err, actionCfg) {
         if (err && actionID  !== '__AlepizMainMenuConfiguration' && actionID  !== '__AlepizMainMenuCustomization') {
-            log.error('Error while getting action configuration for "', actionID, '", user: ', user,
+            log.error('Error while getting action configuration for "', actionID, '", user: ', username,
                 ': ', err.message, ': param: ', req.body);
             return next(err);
         }
         if(func === 'setActionConfig' || func === 'getActionConfig') {
-            actionClient.actionConfig(user, func, actionID, req.body.config, function (err, row) {
+            log.debug((func === 'setActionConfig' ? 'Save' : 'Load'),  ' action configuration for ', actionID,
+                '; user: ', username, '; configuration: ', req.body.config);
+            actionClient.actionConfig(username, func, actionID, req.body.config, function (err, row) {
                 if (err) {
-                    log.error('Can\'t ', func, ' for user: "', user, '", action: "', actionID, '": ', err.message,
+                    log.error('Can\'t ', func, ' for user: "', username, '", action: "', actionID, '": ', err.message,
                         ': ', req.body);
                     return next(err);
                 }
@@ -51,6 +54,8 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
                     } catch (e) {
                         config = configStr;
                     }
+
+                    log.debug('Load configuration ', config);
                 } else config = {};
 
                 //console.log('get:', configStr, config)
@@ -61,24 +66,19 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
         }
 
         var sessionID = unique.createID();
-        actionClient.addSessionID({
-            user: user,
-            actionID: actionID,
-            actionName: actionCfg.name,
-            sessionID: sessionID,
-        });
-
         module.sessionID = sessionID;
-        log.debug('Creating new session for user: "', user, '",  action: "', actionCfg.name, '", sessionID: ', sessionID);
+        log.debug('Creating a new session for user: ', username, ',  action: ', actionCfg.name, ', sessionID: ', sessionID);
 
         if (!'o' in req.body) {
-            return callback(new Error('Error while initialisation action "' + actionID + '": ' +
-                'parameter "o" with object names is not present'));
+            log.error('Error while initialisation action "', actionID, '": ',
+                'parameter "o" with object names is not present');
+            return next(err);
         }
-        objectFilterDB.getObjectsByNames(req.body.o.split(','), user, function(err, objectsFull) {
+        objectFilterDB.getObjectsByNames(req.body.o.split(','), username, function(err, objectsFull) {
             if(err) {
-                return callback(new Error('Error getting object information action "' + actionID + '": ' +
-                    err.message + '. Objects: ' + req.body.o));
+                log.error('Error getting object information action "', actionID, '": ',
+                    err.message, '. Objects: ', req.body.o);
+                return next(err);
             }
             var objects = objectsFull.map((obj) => {
                 return {
@@ -93,7 +93,7 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
                 },
                 // check user rights for view this action
                 function(callback){
-                    rightsWrapper.checkActionRights(user, actionID, 'ajax', callback);
+                    rightsWrapper.checkActionRights(username, actionID, 'ajax', callback);
                 }
             ], function(err){
                 if(err) {
@@ -119,6 +119,7 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
                         ajax: true,
                         server: true
                     });
+                    log.debug('Require for update action: ', actionsForUpdate);
                 }
 
                 res.render(actionHomePage, result, function(err, html) {
@@ -150,7 +151,9 @@ router.all('/' + confActions.get('dir') + '/:action_sessionID/' + confActions.ge
         res.send();
     }
 
+    var username = prepareUser(req.session.username);
     module.sessionID = sessionID;
+
     actions.getConfiguration(actionID, function(err, cfg){
         if(err){
             log.error('Can\'t get action configuration for ', actionID, ' for sending static file: ', err.message);
@@ -158,12 +161,13 @@ router.all('/' + confActions.get('dir') + '/:action_sessionID/' + confActions.ge
         }
 
         if(cfg.staticDir && staticDir === cfg.staticDir){
-            rightsWrapper.checkActionRights(req.session.username, actionID, 'ajax', function(err/*, rights */){
-                if(err){
+            rightsWrapper.checkActionRights(username, actionID, 'ajax', function(err/*, rights */) {
+                if(err) {
                     log.error('Can\'t check user rights for ', actionID, ' for sending static file: ', err.message);
                     return res.send();
                 }
-                var fullPathToStaticFile = path.join(__dirname, '..', confActions.get('dir'), actionID, staticDir, staticFile);
+                var fullPathToStaticFile = path.join(__dirname, '..', confActions.get('dir'), actionID,
+                    staticDir, staticFile);
                 log.debug('Sending static file ', fullPathToStaticFile);
                 return res.sendFile(fullPathToStaticFile);
             });
@@ -193,6 +197,8 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
         return next();
     }
 
+    var username = prepareUser(req.session.username);
+    var executionMode = req.params.mode;
     module.sessionID = sessionID;
 
     if(!actionID) {
@@ -200,105 +206,90 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
         return next();
     }
 
-    var executionMode = req.params.mode;
     if(executionMode !== 'server' && executionMode !== 'ajax' && executionMode !== 'makeTask') {
         log.error('Unknown execution mode for action "', actionID, '": ', executionMode);
         return next();
     }
 
-    var user = prepareUser(req.session.username);
-
-    userDB.getID(user, function(err) {
-        if(err) {
-            log.error(err.message);
+    // for getting action name for run a new actionClient.addSessionID() and get runAjaxOnRemoteServers
+    actions.getConfiguration(actionID, function(err, actionCfg) {
+        if (err) {
+            log.error('Error while getting action configuration for "', actionID, '": ', err.message);
             return next(err);
         }
 
-        // for getting action name for run a new actionClient.addSessionID() and get runAjaxOnRemoteServers
-        actions.getConfiguration(actionID, function(err, actionCfg) {
-            if (err) {
-                log.error('Error while getting action configuration for "', actionID, '": ', err.message);
-                return next(err);
+
+        var args = req.method === 'POST' ? req.body : req.query;
+
+        // for ajax run action directly from webServer without actionClient->actionServer IPC
+        // but action server connected to history and server and make too many connections
+        // and when webServer is restarted, we receive an errors in log from IPC system
+        //var actionProcessor = executionMode === 'ajax' ? actionServer : actionClient;
+        actionClient.runAction({
+            actionID: actionID,
+            executionMode: executionMode,
+            user: username,
+            args: args,
+            notInQueue: true, // run the action started by the user without a queue
+            // default value of actionCfg.runActionOnRemoteServers is true.
+            // if actionCfg.runActionOnRemoteServers === false, then do not run action on remote server
+            runActionOnRemoteServers: actionCfg.runActionOnRemoteServers === undefined ||
+                Boolean(actionCfg.runActionOnRemoteServers) !== false,
+            // when runActionOnRemoteServers set to true by default actions running from browser
+            // does not return the action result.
+            // If you want get action result (f.e. to callbackAfterExec(result, callback)) set
+            // the returnActionResult parameter to true. default false
+            returnActionResult: actionCfg.returnActionResult,
+            // if true, then data will be an array of all results returned from the current and remote servers
+            runAjaxOnRemoteServers: actionCfg.runAjaxOnRemoteServers,
+            slowAjaxTime: actionCfg.slowAjaxTime,
+            slowServerTime: actionCfg.slowServerTime,
+            debug: actionCfg.debug,
+            sessionID: sessionID,
+            updateAction: actionsForUpdate.has(actionID) ? actionsForUpdate.get(actionID)[executionMode] : false
+        }, function(err, data){
+            if(!data) data = {actionError: ''};
+            if(err) {
+                log.error('Error in action "', actionID, '": ', err.message);
+                data.actionError = err.message;
             }
 
+            if(actionsForUpdate.has(actionID)) actionsForUpdate.get(actionID)[executionMode] = false;
 
-            var args = req.method === 'POST' ? req.body : req.query;
+            if(executionMode === 'ajax') {
+                log.debug('Sending back for action "',actionID,'", mode: ajax: ', data,
+                    ': ', (Buffer.isBuffer(data) ? '(buffer)' : typeof data));
+                if(typeof data === 'string') return res.send(data);
+                else if(typeof data === 'object' && data.type === 'Buffer' && Array.isArray(data.data)) {
 
-            // for ajax run action directly from webServer without actionClient->actionServer IPC
-            // but action server connected to history and server and make too many connections
-            // and when webServer is restarted, we receive an errors in log from IPC system
-            //var actionProcessor = executionMode === 'ajax' ? actionServer : actionClient;
-            actionClient.runAction({
-                actionID: actionID,
-                executionMode: executionMode,
-                user: user,
-                args: args,
-                notInQueue: true, // run the action started by the user without a queue
-                // default value of actionCfg.runActionOnRemoteServers is true.
-                // if actionCfg.runActionOnRemoteServers === false, then do not run action on remote server
-                runActionOnRemoteServers: actionCfg.runActionOnRemoteServers === undefined ||
-                    Boolean(actionCfg.runActionOnRemoteServers) !== false,
-                // when runActionOnRemoteServers set to true by default actions running from browser
-                // does not return the action result.
-                // If you want get action result (f.e. to callbackAfterExec(result, callback)) set
-                // the returnActionResult parameter to true. default false
-                returnActionResult: actionCfg.returnActionResult,
-                // if true, then data will be an array of all results returned from the current and remote servers
-                runAjaxOnRemoteServers: actionCfg.runAjaxOnRemoteServers,
-                slowAjaxTime: actionCfg.slowAjaxTime,
-                slowServerTime: actionCfg.slowServerTime,
-                debug: actionCfg.debug,
-                sessionID: sessionID,
-                updateAction: actionsForUpdate.has(actionID) ? actionsForUpdate.get(actionID)[executionMode] : false
-            }, function(err, data){
-                if(!data) data = {actionError: ''};
-                if(err) {
-                    log.error('Error in action "', actionID, '": ', err.message);
-                    data.actionError = err.message;
-                }
+                    res.set({
+                        'Content-Type': 'application/octet-stream',
+                        'Content-Disposition': 'attachment' + (data.fileName ? ('; filename="' + data.fileName + '"') : ''),
+                    });
+                    res.write(Buffer.from(data.data), 'binary');
+                    res.end();
+                    return;
+                } return res.json(data);
+            }
 
-                if(actionsForUpdate.has(actionID)) actionsForUpdate.get(actionID)[executionMode] = false;
+            if(executionMode === 'server') {
+                log.info('Complete executing action ', actionID, ' with result: ', data);
+            } else if(executionMode === 'makeTask') {
+                log.info('Completed saving action ', actionID);
+            }
 
-                if(executionMode === 'ajax') {
-                    log.debug('Sending back for action "',actionID,'", mode: ajax: ', data,
-                        ': ', (Buffer.isBuffer(data) ? '(buffer)' : typeof data));
-                    if(typeof data === 'string') return res.send(data);
-                    else if(typeof data === 'object' && data.type === 'Buffer' && Array.isArray(data.data)) {
+            // when action is finished, clear old and create new session ID
+            browserLog.deleteSession(sessionID);
+            var newSessionID = unique.createID();
+            data.sessionID = newSessionID;
+            data.oldSessionID = sessionID;
+            data.actionID = actionID;
+            data.actionName = actionCfg.name;
+            log.debug('Sending back for action ', actionID, ', mode: ', executionMode, ': ', data);
+            res.json(data);
 
-                        res.set({
-                            'Content-Type': 'application/octet-stream',
-                            'Content-Disposition': 'attachment' + (data.fileName ? ('; filename="' + data.fileName + '"') : ''),
-                        });
-                        res.write(Buffer.from(data.data), 'binary');
-                        res.end();
-                        return;
-                    } return res.json(data);
-                }
-
-                // when action is finished, clear old and create new session ID
-                browserLog.deleteSession(sessionID);
-
-                var newSessionID = unique.createID();
-                actionClient.addSessionID({
-                    user: user,
-                    actionID: actionID,
-                    actionName: actionCfg.name,
-                    sessionID: newSessionID,
-                });
-
-                if(executionMode === 'server') {
-                    log.info('Complete executing action ', actionID, ' with result: ', data);
-                } else if(executionMode === 'makeTask') {
-                    log.info('Completed saving action ', actionID);
-                }
-
-                data.sessionID = newSessionID;
-                log.debug('Sending back for action ', actionID, ', mode: ', executionMode, ': ', data);
-                res.json(data);
-
-                module.sessionID = newSessionID;
-                log.debug('New sessionID for user: ', user, ',  action: ', actionCfg.name, ': ', newSessionID);
-            });
+            module.sessionID = newSessionID;
+            log.debug('New sessionID for user: ', username, ',  action: ', actionCfg.name, ': ', newSessionID);
         });
     });
 });

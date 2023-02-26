@@ -50,11 +50,13 @@ module.exports = function(args, callback) {
                             _saveInteractions(user, param.objectsIDs, args, function(err, isUpdatedInteractions) {
                                 if (err) return transactionDB.rollback(err, callback);
 
+                                // args.alepizIDs can be '-1', '' or f.e. '1,2,3'
                                 // args.alepizIDs === '' - remove alepizIDs
                                 // args.alepizIDs === '-1' - save alepizIDs unchanged
                                 var objectIDsForRelationships = args.alepizIDs !== '-1' ? param.objectsIDs : [];
                                 var alepizIDs = args.alepizIDs && args.alepizIDs !== '-1' ?
-                                    args.alepizIDs.split(',').map(id => parseInt(id, 10)) : [];
+                                    args.alepizIDs.toString().split(',').map(id => parseInt(id, 10)) : [];
+
                                 objectsDB.addObjectsAlepizRelation(user, objectIDsForRelationships, alepizIDs,
                                     function(err, newObjectsAlepizRelations, objectsAlepizRelationsForRemove) {
                                     if (err) return transactionDB.rollback(err, callback);

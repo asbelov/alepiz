@@ -34,7 +34,7 @@ transaction.end = function(callback) {
     //log.debug('Commit transaction. No ', (new Error).stack);
     db.exec('COMMIT', function(err) {
         if(err) log.warn('Error committing transaction. Stack: ', err.stack);
-        runDelayedTransaction(callback);
+        runDelayedTransaction(err, callback);
     });
 };
 
@@ -42,11 +42,11 @@ transaction.rollback = function(err, callback){
     log.warn('Rollback transaction. Stack: ', err.stack || err);
     db.exec('ROLLBACK', function(errRollBack) {
         if(errRollBack) log.error('Error while rollback transaction: ', errRollBack.message);
-        runDelayedTransaction(callback);
+        runDelayedTransaction(err, callback);
     });
 };
 
-function runDelayedTransaction(callback) {
+function runDelayedTransaction(err, callback) {
     if(!delayedCallbacks.size) {
         transactionInProgress = false;
         var now = Date.now();
@@ -57,7 +57,7 @@ function runDelayedTransaction(callback) {
                 truncateInProgress = 0;
             });
         }
-        callback();
+        callback(err);
         return;
     }
 
@@ -65,6 +65,7 @@ function runDelayedTransaction(callback) {
     transactionInProgress = false;
     // trying to fix bug with RangeError: Maximum call stack size exceeded
     // transaction.begin(delayedCallback);
-    setTimeout(transaction.begin, 0, delayedCallback);
-    callback();
+    var t = setTimeout(transaction.begin, 0, delayedCallback);
+    t.unref();
+    callback(err);
 }

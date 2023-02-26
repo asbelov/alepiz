@@ -214,14 +214,6 @@ function childFunc() {
     });
 }
 
-/*
-// create new unique message ID
-function getNewMessageID() {
-    return (messageID < maxMessageID-1 ? messageID++ : 0);
-}
-
- */
-
 // id, last, cnt, maxRecordsCnt, callback
 storage.getRecordsFromStorageByIdx = function () {
     var args = Array.prototype.slice.call(arguments);

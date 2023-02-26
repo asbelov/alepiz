@@ -2,21 +2,21 @@
 * Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
 * Created on 2021-1-24 0:54:27
 */
-var async = require('async');
-var log = require('../../lib/log')(module);
-var objectsPropertiesDB = require('../../models_db/objectsPropertiesDB');
-var objectsDB = require('../../rightsWrappers/objectsDB');
-var countersDB = require('../../models_db/countersDB');
-var history = require('../../serverHistory/historyClient');
+const async = require('async');
+const log = require('../../lib/log')(module);
+const objectsPropertiesDB = require('../../models_db/objectsPropertiesDB');
+const objectsDB = require('../../rightsWrappers/objectsDB');
+const countersDB = require('../../models_db/countersDB');
+const history = require('../../serverHistory/historyClient');
 const fromHuman = require('../../lib/utils/fromHuman');
 const toHuman = require('../../lib/utils/toHuman');
-
-var cfg = {};
+const Conf = require('../../lib/conf');
+const confActions = new Conf('config/actions.json');
+const confOptionsInformation = new Conf(confActions.get('dir') + '/information/settings.json');
 
 module.exports = getData;
 
 /*
-
 callback(err, obj),
 obj = [{<objectName>: { name: <name>, value: <value>, }}, ...]
  */
@@ -27,8 +27,9 @@ function getData(args, callback) {
         return callback(new Error('Ajax function is not set or unknown function "' + args.func + '"'));
     }
 
-    cfg = args.actionCfg;
-    if(!cfg.properties) return callback(new Error('Properties are not set in the action configuration'));
+    var cfg = confOptionsInformation.get();
+    log.info('cfg: ', confActions.get('dir') + '/information/settings.json', ': ', cfg);
+    if(!cfg) return callback(new Error('Properties are not set in the action configuration'));
 
     try {
         var objects = JSON.parse(args.objects);
@@ -39,9 +40,7 @@ function getData(args, callback) {
     if(!objects.length) return callback();
 
     history.connect('actionInformation', function() {
-
-
-        // SELECT * FROM objects WHERE id=? and check for user rights ti the objects
+        // SELECT * FROM objects WHERE id=? and check for user rights to the objects
         objectsDB.getObjectsByIDs(args.username, objects.map(o => o.id), function (err, objectsRows) {
             if (err && (!objectsRows || !objectsRows.length)) return callback(err);
 
@@ -65,8 +64,8 @@ function getData(args, callback) {
                     tableHeads = new Map(),
                     historyFunctions = new Set(history.getFunctionList().map(f => f.name)); // to check if the function name exists
 
-                for (var name in cfg.properties) {
-                    var prop = cfg.properties[name];
+                for (var name in cfg) {
+                    var prop = cfg[name];
                     if (prop.property) {
                         props2TableHeads.set(prop.property, name);
                     } else if (prop.counter) {
@@ -82,7 +81,7 @@ function getData(args, callback) {
                             }
                             // join('('): if parameters contained "(" characters, they will be separated.
                             // split function parameters from string to array
-                            var param = arr.join('(').split(/[ ]*,[ ]*/).map(function (parameter) {
+                            var param = arr.join('(').split(/ *, */).map(function (parameter) {
                                 // try to convert Gb, Mb, Kb, B or date\time to numeric or return existing parameter
                                 var hasExclamation = false;
                                 if (String(parameter).charAt(0) === '!') {
@@ -112,7 +111,7 @@ function getData(args, callback) {
                     if (!tableHead) return;
                     result[objectName][tableHead] = {
                         rawResult: row.value,
-                        result: resultProcessing(cfg.properties[tableHead], row.value)
+                        result: resultProcessing(cfg[tableHead], row.value)
                     };
                     tableHeads.set(tableHead, true);
                 });
@@ -193,7 +192,7 @@ function getData(args, callback) {
                                         OCID: _item.OCID,
                                         axisY: _item.axisY,
                                         rawResult: res.data,
-                                        result: resultProcessing(cfg.properties[_item.tableHead], res.data)
+                                        result: resultProcessing(cfg[_item.tableHead], res.data)
                                     };
                                     tableHeads.set(_item.tableHead, true);
                                     callback();

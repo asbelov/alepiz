@@ -15,6 +15,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
         script(src='/javascripts/alepizLog.js')
         script(src='/javascripts/alepizHelp.js')
         script(src='/javascripts/alepizAudit.js')
+        script(src='/javascripts/alepizActionLogViewer.js')
         script(src='/javascripts/alepizObjects.js')
         script(src='/javascripts/alepizActions.js')
         script(src='/javascripts/alepizFilters.js')
@@ -148,12 +149,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
                 a(href="#")#logout.modal-action.modal-close.waves-effect.waves-green.btn-flat Logout
 
         div#modal-log-window.bottom-sheet.modal
-            div.modal-content
-                div.row
-                    div.col.s12.right-align#last-update
-                    div.col.s12
-                        div.divider
-                    ul#collapsible-log-body.collapsible.z-depth-0
+            div#modal-log-content.modal-content
 
         div#modal-log.modal
             div.modal-content

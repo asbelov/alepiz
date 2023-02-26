@@ -11,7 +11,6 @@
     "showWhenNoObjectsSelected": true,
     "onChangeObjectMenuEvent": "callback:onChangeObjects",
     "callbackBeforeExec": "callbackBeforeExec",
-    "callbackAfterExec": "callbackAfterExec",
     "outputFormat": "text",
     "descriptionTemplate": "Import or export objects %:o:%",
     "icon": "settings",

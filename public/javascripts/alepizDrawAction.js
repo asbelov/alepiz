@@ -21,7 +21,7 @@ callback(html), where html is a string with HTML page for active action
         bodyElm.css("cursor", "wait");
         $(iframeDOMElm.contentWindow).find('body').css("cursor", "wait");
 
-        var activeAction = alepizActionsNamespace.getActiveActionsConf();
+        var activeAction = alepizActionsNamespace.getActiveActionConf();
         // if not selected any action, return
         if(!activeAction){
             bodyElm.css("cursor", "auto");
@@ -55,7 +55,7 @@ callback(html), where html is a string with HTML page for active action
 
     function redrawIFrameDataOnChangeObjectsList() {
 
-        var activeAction = alepizActionsNamespace.getActiveActionsConf();
+        var activeAction = alepizActionsNamespace.getActiveActionConf();
         if(!activeAction) return drawAction();
 
         var activeActionLink = activeAction.link;
@@ -104,7 +104,7 @@ callback(html), where html is a string with HTML page for active action
     */
     function drawAction(html) {
 
-        var activeAction = alepizActionsNamespace.getActiveActionsConf();
+        var activeAction = alepizActionsNamespace.getActiveActionConf();
         var activeActionLink = html && activeAction ? activeAction.link : 'action not selected';
 
         // stopping all executed setTimeout setInterval functions in the action frame

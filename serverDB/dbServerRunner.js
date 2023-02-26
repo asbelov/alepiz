@@ -14,19 +14,11 @@ var dbServer = {
         log.info('DB Server was not initialized for stop');
         callback()
     },
-    kill: function () {
-        log.info('DB Server was not initialized for kill');
-    },
 };
 
 module.exports = dbServer;
 
-dbServer.start = function (_callback) {
-    var callback = function(err, isDbServerExit) {
-        if(typeof _callback === 'function') return _callback(err, isDbServerExit);
-        if(err) log.error(err.message)
-    };
-
+dbServer.start = function (callback) {
     var cfg = confSqlite.get(); // configuration for each module
 
     if(cfg.disableServer) {
@@ -47,11 +39,8 @@ dbServer.start = function (_callback) {
             if(err) return callback(new Error('Can\'t run dbServer process: ' + err.message));
 
             dbServer.stop = dbServerProcess.stop;
-            dbServer.kill = dbServerProcess.kill;
-
             log.info('dbServer was started: ', cfg);
             callback();
         });
     });
-
 };

@@ -33,7 +33,7 @@ function getVarFromExpression(variable, variables, getVariableValue, param, call
             variablesDebugInfo.result = (err ? '. Error: ' + err.message + '. ' : '') +
                 'Unresolved variables: ' + trueUnresolvedVariables.join(';  ');
             return callback(new Error(param.objectName + '(' + param.counterName + ' #' + param.counterID + '): ' +
-                variablesDebugInfo.result), result, variablesDebugInfo);
+                variablesDebugInfo.result.replace(/^. /, '')), result, variablesDebugInfo);
         }
 
         callback(null, result, variablesDebugInfo);

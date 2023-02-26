@@ -5,19 +5,19 @@
 /**
  * Created by Alexander Belov on 16.05.2015.
  */
-var objectsDB = require('../../rightsWrappers/objectsDB');
-var countersDB = require('../../rightsWrappers/countersDB');
-var rawCountersDB = require('../../models_db/countersDB');
-var counterSaveDB = require('../../models_db/modifiers/countersDB');
-var transactionDB = require('../../models_db/modifiers/transaction');
-var log = require('../../lib/log')(module);
-var server = require('../../server/counterProcessor');
+const log = require('../../lib/log')(module);
+const objectsDB = require('../../rightsWrappers/objectsDB');
+const countersDB = require('../../rightsWrappers/countersDB');
+const rawCountersDB = require('../../models_db/countersDB');
+const counterSaveDB = require('../../models_db/modifiers/countersDB');
+const transactionDB = require('../../models_db/modifiers/transaction');
+const server = require('../../server/counterProcessor');
 const Conf = require("../../lib/conf");
 const confMyNode = new Conf('config/node.json');
 
 
 module.exports = function(args, callback) {
-    log.debug('Starting action server \"'+args.actionName+'\" with parameters', args);
+    log.debug('Starting action server ', args.actionName, ' with parameters', args);
 
     editObjects(args.username, args, callback);
 };
@@ -25,7 +25,7 @@ module.exports = function(args, callback) {
 // edit objects description, order and interactions
 // parameters - parameters, which returned by HTML form
 // callback(err, <success message>)
-function editObjects(user, args, callback){
+function editObjects(user, args, callback) {
 
     if(!args.o) return callback(new Error('Objects are not selected'));
 
@@ -35,6 +35,7 @@ function editObjects(user, args, callback){
         return callback(new Error('Can\'t parse JSON string with an object parameters "' + args.o + '": ' +
             err.message));
     }
+
 
     var objectID2Name = {};
     var objectIDs = objects.map(function(obj) {
@@ -46,6 +47,8 @@ function editObjects(user, args, callback){
     }).filter(function(id) {
         return (id === parseInt(id, 10) && id > 0); // return only integer objectIDs > 0
     });
+
+    log.debug('Objects: ', objects, '\nobjectIDs: ', objectIDs, '\nobjectID2Name: ', objectID2Name);
 
     if(!objectIDs.length || objectIDs.length !== objects.length) {
         return callback(new Error('Incorrect object ' + args.o));
@@ -60,6 +63,7 @@ function editObjects(user, args, callback){
                 args.rulesForRenameObjects + '": ' + err.message))
         }
     }
+    log.debug('newObjects (for rename): ', newObjects, '\nrulesForRenameObjects: ', args.rulesForRenameObjects);
 
     if(args.rulesForRenameObjects && (!Array.isArray(newObjects) || !newObjects.length))
         return callback(new Error('Error while parse JSON string with a new objects names "' +
@@ -81,6 +85,8 @@ function editObjects(user, args, callback){
     // color will be unchanged if color is undefined. args.objectsColor !== undefined for old tasks
     var color = args.objectsColor !== '0' && args.objectsColor !== undefined ?
         args.objectsColor + ':' + args.objectsShade : undefined;
+
+    log.debug('order: ', order, '\ncolor: ', color);
 
     // Do not check the rights to counters, because otherwise counters that are not linked to any object
     // will be skipped
@@ -138,6 +144,12 @@ function editObjects(user, args, callback){
                 }
             }
 
+            log.debug('countersObjectsLinkage: ', countersObjectsLinkage,
+                '\nOCIDsToInsert: ', OCIDsToInsert,
+                '\nOCIDsToInsertHuman: ', OCIDsToInsertHuman,
+                '\nOCIDsForDelete: ', OCIDsForDelete,
+                '\nOCIDsForDeleteHuman: ', OCIDsForDeleteHuman);
+
             transactionDB.begin(function (err) {
                 if (err) {
                     return callback(new Error('Error begin transaction for edit objects ' + String(newObjects) +
@@ -149,20 +161,26 @@ function editObjects(user, args, callback){
                     if (err) return transactionDB.rollback(err, callback);
                     if(isObjectRenamed) {
                         log.info('Rename ', Object.values(objectID2Name), ' to ', newObjects.map(o=>o.name));
+                    } else {
+                        log.debug('Objects do not need to be renamed');
                     }
 
-                    if(newObjects && newObjects.length) log.info('Rename objects: ', newObjects);
                     // update description and order for all existing objects
                     objectsDB.updateObjectsInformation(user, objectIDs, description, order, disabled, color, args.sessionID,
                         function (err, updateData) {
                         if (err) return transactionDB.rollback(err, callback);
                         if(updateData) {
-                            log.info(Object.values(objectID2Name) + ': update object information: ', updateData);
+                            log.info(Object.values(objectID2Name), ': update object information: ', updateData);
+                        } else {
+                            log.debug(Object.values(objectID2Name), ': do not update object information: ', updateData);
                         }
+
                         if(OCIDsForDelete.size || OCIDsToInsert.size) {
-                            log.info(Object.values(objectID2Name) +
+                            log.info(Object.values(objectID2Name),
                                 ': links for delete: ', Array.from(OCIDsForDeleteHuman).join('; ') || 'none',
                                 '; links to insert: ', Array.from(OCIDsToInsertHuman).join('; ') || 'none');
+                        } else {
+                            log.debug('No links for delete or insert: ', Object.values(objectID2Name));
                         }
 
                         counterSaveDB.deleteObjectCounterID(Array.from(OCIDsForDelete), function(err) {
@@ -171,24 +189,34 @@ function editObjects(user, args, callback){
                             counterSaveDB.saveObjectsCountersIDs(Array.from(OCIDsToInsert), function(err) {
                                 if(err) return transactionDB.rollback(err, callback);
 
-                                // param.alepizIDs === '' - remove alepizIDs
-                                // param.alepizIDs === '-1' - save alepizIDs unchanged
+                                // args.alepizIDs can be '-1', '' or f.e. '1,2,3'
+                                // args.alepizIDs === '' - remove alepizIDs
+                                // args.alepizIDs === '-1' - save alepizIDs unchanged
                                 var objectIDsForRelationships = args.alepizIDs !== '-1' ? objectIDs : [];
                                 var alepizIDs = args.alepizIDs && args.alepizIDs !== '-1' ?
-                                    args.alepizIDs.split(',').map(id => parseInt(id, 10)) : [];
+                                    args.alepizIDs.toString().split(',').map(id => parseInt(id, 10)) : [];
 
+                                log.debug('user: ', user, '\nobjectIDsForRelationships: ', objectIDsForRelationships,
+                                    '\nalepizIDs: ', alepizIDs);
                                 objectsDB.addObjectsAlepizRelation(user, objectIDsForRelationships, alepizIDs,
                                     function(err, newObjectsAlepizRelations, objectsAlepizRelationsForRemove) {
                                     if(err) return transactionDB.rollback(err, callback);
 
                                         if(newObjectsAlepizRelations && newObjectsAlepizRelations.length) {
-                                            log.info(Object.values(objectID2Name) +
+                                            log.info(Object.values(objectID2Name),
                                                 ': add object to Alepiz relations: ', newObjectsAlepizRelations);
+                                        } else {
+                                            log.debug(Object.values(objectID2Name),
+                                                ': do not add object to Alepiz relations: ', newObjectsAlepizRelations);
                                         }
 
                                         if(objectsAlepizRelationsForRemove && objectsAlepizRelationsForRemove.length) {
-                                            log.info(Object.values(objectID2Name) +
+                                            log.info(Object.values(objectID2Name),
                                                 ': remove object to Alepiz relations: ', objectsAlepizRelationsForRemove);
+                                        } else {
+                                            log.debug(Object.values(objectID2Name),
+                                                ': do not remove object to Alepiz relations: ',
+                                                objectsAlepizRelationsForRemove);
                                         }
 
 
@@ -200,7 +228,11 @@ function editObjects(user, args, callback){
                                         var indexOfOwnNode = cfg.indexOfOwnNode;
                                         var ownerOfUnspecifiedAlepizIDs = cfg.serviceNobodyObjects;
 
-                                        //console.log('!!!', param.disabled, alepizIDs, ownerOfUnspecifiedAlepizIDs, indexOfOwnNode)
+                                        log.debug('args.disabled: ', args.disabled,
+                                            '\nalepizIDs: ', alepizIDs,
+                                            '\nownerOfUnspecifiedAlepizIDs: ', ownerOfUnspecifiedAlepizIDs,
+                                            '\nindexOfOwnNode:', indexOfOwnNode);
+
                                         var objectsAreEnabled = !args.disabled &&
                                             ((!alepizIDs.length && ownerOfUnspecifiedAlepizIDs) ||
                                                 alepizIDs.indexOf(indexOfOwnNode) !== -1);
@@ -217,6 +249,10 @@ function editObjects(user, args, callback){
                                                 updateObjectsIDs: objectIDs
                                             });
                                             return callback(null, objectIDs.join(','));
+                                        } else {
+                                            log.debug('Do not sending message to the server for update objects ',
+                                                Object.values(objectID2Name).join('; '),
+                                                '\nobjectsAreEnabled: ', objectsAreEnabled);
                                         }
 
                                         // object disabled. remove counters
@@ -233,7 +269,13 @@ function editObjects(user, args, callback){
                                                     description: 'Objects were disabled from the "object editor" by user ' +
                                                         user + '. Object names: ' + Object.values(objectID2Name).join('; ')
                                                 });
+                                            } else {
+                                                log.debug('Do not sending message to the server for remove counters for ' +
+                                                    'disabled objects ', Object.values(objectID2Name).join('; '),
+                                                    '; OCIDs: ', OCIDs);
                                             }
+
+                                            log.debug('Action returned result: ', objectIDs);
                                             callback(null, objectIDs.join(','));
                                         });
                                     });

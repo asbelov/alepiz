@@ -161,6 +161,12 @@ history.getFunctionList = function() { return functionsArray; };
  * {timestamp:…, value:…} or undefined on error
  */
 history.add = function(initID, data) {
+    log.debug('history.add(initID: ', initID, ', data: ', data, ')', {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": initID
+            }
+        });
     // don't add empty value
     if(data === undefined || data === null) return;
 
@@ -348,6 +354,14 @@ function getByIdx (id, offset, cnt, maxRecordsCnt, callback) {
             sendAndReceive: true,
             dontSaveUnsentMessage: true,
         }, function (err, result) {
+            log.debug(hostPort, ': getByIdx(id: ', id, ', offset: ', offset, ', cnt: ', cnt,
+                ', maxRecordsCnt: ', maxRecordsCnt, '): result: ', result, ', err: ', err, {
+                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                vars: {
+                    "RECEIVED_OCID": id
+                }
+            });
+
             if (err && !result) {
                 log.warn('Can\'t getByIdx from ', hostPort, ': ', err.message);
                 return callback();
@@ -361,6 +375,9 @@ function getByIdx (id, offset, cnt, maxRecordsCnt, callback) {
             callback();
         });
     }, function () {
+        // sorted by ascending timestamp and
+        // removing unnecessary elements from the records received from different instances
+        results.sort((a, b) => a.timestamp - b.timestamp).splice(0, results.length - cnt);
         callback(null, results, isGotAllRequiredRecords);
     });
 }
@@ -416,6 +433,13 @@ function getByTime (id, time, interval, maxRecordsCnt, callback) {
             sendAndReceive: true,
             dontSaveUnsentMessage: true,
         }, function(err, result) {
+            log.debug(hostPort, ': getByTime(id: ', id, ', time: ', time, ', interval: ', interval,
+                ', maxRecordsCnt: ', maxRecordsCnt, '): result: ', result, ', err: ', err, {
+                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    vars: {
+                        "RECEIVED_OCID": id
+                    }
+                });
             if (err && !result) {
                 log.warn('Can\'t getByTime from ', hostPort, ': ', err.message);
                 return callback();
@@ -429,6 +453,8 @@ function getByTime (id, time, interval, maxRecordsCnt, callback) {
             callback();
         });
     }, function () {
+        //sorted by ascending timestamp
+        results.sort((a, b) => a.timestamp - b.timestamp);
         callback(null, results, isGotAllRequiredRecords);
     });
 }

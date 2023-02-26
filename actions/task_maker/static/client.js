@@ -40,8 +40,8 @@ function callbackBeforeExec(callback) {
     callback();
 }
 
-function callbackAfterExec(callback) {
-    JQueryNamespace.afterExec(callback);
+function callbackAfterExec(parameterNotUsed, callback) {
+    JQueryNamespace.afterExec(parameterNotUsed, callback);
 }
 
 var JQueryNamespace = (function ($) {

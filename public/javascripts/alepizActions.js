@@ -190,8 +190,12 @@ var alepizActionsNamespace = (function($) {
     return {
         init: init,
         createActionsList: createActionsList,
-        getActiveActionsConf: function () {
+        getActiveActionConf: function () {
             return actionsConf[activeActionLink];
+        },
+        getActionConf: function (actionID) {
+            var actionLink = activeActionLink.replace(/[^\\/]+$/, '') + actionID;
+            return actionsConf[actionLink];
         }
     }
 

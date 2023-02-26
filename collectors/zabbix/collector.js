@@ -11,7 +11,7 @@ var throttling = require('../../lib/throttling');
 var collector = {};
 module.exports = collector;
 
-var zbx_notsupportedLength = String('ZBX_NOTSUPPORTED').length;
+var ZBX_NOTSUPPORTED_Length = String('ZBX_NOTSUPPORTED').length;
 var minResponseLength = String('ZBXD').length + 1 + 8 + 1;
 
 collector.get = function(param, callback) {
@@ -19,8 +19,9 @@ collector.get = function(param, callback) {
     if(param.itemParameters) param.itemParameters = '['+param.itemParameters+']';
     else param.itemParameters= '';
 
-	var sentData = param.item + param.itemParameters + '\n';
-    var errorMessage = 'Zabbix agent error for '+param.host+':'+param.port+':'+sentData+': ';
+	var sentData = param.item + param.itemParameters;
+    var errorMessage = 'Zabbix agent error for ' + param.host + ':' + param.port + ':' + sentData + ': ';
+    sentData += '\n';
 
     var addressPrepareDst;
     // checking for Internet domain name
@@ -126,7 +127,7 @@ collector.get = function(param, callback) {
                 data = Buffer.alloc(0);
 
                 if(result.indexOf('ZBX_NOTSUPPORTED') === 0) {
-                    log.warn(errorMessage + data.toString('utf8', data.length - length + zbx_notsupportedLength + 1));
+                    log.warn(errorMessage + data.toString('utf8', data.length - length + ZBX_NOTSUPPORTED_Length + 1));
                     result = null;
                 }
                 

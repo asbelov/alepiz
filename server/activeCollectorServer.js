@@ -170,8 +170,15 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                                     collectorsObj[message.name][message.type](message.data, callback);
                                 } else { // save collector data to history
                                     collectorsObj[message.name].get(message.data, function (err, result) {
-                                        //if(Number(message.data.id$) === 155101) log.warn('Add record ', message.data.$id, ':', result, ': ', message);
-                                        //log.warn('Add record ', message.data.$id, ':', result, ': ', message);
+
+                                        log.debug('Received for OCID ', message.data.$id, ': ', result, ': ', message,
+                                            '; err: ', err, {
+                                                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                                                vars: {
+                                                    "RECEIVED_OCID": message.data.$id
+                                                }
+                                            });
+
                                         if(message.data.$variables) {
                                             var preparedResult = history.add(message.data.$id, result)
                                             counterProcessorServer.processCounterResult({
@@ -179,7 +186,6 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                                                 result: preparedResult,
                                                 parameters: message.data,
                                                 collectorName: message.name,
-                                                taskCondition: message.$taskCondition,
                                             });
 
                                         } else {

@@ -1,17 +1,17 @@
 {
     "db": [
         {
-            "path": "db",
+            "path": "..\\..\\..\\ALEPIZ\\DB",
             "file": "events.db",
             "relative": true
         },
         {
-            "path": "db",
-            "file": "events_clone.db",
+            "path": "..\\..\\..\\ALEPIZ\\DBClone",
+            "file": "events.db",
             "relative": true
         }
     ],
-    "dbPath": "db",
+    "dbPath": "..\\..\\..\\ALEPIZ\\DB",
     "dbFile": "events.db",
     "saveRepeatEventsCacheInterval": 15,
     "runTaskOnProblem": false,

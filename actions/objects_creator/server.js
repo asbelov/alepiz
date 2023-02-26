@@ -94,7 +94,10 @@ function addNewObjects(user, args, callback){
                 return transactionDB.rollback(err, callback);
             }
 
-            var alepizIDs = args.alepizIDs ? args.alepizIDs.split(',').map(id => parseInt(id, 10)) : [];
+            // args.alepizIDs can be '' or f.e. '1,2,3'
+            var alepizIDs = args.alepizIDs ?
+                args.alepizIDs.toString().split(',').map(id => parseInt(id, 10)) : [];
+
             rightsWrapper.addObjectsAlepizRelation(user, newObjectsIDs, alepizIDs, function (err) {
                 if (err) return transactionDB.rollback(err, callback);
 

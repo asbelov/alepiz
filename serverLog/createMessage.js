@@ -2,17 +2,18 @@
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-
 const util = require('util');
 const {threadId} = require('worker_threads');
 const PID = process.pid;
 
+var createMessage = {};
 module.exports = createMessage;
 
 // TID_PID = ":<TID>:<PID>" or ":<PID>"
 const TID_PID = (threadId ? ':' + threadId + ':' : ':') + PID;
 
-var levelsColors = {
+// colors for different log level and object types
+var colorsLabels = {
     S:          ['fgGrey','fgDefault'],
     D:          ['fgGreen','fgDefault'],
     I:          ['fgDefault','fgDefault'],
@@ -24,7 +25,7 @@ var levelsColors = {
     boolean:    ['attrDim','attrReset'],
 };
 
-
+// console colors specifications
 // http://wiki.bash-hackers.org/scripting/terminalcodes
 //    \0x1b = 27 = ←: Esc character
 var consoleColors = {
@@ -60,35 +61,59 @@ var consoleColors = {
     attrHidden:     '\u001b[8m'
 };
 
-function setColor(str, level) {
-    if(level in levelsColors) return consoleColors[levelsColors[level][0]] + str + consoleColors[levelsColors[level][1]];
+/** Set color for a string
+ * @param {string} str part of the log message for se color
+ * @param {string} colorLabel message color label
+ * @returns {string} part of the log message with color
+ */
+function setColor(str, colorLabel) {
+    if(colorLabel in colorsLabels) {
+        return consoleColors[colorsLabels[colorLabel][0]] + str + consoleColors[colorsLabels[colorLabel][1]];
+    }
     else return str;
 }
 
-function createMessageBody(args, level, objectDepth) {
+/**
+ * Create log message header with time, label, level, PID, TID
+ * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} level message debug level
+ * @param {string} label label for log message. Usually it is a path to the .js file, separated by ":"
+ * @param {number|null} sessionID sessionID or null
+ * @param {Date} [date] log message timestamp
+ * @returns {string} log message header
+ */
+createMessage.createHeader = function (level, label, sessionID, date) {
+    if(!date) date = new Date();
+    const timeStr = date.toLocaleTimeString() + '.' +
+        String('00' + date.getMilliseconds()).replace(/^0*?(\d\d\d)$/, '$1');
+
+    return setColor((timeStr), 'timestamp') +
+        setColor((label ? ' [' + label + TID_PID + ']' : ' ') +
+            (sessionID ? '[' + sessionID + '] ' : ' ') + level + ': ', level);
+}
+
+/**
+ * Convert args to string and create message body
+ * @param {Array} args array of the message parts. Parts can be any types
+ * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} level message debug level
+ * @param {number} objectDepth object depth for log object
+ * @returns {string} lo message body
+ */
+createMessage.createBody = function (args, level, objectDepth) {
     return args.map(arg => {
         if (typeof arg === 'number'/* || !isNaN(arg)*/) return setColor(String(arg), 'number');
         if (typeof arg === 'string') return setColor(arg.replace(/[\r\n]+$/, ''), level);
         if (typeof arg === 'boolean') return setColor(String(arg), 'boolean');
 
         try {
-            return ('\n' + util.inspect(arg, {
+            var str = (util.inspect(arg, {
                 colors: true,
                 showHidden: true,
                 depth: objectDepth,
             }));
+
+            return str.split('\n').length > 1 ? '\n' + str : str.replace('\n', '');
         } catch(err) {
             return '(ERROR CONVERTING OBJECT TO STRING: ' + err.message+')'
         }
     }).join('');
-}
-
-function createMessage(args, level, label, objectDepth) {
-    const date = new Date();
-    const timeStr = date.toLocaleTimeString() + '.' +
-        String('00' + date.getMilliseconds()).replace(/^0*?(\d\d\d)$/, '$1');
-
-    return setColor((timeStr), 'timestamp') +
-        (label ? '[' + label + TID_PID + ']' : '') +
-        level + ': ' + createMessageBody(args, level, objectDepth);
 }

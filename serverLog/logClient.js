@@ -2,163 +2,257 @@
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
+const log = require('./simpleLog')(module);
+const async = require('async');
 const IPC = require('../lib/IPC');
-const path = require("path");
 const calc = require('../lib/calc');
+const createLogObject = require('./createLogObject');
+const prepareLogMessage = require('./prepareLogMessage');
 const writeLog = require('./writeLog');
-const createMessage = require('./createMessage');
-const createConfig = require('./createConfig');
+const connectToRemoteNodes = require("../lib/connectToRemoteNodes");
+const createLabel = require('./createLabel');
+const exitHandler = require('../lib/exitHandler');
 
 const Conf = require('../lib/conf');
 const confLog = new Conf('config/log.json');
 
-var clientIPC;
-var topDirName = path.join(__dirname, '..');
-var levelOrder = {S:0, D:1, I:2, W:3, E:4, EXIT:5};
+var cfg = confLog.get();
+var clientIPC, allClientIPC, callbacksWhileConnecting = [];
+var cntOfGetLogRecordsFunction = 0;
 
 module.exports = function (parentModule) {
 
-    var log = {};
-    log.silly = function () {
-        prepareLogMessage('S', Array.prototype.slice.call(arguments), parentModule)
-    };
+    exitHandler.init(null, parentModule, {});
+    cfg.id = 'log:' + createLabel(parentModule);
 
-    log.debug = function () {
-        prepareLogMessage('D', Array.prototype.slice.call(arguments), parentModule)
-    };
+    if (!clientIPC) {
+        clientIPC = new IPC.client(cfg, function (err, msg, _clientIPC) {
+            if (err) log.warn('IPC client error: ', err.message);
+        });
+    }
 
-    log.info = function () {
-        prepareLogMessage('I', Array.prototype.slice.call(arguments), parentModule)
-    };
+    var logObj = createLogObject(parentModule, sendToLogServer);
 
-    log.warn = function () {
-        prepareLogMessage('W', Array.prototype.slice.call(arguments), parentModule)
-    };
+    logObj.raw = sendToLogServer;
 
-    log.error = function () {
-        prepareLogMessage('E', Array.prototype.slice.call(arguments), parentModule)
-    };
-
-    log.exit = function () {
-        prepareLogMessage('EXIT', Array.prototype.slice.call(arguments), parentModule)
-    };
-
-    log.throw = function () {
-        prepareLogMessage('THROW', Array.prototype.slice.call(arguments), parentModule)
-    };
-
-    log.raw = prepareLogMessage;
-
-    log.options = function () {
+    logObj.options = function () {
         var args = Array.prototype.slice.call(arguments);
         var options = args.pop();
-        prepareLogMessage('I', args, parentModule, options);
+        sendToLogServer('I', args, parentModule, options);
     };
 
-   if (!clientIPC) {
-        clientIPC = new IPC.client(confLog.get(), function (err) {
-            if (err) prepareLogMessage('E', [err.message], module);
-        });
+    /**
+     * Add a new session
+     * @param {Object} sessionObj sessionParameters
+     * @param {number|string} sessionObj.user userID ar username
+     * @param {number} sessionObj.sessionID sessionID
+     * @param {string} sessionObj.actionID action directory name
+     *   to the auditDB. In the future can be add to audit another session type if necessary
+     * @param {number} [sessionObj.startTimestamp] timestamp when action was started
+     * @param {number} [sessionObj.stopTimestamp] timestamp when action was stopped
+     * @param {string} [sessionObj.description] action description
+     * @param {Object} [sessionObj.objects] objects for action
+     */
+    logObj.addNewSession = function (sessionObj) {
+        clientIPC.send(sessionObj);
     }
 
-    log.disconnect = clientIPC.stop;
+    /**
+     * Get log records or session data from auditDB.
+     * @param {string} initLastRecordIDs last record ID or 0
+     * @param {string|number|null} user userID or username or null
+     * @param {string|Array|null} sessionIDs array with sessionIDs or string with comma separated sessionIDs or null
+     * @param {function(Error)|function(null, Array)} callback callback(err, records), where records is a array of
+     * records objects
+     */
+    logObj.getAuditData = getAuditData;
 
-   return log;
+    logObj.disconnect = clientIPC.stop;
+
+    return logObj;
 }
 
-function prepareLogMessage(level, args, module, options) {
-    if(!args.length) return;
-    if (options && options.level) level = options.level;
 
-    var label = options && options.emptyLabel ? '' :
-        ( typeof module.filename === 'string' ?
-            module.filename
-                .substring((topDirName + path.sep).length, module.filename.lastIndexOf('.')) // remove topDir and extension
-                .split(path.sep).join(':') : // replace all '\' or '/' to ':'
-            (module || '') );
-    var cfg = createConfig(label);
-    if (levelOrder[level] < levelOrder[cfg.logLevel]) return;
+/**
+ * Send log message to the log server
+ *
+ * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} level log level
+ * @param {Array} args array of log arguments
+ * @param {NodeModule} parentModule parent node module
+ * @param {object|undefined} [options] log options
+ */
+function sendToLogServer(level, args, parentModule, options) {
+    var dataToSend = prepareLogMessage(level, args, parentModule);
+    if(!dataToSend) return;
 
-    if(level === 'D' && typeof args[0] === 'object' &&
-        typeof args[0].expr === 'string' && typeof cfg.vars === 'object') {
-        /**
-         * The first parameter of the log.debug() can be a condition for debugging.
-         * If the result of calculation the debugging condition is true, then debugging information
-         * will be printed in the log file.
-         *
-         * @param condition {Object} description of the debugging condition.
-         * @param condition.expr {string} condition, f.e. '%:VAR1:% > %:VAR_FROM_CONF1:% || %:VAR2:% == %:VAR_FROM_CONF2:%'
-         * @param condition.vars {Object} variables, f.e. {VAR1: <value1>, VAR2: <value2>}. Other variables from example
-         * (VAR_FROM_CONF1, VAR_FROM_CONF2) mast be specified in the log configuration file conf/log.json
-         * @example
-         * Example of the conf/log.json part with variables VAR_FROM_CONF1 and VAR_FROM_CONF2
-         * ....
-         * "server": {
-         *     "file": "server.log"
-         *     "vars": {
-         *         "VAR_FROM_CONF1": 1,
-         *         "VAR_FROM_CONF2": 2
-         *     }
-         * },
-         * ....
-         */
-        var condition = args.shift();
-        var vars = {};
-        if(typeof condition.vars === 'object') {
-            for (let variableName in condition.vars) {
-                vars[variableName] = condition.vars[variableName];
+    calcDebugCondition(dataToSend.condition, dataToSend.cfg, function () {
+
+        for (var mod = module; mod; mod = mod.parent) {
+            if (mod.sessionID) {
+                dataToSend.sessionID = Number(mod.sessionID);
+                break;
             }
         }
-        for(let variableName in cfg.vars) {
-            vars[variableName] = cfg.vars[variableName];
+
+        dataToSend.options = options;
+
+        if(clientIPC && clientIPC.isConnected() && dataToSend.level !== 'EXIT' && dataToSend.level !== 'TROW') {
+            clientIPC.send(dataToSend);
+        } else {
+            dataToSend.additionalLabel = '#';
+            writeLog(dataToSend);
+
+            if(dataToSend.level === 'THROW') {
+                if(clientIPC && typeof clientIPC.stop === 'function') {
+                    clientIPC.stop(function () {
+                        process.exit(2);
+                    })
+                } else process.exit(2);
+            }
         }
-
-        calc(condition.expr, vars, null,
-            function (err, result, functionDebug, unresolvedVariables) {
-            if(err && !unresolvedVariables.length) {
-                sendLogMessage('W', label, cfg, [
-                        'The condition for debugging cannot be calculated: ', err.message,
-                        '; condition ', condition,
-                        '; debug: ', functionDebug,
-                    ], module, options);
-            }
-
-            if(!unresolvedVariables.length && (result || err)) {
-                sendLogMessage(level, label, cfg, args, module, options);
-            }
-        });
-    } else sendLogMessage(level, label, cfg, args, module, options);
+    });
 }
 
-function sendLogMessage(level, label, cfg, args, module, options) {
-    var message = createMessage(args, level, label, Number(cfg.printObjectWithDepth) || 10);
+/**
+ * Calculate the condition that debugging information needs to be printed when using the log.debug function
+ * The last parameter of the log.debug() can be a condition for debugging.
+ * If the result of calculation the debugging condition is true, then debugging information
+ * will be printed in the log file.
+ *
+ * @param condition {Object} description of the debugging condition.
+ * @param condition.expr {string} condition, f.e. '%:VAR1:% > %:VAR_FROM_CONF1:% || %:VAR2:% == %:VAR_FROM_CONF2:%'
+ * @param condition.vars {Object} variables, f.e. {VAR1: <value1>, VAR2: <value2>}. Other variables from example
+ * (VAR_FROM_CONF1, VAR_FROM_CONF2) mast be specified in the log configuration file conf/log.json
+ * @param {object} cfg log configuration
+ * @param {function()} callback callback()
+ * @example
+ * Example of the conf/log.json part with variables VAR_FROM_CONF1 and VAR_FROM_CONF2
+ * ....
+ * "server": {
+ *     "file": "server.log"
+ *     "vars": {
+ *         "VAR_FROM_CONF1": 1,
+ *         "VAR_FROM_CONF2": 2
+ *     }
+ * },
+ */
+function calcDebugCondition(condition, cfg, callback) {
+    if(!condition) return callback();
 
-    for (var mod = module, sessionID = ''; mod; mod = mod.parent) {
-        if (mod.sessionID) {
-            sessionID = mod.sessionID;
-            break;
+    var vars = {};
+    if(typeof condition.vars === 'object') {
+        for (let variableName in condition.vars) {
+            vars[variableName] = condition.vars[variableName];
         }
     }
-
-    var dataToSend = {
-        level: level,
-        label: label,
-        message: message,
-        options: options,
-        sessionID: sessionID,
+    for(let variableName in cfg.vars) {
+        vars[variableName] = cfg.vars[variableName];
     }
 
-    if(clientIPC && clientIPC.isConnected() && level !== 'EXIT' && level !== 'TROW') {
-        clientIPC.send(dataToSend);
-    } else {
-        writeLog(dataToSend);
-
-        if(level === 'THROW') {
-            if(clientIPC && typeof clientIPC.stop === 'function') {
-                clientIPC.stop(function () {
-                    process.exit(2);
-                })
-            } else process.exit(2);
+    calc(condition.expr, vars, null,
+    function (err, result, functionDebug, unresolvedVariables) {
+        if(err && !unresolvedVariables) {
+            log.warn('The condition for debugging cannot be calculated: ', err.message,
+                '; condition ', condition,
+                '; debug: ', functionDebug);
         }
+
+        if(!unresolvedVariables && (result || err)) callback();
+    });
+}
+
+/**
+ * Get log records or session data from auditDB.
+ * @param {string} initLastRecordIDs last record ID or 0
+ * @param {string|number|null} user userID or username or null
+ * @param {string|Array|null} sessionIDs array with sessionIDs or string with comma separated sessionIDs or null
+ * @param {function(Error)|function(null, Array)} callback callback(err, records), where records is a array of
+ * records objects
+ */
+
+function getAuditData (initLastRecordIDs, user, sessionIDs, callback) {
+    try {
+        var lastRecordIDs = JSON.parse(initLastRecordIDs);
+    } catch (e) {
+        log.error('Can\'t get log records: error while parse lastRecordIDs (', initLastRecordIDs,
+            '): ', e.message);
+        return callback();
     }
+
+    if(typeof sessionIDs === 'string') {{
+        sessionIDs = sessionIDs.split(',').map(sessionID => Number(sessionID));
+    }}
+
+    ++cntOfGetLogRecordsFunction;
+    if(cntOfGetLogRecordsFunction >= 300) {
+        --cntOfGetLogRecordsFunction;
+        return callback(new Error('Maximum count of log retrievers (browsers) occurred: ' + cntOfGetLogRecordsFunction));
+    }
+
+    connectToRemoteLogNodes(function () {
+        var logRecordRows = {};
+        async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
+            if (typeof clientIPC.sendAndReceive !== 'function') return callback();
+            clientIPC.sendExt({
+                lastRecordID: lastRecordIDs[hostPort] || 0,
+                user: user,
+                sessionIDs: sessionIDs,
+            }, {
+                sendAndReceive: true,
+                dontSaveUnsentMessage: true,
+            }, function (err, rows) {
+
+                if (Array.isArray(rows) && rows.length) {
+                    log.debug('Return audit records for ', hostPort,', user: ', user, ', sessions: ',  sessionIDs,
+                        ', lastRecordID: ', lastRecordIDs[hostPort], ' || 0, Error: ', err,
+                        '\nlogRecords: \n',
+                        (Array.isArray(rows) &&
+                            rows.map(row=>(row.message || row.actionID).substring(0, 100)
+                                .replace(/\n/gm, ''))
+                                .join('...\n'))
+                    );
+
+                    var lastID = rows[0].id;
+                    var firstID = rows[0].id;
+                    rows.forEach(row => {
+                        if (row.id > lastID) lastID = row.id
+                        if (row.id < firstID) firstID = row.id
+                    });
+                    rows[0].lastID = lastID;
+                    rows[0].firstID = firstID;
+
+                    logRecordRows[hostPort] = rows;
+                }
+
+                callback(err);
+            });
+        }, function (err) {
+            log.debug('Return audit records for user: ', user, ', sessions: ',  sessionIDs,
+                ', lastRecordIDs: ', lastRecordIDs, ', logRecords for: \n', Object.keys(logRecordRows));
+            --cntOfGetLogRecordsFunction;
+            return callback(err, logRecordRows);
+        });
+    });
+}
+
+
+function connectToRemoteLogNodes(callback) {
+    if(allClientIPC) return callback();
+
+    callbacksWhileConnecting.push(callback);
+    // connection in progress
+    if(callbacksWhileConnecting.length > 1) return;
+
+    connectToRemoteNodes('audit', cfg.id, function (err, _allClientIPC) {
+        if (!_allClientIPC) {
+            log.warn('No remote nodes specified for audit');
+            _allClientIPC = new Map();
+        }
+        _allClientIPC.set(cfg.serverAddress + ':' + cfg.serverPort, clientIPC);
+
+        allClientIPC = _allClientIPC;
+        callbacksWhileConnecting.forEach(callback => callback());
+        callbacksWhileConnecting.length = 0;
+        log.info('Connected to ', (allClientIPC.size - 1), ' remote log nodes for audit');
+    });
 }

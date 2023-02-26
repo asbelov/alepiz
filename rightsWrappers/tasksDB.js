@@ -221,38 +221,38 @@ actions: {
 callback(err)
  */
 
-rightsWrapper.addTask = function(initUser, task, actions, callback) {
-    log.info('Add task ', task, ', user: ', initUser, ', actions: ', actions);
+rightsWrapper.addTask = function(initUsername, task, actions, callback) {
+    log.info('Add task ', task, ', user: ', initUsername, ', actions: ', actions);
 
-    var user = prepareUser(initUser);
-    if(!user) return callback(new Error('Incorrect user name "'+initUser+'" for add new task'));
+    var username = prepareUser(initUsername);
+    if (!username) return callback(new Error('Incorrect user name "' + initUsername + '" for add new task'));
 
-    if(!task.actionsOrder || !Array.isArray(task.actionsOrder) || !task.actionsOrder.length) {
-        return callback(new Error('Incorrect actionsOrder "'+task.actionsOrder+'" for add new task'));
+    if (!task.actionsOrder || !Array.isArray(task.actionsOrder) || !task.actionsOrder.length) {
+        return callback(new Error('Incorrect actionsOrder "'+ task.actionsOrder + '" for add new task'));
     }
 
-    if(!task.name || typeof task.name !== 'string') task.name = null;
+    if (!task.name || typeof task.name !== 'string') task.name = null;
 
-    if(task.groupID === undefined || task.groupID === null) {
+    if (task.groupID === undefined || task.groupID === null) {
         return callback(new Error('Undefined group ID for add new task'));
     }
     var groupID = Number(task.groupID);
-    if(groupID === undefined || groupID !== parseInt(String(groupID), 10)) {
+    if (groupID === undefined || groupID !== parseInt(String(groupID), 10)) {
         return callback(new Error('Incorrect group ID "'+task.groupID+'" for add new task'));
     }
 
 
     tasksDB.getActionsIDs(task.actionsOrder, function(err, actionsToSessionsID) {
-        if(err) return callback(new Error('Can\'t get actions IDs by sessions IDs "' + task.actionsOrder + '"'));
+        if (err) return callback(new Error('Can\'t get actions IDs by sessions IDs "' + task.actionsOrder + '"'));
 
         var actionsIDs = actionsToSessionsID.map(function(action) { return action.actionID});
 
-        rightsWrapper.checkActionsRights(initUser, actionsIDs, 'modify', function (err) {
+        rightsWrapper.checkActionsRights(initUsername, actionsIDs, 'modify', function (err) {
             if (err) return callback(err);
 
-            usersDB.getID(user, function(err, userID) {
-                if (err) return callback(new Error('Can\'t get userID for user "' + user + '": ' + err.message));
-                if (!userID) return callback(new Error('Can\'t get userID for user "' + user + '": no such user'));
+            usersDB.getID(username, function(err, userID) {
+                if (err) return callback(new Error('Can\'t get userID for user "' + username + '": ' + err.message));
+                if (userID === undefined) return callback(new Error('Can\'t get userID for user "' + username + '": no such user'));
 
                 var timestamp = Date.now();
 
@@ -266,7 +266,7 @@ rightsWrapper.addTask = function(initUser, task, actions, callback) {
                  */
                 addOrUpdateTask(task.taskID, userID, timestamp, task.name, groupID, task.sessionID,
                     function(err, taskID) {
-                    if(err) return callback(err);
+                    if (err) return callback(err);
 
                     var actionsOrder = {};
                     for(var i = 0; i < task.actionsOrder.length; i++) {
@@ -276,18 +276,18 @@ rightsWrapper.addTask = function(initUser, task, actions, callback) {
 
                     log.info('Processing actions with order: ', task.actionsOrder, '; task ID is ', taskID);
 
-                    async.eachSeries(task.actionsOrder, function(sessionID, callback){
-                        if(!actions[sessionID]) {
+                    async.eachSeries(task.actionsOrder, function(sessionID, callback) {
+                        if (!actions[sessionID]) {
                             return callback(new Error('Undefined action for sessionID ' + sessionID));
                         }
 
                         var startupOptions = actions[sessionID].startupOptions;
-                        if(startupOptions !== 0 && startupOptions !== 1 && startupOptions !== 2) {
+                        if (startupOptions !== 0 && startupOptions !== 1 && startupOptions !== 2) {
                             return callback(new Error('Incorrect startup options "'+startupOptions+
                                 '" for action sessionID "'+sessionID+'"'));
                         }
 
-                        if(!actions[sessionID].args || !Object.keys(actions[sessionID].args).length) {
+                        if (!actions[sessionID].args || !Object.keys(actions[sessionID].args).length) {
                             return callback(new Error('Action parameters undefined for action sessionID ' +
                                 sessionID));
                         }
@@ -297,11 +297,11 @@ rightsWrapper.addTask = function(initUser, task, actions, callback) {
                             ', action parameters: ', actions[sessionID]);
                         addNewSessionID(userID, sessionID, actions[sessionID].id, actions[sessionID].name, timestamp,
                             actions[sessionID].addNewSessionID, function(err) {
-                            if(err) return callback(err);
+                            if (err) return callback(err);
 
                             tasksDBSave.addAction(taskID, sessionID, startupOptions, actionsOrder[sessionID],
                                 function(err, actionID) {
-                                if(err) return callback(err);
+                                if (err) return callback(err);
 
                                 log.info('Add parameters for task ID: ', taskID, ', actionID: ', actionID, ', params: ',
                                     actions[sessionID].args);
@@ -359,14 +359,14 @@ rightsWrapper.addTask = function(initUser, task, actions, callback) {
     }
 };
 
-rightsWrapper.saveAction = function (user, args, callback) {
-    user = prepareUser(user);
-    sessionID = args.sessionID;
+rightsWrapper.saveAction = function (username, args, callback) {
+    username = prepareUser(username);
+    var sessionID = args.sessionID;
 
-    log.info('Starting to save the action for the user: ', user, ', sessionID: ', sessionID, ', args: ', args);
-    usersDB.getID(user, function(err, userID){
-        if(err) return callback(new Error('Can\'t get userID for user "'+user+'": '+err.message));
-        if(!userID) return callback(new Error('Can\'t get userID for user "'+user+'": no such user'));
+    log.info('Starting to save the action for the user: ', username, ', sessionID: ', sessionID, ', args: ', args);
+    usersDB.getID(username, function(err, userID) {
+        if (err) return callback(new Error('Can\'t get userID for user "' + username + '": '+err.message));
+        if (userID === undefined) return callback(new Error('Can\'t get userID for user "' + username + '": no such user'));
 
         tasksDB.getUnnamedTask(userID, function(err, taskID){
             if(err) return callback(err);

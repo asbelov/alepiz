@@ -1,6 +1,7 @@
 /*
  * Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
+const log = require('../lib/log')(module);
 const async = require("async");
 const countersDB = require("../models_db/countersDB");
 const objectsPropertiesDB = require("../models_db/objectsPropertiesDB");
@@ -39,26 +40,38 @@ function createCache(updateMode, callback) {
                 cache.countersObjects = countersObjects;
                 objectAlepizRelation = _objectAlepizRelation;
                 cache.alepizInstance = alepizInstance;
-                callback(err);
+
+                    log.debug('Update cache: ' +
+                        '\ncounterObjectNames: ', counterObjectNames.size,
+                        '\nobjectAlepizRelation: ', objectAlepizRelation.size,
+                        '\nalepizInstance: ', alepizInstance,
+                        '\ncountersObjects.OCIDs: ', countersObjects.OCIDs.size,
+                        '\ncountersObjects.objects: ', countersObjects.objects.size,
+                        '\ncountersObjects.objectName2OCID: ', countersObjects.objectName2OCID.size,
+                        '\ncountersObjects.counters: ', countersObjects.counters.size
+                    );
+
+                    callback(err);
             });
         },
         // variablesHistory
         function(callback) {
             if(updateMode && !updateMode.getHistoryVariables.length) return callback();
-            getVariables(null, countersDB.getVariables, 'counterID', cache.variablesHistory, callback);
+            getVariables(null, countersDB.getVariables, 'counterID',
+                cache.variablesHistory, 'variablesHistory', callback);
         },
 
         // variablesExpressions
         function(callback) {
             if(updateMode && !updateMode.getVariablesExpressions.length) return callback();
             getVariables(null, countersDB.getVariablesExpressions, 'counterID',
-                cache.variablesExpressions, callback);
+                cache.variablesExpressions, 'variablesExpressions', callback);
         },
         // objectsProperties
         function(callback) {
             if(updateMode && !updateMode.geObjectsProperties.length) return callback();
             getVariables(updateMode ? updateMode.geObjectsProperties : null, objectsPropertiesDB.getProperties,
-                'objectID', cache.objectsProperties, callback);
+                'objectID', cache.objectsProperties, 'objectsProperties', callback);
         }
     ], function(err) {
         return callback(err, cache, counterObjectNames, objectAlepizRelation, recordsFromDBCnt);
@@ -208,15 +221,18 @@ function getDataForCheckDependencies(callback) {
     });
 }
 
-function getVariables(initIDs, func, key, variables, callback) {
+function getVariables(initIDs, func, key, variables, debugStr, callback) {
 
     checkIDs(initIDs, function (err, IDs) {
-        //if(err) log.error(err.message);
+        if(initIDs && err) log.debug('Update cache checkIDs err: ', err.message, '; IDs: ', initIDs);
         // when initIDs is not set, IDs will be set to []
         if(err && !IDs.length) IDs = null;
 
         func(IDs, function(err, rows) {
-            if (err) return callback(err);
+            if (err) {
+                log.debug('getVariables for ', debugStr, ' error: ', err.message);
+                return callback(err);
+            }
             recordsFromDBCnt += rows.length;
 
             rows.forEach(function (row) {
@@ -224,7 +240,7 @@ function getVariables(initIDs, func, key, variables, callback) {
                 if(!variables.has(id)) variables.set(id, new Map());
                 variables.get(id).set(row.name, row);
             });
-
+            log.debug('Update cache ', debugStr, ': ', variables.size > 5 ? variables.size : variables);
             callback();
         });
     })

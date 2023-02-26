@@ -36,7 +36,6 @@ log.info('Starting the action runner server...');
 
 var actionsQueueSystem = new Set(),
     actionQueueUser = new Set(),
-    createSessionQueue = new Set(),
     lastProcessedAction = {},
     processedNotInQueue = 0,
     processedInQueue = 0,
@@ -59,7 +58,6 @@ attachRunAction(cfg.serverNumber || 5, function (err, _runActionSystem) {
             if (err) log.error(err.message);
 
             if (msg && msg.msg === 'runAction') return addActionToQueue(msg.param, callback);
-            if (msg && msg.msg === 'addSessionID') return addCreateSessionToQueue(msg.param);
             if (msg && msg.msg === 'getActionConfig') {
                 return actionsDB.getActionConfig(msg.user, msg.actionID, callback);
             }
@@ -136,44 +134,6 @@ function attachRunAction(serverNumber, callback) {
     });
 }
 
-/**
- * Add new session ID for each running actions or if no action running
- * @param {{user: {string}, sessionID: {uint}, actionID: {string}, actionName: {string}}} param -
- *  parameters for creating sessionID
- * @param {function(Error)} callback - callback(err)
- */
-function addSession(param, callback) {
-
-    var user = param.user,
-        actionID = param.actionID,
-        actionName = param.actionName,
-        sessionID = param.sessionID;
-
-    userDB.getID(user, function(err, userID) {
-        if (err) return callback(new Error('Can\'t get user ID for user ' + user + ': ' + err.message));
-
-        // use transaction for prevent locking database when inserting action data and session parameters.
-        transaction.begin(function (err) {
-            if(err) return callback(err);
-
-            sessionDB.addNewSessionID(userID, sessionID, actionID, actionName, Date.now(),
-                function (err) {
-                if(err) return transaction.rollback(err, callback);
-
-                transaction.end(function (err) {
-                    callback(err);
-                });
-            });
-        });
-    });
-}
-
-function addCreateSessionToQueue(param) {
-    createSessionQueue.add({
-        param: param,
-    });
-    runActionFromQueue();
-}
 
 function addActionToQueue(param, callback) {
     actionConf.getConfiguration(param.actionID, function (err, actionConf) {
@@ -231,33 +191,6 @@ function runActionFromQueue() {
             new Date(lastProcessedAction.startTime).toLocaleString(),
             ' (', Math.round((Date.now() - lastProcessedAction.startTime) / 1000), 'sec/', actionTimeout/1000,
             'sec). Running the next action');
-    }
-
-    // first creating sessions
-    if(createSessionQueue.size) {
-        var sessions = Array.from(createSessionQueue);
-        createSessionQueue.clear();
-
-        lastProcessedAction = {
-            startTime: Date.now(),
-            action: {
-                conf: {
-                    timeout: 60,
-                    name: 'addSessions: ' + JSON.stringify(sessions),
-                }
-            },
-        };
-        async.eachSeries(sessions, function (session, callback) {
-            addSession(session.param, function (err) {
-                if(err) log.error('Error add new session to DB: ', err.message, ': ', session.param);
-                lastProcessedAction = {};
-                callback();
-            });
-        }, function () {
-            var t = setTimeout(runActionFromQueue, 0);
-            t.unref();
-        });
-        return
     }
 
     // run actions from user queue

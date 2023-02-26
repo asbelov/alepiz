@@ -11,11 +11,10 @@ var countersDB = {};
 module.exports = countersDB;
 
 
-/*
-    Delete counter
-
-    counterID: counter ID
-    callback(err)
+/**
+ * Delete counter
+ * @param {number} counterID counter ID
+ * @param {function(err)} callback callback(err)
  */
 countersDB.delete = function(counterID, callback) {
     log.info('Deleting counter with ID ', counterID);
@@ -23,14 +22,23 @@ countersDB.delete = function(counterID, callback) {
     db.run('DELETE FROM counters WHERE counters.id = ?', counterID, callback);
 };
 
-/*
-    Updating a new counter into the database
-
-    counter: counter object, see SQL query for details
-    callback(err, counterID)
-
-    counterID: counter ID of updated counter
-
+/**
+ * Update counter data
+ * @param {Object} counter counter object
+ * @param {string} counter.name counter name
+ * @param {string} counter.collectorID collector ID (collector dir name)
+ * @param {number|null} counter.unitID counter unit ID
+ * @param {number} counter.sourceMultiplier counter sourceMultiplier
+ * @param {number} counter.keepHistory counter keepHistory days
+ * @param {number} counter.keepTrends counter keepTrends days
+ * @param {number} counter.counterID counter ID
+ * @param {number} counter.timestamp counter modification time
+ * @param {string|null} counter.description counter description
+ * @param {0|1} counter.disabled is counter disabled
+ * @param {0|1} counter.debug is counter debug switched on
+ * @param {0|1} counter.taskCondition is counter a taskCondition
+ * @param {function(err)|function(err, counterID)} callback callback(err, counterID) where counterID is a
+ *  ID of updated counter
  */
 countersDB.updateCounter = function(counter, callback) {
     log.info('Updating counter with ID ' + counter.counterID + ' into the database', counter);
@@ -113,16 +121,13 @@ countersDB.insertCounter = function(counter, sessionID, callback) {
 };
 
 
-/*
-    Update counter parameters from database
-
-    counterID: counter ID
-    counterParameters: counter parameters  {name1: value, name2: value:...}
-    callback(err, notUpdatedParameters)
-
-    notUpdatedParameters: parameters, which not updated (f.e. they are not existing in DB) {name1: value, name2: value:...}
+/**
+ * Update counter parameters
+ * @param {number} counterID counter ID
+ * @param {Array} counterParameters counter parameters like ['name1', 'name2', ...]
+ * @param {function(err)|function(null, Object)} callback callback(err, notUpdatedParameters), where
+ *  notUpdatedParameters is object with not updated parameter names, like {name1: value, name2: value:...}
  */
-
 countersDB.updateCounterParameters = function(counterID, counterParameters, callback) {
     log.info('Updating counter parameters into the database for counterID: ', counterID, counterParameters);
 
@@ -192,24 +197,23 @@ countersDB.insertCounterParameters = function(counterID, counterParameters, call
     );
 };
 
-/*
-    Delete counter parameters from database
-
-    counterID: counter ID
-    counterParametersNames: counter parameters  names [name1, name2, ....]
-    callback(err)
+/**
+ * Delete counter parameters from database
+ * @param {number} counterID counter ID
+ * @param {Array} counterParameterNames counter parameter  names like [name1, name2, ....]
+ * @param {function(err)|function()} callback callback(err)
+ * @returns {*}
  */
+countersDB.deleteCounterParameters = function(counterID, counterParameterNames, callback) {
 
-countersDB.deleteCounterParameters = function(counterID, counterParametersNames, callback) {
+    if (!counterParameterNames.length) return callback();
 
-    if (!counterParametersNames.length) return callback();
+    log.info('Remove counter parameters for counterID: ', counterID, counterParameterNames);
 
-    log.info('Remove counter parameters for counterID: ', counterID, counterParametersNames);
-
-    var questionStr = counterParametersNames.map(function() { return '?' }).join(',');
+    var questionStr = counterParameterNames.map(function() { return '?' }).join(',');
 
     var counterIDAndCounterParameters = [counterID];
-    Array.prototype.push.apply(counterIDAndCounterParameters, counterParametersNames);
+    Array.prototype.push.apply(counterIDAndCounterParameters, counterParameterNames);
 
     db.run('DELETE FROM counterParameters WHERE counterParameters.counterID = ? AND counterParameters.name IN (' +
         questionStr + ')', counterIDAndCounterParameters, callback);
@@ -327,14 +331,12 @@ countersDB.insertUpdateEvents = function(counterID, updateEvents, callback) {
     );
 };
 
-
-/*
-    delete update events for counter
-
-    counterID: counter ID
-    updateEvents: array of objects with update events
-        [{objectID:<parent object ID>, expression:<string with expression>, mode: <0|1|2|3|4>}, {..}, ...]
-    callback(err)
+/**
+ * Delete update events for counter
+ * @param {number} counterID counter ID
+ * @param {Array} updateEvents array of the objects with update events like
+ *         [{objectID:<parent object ID>, expression:<string with expression>, mode: <0|1|2|3|4>}, {..}, ...]
+ * @param {function(err)|function()} callback callback(err)
  */
 countersDB.deleteUpdateEvents = function(counterID, updateEvents, callback) {
     if(!updateEvents.length) return callback();
@@ -366,15 +368,6 @@ countersDB.deleteUpdateEvents = function(counterID, updateEvents, callback) {
     db.run('DELETE FROM countersUpdateEvents WHERE ' + queryStr.join(' OR '), queryParams, callback)
 };
 
-/*
-    Inserting new variables for counter
-
-    counterID: counter ID
-    variables: {name1: {expression: <expression> }, name2: {},...} or
-        {objectID:.., parentCounterName:.., function:.., functionParameters:..., objectName:...}
-
-    callback(err)
- */
 /**
  * Inserting new variables for specific counterID (historical or expression)
  * @param {Number} counterID - counter ID
@@ -459,12 +452,11 @@ countersDB.insertVariables = function(counterID, variables, callback) {
     );
 };
 
-/*
-    When update counter, delete previous variables
-
-    counterID: counter ID
-    callback(err)
-*/
+/**
+ * When update counter, delete previous variables
+ * @param {number} counterID counter ID
+ * @param {function(err)|function()} callback callback(err)
+ */
 countersDB.deleteVariables = function(counterID, callback) {
     log.info('Remove all variables for counter ID ', counterID);
 
@@ -478,13 +470,11 @@ countersDB.deleteVariables = function(counterID, callback) {
     });
 };
 
-/*
-    Update parent counter name for variables when counter name is changed
-    newCounterName: new counter name
-    oldCounterName: old counter name
-
-    callback(err)
-
+/**
+ * Update parent counter name for variables when counter name is changed
+ * @param {string} oldCounterName case insensitive old counter name
+ * @param {string} newCounterName new counter name
+ * @param {function(err)} callback callback(err)
  */
 countersDB.updateVariablesRefs = function(oldCounterName, newCounterName, callback) {
     log.info('Updating variables refers for counter ', oldCounterName, '->', newCounterName);

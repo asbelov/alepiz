@@ -3,21 +3,20 @@
  */
 
 const log = require('../lib/log')(module);
-const actions = require("../lib/actionsConf");
 const async = require("async");
-const rightsWrapperActions = require("../rightsWrappers/actions");
-const tasksDB = require("../rightsWrappers/tasksDB");
+const path = require('path');
+const actionsConf = require('../lib/actionsConf');
+const rightsWrapperActions = require('../rightsWrappers/actions');
+const tasksDB = require('../rightsWrappers/tasksDB');
 const objectsDB = require('../models_db/objectsDB');
-const path = require("path");
-const runInThread = require("../lib/runInThread");
+const runInThread = require('../lib/runInThread');
+const thread = require('../lib/threads');
+
 const Conf = require('../lib/conf');
-const thread = require("../lib/threads");
 const conf = new Conf('config/common.json');
 const confActions = new Conf('config/actions.json');
 const confLaunchers = new Conf('config/launchers.json');
 const confMyNode = new Conf('config/node.json');
-
-//110591
 
 var systemUser = conf.get('systemUser') || 'system';
 var ajax = {}, launchers = {};
@@ -56,7 +55,7 @@ function runAction(param, callback) {
     module.sessionID = param.sessionID;
 
     // checking in parallel for objects compatibility and user action rights
-    actions.getConfiguration(actionID, function(err, actionCfg){
+    actionsConf.getConfiguration(actionID, function(err, actionCfg){
         if(err) return callback(err);
 
         if(!param.args) param.args = {};
@@ -119,7 +118,6 @@ function runAction(param, callback) {
             }
 
             if(executionMode === 'makeTask') {
-                module.sessionID = param.sessionID;
                 log.info('Saving action to the new task: ', param.args);
 
                 // saving action parameters
@@ -135,18 +133,17 @@ function runAction(param, callback) {
                 var ajaxSource = path.join(__dirname, '..', confActions.get('dir'),
                     actionID, actionCfg.ajaxServer);
 
-                module.sessionID = param.sessionID;
                 updateActionAjax(ajaxSource, param.updateAction, actionCfg.startAjaxAsThread, function (err) {
                     if(err) return callback(err);
 
                     //try {
-                        ajax[ajaxSource].func(param.args, callback);
+                    ajax[ajaxSource].func(param.args, callback);
                     /*} catch (err) {
                         callback(new Error('Error occurred while executing ajax for action "' + actionID + '": ' +
                             err.message + '; ajax: ' + JSON.stringify(ajax[ajaxSource]) + '; ' + err.stack));
                     }*/
                 })
-            } else {
+            } else { //executionMode === 'server'
                 getOwnObjectIDs(objects, actionCfg.applyToOwnObjects,function (err, filteredObjects) {
                     if(err) return callback(err);
 
@@ -182,7 +179,6 @@ function runAction(param, callback) {
                     var launcherSource = path.join(__dirname, '..', confLaunchers.get('dir'), launcherName,
                         confLaunchers.get('fileName'));
 
-                    module.sessionID = param.sessionID;
                     // delete old launcher from require cache for reread
                     if(param.updateAction && require.resolve(launcherSource) &&
                         require.cache[require.resolve(launcherSource)]) {
@@ -191,10 +187,10 @@ function runAction(param, callback) {
 
                     if(!launchers[launcherSource] || param.updateAction) {
                         //try {
-                            log.info('Attaching launcher file ', launcherSource,
-                                (param.updateAction ?
-                                    '. Required action update. Cached data was deleted.' : ' at a first time.'));
-                            launchers[launcherSource] = require(launcherSource);
+                        log.info('Attaching launcher file ', launcherSource,
+                            (param.updateAction ?
+                                '. Required action update. Cached data was deleted.' : ' at a first time.'));
+                        launchers[launcherSource] = require(launcherSource);
                         /*} catch (err) {
                             return callback(new Error('Can\'t attach launcher source file: ' + launcherSource +
                                 ' for action "' + actionID + '": ' + err.message));
@@ -207,16 +203,48 @@ function runAction(param, callback) {
                             if(typeof callback !== 'function') return;
                             var savedCallback = callback;
                             callback = null;
-                            savedCallback(new Error('Timeout ' + actionCfg.timeout +
-                                'sec occurred while execute action ' + actionCfg.name));
+                            var errMessage = 'Timeout ' + actionCfg.timeout +
+                                'sec occurred while execute action ' + actionCfg.name;
+                            log.addNewSession({
+                                sessionID: param.sessionID,
+                                stopTimestamp: Date.now(),
+                                error: errMessage,
+                            });
+                            savedCallback(new Error(errMessage));
                         }, actionCfg.timeout * 1000)
                     }
 
                     actionCfg.launcherPrms.actionID = actionID;
                     actionCfg.launcherPrms.updateAction = param.updateAction;
                     var startActionTimestamp = Date.now();
+
+                    // add session with executionMode = 'server' for add log to the audit
+                    var sessionParameters = {
+                        user: param.user, // username
+                        sessionID: param.sessionID,
+                        actionID: actionID,
+                        startTimestamp: Date.now(),
+                        objects: filteredObjects,
+                    };
+
+                    // for create action description
+                    if(actionCfg.descriptionTemplateHTML || actionCfg.descriptionTemplate) {
+                        sessionParameters.descriptionTemplate =
+                            actionCfg.descriptionTemplateHTML || actionCfg.descriptionTemplate;
+                        sessionParameters.args = param.args;
+                    }
+
+                    log.addNewSession(sessionParameters);
+
                     launchers[launcherSource](actionCfg.launcherPrms, param.args, function(err, result) {
+                        // add session with executionMode = 'server' for add stopTimestamp to the audit
+                        log.addNewSession({
+                            sessionID: param.sessionID,
+                            stopTimestamp: Date.now(),
+                            error: err ? err.message : null,
+                        });
                         clearTimeout(actionTimeoutWatchdog);
+
                         if(typeof callback !== 'function') {
                             log.error('Action ', actionCfg.name, ' returned after timeout ', actionCfg.timeout,
                                 'sec result: ', result, (err ? '; Error: ' + err.message : ' '), ' executing time: ',
@@ -251,7 +279,7 @@ function updateActionAjax(ajaxSource, updateAction, startAjaxAsThread, callback)
 
             log.info('Starting ajax ', ajaxSource, ' as a thread',
                 (updateAction ? '. Required action update. Previous thread will be terminated.' : ' at a first time'));
-            runInThread(ajaxSource, null,function (err, ajaxObj) {
+            runInThread(ajaxSource, {module: module},function (err, ajaxObj) {
                 if(err) return callback(new Error('Can\'t start ajax : ' + ajaxSource + '  as a thread: ' + err.message));
 
                 ajax[ajaxSource] = ajaxObj;

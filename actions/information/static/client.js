@@ -15,6 +15,7 @@ var JQueryNamespace = (function ($) {
     var objects = parameters.objects; // initialize the variable "objects" for the selected objects on startup
     //var cfg = parameters.action.properties;
     var tableElm,
+        bodyElm,
         CSVData = '',
         CSVRawData = '',
         div = parameters.action.CSVDiv || ',',
@@ -31,6 +32,7 @@ var JQueryNamespace = (function ($) {
 
     function init() {
         tableElm = $('#infoTable');
+        bodyElm = $('body');
         $('#downloadCSV').click(function () {
             saveToFile(CSVData, 'objectsInfo.csv');
         });
@@ -41,12 +43,15 @@ var JQueryNamespace = (function ($) {
     }
 
     function getData(callback) {
+        bodyElm.css("cursor", "progress");
         $.post(serverURL, {func: 'getProperties', objects: JSON.stringify(objects)}, function(data) {
             if(!data || typeof data !== 'object' || !data.result || !Array.isArray(data.tableHeads) || !data.tableHeads.length) {
                 //console.log('getProperties(', objects, '): ', data);
+                bodyElm.css("cursor", "auto");
                 return callback([]);
             }
             callback(data);
+            bodyElm.css("cursor", "auto");
         });
     }
 
@@ -110,7 +115,7 @@ var JQueryNamespace = (function ($) {
             't': encodeURIComponent(Date.now() - 3600000 + '-' + Date.now()), // timestamps in ms
             'l': encodeURIComponent(leftOCIDs.join('-')), // show graph for this OCID with align to left
             'r': encodeURIComponent(rightOCIDs.join('-')), // show graph for this OCID with align to left
-            'n': '1', // don't autoupdate
+            'n': '1', // don't auto-update
             'y': '0--0-',
             'a': encodeURIComponent(actionPath), // /action/data-browser
             'c': encodeURIComponent(objectName), // selected object

@@ -12,6 +12,7 @@
     },
     "staticDir": "static",
     "showWhenNoObjectsSelected": true,
+    "returnActionResult": true,
     "onChangeObjectMenuEvent": "callback:onChangeObjects",
     "callbackBeforeExec": "callbackBeforeExec",
     "callbackAfterExec": "callbackAfterExec",

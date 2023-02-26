@@ -72,7 +72,6 @@ countersParameters (runTask.taskID)
 tasks
 tasksGroups
 tasksActions
-auditUsers
 taskParameters
 
  */

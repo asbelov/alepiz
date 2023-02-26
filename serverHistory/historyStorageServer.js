@@ -7,7 +7,6 @@ const async = require('async');
 const threads = require('../lib/threads');
 const Database = require('better-sqlite3');
 const fs = require("fs");
-const exitHandler = require("../lib/exitHandler");
 const countersDB = require("../models_db/countersDB");
 const historyStorage = require('./historyStorage');
 const setShift = require('../lib/utils/setShift');
@@ -314,12 +313,19 @@ historyStorageServer.getRecordsFromStorageByIdx = function (id, offset, cnt, fir
         return callback(err);
     }
 
+    log.debug('getRecordsFromStorageByIdx(id: ', id, ', offset: ', offset, ', cnt: ', cnt,
+        ', firstTimestamp: ', firstTimestamp, ', maxRecordsCnt: ', maxRecordsCnt, ', recordsType: ', recordsType,
+        ') tableType: ', tableType, ': ', records1, {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
+
+
     if (Date.now() - startTime > parameters.slowQueueSec * 1000) {
         addSlowRecord(Date.now() - startTime, records1.length);
     }
-    /*
-    log.debug('Getting records for object id: ' + id + ', from '+ tableType +', position: ' + offset + ', count: ' + cnt + ': ', records1);
-     */
 
     if(recordsType > 0) return callback(null, records1.reverse());
 
@@ -348,11 +354,20 @@ historyStorageServer.getRecordsFromStorageByIdx = function (id, offset, cnt, fir
         return a.timestamp - b.timestamp; // inc sorting
     });
 
-    /*
-    log.debug('Getting records for object id: ' + id + ', from strings, position: ' + offset + ', count: ' + cnt + ': ', records2);
-     */
     // remove first unneeded and return not more than required number of records
-    callback(null ,records1.slice(Math.max(records1.length - cnt, 0)));
+    var result = records1.slice(Math.max(records1.length - cnt, 0));
+    log.debug('getRecordsFromStorageByIdx(id: ', id, ', offset: ', offset, ', cnt: ', cnt,
+        ', firstTimestamp: ', firstTimestamp, ', maxRecordsCnt: ', maxRecordsCnt, ', recordsType: ', recordsType,
+        ') tableType: strings: ', records2,
+        ', result: ', result,
+        {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
+
+    callback(null, result);
 };
 
 /*
@@ -392,14 +407,20 @@ historyStorageServer.getRecordsFromStorageByTime = function (id, timeFrom, timeT
         } catch (err) {
             return callback(err);
         }
+        log.debug('getRecordsFromStorageByTime(id: ', id,
+            ', timeFrom: ', (new Date(timeFrom)).toLocaleString(), '(', timeFrom, ')',
+            ', timeTo: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, ')',
+            ', maxRecordsCnt: ', maxRecordsCnt, ', recordsType: ', recordsType,
+            ') tableType: ', tableType, ': ', records1, {
+                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                vars: {
+                    "RECEIVED_OCID": id
+                }
+            });
+
         if (Date.now() - startTime > parameters.slowQueueSec * 1000) {
             addSlowRecord(Date.now() - startTime, records1.length);
         }
-        /*
-        log.debug('Getting records from ' + tableType + ' for object id: ', id, ', from: ',
-            (new Date(timeFrom)).toLocaleString(), '(', timeFrom, ')',
-            ' to: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, '): ', records1);
-        */
         if(recordsType > 0) {
             if(records1.length) {
                 records1 = records1.reverse();
@@ -445,6 +466,18 @@ historyStorageServer.getRecordsFromStorageByTime = function (id, timeFrom, timeT
             ' to: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, '): ', records2);
         */
         records1[0].isDataFromTrends = tableType !== 'numbers';
+        log.debug('getRecordsFromStorageByTime(id: ', id,
+            ', timeFrom: ', (new Date(timeFrom)).toLocaleString(), '(', timeFrom, ')',
+            ', timeTo: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, ')',
+            ', maxRecordsCnt: ', maxRecordsCnt, ', recordsType: ', recordsType,
+            ') tableType: strings: ', records2,
+            ', result: ', records1,
+            {
+                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                vars: {
+                    "RECEIVED_OCID": id
+                }
+            });
         return callback(null, records1);
     });
 };
@@ -498,7 +531,13 @@ function getTableName(id, timeFrom, timeTo, maxRecordsCnt, recordsType, callback
     log.debug('Using numbers table for get ', maxRecordsCnt,' records for object ', id,
         ', time interval: ', (new Date(timeFrom)).toLocaleString(), ' - ', (new Date(timeTo)).toLocaleString(),
         '; required time interval: ', Math.round(requiredTimeInterval), 'min; ',
-        ' records in trends: ', debugInfo.join('; '));
+        ' records in trends: ', debugInfo.join('; '),
+        {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
     return callback('numbers');
 }
 
@@ -523,8 +562,13 @@ historyStorageServer.getLastRecordTimestampForValue = function (id, value, callb
             'ms for object id: ' + id + ', value: ' + value +
             ' from history table "' + table + '" is: ' + (row ? row.timestamp : 'not found'));
     else
-        log.debug('Last timestamp for object id: ' + id + ', value: ' + value +
-            ' from history table "' + table + '" is: ' + (row ? row.timestamp : 'not found'));
+        log.debug('getLastRecordTimestampForValue(id: ', id, ', value: ', value, ') table: ', table, ': ', row,
+            {
+                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                vars: {
+                    "RECEIVED_OCID": id
+                }
+            });
     callback(null, row ? row.timestamp : undefined);
 };
 
@@ -799,8 +843,16 @@ function delRecords(IDs, daysToKeepHistory, daysToKeepTrends, _callback) {
                         timeInterval + 'min table for objectID: ' + id + ': ' + err.message));
                 }
             }
-        }
         deleteRecordsDebugInfo.push('finish');
+        log.debug('delRecords(id: ', id, ', daysToKeepHistory: ', daysToKeepHistory,
+            ', daysToKeepTrends: ', daysToKeepTrends, ') was finished: ', deleteRecordsDebugInfo,
+            {
+                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                vars: {
+                    "RECEIVED_OCID": id
+                }
+            });
+        }
     } else {
         try {
             var stmt = db.prepare('DELETE FROM objects WHERE id=?');
@@ -823,6 +875,14 @@ function delRecords(IDs, daysToKeepHistory, daysToKeepTrends, _callback) {
             }
         }
         deleteRecordsDebugInfo.push('finish');
+        log.debug('delRecords(id: ', id, ', daysToKeepHistory: ', daysToKeepHistory,
+            ', daysToKeepTrends: ', daysToKeepTrends, ') was finished for all records: ', deleteRecordsDebugInfo,
+            {
+                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                vars: {
+                    "RECEIVED_OCID": id
+                }
+            });
     }
     callback();
 }
@@ -945,9 +1005,15 @@ historyStorageServer.saveRecordsForObject = function (id, newObjectParameters, r
             log.error('Can\'t update trends data for object ' + id + ': ' + err.message + '; data: ' + saveDataTrendsStr);
         }
     }
-
-    log.debug('Saving ', recordsForSave.length, ' records, ', savedTrends, ' trends for object ', id,
-        '. parameters: ', newObjectParameters, ': records: ', recordsForSave, ': trends: ', trendsStr);
+    log.debug('saveRecordsForObject(id: ', id, ', newObjectParameters: ', newObjectParameters,
+        ', recordsForSave', recordsForSave, ') was finished: savedTrends: ', savedTrends,
+        ': trends: ', trendsStr,
+        {
+            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            vars: {
+                "RECEIVED_OCID": id
+            }
+        });
 
     callback(err, {
         id: id,

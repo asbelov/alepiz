@@ -9,6 +9,10 @@ var db = require('./db');
 var objectsDB = {};
 module.exports = objectsDB;
 
+/**
+ * Get all data from objects table using SELECT * FROM objects
+ * @param {function(Error)|function(null, Array)} callback callback(err, rows)
+ */
 objectsDB.getAllObjects = function(callback) {
     db.all('SELECT * FROM objects', callback);
 };
@@ -110,9 +114,9 @@ objectsDB.getObjectsFromGroups = function(groupsNames, objectsNames, callback){
     var questionStrForGroups = groupsNames.map(function(){return '?'}).join(',');
     var questionStrForObjects = objectsNames.map(function(){return '?'}).join(',');
 
-    // copy groupsNames array to queryParameters
+    // copy groupNames array to queryParameters
     var queryParameters = groupsNames.slice();
-    // add objectsNames array to queryParameters array
+    // add objectNames array to queryParameters array
     queryParameters.push.apply(queryParameters, objectsNames);
 
     db.all('SELECT objects.name AS name FROM objects '+
@@ -217,7 +221,7 @@ objectsDB.getAlepizIDs = function (callback) {
  * Get object relationship to Alepiz instances for specific objectIDs using
  *  SELECT * FROM objectsAlepizRelation WHERE objectsAlepizRelation.objectID = ?
  * @param {Array} objectIDs - array of the objectIDs list
- * @param {function(Error)|function(null, Array)} callback - callback(err, rows) ,where rows is array like
+ * @param {function(Error)|function(Error, Array)} callback - callback(err, rows) ,where rows is array like
  *  [{id:, objectID:, alepizID: }, ...]
  */
 objectsDB.getObjectsAlepizRelationByObjectIDs = function (objectIDs, callback) {

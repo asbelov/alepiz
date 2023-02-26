@@ -25,7 +25,7 @@ rightsWrapper.renameObjects = function(user, objects, callback){
 
     if(!Array.isArray(objects) || !objects.length) return callback(null, false);
 
-    var initIDs = objects.map(function(obj){return obj.id});
+    var initIDs = objects.map(function(obj) {return obj.id});
 
     checkIDs(initIDs, function(err, checkedIDs) {
         if (err) {
@@ -278,30 +278,30 @@ rightsWrapper.insertInteractions = function(user, newInteractions, callback) {
     });
 };
 
-
-/*
- deleting some objects interactions
- user user name
- interactions = [{id1:<objectID1>, id2: <objectID2>, type: <interactionType>}]
- callback(err)
+/**
+ * Deleting some objects interactions
+ * @param {string} username username
+ * @param {Array} interactionsForDeleting array of the interactions for delete like
+ *  [{id1:<objectID1>, id2: <objectID2>, type: <interactionType>}]
+ * @param {function(err)|function()} callback
  */
-rightsWrapper.deleteInteractions = function(user, interactionsForDeleting, callback){
+rightsWrapper.deleteInteractions = function(username, interactionsForDeleting, callback){
 
     var initIDs = interactionsForDeleting.map(function(obj){ return obj.id1; });
     initIDs.push.apply(initIDs, interactionsForDeleting.map(function(obj){ return obj.id2; }));
 
     if(!initIDs.length) {
-        log.info('No interaction specified for deleting: ', interactionsForDeleting);
-        return callback(null, {});
+        log.info('No interactions to delete are specified: ', interactionsForDeleting);
+        return callback();
     }
 
     checkIDs(initIDs, function(err, checkedIDs) {
         if (err && !checkedIDs) return callback(err);
 
-        user = prepareUser(user);
+        username = prepareUser(username);
 
         rightsDB.checkObjectsIDs({
-            user: user,
+            user: username,
             IDs: checkedIDs,
             checkChangeInteractions: true,
             errorOnNoRights: true
@@ -386,58 +386,67 @@ rightsWrapper.getInteractions = function(user, initIDs, callback){
 };
 
 
-/*
-Getting objectsCountersIDs for specific objects
- user - user name
- objectsIDs - array of objects IDs
- callback(err, OCIDs)
-
- OCIDs - array of objectsCountersIDs
+/**
+ * Getting objectCounterIDs for specific objects
+ * @param {string} username username
+ * @param {Array} objectIDs array of the object IDs
+ * @param {function(err)|function(null, Array)} callback callback(err, rows), where rows is
+ *  [{id: <OCID1>}, {id: <OCID2>}, ...]
  */
-rightsWrapper.getObjectsCountersIDs = function (user, objectsIDs, callback){
+rightsWrapper.getObjectsCountersIDs = function (username, objectIDs, callback){
 
-    checkIDs(objectsIDs, function(err, checkedIDs){
+    checkIDs(objectIDs, function(err, checkedIDs){
         if(err) {
-            return callback(new Error('User ' + user + ' try to get OCIDs for incorrect object IDs ' +
-                objectsIDs.join(', ') + ': ' + err.message));
+            return callback(new Error('User ' + username + ' try to get OCIDs for incorrect object IDs ' +
+                (Array.isArray(objectIDs) ? objectIDs.join(', ') : objectIDs.toString()) + ': ' + err.message));
         }
 
-        user = prepareUser(user);
+        username = prepareUser(username);
 
         rightsDB.checkObjectsIDs({
-            user: user,
+            user: username,
             IDs: checkedIDs,
             checkChange: true, // don't remove it! function used for change counters
             errorOnNoRights: true
-        }, function(err, checkedObjectsIDs){
+        }, function(err, checkedObjectIDs){
             if(err) {
-                return callback(new Error('User ' + user + ' has no rights for getting OCIDs for object IDs ' +
-                    objectsIDs.join(', ') + ': ' + err.message));
+                return callback(new Error('User ' + username + ' has no rights for getting OCIDs for object IDs ' +
+                    objectIDs.join(', ') + ': ' + err.message));
             }
 
-            objectsDB.getObjectsCountersIDs(checkedObjectsIDs, function(err, rows) {
+            objectsDB.getObjectsCountersIDs(checkedObjectIDs, function(err, rows) {
                 if(err) {
-                    return callback(new Error('User ' + user + ' got error when getting OCIDs for object IDs ' +
-                        objectsIDs.join(', ') + ': ' + err.message));
+                    return callback(new Error('User ' + username + ' got error when getting OCIDs for object IDs ' +
+                        objectIDs.join(', ') + ': ' + err.message));
                 }
 
                 callback(null, rows);
-                //callback(null, rows.map(function(obj) { return obj.id }));
             });
         });
     });
 };
 
-rightsWrapper.getObjectsIDs = function (user, objectsNames, callback) {
+/**
+ * Get object IDs by object names
+ * @param {string} username username
+ * @param {Array} objectNames array of the object names
+ * @param {function(err)|function(null, Array) } callback callback(err, objectIDs), where objectIDs is an array
+ *  of the object IDs
+ */
+rightsWrapper.getObjectsIDs = function (username, objectNames, callback) {
 
-    // select * from objects where name like <objectsNames>
-    objectsDB.getObjectsLikeNames(objectsNames, function (err, rows) {
-        if(err) return callback(new Error('Can\'t get object IDs by names like ' + objectsNames.join(', ') + ': ' + err.message));
+    // select * from objects where name like <objectNames>
+    objectsDB.getObjectsLikeNames(objectNames, function (err, rows) {
+        if(err) {
+            return callback(new Error('Can\'t get object IDs by names like ' +
+                (Array.isArray(objectNames) ? objectNames.join(', ') : objectNames.toString()) +
+                ': ' + err.message));
+        }
 
-        user = prepareUser(user);
+        username = prepareUser(username);
 
         rightsDB.checkObjectsIDs({
-            user: user,
+            user: username,
             IDs: rows, // can be a [{id:..., name:...}, ....]
             errorOnNoRights: true
         }, function(err, checkedObjectsIDs) {
@@ -448,14 +457,28 @@ rightsWrapper.getObjectsIDs = function (user, objectsNames, callback) {
     });
 }
 
-rightsWrapper.addObjectsAlepizRelation = function (user, objectIDs, alepizIDs, callback) {
+/**
+ * Add objects to alepizID relations
+ * @param {string} username username
+ * @param {Array} objectIDs array of the object IDs
+ * @param {Array} alepizIDs array of the alepiz IDs
+ * @param {function(err)|function(null, Array, Array)} callback
+ *  callback(err, newObjectsAlepizRelations, objectsAlepizRelationsForRemove) where newObjectsAlepizRelations is an
+ *  array of the new objects to alepizID relations like [{objectID:, alepizID: }, ....] and
+ *  objectsAlepizRelationsForRemove is an array of the objectIDs for remove relations with alepizIDs
+ */
+rightsWrapper.addObjectsAlepizRelation = function (username, objectIDs, alepizIDs, callback) {
     if(!objectIDs.length) return callback();
 
     rightsDB.checkObjectsIDs({
-        user: user,
+        user: username,
         IDs: objectIDs,
         errorOnNoRights: true
     }, function(err, checkedObjectsIDs) {
+
+        log.debug('checkObjectsIDs for user ', username, '\ncheckedObjectsIDs: ', checkedObjectsIDs,
+            '\n objectIDs: ', objectIDs, '\nerr: ', err);
+
         if(err) return callback(err);
 
         objectsDB.getObjectsAlepizRelationByObjectIDs(checkedObjectsIDs, function (err, rows) {
@@ -485,6 +508,15 @@ rightsWrapper.addObjectsAlepizRelation = function (user, objectIDs, alepizIDs, c
                     }
                 });
             });
+
+            log.debug('checkedObjectsIDs: ', checkedObjectsIDs,
+                '\ngetObjectsAlepizRelationByObjectIDs rows: ', rows,
+                '\nnewObjectIDsSet: ', newObjectIDsSet,
+                '\nnewAlepizIDsSet: ', newAlepizIDsSet,
+                '\nobjectIDsSet: ', objectIDsSet,
+                '\nalepizIDsSet: ', alepizIDsSet,
+                '\nnewObjectsAlepizRelations: ', newObjectsAlepizRelations,
+                '\nobjectsAlepizRelationsForRemove: ', objectsAlepizRelationsForRemove);
             objectsDBSave.deleteObjectsAlepizRelation(objectsAlepizRelationsForRemove, function (err) {
                 if(err) {
                     return callback(new Error('Can\'t remove objectsAlepizRelations: ' + err.message +
