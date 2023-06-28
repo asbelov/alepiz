@@ -60,7 +60,7 @@ module.exports = function(args, callback) {
     if(func === 'getCountersForObjects') {
         var groupID = (!args.groupID || args.groupID === '0' ? null : [Number(args.groupID)]);
         if(!args.ids) {
-            if(groupID) return rightsWrappersCountersDB.getCountersForGroup(args.username, groupID, callback);
+            if(groupID) return rightsWrappersCountersDB.getCountersForGroup(args.username, groupID[0], callback);
             else return rightsWrappersCountersDB.getAllCounters(args.username, callback);
         }
         return rightsWrappersCountersDB.getCountersForObjects(args.username, args.ids, groupID, callback);
@@ -89,8 +89,7 @@ module.exports = function(args, callback) {
     if(func === 'getFunctionsDescription') return callback(null, getFunctionsDescription());
 
     if(func === 'getParentCountersVariables') {
-        return rightsWrappersCountersDB.getParentCountersVariables(args.username, [args.id],
-            [], callback);
+        return rightsWrappersCountersDB.getParentCountersVariables(args.username, [args.id], callback);
     }
 
     if(func === 'getFilesList') return getLogFileList(args, callback);

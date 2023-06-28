@@ -5,6 +5,20 @@ const calc = require("../../lib/calc");
 
 module.exports = getVarFromExpression;
 
+/**
+ * Calculate expression and return variable value
+ *
+ * @param {Object} variable object with variable parameters
+ * @param {string} variable.name variable name
+ * @param {string} variable.expression variable expression
+ * @param {Object} variables list of the variables, like {<name>: <value>, ....}
+ * @param {function(string, function)} getVariableValue function for get variable value for unresolved variable
+ * @param {Object} param for debug information
+ * @param {string} param.objectName object name
+ * @param {string} param.counterName counterName
+ * @param {string} param.counterID counterID
+ * @param {function(Error, *, Object)} callback callback(err, result, variablesDebugInfo)
+ */
 function getVarFromExpression(variable, variables, getVariableValue, param, callback) {
 
     calc(variable.expression, variables, getVariableValue,

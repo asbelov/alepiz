@@ -1,5 +1,5 @@
 //var log = require('../../lib/log')(module);
-const taskServer = require('../../serverTask/taskServerClient');
+const taskServer = require('../../serverTask/taskClient');
 
 var Conf = require('../../lib/conf');
 const conf = new Conf('config/common.json');

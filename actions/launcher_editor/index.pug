@@ -44,7 +44,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         div.row
             div.col.s12
                 script(src='/javascripts/javaScriptEditor.js')
-                script(src='/javascripts/pugEditor.js')
+                script(src='/javascripts/jadeEditor.js')
                 script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
                 div.col.s12.m12.l12
                     ul#mainTabs.tabs
@@ -56,7 +56,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                         label Select launcher
                     div(data-tooltip='Enter new launcher name or rename selected launcher. Launcher name will be a folder for launcher').input-field.col.s12.m4.l3.tooltipped
                         input(type='text')#newLauncher
-                        label(for='newLauncher') New laucher
+                        label(for='newLauncher') New launcher
                     div.input-field.col.s6.m4.l3
                         label(data-tooltip='Delete selected launcher').tooltipped
                             input(type='checkbox' disabled)#deleteLauncher

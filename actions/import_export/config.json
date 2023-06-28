@@ -13,7 +13,7 @@
     "callbackBeforeExec": "callbackBeforeExec",
     "outputFormat": "text",
     "descriptionTemplate": "Import or export objects %:o:%",
-    "icon": "settings",
+    "icon": "output",
     "canAddParametersToAction": false,
     "parameters": {
         "objects": {

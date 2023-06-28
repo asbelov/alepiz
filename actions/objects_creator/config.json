@@ -15,7 +15,7 @@
     "timeout": 180,
     "showWhenNoObjectsSelected": true,
     "outputFormat": "text",
-    "icon": "library_add",
+    "icon": "add_box",
     "descriptionTemplate": "A new object or objects \"%:objectsNames:%\" will be created {{%:objectsDescription:% ?? with a description \"%:objectsDescription:%\" ::}}, the sort order of objects will be %:objectsOrder:% {{%:objectsOrder:% == 10 ?? (On top of the list) ::}}{{%:objectsOrder:% == 30 ?? (Between middle and top) :: }}{{%:objectsOrder:% == 50 ?? (At the middle of the list) :: }}{{%:objectsOrder:% == 70 ?? (Between middle and end) :: }}{{%:objectsOrder:% == 100 ?? (At the end of the list) :: }}{{%:objectsOrder:% == 1 ?? (On top and at up level) :: }}{{%:objectsOrder:% == 5 ?? (At the middle and at up level) :: }}{{%:objectsOrder:% == 9 ?? (At the end and at up level) :: }}. {{%:groupsDescription:% ?? New objects will be include in a groups \"%:o:%\". ::}}{{%:disabled:% ?? Objects will be disabled to collect data from counters ::}}",
     "parameters": {
         "o": {

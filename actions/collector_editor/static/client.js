@@ -295,7 +295,7 @@ var JQueryNamespace = (function ($) {
                       $('#help').click(function () {
                           if(!helpEditor) {
                               setTimeout(function () {
-                                  helpEditor = pugEditor({parentID: 'helpEditor'});
+                                  helpEditor = jadeEditor({parentID: 'helpEditor'});
                               }, 100)
                           }else setTimeout(function() {helpEditor.refresh();}, 100);
                       })

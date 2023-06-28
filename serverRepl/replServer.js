@@ -85,14 +85,18 @@ function replication(remoteDBs) {
     if(cfg.disable) {
         log.info('Replication server was disabled in configuration. Check for enable again after ',
             restartReplicationTime / 1000, 'sec');
-        return setTimeout(replication, restartReplicationTime, remoteDBs).unref();
+        let t = setTimeout(replication, restartReplicationTime, remoteDBs);
+        t.unref();
+        return;
     }
 
 
     if(Object.values(remoteDBs).every(remoteDB => !remoteDB.clientIPC.isConnected())) {
         log.info('Not connected to all remote DB ', Object.keys(remoteDBs).join(', '),
             ', restart replication after ', restartReplicationTime, 'sec');
-        return setTimeout(replication, restartReplicationTime, remoteDBs).unref();
+        let t = setTimeout(replication, restartReplicationTime, remoteDBs);
+        t.unref();
+        return;
     }
 
     var pauseBetweenReplication = cfg.pauseBetweenReplication ===
@@ -123,12 +127,13 @@ function replication(remoteDBs) {
                 if (localTableRows.cnt > maxTableSizeForReplication) {
                     log.warn('Table ', table, ' too big for replication. Rows ',
                         localTableRows.cnt, '/', maxTableSizeForReplication, '. Skip it');
-                    return setTimeout(callback, pauseBetweenTableProcessing).unref();
+                    let t = setTimeout(callback, pauseBetweenTableProcessing);
+                    t.unref();
+                    return;
                 }
 
                 var id = 'id';
-                if (table === 'auditUsers') id = 'sessionID';
-                else if (table === 'tasksRunConditionsOCIDs' || table === 'tasksRunConditions') id = 'taskID';
+                if (table === 'tasksRunConditionsOCIDs' || table === 'tasksRunConditions') id = 'taskID';
                 const query = 'SELECT * FROM ' + table + ' ORDER BY ' + id;
 
                 var differences = [];
@@ -170,7 +175,7 @@ function replication(remoteDBs) {
                             if (diff.length) differences.push(diff);
 
                             if (cfg.debug) {
-                                log.info('Table ', table, 'has ', diff.length, ' differences. Rows local: ',
+                                log.info('Table ', table, ' has ', diff.length, ' differences. Rows local: ',
                                     localTableRows.cnt, ', remote: ', remoteRows.length, ':', hostPort);
                             }
 
@@ -180,7 +185,9 @@ function replication(remoteDBs) {
                         // no differences found
                         if (differences.length === 0) {
                             if (cfg.debug) log.info('No differences found for table ', table);
-                            return setTimeout(callback, pauseBetweenTableProcessing).unref();
+                            let t = setTimeout(callback, pauseBetweenTableProcessing);
+                            t.unref();
+                            return;
                         }
 
                         if (cfg.debug) {
@@ -202,17 +209,21 @@ function replication(remoteDBs) {
                         if (diffRows.length === 0) {
                             log.info('Found ', differences.length + 1,
                                 ' differences, but no rows will be updated after optimization')
-                            return setTimeout(callback, pauseBetweenTableProcessing).unref();
+                            let t = setTimeout(callback, pauseBetweenTableProcessing);
+                            t.unref();
+                            return
                         }
 
                         insertOrUpdateDifferentRows(table, id, diffRows, function () {
-                            setTimeout(callback, pauseBetweenTableProcessing).unref();
+                            let t = setTimeout(callback, pauseBetweenTableProcessing);
+                            t.unref();
                         });
                     });
                 });
             });
         }, function () {
-                setTimeout(replication, pauseBetweenReplication, remoteDBs).unref();
+                let t = setTimeout(replication, pauseBetweenReplication, remoteDBs);
+                t.unref();
         });
     });
 }
@@ -237,7 +248,7 @@ function getDifferenceFromArraysSortedByID(firstArray, secondArray, id, tableNam
 
     return secondArray.filter((secondArrayRow, idx) => {
         while (
-            idx + shift < firstArray.length - 1 &&
+            idx + shift < firstArray.length &&
             idx + shift > -1 &&
             firstArray[idx + shift][id] !== secondArrayRow[id]
             ) {
@@ -276,7 +287,7 @@ function getSimilarityFromArraysSortedByID(firstArray, secondArray, id) {
     var shift = 0;
     return secondArray.filter((secondArrayRow, idx) => {
         while (
-            idx + shift < firstArray.length - 1 &&
+            idx + shift < firstArray.length &&
             idx + shift > -1 &&
             firstArray[idx + shift][id] !== secondArrayRow[id]
             ) {

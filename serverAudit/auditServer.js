@@ -7,11 +7,18 @@ const threads = require('../lib/threads');
 const auditDB = require('./auditDB');
 const auditCreateDB = require('./auditCreateDB');
 const usersDB = require('../models_db/usersDB');
+const getAuditData = require('./getAuditData');
 const actionsConf = require('../lib/actionsConf');
+const Conf = require('../lib/conf');
+const tasksDB = require('../models_db/tasksDB');
+
+const conf = new Conf('config/common.json');
+var systemUser = conf.get('systemUser') || 'system';
 
 const dbPath = threads.workerData && threads.workerData[0];
 var sessions = new Map();
 
+// Initializing the audit server
 // printing cache info and clearing deleted sessions from the cache every 5 minutes
 setInterval(function () {
     var now = Date.now();
@@ -30,6 +37,7 @@ setInterval(function () {
         ' deleted sessions has been cleared; ', sessionsForRemove,
         ' sessions have been marked for deletion in the future');
 }, 300000);
+
 
 auditDB.dbOpen(dbPath, false, function (err, db) {
     if(err) return log.throw('Can\'t open audit DB: ' + err.message);
@@ -51,18 +59,30 @@ auditDB.dbOpen(dbPath, false, function (err, db) {
 
 /**
  * Processing messages from actionClient
- * @param {Object} msgObj
+ * @param {Object} messageObj
  * @param {function(Error)|function(null, object)} callback callback(err, returnedMessage), where returned message is
  *    message which returned from auditDB
  */
-function onMessage (msgObj, callback) {
-    if (!msgObj || typeof msgObj !== 'object') return;
+function onMessage (messageObj, callback) {
+    if (!messageObj || typeof messageObj !== 'object') return;
 
-    if (msgObj.messageBody) addNewRecord(msgObj);
-    else if (msgObj.lastRecordID !== undefined && Array.isArray(msgObj.sessionIDs)) getLogRecords(msgObj, callback);
-    else if (msgObj.lastRecordID !== undefined) getSessions(msgObj.lastRecordID, callback);
-    else if (msgObj.user !== undefined && !sessions.has(msgObj.sessionID)) sessions.set(msgObj.sessionID, msgObj);
-    else if (msgObj.stopTimestamp) addSessionResult(msgObj);
+    log.debug('Receive message: ', messageObj);
+
+    if (messageObj.messageBody) {
+        addNewRecord(messageObj);
+    } else if (messageObj.auditData === 'logRecords') {
+        getAuditData.getLogRecords(messageObj, callback);
+    } else if (messageObj.auditData === 'sessions') {
+        getAuditData.getSessions(messageObj, callback);
+    } else if (messageObj.auditData === 'usersAndActions') {
+        getAuditData.getUsersAndActions(callback);
+    } else if (messageObj.username !== undefined && !sessions.has(messageObj.sessionID)) {
+        sessions.set(messageObj.sessionID, messageObj);
+    } else if (messageObj.stopTimestamp) {
+        addSessionResult(messageObj);
+    } else {
+        return callback(new Error('Unreachable message ' + JSON.stringify(messageObj, null, 4)));
+    }
 }
 
 /**
@@ -74,66 +94,93 @@ function onMessage (msgObj, callback) {
  * @param {string} messageObj.label message label
  * @param {string} messageObj.messageBody message
  * @param {Object} [messageObj.options] log options
+ * @param {Object} messageObj.cfg log configuration
+ * @param {Boolean} messageObj.cfg.auditSystemTasks when true, then log of the tasks, running from the server
+ * will be also add to audit
  */
 function addNewRecord(messageObj) {
     var sessionObj = sessions.get(messageObj.sessionID);
-    if(!sessionObj) return;
+    if(!sessionObj) {
+        log.debug('No session found for ', messageObj.messageBody)
+        return;
+    }
+
+    if(!messageObj.cfg.auditSystemTasks && sessionObj.username === systemUser) {
+        sessions.delete(messageObj.sessionID);
+        log.debug('Don\'t add system task ', messageObj.messageBody, sessionObj)
+        return;
+    }
 
     addNewSession(sessionObj, function (err) {
         if(err) return log.error(err.message);
 
         try {
             auditDB.insertRecord(messageObj);
-            log.debug('Added a new record: ', messageObj);
+            log.debug('Added a new record: ', messageObj.messageBody);
         } catch (err) {
             log.error('Can\'t insert message: ', err.message, ': ', messageObj);
         }
-    })
-
+    });
 }
-
 
 /**
  * Add a new session
  * @param {Object} sessionObj  sessionObj for add a new sessionID
- * @param {number} sessionObj.user username or user ID
+ * @param {string} sessionObj.username username
  * @param {number} sessionObj.userID user ID
  * @param {number} sessionObj.sessionID sessionID
  * @param {string} sessionObj.actionID action dir
+ * @param {number} [sessionObj.taskID] taskID if action was running from the task
+ * @param {number} [sessionObj.taskName] task name if action was running from the task
+ * @param {number} [sessionObj.taskSession] unique taskSession if action was running from the task
  * @param {number} sessionObj.startTimestamp timestamp when action was started
  * @param {string} [sessionObj.descriptionTemplate] action description template
  * @param {string} [sessionObj.description] action description
  * @param {Object} [sessionObj.objects] objects for action
  * @param {boolean} [sessionObj.saved] true if the session with sessionID was added before
+ * @param {Object} sessionObj.args action parameters like {<name>: <value>, ...}}
  * @param {function(Error)|function()} callback callback(err)
  */
 function addNewSession(sessionObj, callback) {
     if(sessionObj.saved) return callback();
 
-    usersDB.getID(sessionObj.user, function (err, userID) {
-        if (err) return callback(new Error('Can\'t get userID for user ' + sessionObj.user + ': ' + err.message));
+    usersDB.getID(sessionObj.username, function (err, userID) {
+        if (err) return callback(new Error('Can\'t get userID for user ' + sessionObj.username + ': ' + err.message));
         if(userID === undefined) {
-            log.warn('Can\'t find user ', sessionObj.user, ' for add a new session. UserID will be set to 0 for ',
+            log.warn('Can\'t find user ', sessionObj.username, ' for add a new session. UserID will be set to 0 for ',
                 sessionObj);
             userID = 0;
         }
 
         sessionObj.userID = userID;
 
-        createActionDescription(sessionObj.args, sessionObj.descriptionTemplate, function(err, description) {
-            if (err) log.warn('Can\'t create description for action: ', err.message, '; ', sessionObj);
+        createActionDescription(sessionObj.args, sessionObj.descriptionTemplate,
+            function(err, description) {
+            //if (err) log.warn('Can\'t create description for action: ', err.message, '; ', sessionObj);
 
             if (description) sessionObj.description = description;
 
-            try {
-                auditDB.addNewSession(sessionObj);
-                sessions.get(sessionObj.sessionID).saved = true;
-                log.debug('Added a new session: ', sessionObj);
-            } catch (err) {
-                return callback(new Error('Can\'t add new session to the sessions table: ' + err.message +
-                    ': ' + JSON.stringify(sessionObj, null, 4)));
-            }
-            return callback()
+            // get task name
+            tasksDB.getTaskData(null, sessionObj.taskID, function (err, rows) {
+                if (err) {
+                    return callback(new Error('Can\'t get task name for task ' + sessionObj.taskID +
+                        ': ' + err.message));
+                }
+
+                if(rows && rows[0] && rows[0].name) {
+                    sessionObj.taskName = rows[0].name;
+                    sessionObj.userID = rows[0].userID;
+                }
+
+                try {
+                    auditDB.addNewSession(sessionObj);
+                    sessions.get(sessionObj.sessionID).saved = true;
+                    log.debug('Added a new session: ', sessionObj.sessionID);
+                } catch (err) {
+                    return callback(err);
+                }
+                return callback()
+            });
         });
     });
 }
@@ -152,7 +199,7 @@ function addSessionResult(sessionObj) {
     try {
         auditDB.addSessionResult(sessionObj);
         savedSession.deleted = Date.now(); // savedSession ia a pointer to the sessions.get(sessionObj.sessionID)
-        log.debug('Add session stop timestamp: ', sessionObj);
+        log.debug('Add session stop timestamp: ', sessionObj.sessionID);
     } catch (err) {
         log.error('Can\'t update session for add stop timestamp to the sessions table: ', err.message,
             ': ', sessionObj);
@@ -160,51 +207,11 @@ function addSessionResult(sessionObj) {
 }
 
 /**
- * Get log records from auditDB for specific user and sessionIDs. Used for show the action execution result
- * @param {Object} req object with request parameters
- * @param {number} req.lastRecordID last log record ID for continue getting the log records
- *     or 0 for get records from beginning
- * @param {Array} req.sessionIDs array with session IDs. If not set, get the records for all sessions
- * @param {string|number} req.user user ID or username. If not set get the records for all users
- * @param {function(Error)|function(null, Array)} callback callback(err, logRecordsRows), where logRecordsRows
- *     is an array with log records objects like [{}]
+ * Create action description using action execute parameters and descriptionTemplate parameter from action config.json
+ * @param {Object} args action parameters like {<name>: <value>, ...}
+ * @param {string} descriptionTemplate descriptionTemplateHTML or descriptionTemplate parameter from action config.json
+ * @param {function()|function(null, string)} callback callback(null, <action description>)
  */
-function getLogRecords (req, callback) {
-    usersDB.getID(req.user, function (err, userID) {
-        if (err) return log.error('Can\'t get userID for user ', req.user, ': ', err.message);
-        if (userID === undefined) return log.error('Can\'t find user ', req.user);
-
-        try {
-            var logRecordsRows = auditDB.getRecords(req.lastRecordID, userID, req.sessionIDs);
-            log.debug('Getting ', logRecordsRows.length, ' log records for request: ', req);
-        } catch (err) {
-            log.error('Can\'t get log records from auditDB: ', err.message, ' for request ', req)
-            return callback(new Error('Can\'t get log records from auditDB: ' + err.message +
-                ' for request ' + JSON.stringify(req, null, 4)));
-        }
-        callback(null, logRecordsRows);
-    });
-}
-
-/**
- * Get sessions from auditDB. Used in the audit action
- * @param {number} lastID last id from sessions table for continue getting the sessions
- *     or 0 for get records from beginning
- * @param {function(Error)|function(null, Array)} callback callback(err, sessionsRows), where logRecordsRows
- *     is an array with log records objects like [{}]
- */
-function getSessions (lastID, callback) {
-    try {
-        var sessionsRows = auditDB.getSessions(lastID);
-        log.debug('Getting ', sessionsRows.length, ' sessions.');
-    } catch (err) {
-        return callback(new Error('Can\'t get sessions from auditDB: ' + err.message +
-            ' for lastID: ' + lastID));
-    }
-    callback(null, sessionsRows);
-}
-
-
 function createActionDescription(args, descriptionTemplate, callback) {
     if(!descriptionTemplate) return callback();
 

@@ -12,7 +12,10 @@
     "staticDir": "static",
     "timeout": 60,
     "showWhenNoObjectsSelected": true,
-    "descriptionTemplate": "{{%:error:% ?? !!! Action will be executed with error: '%:error:%'.:: Action will be executed without error.}} {{%:returnValue:% ?? Action will be return: '%:returnValue:%'.:: Action doesn't return any value.}}",
+    "noObjectsRequired": true,
+    "icon": "priority_high",
+    "swapActionControlBtn": true,
+    "descriptionTemplate": "Action will be executed %:executionTime:%ms {{%:error:% ?? with error: '%:error:%'.:: without error.}} {{%:returnValue:% ?? and return: '%:returnValue:%'.:: and doesn't return any value.}}",
     "parameters": {
         "o": {
             "description": "Objects"
@@ -22,6 +25,9 @@
         },
         "returnValue": {
             "description": "If set, then action will return this value"
+        },
+        "executionTime": {
+            "description": "Action execution time in ms"
         }
     }
 }

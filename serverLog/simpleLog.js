@@ -8,7 +8,11 @@
 
 const createLogObject = require('./createLogObject');
 const prepareLogMessage = require('./prepareLogMessage');
+const {threadId} = require('worker_threads');
 const writeLog = require('./writeLog');
+
+// TID_PID = ":<TID>:<PID>" or ":<PID>"
+const TID_PID = (threadId ? ':' + threadId + ':' : ':') + process.pid;
 
 /**
  * Create log.debug(), log.info(), log.warn(), log.error(), log.exit() and log.throw() functions
@@ -31,8 +35,9 @@ module.exports = function (parentModule) {
  * @param {NodeModule} parentModule parent node module
  */
 function writeToLog(level, args, parentModule) {
-    var dataToSend = prepareLogMessage(level, args, parentModule);
+    var dataToSend = prepareLogMessage(level, args, undefined, parentModule);
     if(dataToSend) {
+        dataToSend.TID_PID = TID_PID;
         dataToSend.additionalLabel = '*';
         writeLog(dataToSend);
     }

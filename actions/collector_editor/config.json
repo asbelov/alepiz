@@ -12,8 +12,8 @@
   "staticDir": "static",
   "callbackBeforeExec": "callbackBeforeExec",
   "onChangeObjectMenuEvent": "nothing",
-  "icon": "mode_edit",
+  "icon": "show_chart",
   "timeout": 60,
   "showWhenNoObjectsSelected": true,
-  "outputFormat": "text"
+  "noObjectsRequired": true
 }

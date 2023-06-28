@@ -45,14 +45,17 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml" style="overflo
 
                     div.fixed-action-btn#runActionFloatingBtn
                         a#runActionBtn.btn-floating.btn-large.waves-effect.waves-circle.waves-light.run-action.btn
-                            i.material-icons.large play_arrow
+                            i(data-run-action-icon).material-icons.large play_arrow
                         ul
                             li: a#makeTaskBtn.btn-floating.waves-effect.waves-light.make-task.btn
-                                i.material-icons playlist_add
+                                i(data-make-task-icon).material-icons playlist_add
 
                     div.fixed-action-btn.hide#makeTaskFloatingBtn
                         a.btn-floating.btn-large.waves-effect.waves-circle.waves-light.make-task.btn
-                            i.material-icons.large playlist_add
+                            i(data-make-task-icon).material-icons.large playlist_add
+                        ul
+                            li: a#runActionSmallBtn.btn-floating.waves-effect.waves-light.run-action.btn
+                                i(data-run-action-icon).material-icons play_arrow
 
             //ul(style="overflow-y:hidden;display:flex;flex-direction:column")#slide-out.side-nav.fixed
             ul(style="overflow-y:hidden;display:flex;flex-direction:column")#slide-out.sidenav.sidenav-fixed

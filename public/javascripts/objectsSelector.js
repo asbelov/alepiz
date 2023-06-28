@@ -189,7 +189,7 @@
 
         // Check for existing objects' selector
         // If objects selector element with id="id+'-objects-panel'" not exist, then init object selector
-        var objectsPanelElm = $('#'+prefixID+'objects-panel');
+        var objectsPanelElm = $('#' + prefixID + 'objects-panel');
         if(!objectsPanelElm.length) {
 
             var title = $(elm).attr('title');
@@ -222,7 +222,7 @@
                 '</div>'
             );
 
-            objectsPanelElm = $('#'+prefixID+'objects-panel');
+            objectsPanelElm = $('div#' + prefixID + 'objects-panel');
 
             $('#' + prefixID + 'remove-all-objects').unbind('click').click(function () {
                 objectsPanelElm.empty();

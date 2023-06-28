@@ -10,7 +10,7 @@ const initCache = require('./initCache');
 //const profiling = require('../lib/profiling');
 const history = require('../../serverHistory/historyClient');
 const debugCounters = require('../../serverDebug/debugCounters');
-const taskServer = require('../../serverTask/taskServerClient');
+const taskServer = require('../../serverTask/taskClient');
 const thread = require('../../lib/threads');
 const getVars = require('./getVars');
 const connectingCollectors = require('./connectingCollectors');
@@ -292,9 +292,9 @@ function getVariablesAndCheckUpdateEvents(message) {
     //profiling.start('1. get variables values', message);
 
     log.debug('getVariablesAndCheckUpdateEvents for OCID ', param.OCID, ' counter parameters: ', param, {
-        expr: '%:RECEIVED_OCID:% == %:OCID:%',
+        func: (vars) => vars.EXPECTED_OCID === vars.OCID,
         vars: {
-            "RECEIVED_OCID": param.OCID
+            "EXPECTED_OCID": param.OCID
         }
     });
 
@@ -329,17 +329,26 @@ function getVariablesAndCheckUpdateEvents(message) {
                 ',\n vars: ', variables,
                 ',\n variablesDebugInfo: ', variablesDebugInfo,
                 ',\n preparedCollectorParameters: ', preparedCollectorParameters, {
-                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                     vars: {
-                        "RECEIVED_OCID": param.OCID
+                        "EXPECTED_OCID": param.OCID
                     }
                 });
         }
 
         if (err) {
-            log.options(err.message, ',\n variablesDebugInfo: ', variablesDebugInfo, {
+            log.options(err.message, {
                 filenames: ['counters/' + param.counterID, 'counters'],
                 level: 'I'
+            });
+            log.options('variablesDebugInfo: ', variablesDebugInfo, {
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
+                vars: {
+                    "EXPECTED_OCID": param.OCID
+                }
+            }, {
+                filenames: ['counters/' + param.counterID, 'counters'],
+                level: 'D'
             });
             return sendCompleteExecutionResult(param);
         }
@@ -397,9 +406,9 @@ function getValue(param) {
 
             log.debug('getValue for OCID ', param.OCID, ': ', param.removeCounter,
                 ' now processed but required for update. Removing...', {
-                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                     vars: {
-                        "RECEIVED_OCID": param.OCID
+                        "EXPECTED_OCID": param.OCID
                     }
                 });
 
@@ -411,9 +420,9 @@ function getValue(param) {
 
                 log.debug('getValue for OCID ', param.OCID, 'Getting data for ', param.removeCounter,
                     ' after removing...', {
-                        expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                        func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                         vars: {
-                            "RECEIVED_OCID": param.OCID
+                            "EXPECTED_OCID": param.OCID
                         }
                     });
 
@@ -474,9 +483,9 @@ function processCollectorResult(err, result, param, collectorName) {
 
     log.debug('processCollectorResult for OCID ', param.OCID, ' return ', result, '(', preparedResult, '); param: ', param,
         '; taskCondition: ', taskCondition, '; err: ', err, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": param.OCID
+                "EXPECTED_OCID": param.OCID
             }
         });
 
@@ -521,9 +530,9 @@ function processCollectorResult(err, result, param, collectorName) {
         // send process ID to server
 
         log.debug('processCollectorResult for OCID ', param.OCID, ' no dependent counters found', {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": param.OCID
+                "EXPECTED_OCID": param.OCID
             }
         });
 
@@ -540,9 +549,9 @@ function processCollectorResult(err, result, param, collectorName) {
 
     log.debug('processCollectorResult for OCID ', param.OCID, ' dependent counters found, return to parent: ',
         returnedMessage, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": param.OCID
+                "EXPECTED_OCID": param.OCID
             }
         });
 

@@ -7,7 +7,6 @@ var db = require('./db');
 var Conf = require('../lib/conf');
 const conf = new Conf('config/common.json');
 
-//var systemUser = conf.get('systemUser') || 'system';
 var reloadRightsInterval = ( conf.get('reloadRightsIntervalSec') || 180 ) * 1000;
 var lastTimeWhenLoadedObjectRightsFromDB = 0;
 var lastTimeWhenLoadedActionsRightsFromDB = 0;
@@ -20,9 +19,8 @@ var objectsRights = new Map(),
     objectRightsCallbacksQueue = new Set(),
     actionsRightsCallbacksQueue = new Set();
 
-// TODO: it's used for load changes from DB to cache, but it is not a good way
 /**
- * Load object rights to cache
+ * Load object rights to the cache
  * @param {function(err)|function()} callback callback(err)
  */
 function loadObjectsRights(callback) {
@@ -52,6 +50,7 @@ WHERE isDeleted=0', function(err, rows) {
             if(!objectsRights.has(row.user)) objectsRights.set(row.user, new Map());
             var userObjectID = objectsRights.get(row.user);
 
+            // For default rights for objects row.objectID can be null
             if(!userObjectID.has(row.objectID)) {
                 userObjectID.set(row.objectID, {
                     view: !!row.view,
@@ -76,15 +75,15 @@ WHERE isDeleted=0', function(err, rows) {
 }
 
 /**
- * Checking user rights for specific objects IDs
+ * Checking user rights for specific object IDs
  * @param {Object} param parameters
  * @param {string} param.user username
  * @param {Array} param.IDs array of the object IDs for check rights.
  *  Can be an array of objects IDs or array of objects, like [{id:.., name:..., ...}, {}]
- * @param {boolean} param.checkView check rights to view object (default, if nothing set to check)
- * @param {boolean} param.checkChange check rights to change object
- * @param {boolean} param.checkChangeInteractions check rights for change interactions for objects
- * @param {boolean} param.errorOnNoRights generate an error when the user does not have rights to some objects
+ * @param {boolean} [param.checkView] check rights to view object (default, if nothing set to check)
+ * @param {boolean} [param.checkChange] check rights to change object
+ * @param {boolean} [param.checkChangeInteractions] check rights for change interactions for objects
+ * @param {boolean} [param.errorOnNoRights] generate an error when the user does not have rights to some objects
  * @param {function(err)|function(null, Array)} callback callback(err, checkedObjectsIDs) where
  *  checkedObjectsIDs is an array of the object IDs
  */
@@ -95,7 +94,8 @@ rightsDB.checkObjectsIDs = function(param, callback) {
 
         var user = param.user;
         var errOnNoRights = param.errorOnNoRights ?
-            new Error('You are not allowed to make operation with some of selected objects: ' + param.IDs.join(', ')) :
+            new Error('You are not allowed to make operation with some of selected objects: ' +
+                JSON.stringify(param.IDs, null, 4)) :
             null;
 
         if(!objectsRights.has(user)) return callback(errOnNoRights, []);
@@ -108,10 +108,15 @@ rightsDB.checkObjectsIDs = function(param, callback) {
         var checkedObjectIDs = [];
         var userObjectsRights = objectsRights.get(user);
 
-        // some optimisation for users with default rights only (objectID === null)
+        // some optimisation for users with default rights only (objectID === null), i.e.
+        // when objectsRights for specific <user> has only default rights for all objects, like this
+        // Map(<user>, Map(<null>, {..some rights..}).
+        // In this case we are check rights only for the first object from an array of param.IDs,
+        // because other objects has a same rights
         if(uncheckedObjectIDs.length > 2 && userObjectsRights.size === 1 && userObjectsRights.get(null)) {
             uncheckedObjectIDs = [param.IDs[0]];
-            checkedObjectIDs = param.IDs.splice(1);
+            // use slice (not splice) for save an array param.IDs unchanged
+            checkedObjectIDs = param.IDs.slice(1);
         }
 
         for(var i = 0; i < uncheckedObjectIDs.length; i++) {
@@ -134,104 +139,85 @@ rightsDB.checkObjectsIDs = function(param, callback) {
     })
 };
 
-/*
- Checking user rights for specific counter ID.
- If user has not rights for linked objects to counter, then user also has not rights to counter
- look at checkObjectsRightsWrapper description for other p.* values
- p.id - counter id for check
- p.errorOnNoRights - generate error when you have no rights for some objects counters
- callback(err, id): id is a counter id
+/**
+ * Checking user rights for a specific counter.
+ * If the user does not have rights to the linked objects with the counter, then the user also does not have
+ * rights to the counter.
+ * @param {Object} param parameters
+ * @param {string} param.user username
+ * @param {number} param.id counterID
+ * @param {boolean} [param.checkView] check rights to view object (default, if nothing set to check)
+ * @param {boolean} [param.checkChange] check rights to change object
+ * @param {boolean} [param.checkChangeInteractions] check rights for change interactions for objects
+ * @param {boolean} [param.errorOnNoRights] generate an error when the user does not have rights to some objects
+ *  linked with a specific counter
+ * @param {function(Error)|function()|function(null, number)} callback callback(err, counterID) counterID will be
+ *      undefined if check failed
+ * @return {*}
  */
-rightsDB.checkCounterID = function(p, callback) {
-    if(!p.id) return callback();
+rightsDB.checkCounterID = function(param, callback) {
+    if(!param.id) return callback();
 
-    db.all('SELECT objectID FROM objectsCounters WHERE counterID=?', p.id, function(err, rows) {
-        if(err) return callback(new Error('Can\'t get objects IDs for counter ID: ' + p.id + ': ' + err.message));
+    db.all('SELECT objectID FROM objectsCounters WHERE counterID=?', param.id, function(err, rows) {
+        if(err) return callback(new Error('Can\'t get objects IDs for counter ID: ' + param.id + ': ' + err.message));
 
         // Cant find objects linked to the counter
-        if(!rows.length) return callback(null, p.id);
+        if(!rows.length) return callback(null, param.id);
 
-        p.IDs = rows.map(function (row) {
-            return row.objectID;
-        });
+        var newParams = {};
+        for(var key in param) newParams[key] = param[key];
+        newParams.IDs = rows.map(row => row.objectID);
 
-        rightsDB.checkObjectsIDs(p, function(err, objectsIDs) {
+        rightsDB.checkObjectsIDs(newParams, function(err, objectsIDs) {
             if(err) return callback(err);
 
-            if(objectsIDs.length) return callback(null, p.id);
+            if(objectsIDs.length) return callback(null, param.id);
 
             callback();
         })
     });
 };
 
-/*
-counters: array of counter IDs or array of objects {[id:...,..], [id:...,...], ...}
-p: parameters
-callback(err, checkedCounters), where checkedCounters created from counters array elements
+/**
+ * Checking user rights for counters.
+ * If the user does not have rights to the linked objects with the counters, then the user also does not have
+ * rights to the counters.
+ * @param {Array} counters counters array like [{id:..,... }, ...] or [<counterID1>, <counterID2>,...]
+ * @param {Object} param parameters
+ * @param {string} param.user username
+ * @param {boolean} [param.checkView] check rights to view object (default, if nothing set to check)
+ * @param {boolean} [param.checkChange] check rights to change object
+ * @param {boolean} [param.checkChangeInteractions] check rights for change interactions for objects
+ * @param {boolean} [param.errorOnNoRights] generate an error when the user does not have rights to some objects
+ *  linked with a specific counter
+ * @param {function(Error)|function()|function(null, Array)} callback callback(err, checkedCountersIDs), where
+ *     checkedCountersIDs is an array with counters elements or undefined if check failed
  */
-rightsDB.checkCountersIDs = function(counters, p, callback) {
+rightsDB.checkCountersIDs = function(counters, param, callback) {
 
     var checkedCountersIDs = [];
     async.each(counters, function(counter, callback) {
-        p.id = counter.id ? counter.id : counter;
-        rightsDB.checkCounterID(p, function(err, counterID) {
+        var newParams = {};
+        for(var key in param) newParams[key] = param[key];
+        newParams.id = counter.id ? counter.id : counter;
+        rightsDB.checkCounterID(newParams, function(err, counterID) {
             if(err) return callback(err);
             if(counterID) checkedCountersIDs.push(counter);
             callback();
         });
     }, function(err) {
-        if(err) return callback('Get error while checking rights for counters: ' + err.message);
+        if(err) return callback(new Error('Error occurred while checking rights for counters : ' + err.message +
+            '; counters for check: ' + JSON.stringify(counters, null, 4)));
         callback(null, checkedCountersIDs);
     });
 };
-
-/*
-Get user rights for specific action
-
-user: username
-actionID: actionID (ie dir name for action)
-actionFolder: Folder in actions menu for actions
-
-callback(err, rights), where
-rights: {view: <1|0>, run: <1|0>, makeTask: <1|0>}
-rightsDB.checkActionRights = function(user, actionID, actionFolder, callback){
-
-    // user 'system' has all rights for all actions
-    if(user === systemUser) return callback(null, {view: 1, run: 1, makeTask: 1});
-
-    db.all('\
-SELECT rightsForActions.view AS view, rightsForActions.run AS run, rightsForActions.makeTask AS makeTask,\
-CASE WHEN EXISTS (SELECT * FROM rightsForActions ra WHERE ra.actionName = $actionID AND usersRoles.roleID=ra.roleID) THEN 3 \
-WHEN EXISTS (SELECT * FROM rightsForActions ra WHERE ra.actionName =  $actionFolder AND usersRoles.roleID=ra.roleID) THEN 2 \
-ELSE 1 \
-END AS priority \
-FROM rightsForActions \
-JOIN usersRoles ON usersRoles.roleID=rightsForActions.roleID \
-JOIN users ON users.id=usersRoles.userID \
-WHERE users.name = $user AND users.isDeleted = 0 AND \
-CASE WHEN EXISTS (SELECT * FROM rightsForActions ra WHERE ra.actionName = $actionID AND usersRoles.roleID=ra.roleID) THEN \
-rightsForActions.actionName = $actionID \
-WHEN EXISTS (SELECT * FROM rightsForActions ra WHERE ra.actionName = $actionFolder AND usersRoles.roleID=ra.roleID) THEN \
-rightsForActions.actionName = $actionFolder \
-ELSE \
-rightsForActions.actionName IS NULL \
-END',
-        {
-            $user: user,
-            $actionID: actionID,
-            $actionFolder: actionFolder,
-        },
-        callback
-    );
-};
-*/
 
 /**
  * Get rights for all actions for users
  * @param {function(err)|function(null, Set)} callback callback(err, actionsRights), where actionsRights is an Set()
  * of the objects like
- * [{username: <username>, actionName: <actionID or actionFolder or null>, view: [0|1], run: [0|1], makeTask: [0|1]}, ...]
+ * [{username: <username>, userID: <userID>, actionName: <actionID or actionFolder or null>,
+ * view: [0|1], run: [0|1], makeTask: [0|1], audit: [0|1]}...]
  */
 rightsDB.getRightsForActions = function(callback) {
     if(Date.now() - lastTimeWhenLoadedActionsRightsFromDB < reloadRightsInterval) {
@@ -243,8 +229,8 @@ rightsDB.getRightsForActions = function(callback) {
     if(actionsRightsCallbacksQueue.size > 1) return;
 
     db.all('\
-SELECT users.name AS username, rightsForActions.actionName AS actionName, rightsForActions.view AS view, \
-rightsForActions.run AS run, rightsForActions.makeTask AS makeTask \
+SELECT users.name AS username, users.id AS userID, rightsForActions.actionName AS actionName, rightsForActions.view AS view, \
+rightsForActions.run AS run, rightsForActions.makeTask AS makeTask, rightsForActions.audit AS audit \
 FROM rightsForActions \
 JOIN usersRoles ON usersRoles.roleID=rightsForActions.roleID \
 JOIN users ON users.id=usersRoles.userID \

@@ -6,6 +6,7 @@ const log = require('../lib/log')(module);
 const thread = require("../lib/threads");
 const path = require("path");
 
+
 var logServer = {
     stop: function(callback) {
         log.info('Log server was not initialized for stop');
@@ -26,7 +27,7 @@ module.exports = logServer;
 logServer.start = function (callback) {
     new thread.parent({
         childrenNumber: 1,
-        childProcessExecutable: path.join(__dirname, 'logServer.js'),
+        childProcessExecutable: path.join(__dirname, 'logRouter.js'),
         restartAfterErrorTimeout: 0,
         killTimeout: 300,
         module: 'log',

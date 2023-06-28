@@ -11,7 +11,6 @@ var auditServerRunner = {
     stop: function(callback) {
         callback()
     },
-    insertRecord: function (messageObj) {},
 };
 
 module.exports = auditServerRunner;

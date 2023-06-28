@@ -11,6 +11,10 @@ function callbackBeforeExec(callback) {
     JQueryNamespace.beforeExec(callback);
 }
 
+// The functions will be passed from the parent frame
+// describe the function here to prevent the error message
+if(!getActionParametersFromBrowserURL) getActionParametersFromBrowserURL = function (callback) {callback();}
+
 var JQueryNamespace = (function ($) {
     $(function () {
         // Will run after finishing drawing the page
@@ -304,7 +308,7 @@ var JQueryNamespace = (function ($) {
 
         if(objects && objects.length) {
             linkHintsToObjectsCbElm.prop('disabled', false);
-            if(cfg.l === '1') linkHintsToObjectsCbElm.prop('checked', true);
+            if(cfg.l === 1) linkHintsToObjectsCbElm.prop('checked', true);
             //commentEditorTabElm.removeClass('disabled');
 
             disabledTabElm.removeClass('disabled');
@@ -340,7 +344,7 @@ var JQueryNamespace = (function ($) {
 
                     [{'list': 'ordered'}, {'list': 'bullet'}],
                     [{'script': 'sub'}, {'script': 'super'}],      // superscript/subscript
-                    [{'indent': '-1'}, {'indent': '+1'}],          // outdent/indent
+                    [{'indent': '-1'}, {'indent': '+1'}],          // indent
 
                     [{'size': ['small', false, 'large', 'huge']}],  // custom dropdown
                     [{'header': [1, 2, 3, 4, 5, 6, false]}],
@@ -364,9 +368,7 @@ var JQueryNamespace = (function ($) {
         });
          */
 
-        tabInstance = M.Tabs.init(document.querySelectorAll('.tabs'), {
-            //swipeable: true,
-        });
+        tabInstance = M.Tabs.init(document.querySelectorAll('.tabs'), {});
 
         var switchElms = $('[data-switch-panel]');
         switchElms.each(function () {
@@ -464,9 +466,9 @@ var JQueryNamespace = (function ($) {
             var from =  getTimeFromStr(disableTimeIntervalFromInstance.time) || '';
             var to = getTimeFromStr(disableTimeIntervalToInstance.time) || '';
 
-            if(!from) return M.toast({html: 'Please set the start of the time interval'}, 1000);
-            if(!to) return M.toast({html: 'Please set the end of the time interval'}, 1000);
-            if(from + 60000 > to) return M.toast({html: 'Please set correct time interval'}, 1000);
+            if(!from) return M.toast({html: 'Please set the start of the time interval', displayLength: 1000});
+            if(!to) return M.toast({html: 'Please set the end of the time interval', displayLength: 1000});
+            if(from + 60000 > to) return M.toast({html: 'Please set correct time interval', displayLength: 1000});
 
             disablingTimeIntervals.push(from + '-' + to);
             disablingTimeIntervals = clearIntervals(disablingTimeIntervals);
@@ -904,7 +906,9 @@ var JQueryNamespace = (function ($) {
             drawTimeIntervals();
         }
         disableCommentSubjectElm.val(sharedDisabled.subject || '');
-        quillDisableComment.clipboard.dangerouslyPasteHTML(sharedDisabled.comment || '');
+        quillDisableComment.setText('');
+        quillDisableComment.clipboard.dangerouslyPasteHTML(0,sharedDisabled.comment || '');
+        quillDisableComment.setSelection(0, 0);
         quillDisableCommentInit = quillDisableComment.getHtml();
     }
 
@@ -927,7 +931,9 @@ var JQueryNamespace = (function ($) {
         if(!cfg.l) {
             if(eventsHints[0]) {
                 hintSubjectElm.val(eventsHints[0].subject || '');
-                quillHint.clipboard.dangerouslyPasteHTML(eventsHints[0].comment || '');
+                quillHint.setText('');
+                quillHint.clipboard.dangerouslyPasteHTML(0,eventsHints[0].comment || '');
+                quillHint.setSelection(0, 0);
                 quillHintInit = quillHint.getHtml();
             }
             return;
@@ -937,7 +943,9 @@ var JQueryNamespace = (function ($) {
         //console.log('Shared: ', sharedHint)
         if(!sharedHint) return;
         hintSubjectElm.val(sharedHint.subject || '');
-        quillHint.clipboard.dangerouslyPasteHTML(sharedHint.comment || '');
+        quillHint.setText('');
+        quillHint.clipboard.dangerouslyPasteHTML(0,sharedHint.comment || '');
+        quillHint.setSelection(0, 0);
         quillHintInit = quillHint.getHtml();
     }
 

@@ -35,9 +35,10 @@ new proc.parent({
 
     service.run (function() {
         const stopTimeout = Number(conf.get('serviceStopTimeout')) || defaultStopTimeout;
-        setTimeout(function() {
+        var t = setTimeout(function() {
             log.exit('ALEPIZ was not stopped in timeout ' + (stopTimeout / 1000) + ' sec. Exiting');
-        }, stopTimeout + 60000).unref();
+        }, stopTimeout + 60000);
+        t.unref();
 
         alepizProcess.stop(function () {
             setTimeout(process.exit, 10000, 6);

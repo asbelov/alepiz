@@ -14,12 +14,16 @@ var delayedCallbacks = new Set(),
     truncateInProgress = 0;
 
 
-// Don't use async operation inside transaction for possible rollback transaction
-// f.e. don't use async.each() or async.parallel(). try to use async.eachSeries() or async.series() instead
+/**
+ * Begin transaction.
+ * Don't use async operation inside transaction for possible rollback transaction
+ * f.e. don't use async.each() or async.parallel(). try to use async.eachSeries() or async.series() instead
+ * @param {function(Error)|function()} callback callback(err|undefined) err is description why can't begin transaction
+ */
 transaction.begin = function(callback) {
     if(transactionInProgress) {
         // you will get many warnings on discovery processes if uncomment this
-        //log.debug('Add new transaction to queue, length of queue: ', delayedCallbacks.size + 1);
+        log.debug('Add new transaction to queue, length of queue: ', delayedCallbacks.size + 1);
         delayedCallbacks.add(callback);
         return;
     }
@@ -30,22 +34,36 @@ transaction.begin = function(callback) {
     db.exec('BEGIN', callback);
 };
 
+/**
+ * Finish transaction
+ * @param {function(Error)|function()} callback callback(err|undefined) err is description why can't finish transaction
+ */
 transaction.end = function(callback) {
-    //log.debug('Commit transaction. No ', (new Error).stack);
+    log.debug('Commit transaction. No ', (new Error).stack);
     db.exec('COMMIT', function(err) {
         if(err) log.warn('Error committing transaction. Stack: ', err.stack);
         runDelayedTransaction(err, callback);
     });
 };
 
+/**
+ * Rollback transaction on error
+ * @param {Error} err error with description, why need to rollback transaction
+ * @param {function(Error)} callback callback(err) started after rollback transaction
+ */
 transaction.rollback = function(err, callback){
-    log.warn('Rollback transaction. Stack: ', err.stack || err);
+    log.debug('Rollback transaction. Stack: ', err.stack || err);
     db.exec('ROLLBACK', function(errRollBack) {
         if(errRollBack) log.error('Error while rollback transaction: ', errRollBack.message);
         runDelayedTransaction(err, callback);
     });
 };
 
+/**
+ * Run delayed transaction after current transaction has been finished
+ * @param {Error|undefined} err error from the parent function
+ * @param  {function(Error)} callback callback(err)
+ */
 function runDelayedTransaction(err, callback) {
     if(!delayedCallbacks.size) {
         transactionInProgress = false;

@@ -2,75 +2,106 @@
  * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var async = require('async');
-var log = require('../lib/log')(module);
-var db = require('./db');
+const async = require('async');
+const log = require('../lib/log')(module);
+const db = require('./db');
 
 var objectsDB = {};
 module.exports = objectsDB;
 
 /**
  * Get all data from objects table using SELECT * FROM objects
- * @param {function(Error)|function(null, Array)} callback callback(err, rows)
+ * @param {function(Error)|function(null, Array)} callback callback(err, rows), where rows is
+ * [{id:<objectID>, name:<objectName>, description:<objectDescription>, sortPosition:<object sort position>
+ *     color:<objectColor>, disabled:<0|1>}, created:<timestamp>}, ..]
  */
 objectsDB.getAllObjects = function(callback) {
     db.all('SELECT * FROM objects', callback);
 };
 
-/*
-    get objects information by object IDs or names
-    Check user rights before using this functions
-    IDs - an array of object IDs
-    or
-    names - an array of object names with exact comparison
-    or
-    namesLike  - an array of object names with SQL LIKE comparison
-
-    callback(err, objects)
-    objects = [{id: <id>, name: <objectName>, description: <objectDescription>, sortPosition: <objectOrder>, color:.., disabled:..., color:...}, {...},...]
-
-    SQLite LIKE operator is case-insensitive. It means "A" LIKE "a" is true. However, for Unicode characters that are
-    not in the ASCII ranges, the LIKE operator is case sensitive e.g., "Ä" LIKE "ä" is false.
-*/
-objectsDB.getObjectsByIDs = function(IDs, callback) {
+/**
+ * Get objects by object IDs and sorted by object names using SELECT * FROM objects WHERE id=?
+ * @param {Array<number>} objectIDs an array with object IDs
+ * @param {function(Error)|function(null, Array)} callback callback(err, rows), where rows is
+ * [{id:<objectID>, name:<objectName>, description:<objectDescription>, sortPosition:<object sort position>
+ *     color:<objectColor>, disabled:<0|1>}, created:<timestamp>}, ..]
+ */
+objectsDB.getObjectsByIDs = function(objectIDs, callback) {
     // SELECT * FROM objects WHERE id=?
-    getObjectsByX(IDs, 'id=', '', callback);
+    getObjectsByX(objectIDs, 'id=', '', callback);
 };
 
-objectsDB.getObjectsByNames = function(names, callback) {
+/**
+ * Get objects by object names and sorted by object names
+ * (exact comparison case insensitive) using SELECT * FROM objects WHERE name=?
+ * @param {Array<string>} objectNames an array with object names
+ * @param {function(Error)|function(null, Array)} callback callback(err, rows), where rows is
+ * [{id:<objectID>, name:<objectName>, description:<objectDescription>, sortPosition:<object sort position>
+ *     color:<objectColor>, disabled:<0|1>}, created:<timestamp>}, ..]
+ */
+objectsDB.getObjectsByNames = function(objectNames, callback) {
     // SELECT * FROM objects WHERE name=?
-    getObjectsByX(names, 'name=', 'COLLATE NOCASE', callback);
+    getObjectsByX(objectNames, 'name=', 'COLLATE NOCASE', callback);
 };
 
-objectsDB.getObjectsLikeNames = function(namesLike, callback) {
+/**
+ * Get objects by object names and sorted by object names
+ * (SQL LIKE comparison case insensitive) using SELECT * FROM objects WHERE name LIKE ?
+ * SQLite LIKE operator is case-insensitive. It means "A" LIKE "a" is true. However, for Unicode characters that are
+ * not in the ASCII ranges, the LIKE operator is case sensitive e.g., "Ä" LIKE "ä" is false.
+ * @param {Array<string>} objectNamesLike an array with object names in SQL like format
+ * @param {function(Error)|function(null, Array)} callback callback(err, rows), where rows is
+ * [{id:<objectID>, name:<objectName>, description:<objectDescription>, sortPosition:<object sort position>
+ *     color:<objectColor>, disabled:<0|1>}, created:<timestamp>}, ..]
+ */
+objectsDB.getObjectsLikeNames = function(objectNamesLike, callback) {
     // SELECT * FROM objects WHERE name LIKE ?
-    getObjectsByX(namesLike, 'name LIKE ', 'ESCAPE "\\" COLLATE NOCASE', callback);
+    getObjectsByX(objectNamesLike, 'name LIKE ', 'ESCAPE "\\" COLLATE NOCASE', callback);
 };
 
-function getObjectsByX(IDs, condition, suffix, callback) {
-    if(!IDs || !IDs.length) return callback(null, []);
+/**
+ * Function for get object various information
+ * @param {Array<number|string>} params object IDs or object names
+ * @param {'id='|'name='|'name LIKE '} condition
+ * @param {''|'COLLATE NOCASE'|'ESCAPE "\\" COLLATE NOCASE'} suffix
+ * @param {function(Error)|function(null, Array)} callback callback(err, rows), where rows is
+ * [{id:<objectID>, name:<objectName>, description:<objectDescription>, sortPosition:<object sort position>
+ *     color:<objectColor>, disabled:<0|1>}, created:<timestamp>}, ..]
+ */
+function getObjectsByX(params, condition, suffix, callback) {
+    if(!params || !params.length) return callback(null, []);
 
-    var rows = [];
     var stmt = db.prepare('SELECT * FROM objects WHERE ' + condition + '? ' + suffix + ' ORDER BY name', function(err) {
         if(err) return callback(err);
-        async.each(IDs, function(ID, callback) {
-            stmt.all(ID, function(err, subRows) {
-                if(err) return callback(err);
+        getSTMTResult(stmt, params, callback);
+    });
+}
 
-                rows.push.apply(rows, subRows);
-                callback();
-            })
-        }, function(err) {
-            stmt.finalize();
-            callback(err, rows);
+/**
+ * Get result for the prepared SQL statement
+ * @param {Object} stmt prepared SQL statement
+ * @param {Array<number|string>} params an array of the SQL query parameters
+ * @param {function(Error)|function(null, Array)} callback callback(err, rows) where rows is an array with objects
+ */
+function getSTMTResult(stmt, params, callback) {
+    var rows = [];
+    async.each(params, function(param, callback) {
+        stmt.all(param, function(err, subRows) {
+            if(err) return callback(err);
+
+            rows.push.apply(rows, subRows);
+            callback();
         })
+    }, function(err) {
+        stmt.finalize();
+        callback(err, rows);
     })
 }
 
 /** Get interactions for specified objects IDs. Check user rights before using it functions
  * @param {Array} IDs - array of objects IDs
- * @param {function(Error)|function(null, Array)} callback - callback(err, interactions)
- *
+ * @param {function(Error)|function(null, Array)} callback - callback(err, interactions) where interactions described
+ * at example bellow
  * @example
  * // interactions returned by callback(err, interactions)
  * interactions - [{
@@ -100,14 +131,13 @@ objectsDB.getInteractions = function(IDs, callback){
         IDsForSelect, callback);
 };
 
-/*
-Checks if objects (objectsNames) are in specific groups (groupsNames)
-
- groupsNames: objects names in !!lower case!!, which include searched objects i.e. groups of objects
- objectsNames: check is this objects names in !!lower case!! in a groups
- callback(err, objectsNames), where objectsNames is an array of objects names
- // function can be used for less than 999 objects, according  SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999
-// https://www.sqlite.org/limits.html
+/**
+ * Checks is objects (objectsNames) are in specific groups (groupsNames)
+ * this function can be used for less than 999 objects, according  SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999
+ * https://www.sqlite.org/limits.html
+ * @param {Array<string>} groupsNames
+ * @param {Array<string>}objectsNames
+ * @param {function(Error)|function(null, Array)} callback callback(err, objectNames), [<objectName1>, <objectName2>,..]
  */
 objectsDB.getObjectsFromGroups = function(groupsNames, objectsNames, callback){
 
@@ -119,36 +149,34 @@ objectsDB.getObjectsFromGroups = function(groupsNames, objectsNames, callback){
     // add objectNames array to queryParameters array
     queryParameters.push.apply(queryParameters, objectsNames);
 
-    db.all('SELECT objects.name AS name FROM objects '+
-        'JOIN interactions ON objects.id = interactions.objectID2 AND interactions.type = 0 '+
-        'JOIN objects topObjects ON interactions.objectID1=topObjects.id '+
-        'WHERE LOWER(topObjects.name) IN ('+questionStrForGroups+') AND ' +
-        'LOWER(objects.name) IN ('+questionStrForObjects+')', queryParameters,
-        function(err, rows){
-            if(err) return callback(new Error('Error while checking, is objects "'+objectsNames.join(', ')+
-                '" are including in objects "'+groupsNames.join(', ')+'": '+err.message));
+    db.all('SELECT objects.name AS name FROM objects ' +
+        'JOIN interactions ON objects.id = interactions.objectID2 AND interactions.type = 0 ' +
+        'JOIN objects topObjects ON interactions.objectID1=topObjects.id ' +
+        'WHERE LOWER(topObjects.name) IN (' + questionStrForGroups + ') AND ' +
+        'LOWER(objects.name) IN (' + questionStrForObjects + ')', queryParameters,
+        function(err, rows) {
+            if(err) {
+                return callback(new Error('Error while checking, is objects "' + objectsNames.join(', ') +
+                    '" are including in objects "' + groupsNames.join(', ') + '": ' + err.message));
+            }
 
-            callback(null, rows.map(function(object){ return object.name.toLowerCase() }));
+            callback(null, rows.map(object => object.name.toLowerCase()));
     });
 };
 
-/*
-    getting objectsCountersIDs for specific objectID
-
-    objectID - object ID
-    callback(err, row)
-
-    rows: [{id: <OCID1>}, {id: <OCID2>}, ...]
+/**
+ * Return OCIDs by objectIDs using SELECT * FROM objectsCounters WHERE objectID=?
+ * @param {Array<number>} objectsIDs an array with object IDs
+ * @param {function(Error)|function(null, Array)} callback callback(err, rows) ,where rows is
+ * [{id:<OCID>, objectID:, counterID:},..]
  */
-
 objectsDB.getObjectsCountersIDs = function (objectsIDs, callback){
     log.debug('Getting objectsCountersIDs for objectsIDs: ', objectsIDs);
 
-    // used for remove too big array of objects. don\'t optimize and don\'t use IN() in select
-    var rows = [];
     var stmt = db.prepare('SELECT * FROM objectsCounters WHERE objectID=?', function(err) {
         if(err) return callback(err);
 
+        var rows = [];
         async.eachLimit(objectsIDs, 20,function(objectID, callback) {
             stmt.all(objectID, function(err, subRows) {
                 if(err) return callback(err);
@@ -163,29 +191,28 @@ objectsDB.getObjectsCountersIDs = function (objectsIDs, callback){
     })
 };
 
+/**
+ * Return objectNames, objectIDs, OCIDs by object IDs
+ * @param {Array<number>} OCIDs an array of OCIDs
+ * @param {function(Error)|function(null, Array)} callback callback(err, rows) ,where rows is
+ * [{name:<objectName>, objectID:, OCID:},..]
+ */
 objectsDB.getObjectsByOCIDs = function (OCIDs, callback) {
     var stmt = db.prepare('SELECT objects.name AS name, objects.id AS objectID, objectsCounters.id AS OCID ' +
         'FROM objects ' +
         'JOIN objectsCounters ON objectsCounters.objectID = objects.id ' +
         'WHERE objectsCounters.id = ?', function (err) {
         if(err) return callback(err);
-
-        var rows = [];
-        async.each(OCIDs, function (OCID, callback) {
-            stmt.all(OCID, function (err, subRows) {
-                if(err) return callback(err);
-
-                rows.push.apply(rows, subRows);
-                callback();
-            });
-        }, function (err) {
-            stmt.finalize();
-            callback(err, rows);
-        });
+        getSTMTResult(stmt, OCIDs, callback);
     });
 }
 
-
+/**
+ * Return OCID, counterName, objectName by OCID
+ * @param {Array<number>} OCIDs an array of OCIDs
+ * @param {function(Error)|function(null, Array)} callback callback(err, rows) ,where rows is
+ * [{OCID:, counterName:, objectName: },..]
+ */
 objectsDB.getObjectsAndCountersByOCIDs = function (OCIDs, callback) {
     var stmt = db.prepare('\
 SELECT objectsCounters.id AS OCID, counters.name AS counterName, objects.name AS objectName FROM objects \
@@ -193,19 +220,7 @@ JOIN objectsCounters ON objects.id = objectsCounters.objectID \
 JOIN counters ON counters.id = objectsCounters.counterID \
 WHERE objectsCounters.id = ?', function (err) {
         if(err) return callback(err);
-
-        var rows = [];
-        async.each(OCIDs, function (OCID, callback) {
-            stmt.all(OCID, function (err, subRows) {
-                if(err) return callback(err);
-
-                rows.push.apply(rows, subRows);
-                callback();
-            });
-        }, function (err) {
-            stmt.finalize();
-            callback(err, rows);
-        });
+        getSTMTResult(stmt, OCIDs, callback);
     });
 }
 
@@ -227,19 +242,7 @@ objectsDB.getAlepizIDs = function (callback) {
 objectsDB.getObjectsAlepizRelationByObjectIDs = function (objectIDs, callback) {
     var stmt = db.prepare('SELECT * FROM objectsAlepizRelation WHERE objectsAlepizRelation.objectID = ?', function (err) {
         if(err) return callback(err);
-
-        var rows = [];
-        async.each(objectIDs, function (objectID, callback) {
-            stmt.all(objectID, function (err, subRows) {
-                if(err) return callback(err);
-
-                rows.push.apply(rows, subRows);
-                callback();
-            });
-        }, function (err) {
-            stmt.finalize();
-            callback(err, rows);
-        });
+        getSTMTResult(stmt, objectIDs, callback);
     });
 }
 

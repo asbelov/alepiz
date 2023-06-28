@@ -37,7 +37,7 @@ countersDB.delete = function(counterID, callback) {
  * @param {0|1} counter.disabled is counter disabled
  * @param {0|1} counter.debug is counter debug switched on
  * @param {0|1} counter.taskCondition is counter a taskCondition
- * @param {function(err)|function(err, counterID)} callback callback(err, counterID) where counterID is a
+ * @param {function(err)|function(err, number)} callback callback(err, counterID) where counterID is a
  *  ID of updated counter
  */
 countersDB.updateCounter = function(counter, callback) {
@@ -124,7 +124,7 @@ countersDB.insertCounter = function(counter, sessionID, callback) {
 /**
  * Update counter parameters
  * @param {number} counterID counter ID
- * @param {Array} counterParameters counter parameters like ['name1', 'name2', ...]
+ * @param {Object} counterParameters counter parameters like {<name>: <value>, ...}
  * @param {function(err)|function(null, Object)} callback callback(err, notUpdatedParameters), where
  *  notUpdatedParameters is object with not updated parameter names, like {name1: value, name2: value:...}
  */
@@ -334,7 +334,7 @@ countersDB.insertUpdateEvents = function(counterID, updateEvents, callback) {
 /**
  * Delete update events for counter
  * @param {number} counterID counter ID
- * @param {Array} updateEvents array of the objects with update events like
+ * @param {Array<Object>} updateEvents array of the objects with update events like
  *         [{objectID:<parent object ID>, expression:<string with expression>, mode: <0|1|2|3|4>}, {..}, ...]
  * @param {function(err)|function()} callback callback(err)
  */

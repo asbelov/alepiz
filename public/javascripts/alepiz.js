@@ -165,9 +165,10 @@ alepizMainNamespace = (function($) {
         sideNavLockIconElm = $('#sideNavLockIcon');
         sideNavResizeIconElm = $('#sideNavResizeIcon');
 
-        searchObjectsElm = lastFocusedSearchStringElm = $('#searchObjects');
+        searchObjectsElm = $('#searchObjects');
         searchActionsElm = $('#searchActions');
         searchFiltersElm = $('#searchFilters');
+        lastFocusedSearchStringElm = searchObjectsElm;
         searchIconElm = $('#searchIcon');
 
         runActionBtnElm = $('#runActionBtn');
@@ -291,8 +292,7 @@ alepizMainNamespace = (function($) {
         slideOutElm.css('width', currentMenuWidth);
         var backgroundHeight = $('#backgroundImg').height() - 35;
         searchObjectsElm.css('max-height', backgroundHeight + 'px');
-        sideNavResizeIconElm.click(function () {
-
+        sideNavResizeIconElm.click(function (e) {
             tabInstance.destroy();
             if(slideOutElm.width() <= Number(minMenuWidth.replace(/\D/g, '')) ) {
                 currentMenuWidth = maxMenuWidth;
@@ -357,42 +357,49 @@ alepizMainNamespace = (function($) {
                 $('footer').css('padding-left', currentMenuWidth);
             }
 
-            searchObjectsElm.keydown(function (e) {
-                if(e.which === 9) {
-                    if(filterTabSwitchElm.hasClass('active')) {
-                        tabInstance.select('objectsFilterTab');
-                        lastFocusedSearchStringElm = searchFiltersElm;
-                        searchFiltersElm.focus();
-                        searchFiltersElm.trigger('keyup');
-                    } else {
-                        tabInstance.select('actionsList');
-                        lastFocusedSearchStringElm = searchActionsElm;
-                        searchActionsElm.focus();
-                        searchActionsElm.trigger('keyup');
-                    }
-                    return false;
-                } else lastFocusedSearchStringElm = searchObjectsElm
-            });
-            searchObjectsElm.click(function () { lastFocusedSearchStringElm = searchObjectsElm});
-
-            searchActionsElm.keydown(function (e) {
-                if(e.which === 9) {
-                    lastFocusedSearchStringElm = searchObjectsElm
-                    alepizObjectsNamespace.runSearchObjectsWhenNoActionFound();
-                } else lastFocusedSearchStringElm = searchActionsElm
-            });
-            searchActionsElm.click(function () { lastFocusedSearchStringElm = searchActionsElm});
-
-            searchFiltersElm.keydown(function (e) {
-                if(e.which === 9) {
-                    lastFocusedSearchStringElm = searchObjectsElm
-                    alepizObjectsNamespace.runSearchObjectsWhenNoActionFound();
-                }
-                else lastFocusedSearchStringElm = searchFiltersElm
-            });
-            searchFiltersElm.click(function () { lastFocusedSearchStringElm = searchFiltersElm});
-
             saveConfig();
+        });
+
+
+        searchObjectsElm.keydown(function (e) {
+            if(e.which === 9) {
+                if(filterTabSwitchElm.hasClass('active')) {
+                    tabInstance.select('objectsFilterTab');
+                    lastFocusedSearchStringElm = searchFiltersElm;
+                    searchFiltersElm.focus();
+                    searchFiltersElm.trigger('keyup');
+                } else {
+                    tabInstance.select('actionsList');
+                    lastFocusedSearchStringElm = searchActionsElm;
+                    searchActionsElm.focus();
+                    searchActionsElm.trigger('keyup');
+                }
+                return false;
+            } else lastFocusedSearchStringElm = searchObjectsElm
+        });
+        searchObjectsElm.click(function () {
+            lastFocusedSearchStringElm = searchObjectsElm
+        });
+
+        searchActionsElm.keydown(function (e) {
+            if(e.which === 9) {
+                lastFocusedSearchStringElm = searchObjectsElm
+                alepizObjectsNamespace.runSearchObjectsWhenNoActionFound();
+            } else lastFocusedSearchStringElm = searchActionsElm
+        });
+        searchActionsElm.click(function () {
+            lastFocusedSearchStringElm = searchActionsElm
+        });
+
+        searchFiltersElm.keydown(function (e) {
+            if(e.which === 9) {
+                lastFocusedSearchStringElm = searchObjectsElm
+                alepizObjectsNamespace.runSearchObjectsWhenNoActionFound();
+            }
+            else lastFocusedSearchStringElm = searchFiltersElm
+        });
+        searchFiltersElm.click(function () {
+            lastFocusedSearchStringElm = searchFiltersElm
         });
 
         objectsLabelElm.click(function() {
@@ -438,7 +445,7 @@ alepizMainNamespace = (function($) {
             }
         });
 
-        actionsTabSwitchElm.click(function() {
+        actionsTabSwitchElm.click(function(e) {
             var checkedObjectsNum = alepizObjectsNamespace.getSelectedObjectNames().length;
             objectsTabSwitchElm.text('OBJECTS' + (checkedObjectsNum ? ' [' + checkedObjectsNum + ']' : ''));
             var checkedFiltersNum = alepizFiltersNamespace.getCheckedFilterNames().length;
@@ -462,7 +469,8 @@ alepizMainNamespace = (function($) {
                 config.tabItem = 'ACTIONS';
                 saveConfig();
             }
-            searchActionsElm.trigger('click');
+            // when alepiz is initialized, focus will be set to the action search element instead of the object search
+            //searchActionsElm.trigger('click');
         });
 
         filterTabSwitchElm.click(function () {
@@ -736,7 +744,7 @@ alepizMainNamespace = (function($) {
         getObjectGroups: function () { return objectGroups; },
         saveConfig: saveConfig,
         getSessionID: function () { return sessionID; },
-        setSessionID: function (_sessionID) { sessionsIDs[_sessionID] = true; sessionID = _sessionID},
+        setSessionID: function (newSessionID) { sessionsIDs[newSessionID] = true; sessionID = newSessionID},
         getSessionIDs: function () { return Object.keys(sessionsIDs); },
         getThemeColor: function () { return themeColor; },
     }

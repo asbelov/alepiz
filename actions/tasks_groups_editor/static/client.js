@@ -6,7 +6,7 @@
  * Created by Alexander Belov on 19.06.2017.
  */
 
-var JQueryNamespace = (function ($) {
+(function ($) {
     $(function () {
         init();
     });
@@ -20,7 +20,7 @@ var JQueryNamespace = (function ($) {
                 var html = '';
 
                 groups.forEach(function(group) {
-                    // skip "defaul group" with id = 0
+                    // skip "default group" with id = 0
                     var deleteElmHTML = group.id ? '<span class="secondary-content"><i class="material-icons">close</i></span>' : ''
 
                     html += '<a href="#!" class="collection-item" id="'+escapeHtml(group.id)+'"><span groupName>' +

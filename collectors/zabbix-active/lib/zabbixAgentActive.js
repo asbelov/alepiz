@@ -50,6 +50,13 @@ collector.get = function(param, callback) {
     var key = param.itemParameters ? param.item+'['+param.itemParameters+']' : param.item;
     var OCID = Number(param.$id);
 
+    log.debug('Receiving request for add ', OCID, ': ', zabbixHostname, ':', key, ': ', param, {
+        func: (vars) => vars.EXPECTED_OCID === vars.OCID,
+        vars: {
+            "EXPECTED_OCID": OCID
+        }
+    });
+
     if(!counters.has(zabbixHostname)) counters.set(zabbixHostname, new Map());
     // update counter parameters for existing OCID
     else if(OCID && countersOCID2ZabbixHost.has(OCID)) {
@@ -111,6 +118,13 @@ collector.get = function(param, callback) {
         log.info('Add: ', OCID, ': "',
             zabbixHostname, '": ', counters.get(zabbixHostname).get(OCID));
     }
+
+    log.debug('Added ', OCID, ': ', zabbixHostname, ':', lowerCaseKey, ': ', counters.get(zabbixHostname), {
+        func: (vars) => vars.EXPECTED_OCID === vars.OCID,
+        vars: {
+            "EXPECTED_OCID": OCID
+        }
+    });
 };
 
 collector.init = function(newServerPort) {
@@ -125,8 +139,16 @@ collector.removeCounters = function(OCIDs, callback) {
     var existingOCIDs = [];
     OCIDs.forEach(function(OCID) {
         OCID = Number(OCID);
-        if(!countersOCID2ZabbixHost.has(OCID)) return;
+
         var zabbixHostname = countersOCID2ZabbixHost.get(OCID);
+        log.debug('Receiving request for remove ', OCID, ', zabbixHost: ', zabbixHostname, {
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
+                vars: {
+                    "EXPECTED_OCID": OCID
+                }
+            });
+
+        if(!zabbixHostname) return;
 
         // typeof null === 'object'
         if(counters.has(zabbixHostname) && typeof counters.get(zabbixHostname).get(OCID) === 'object') {
@@ -141,6 +163,14 @@ collector.removeCounters = function(OCIDs, callback) {
             }
             if(foundCallbackForDelete) {
                 if(!countersParameters.get(zabbixHostname).get(lowerCaseKey).get('callbacks').size) {
+                    log.debug('Remove counters: remove ', OCID, ': ', zabbixHostname, ':', lowerCaseKey, ': ',
+                        counters.get(zabbixHostname), {
+                        func: (vars) => vars.EXPECTED_OCID === vars.OCID,
+                        vars: {
+                            "EXPECTED_OCID": OCID
+                        }
+                    });
+
                     countersParameters.get(zabbixHostname).delete(lowerCaseKey);
                     counters.get(zabbixHostname).delete(OCID);
                     if(!counters.get(zabbixHostname).size) counters.delete(zabbixHostname);
@@ -180,7 +210,11 @@ function createServer() {
 
     server = net.createServer(function(socket) {
 		// 'connection' listener
-		//log.debug('Client connected: ', socket.remoteAddress, ':', socket.remotePort, '->', socket.localAddress, ':', socket.localPort);
+        /*
+        // print on every connection to the zabbix_agentd
+		log.debug('Client connected: ', socket.remoteAddress, ':', socket.remotePort, '->', socket.localAddress, ':',
+            socket.localPort);
+         */
 
         var prevData = Buffer.alloc(0);
         var isHeaderOK = false;
@@ -401,14 +435,20 @@ function reqAgentData(result, socket){
 
         if(!throttling.check(zabbixHost + '-' + zabbixKey, value)) return;
 
-        if (data.clock && data.ns &&
-            Number(data.clock) === parseInt(String(data.clock), 10) &&
-            Number(data.ns) === parseInt(String(data.ns), 10)) {
-
-            var res = {
-                value: value,
-                timestamp: Math.round(Number(data.clock) * 1000 + (Number(data.ns) / 1000000)) // convert to milliseconds
-            };
+        if (data.clock && Number(data.clock) === parseInt(String(data.clock), 10)) {
+            if (data.ns && Number(data.ns) === parseInt(String(data.ns), 10)) {
+                var res = {
+                    value: value,
+                    // convert to milliseconds
+                    timestamp: Math.round(Number(data.clock) * 1000 + (Number(data.ns) / 1000000)),
+                };
+            } else {
+                res = {
+                    value: value,
+                    // convert to milliseconds
+                    timestamp: Number(data.clock) * 1000,
+                };
+            }
         } else res = value;
 
         for(var OCID of countersParameters.get(zabbixHost).get(zabbixKey).get('callbacks').keys()) {
@@ -418,6 +458,13 @@ function reqAgentData(result, socket){
                 errCnt++;
                 continue;
             }
+
+            log.debug('Receiving data for ', OCID, ': ', zabbixHost, ':', zabbixKey, ': ', res, {
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
+                vars: {
+                    "EXPECTED_OCID": OCID
+                }
+            });
             countersParameters.get(zabbixHost).get(zabbixKey).get('callbacks').get(OCID)(null, res);
         }
     });

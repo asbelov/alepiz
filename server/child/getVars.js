@@ -26,7 +26,7 @@ const updateEventsMode = {
 };
 
 /**
- *
+ * Get variable values
  * @param param {{
  *      parentCounterName: ({string}|*),
  *      updateEventMode,

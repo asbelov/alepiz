@@ -18,16 +18,16 @@
   "showWhenNoObjectsSelected": false,
   "outputFormat": "text",
   "descriptionTemplate": "Processing objects: %:o:%:{{%:newObjectsNames:% ?? Renaming objects following these rules: %:renamedObjectsNames:%.::}}{{%:objectsDescription:% ?? New description for objects will be \"%:objectsDescription:%\".::}}{{%:objectsOrder:% == 0 ?? :: New sort order for all objects will be a %:objectsOrder:% ({{%:objectsOrder:% == 10 ?? On top of the list ::}}{{%:objectsOrder:% == 30 ?? Between middle and top :: }}{{%:objectsOrder:% == 50 ?? At the middle of the list :: }}{{%:objectsOrder:% == 70 ?? Between middle and end :: }}{{%:objectsOrder:% == 100 ?? At the end of the list :: }}{{%:objectsOrder:% == 1 ?? On top and at up level :: }}{{%:objectsOrder:% == 5 ?? At the middle and at up level :: }}{{%:objectsOrder:% == 9 ?? At the end and at up level :: }}).}}{{%:disabled:% ?? Objects will be disabled for collecting data from counters ::}}",
-  "icon": "edit",
+  "icon": "edit_calendar",
   "parameters": {
     "o": {
       "description": "Edited objects"
     },
     "objectsDescription": {
-      "description": "New description for all edited objects. If empty, then description will be unchanges"
+      "description": "New description for all edited objects. If empty, then description will be unchanged"
     },
     "objectsOrder": {
-      "description": "New sort order for all edited obejcts. If \"0\" then sort order will be unchanged"
+      "description": "New sort order for all edited objects. If \"0\" then sort order will be unchanged"
     },
     "rulesForRenameObjects": {
       "description": "Stringified JSON object, used as a rule for rename objects. Format of this objects is a [{\"id\": XX, \"name\": \"newObjectNameXX\"}, {..}, ...]"

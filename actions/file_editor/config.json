@@ -15,9 +15,10 @@
     "onChangeObjectMenuEvent": "fullreload",
     "timeout": 60,
     "outputFormat": "text",
-    "icon": "description",
+    "icon": "edit",
     "showOnlyForObjectsWithProperties": "SERVICE_PATH",
     "applyToOwnObjects": true,
+    "swapActionControlBtn": true,
     "options": {
         "IDForm": "EditorForm",
         "IDResult": "editorResult",
@@ -28,6 +29,7 @@
         "filterFiles": "(\\.ini$)|(\\.xml$)|(\\.dsc$)|(\\.cmd$)|(\\.bat$)|(\\.cfg$)|(\\.data$)|(\\.tmpl$)|(\\.json$)|(\\.txt$)",
         "order": "common.json,config,main",
         "skipDirs": "old_version,sav,certs,!scripts",
-        "filePath": "CONFIG_FILES_PATH"
+        "filePath": "CONFIG_FILES_PATH",
+        "bcpFilePath": "./old_version/%:YYYY:%%:MM:%%:dd:%%:HH:%%:mm:%%:ss:%_edt"
     }
 }

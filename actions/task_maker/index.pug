@@ -5,9 +5,9 @@ doctype
 html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
     head
         title= action.name
-        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
-        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
-        link(rel='stylesheet', href='/stylesheets/actions.css')
+        link(rel='stylesheet' href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet' href='/material-design-icons/material-icons.css')
+        link(rel='stylesheet' href='/stylesheets/actions.css')
         meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
         script(src='/jquery/jquery.min.js')
         // http://jqueryui.com/download/#!themeParams=none
@@ -15,103 +15,98 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         // http://jqueryui.com/sortable/
         script(src='/jquery-ui/jquery-ui.min.js')
         script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/resizer.js')
+        script(src='/javascripts/escapeHTML.js')
         script.
             var parameters = {
                 action: !{JSON.stringify(action)},
                 objects: !{JSON.stringify(objects)}
             };
-
-            var entityMap = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;',
-                '/': '&#x2F;',
-                '`': '&#x60;',
-                '=': '&#x3D;'
-            };
-
-            function escapeHtml(string) {
-                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
-                    return entityMap[s];
-                });
-            }
     body
+        script(src='/javascripts/objectsSelector.js')
+        script(src= action.link + '/' + action.staticDir + '/' + 'taskList.js')
+        script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
     main
-        div.row
-            div.col.s12
-                //h2= action.name
-                //p.right-align= action.description
-        div.row
-            div.col.s12
-                script(src='/javascripts/objectsSelector.js')
-                script(src= action.link + '/' + action.staticDir + '/' + 'taskList.js')
-                script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
+        div#taskMakerBody
+            div(style="overflow: auto;padding: 0 10px 0 10px")#taskListParent
                 div.row
                     div.col.s12
-                        div#removedTaskCard.card.hide
-                            div.card-content
-                                span.card-title Tasks for removing
-                                div.input-field
-                                    textarea(disabled)#removedTaskList.materialize-textarea
-                                    label(for="removedTaskList") Task list for removing
-                                    input(type="hidden")#removedTaskIDs
-                            div.card-action
-                                a(href="#!")#clearListOfRemovedTasks Clear list
-
                         input(type="hidden" value="")#workflow
                         span#taskListArea
+            div(data-direction="vertical" style="width:100%; height:24px; padding-top:11px;").resizer#resizer
+                div(style="width:100%; height:2px; background-color: #bbbbbb;")
+                    div(style="position: relative; bottom: 80px; right: 20px; width: 4rem; float: right; " +
+                    "text-align: center; cursor: pointer;")#removedTask.hide
+                        i(style="text-shadow: lightgrey 2px 2px; color: red; font-size: 4rem;")#removedTaskIcon.material-icons delete
+                        div(style="position: relative; bottom: 3rem; font-size: 1.2rem; color: white")#removedTaskNum 10
+                        input(type="hidden")#removedTaskIDs
+            div(style="position: absolute; width: 100%; overflow: auto;padding: 0 10px 0 10px;")#taskAction
+                div#taskSettings.row.hide
+                    div.col.s12.m6.l4.input-field#taskNameDiv
+                        //i.material-icons.prefix edit
+                        input(type="text")#taskName.validate
+                        label(for="taskName") Task name
+                        // 0 - don't add a new task
+                        input(type="hidden" value="0")#taskID
+                        input(type="hidden")#taskUpdated
+                    div.col.s12.m6.l2.input-field#newTaskGroupParent
+                        select#newTaskGroup
+                        label(for="newTaskGroup") Group for task
+                    div.col.s6.m6.l4.input-field#taskExecutionConditionParent
+                        select(multiple)#taskExecutionCondition
+                        label(for="taskExecutionCondition") Task execution condition
+                    span#taskExecuteConditionSettingsArea.hide
+                        div.input-field.col.s6.m6.l2
+                            label
+                                input(type="checkbox" checked)#runTaskOnce
+                                span Run the task once
+                    span#taskExecuteTimeSettingsArea.hide
+                        div.input-field.col.s3.m3.l1
+                            input(type="hidden")#runTaskAtDateTimestamp
+                            input(type="text")#runTaskAtDate.datepicker
+                            label(for="runTaskAtDate") Date
+                        div.input-field.col.s3.m3.l1
+                            input(type="text")#runTaskAtTime.timepicker
+                            label(for="runTaskAtTime") Time
+                    div.col.s12#taskExecutionConditionsDescription
+                    div.col.s12
+                        input(type="hidden")#actionsOrder
+                        ul(data-collapsible="expandable")#taskParametersArea.collapsible.z-depth-0
 
-                        div#taskSettings.card.hide
-                            div.card-content.row
-                                div.col.s12.card-title Task settings
-                                div.col.s12.m6.l4.input-field#taskNameDiv
-                                    //i.material-icons.prefix edit
-                                    input(type="text")#taskName.validate
-                                    label(for="taskName") Task name
-                                    // 0 - don't add a new task
-                                    input(type="hidden" value="0")#taskID
-                                    input(type="hidden")#taskUpdated
-                                div.col.s12.m6.l2.input-field
-                                    select#newTaskGroup
-                                    label(for="newTaskGroup") Group for task
-                                div.col.s6.m6.l4.input-field
-                                    select(multiple)#taskExecutionCondition
-                                    label(for="taskExecutionCondition") Task execution condition
-                                span#taskExecuteConditionSettingsArea.hide
-                                    div.input-field.col.s6.m6.l2
-                                        label
-                                            input(type="checkbox" checked)#runTaskOnce
-                                            span Run the task once
-                                span#taskExecuteTimeSettingsArea.hide
-                                    div.input-field.col.s3.m3.l1
-                                        input(type="hidden")#runTaskAtDateTimestamp
-                                        input(type="text")#runTaskAtDate.datepicker
-                                        label(for="runTaskAtDate") Date
-                                    div.input-field.col.s3.m3.l1
-                                        input(type="text")#runTaskAtTime.timepicker
-                                        label(for="runTaskAtTime") Time
-                                div.col.s12#taskExecutionConditionsDescription
-                                div.col.s12
-                                    input(type="hidden")#actionsOrder
-                                    ul(data-collapsible="expandable")#taskParametersArea.collapsible.z-depth-0
+        div#modalChangeTaskConfirm.modal
+            div.modal-content
+                h4 Change task confirmation
+                p.
+                    If you select another task, you will lose all changes made for the selected task.
+                    Do you really want to choose another task and have lost all the changes?
+            div.modal-footer
+                a(href='#!')#modalChangeTaskConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                a(href='#!')#modalChangeTaskConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
 
-                div#modalChangeTaskConfirm.modal
-                    div.modal-content
-                        h4 Change task confirmation
-                        p If you select another task, you will lost all changes for selected task. Do you really want to change task and lost all changes?
-                    div.modal-footer
-                        a(href='#!')#modalChangeTaskConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
-                        a(href='#!')#modalChangeTaskConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+        div#modalTimePassedConfirm.modal
+            div.modal-content
+                h4 Task start time attention
+                p.
+                    The task start time has expired. Do you want to save a task with expired start time?
+                    The task will be started immediately.
+            div.modal-footer
+                a(href='#!')#modalTimePassedConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
+                a(href='#!')#modalTimePassedConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
 
-                div#modalTimePassedConfirm.modal
-                    div.modal-content
-                        h4 Task start time attention
-                        p Task start time has passed. Do you want to save a task with past start time?
-                    div.modal-footer
-                        a(href='#!')#modalTimePassedConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
-                        a(href='#!')#modalTimePassedConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
+        div#modalPressAddOnTaskConfirm.modal
+            div.modal-content
+                h4 Merge tasks
+                p
+                    span You can add all the actions from the selected task "
+                    span(data-modal-add-on-task-confirm-taskname style="font-weight: bold;")
+                    span.
+                        " to any other. To do this, click on "Select a task to merge", then click on the task to which
+                        you want to add actions.
+            div.modal-footer
+                a(href='#!')#modalPressAddOnTaskConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat.
+                    Select task to merge
+                a(href='#!')#modalPressAddOnTaskConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat.
+                    Cancel
 
     footer
         input(type="hidden" name="actionName" value= action.name)

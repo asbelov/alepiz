@@ -8,7 +8,7 @@
             "chatID": "-123456789",
             "//localAddress": "127.0.0.1",
             "//family": 6,
-            "//proxyHost": "proxy.mydomain.com",
+            "//proxyHost": "proxy.my-domain.com",
             "proxyProtocol": "http|https",
             "proxyPort": 3128,
             "proxyUser": "proxyUserName",

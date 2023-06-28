@@ -6,7 +6,6 @@
 const log = require('../lib/log')(module);
 const path = require('path');
 const thread = require("../lib/threads");
-const Conf = require('../lib/conf');
 
 const replServer = {
     start: replServerStart,

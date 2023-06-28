@@ -12,16 +12,15 @@ var async = require('async');
 var countersDB = {};
 module.exports = countersDB;
 
-/*
-    return all counters for specific objects
-
-    objectsIDs: array of objects IDs
-    callback(err, rows)
-    rows: [{id:.., name:.., unitID:..., collector:..., sourceMultiplier:..., groupID:..., OCID:..., objectID:..., objectName:..., objectDescription:..}, ...]
-    OCID is a objects-counters ID
+/**
+ * Return all counter parameters for specific objects
+ * @param {Array<number>} objectIDs an array with the object IDs
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows)
+ *     rows: [{id:.., name:.., taskCondition:..., unitID:..., collectorID:..., debug:..., sourceMultiplier:...,
+ *     groupID:..., OCID:..., objectID:..., objectName:..., objectDescription:..}, ...]
  */
-countersDB.getCountersForObjectsAndGroups = function(objectsIDs, callback) {
-    log.debug('Try to get counters for objects ', objectsIDs);
+countersDB.getCountersForObjectsAndGroups = function(objectIDs, callback) {
+    log.debug('Try to get counters for objects ', objectIDs);
 
     var rows = [];
     var stmt = db.prepare(
@@ -37,7 +36,7 @@ WHERE objectsCounters.objectID = ? \
 ORDER BY countersGroups.name, counters.name, objects.name', function(err) {
         if(err) return callback(err);
 
-        async.eachLimit(objectsIDs,100,function(objectID, callback) {
+        async.eachLimit(objectIDs,100,function(objectID, callback) {
             stmt.all(objectID, function(err, rowsPart) {
                 if(err) return callback(err);
                 rows.push.apply(rows, rowsPart);
@@ -50,12 +49,26 @@ ORDER BY countersGroups.name, counters.name, objects.name', function(err) {
     });
 }
 
+/**
+ * Get counters fro the counter group SELECT * FROM counters WHERE counters.groupID=?
+ * @param {number} groupID group ID
+ * @param {function(Error, Array<Object>)} callback callback(err, rows) where rows
+ * [{id, name, collectorID, groupID, unitID, sourceMultiplier, keepHistory, keepTrends, modifyTime,
+ * description, disabled, debug, taskCondition, created}, ...]
+ */
 countersDB.getCountersForGroup = function(groupID, callback) {
     log.debug('Getting all counters for group ', groupID);
 
     db.all('SELECT * FROM counters WHERE counters.groupID=?', groupID, callback);
 };
 
+/**
+ * Get counters for the counter ID SELECT * FROM counters WHERE counters.id=?
+ * @param {number} counterID counter ID
+ * @param {function(Error)|function(null, Object|undefined)} callback callback(err, row) where rows is
+ * {id, name, collectorID, groupID, unitID, sourceMultiplier, keepHistory, keepTrends, modifyTime,
+ * description, disabled, debug, taskCondition, created} or undefined when the counter is not found
+ */
 countersDB.getCounterByID = function(counterID, callback){
     log.debug('Get counter by ID ', counterID);
 
@@ -66,21 +79,30 @@ countersDB.getCounterByID = function(counterID, callback){
     });
 };
 
+/**
+ * Get counter parameters for the counter SELECT name, value FROM counterParameters WHERE counterID = ?
+ * @param {number} counterID counter ID
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows) where rows
+ * [{name:..., value:...}, ....]
+ */
 countersDB.getCounterParameters = function(counterID, callback){
     log.debug('Getting counter parameters for id '+counterID);
     if(!counterID) return callback();
 
-    db.all('SELECT name, value FROM counterParameters WHERE counterID = ?', counterID, function(err, parameters){
-        if(err) return callback(new Error('Can\'t get collector parameters for counter ID '+counterID+': '+err.message));
-        callback(null, parameters);
+    db.all('SELECT name, value FROM counterParameters WHERE counterID = ?', counterID, function(err, rows){
+        if(err) {
+            return callback(new Error('Can\'t get collector parameters for counter ID ' + counterID +
+                ': ' + err.message));
+        }
+        callback(null, rows);
     });
 };
 
-/*
-    used in history.js for housekeeper procedure and don't require for check user rights
-
-    callback(err, row), where
-    row: [{OCID:.., history: .., trends: ...}, ...]
+/**
+ * Get all keepHistory and trends data.
+ * Used in history.js for housekeeper procedure and don't require for check user rights
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows) where rows is
+ * [{OCID:.., history: .., trends: ...}, ...]
  */
 countersDB.getKeepHistoryAndTrends = function(callback){
     log.debug('Getting keep history and trends parameter for all objects');
@@ -94,6 +116,12 @@ countersDB.getKeepHistoryAndTrends = function(callback){
     });
 };
 
+/**
+ * Get objects linked to the counter
+ * @param {number} counterID counter ID
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows) where rows is
+ * [{id:<objectID>, name:<objectName>, OCID:<OCID>}, ...]
+ */
 countersDB.getCounterObjects = function(counterID, callback){
     log.debug('Getting objects IDs and objects names for counter id '+counterID);
     if(!counterID) return callback();
@@ -110,28 +138,47 @@ WHERE objectsCounters.counterID=?', counterID, function(err, objects){
 
 /**
  * SELECT * FROM objectsCounters
- * @param {function} callback callback(err, rows): rows: [{id, objectID, counterID}, ...]
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows):
+ * rows: [{id, objectID, counterID}, ...]
  */
 countersDB.getAllObjectsCounters = function(callback) {
     db.all('SELECT * FROM objectsCounters', callback);
 };
 
 /** SELECT * FROM counters.
- * @param {function} callback callback(err, rows): rows: [{id, name, collectorID, groupID,unitID, sourceMultiplier,
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows): rows:
+ * [{id, name, collectorID, groupID,unitID, sourceMultiplier,
  *  keepHistory, keepTrends, modifyTime, disabled, debug, taskCondition, created}, ...]
  */
 countersDB.getAllCounters = function(callback) {
     db.all('SELECT * FROM counters', callback);
 };
 
+/**
+ * SELECT * FROM countersUpdateEvents
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows): rows:
+ * [{id, counterID, parentCounterID, parentObjectID, expression, mode, objectFilter, description, updateEventOrder}, ..]
+ */
 countersDB.getAllUpdateEvents = function(callback) {
     db.all('SELECT * FROM countersUpdateEvents', callback);
 };
 
+/**
+ * SELECT * FROM counterParameters
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows): rows:
+ * [{id, name, value, counterID}, ...]
+ */
 countersDB.getAllParameters = function (callback) {
     db.all('SELECT * FROM counterParameters', callback);
 }
 
+/**
+ * Get historical variables data
+ * @param {string|number} counter counterID or parent counter name
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows): rows:
+ * [{name:<variableName>, counterID, objectID, objectName, parentCounterName, function, functionParameters,
+ * objectVariable, description, variableOrder, OCID, counterName, parentCounterID}]
+ */
 countersDB.getVariables = function(counter, callback){
     log.debug('Getting variables for counter: ', counter);
 
@@ -165,6 +212,12 @@ countersDB.getVariables = function(counter, callback){
         counter ? counter : [], callback);
 };
 
+/**
+ * Get data from expression variables
+ * @param {number|null} counterID counterID or null for get data for all variables
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows): rows:
+ * [{id, name, counterID, expression, description, variableOrder}, ...]
+ */
 countersDB.getVariablesExpressions = function(counterID, callback) {
     log.debug('Getting variables expression for counter ID ', counterID);
 
@@ -180,6 +233,15 @@ countersDB.getVariablesExpressions = function(counterID, callback) {
 
     callback(err, data)
     data: [{OCID: <objectsCountersID>, collector: <collectorID>, counterID:.., counterName:..., objectID:.., objectName:..}, {...}...]
+ */
+
+/**
+ * Get data for first calculation for all counters
+ * @param {Array<string>} collectorNames an array with collector names
+ * @param {Array<number>} objectsIDs an array with object IDs
+ * @param {Array<number>} countersIDs an array with counter IDs
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows): rows:
+ * [{OCID, collector, counterID, counterName, objectID, objectName, debug, groupID, taskCondition}]
  */
 countersDB.getCountersForFirstCalculation = function(collectorNames, objectsIDs, countersIDs, callback) {
     log.debug('Getting data for independent counters calculation for counters: ', countersIDs,' and objects: ', objectsIDs);
@@ -212,16 +274,14 @@ countersDB.getCountersForFirstCalculation = function(collectorNames, objectsIDs,
 };
 
 
-/*
-    get counters parameters for specific objects and counters IDs
-
-    OCIDsArray - array with objectCounterIDs
-    callback(err, data)
-    data = [{OCID: <OCID>, name: <parameter name>, value: <parameter value>}, ...]
-    parameter value can be a variable %:<var>:%
-*/
-countersDB.getCountersParameters = function(OCIDsArray, callback){
-    log.debug('Getting parameters for objectCountersIDs ', OCIDsArray);
+/**
+ * get counters parameters for specific objects and counters IDs
+ * @param {Array<number>} OCIDs an array with OCIDs
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows): rows:
+ * [{OCID: <OCID>, name: <parameter name>, value: <parameter value>}, ...]
+ */
+countersDB.getCountersParameters = function(OCIDs, callback){
+    log.debug('Getting parameters for objectCountersIDs ', OCIDs);
 
     var rows = [];
     var stmt = db.prepare(
@@ -231,7 +291,7 @@ JOIN objectsCounters ON counterParameters.counterID=objectsCounters.counterID \
 WHERE objectsCounters.id = ?', function(err) {
         if(err) return callback(err);
 
-        async.eachLimit(OCIDsArray, 100,function(objectCounterID, callback) {
+        async.eachLimit(OCIDs, 100,function(objectCounterID, callback) {
             stmt.all(objectCounterID, function(err, param) {
                 if(err) return callback(err);
                 rows.push.apply(rows, param);
@@ -261,6 +321,12 @@ countersDB.getObjectCounterID = function (objectID, counterID, callback){
     }, callback) // callback(err, row) where row undefined if not found or row.id
 };
 
+/**
+ * Get OCIDs for the counter
+ * @param {number} counterID counter ID
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows): rows:
+ * [{id:<OCID>, objectID}, ...]
+ */
 countersDB.getObjectCounterIDForCounter = function (counterID, callback){
     log.debug('Getting objectCounterID for counterID: ' + counterID);
 
@@ -268,30 +334,20 @@ countersDB.getObjectCounterIDForCounter = function (counterID, callback){
     db.all('SELECT id, objectID FROM objectsCounters WHERE counterID=?', [counterID], callback)
 };
 
-/*
-    get all objects IDs and counters IDs by objectsCountersIDs array from objectsCounters table
-
-    OCIDs - objectsCountersIDs array
-
-    callback(err, rows)
-    rows: [{id: objectCounterID, objectID: ..., counterID: ...}, {},...]
+/**
+ * get all object IDs and counter IDs by OCIDs array from the objectsCounters table
+ * @param {Array<number>} OCIDs an array with OCIDs
+ * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows): rows:
+ * [{id:<OCID>, objectID:, counterID}, ...]
  */
 countersDB.getObjectsCounters = function(OCIDs, callback) {
     //log.info('Getting objectsIDs and counters IDs for objectCountersIDs ', OCIDs);
-
-    // for small count of OCIDs
-    if(OCIDs.length < db.maxVariableNumber) {
-        db.all('SELECT * FROM objectsCounters WHERE objectsCounters.id IN (' +
-            (new Array(OCIDs.length)).fill('?').join(',') + ')', OCIDs, callback);
-
-        return;
-    }
 
     var rows = [];
     var stmt = db.prepare('SELECT * FROM objectsCounters WHERE objectsCounters.id = ?', function(err) {
         if(err) return callback(err);
 
-        async.eachLimit(OCIDs, 100,function(OCID, callback) {
+        async.eachSeries(OCIDs,function(OCID, callback) {
             stmt.all(OCID, function(err, res) {
                 if(err) return callback(err);
                 rows.push.apply(rows, res);
@@ -317,7 +373,7 @@ countersDB.getCountersForObjects = function(objectsIDs, callback) {
     var stmt = db.prepare('SELECT * FROM objectsCounters WHERE objectsCounters.objectID = ?', function(err) {
         if(err) return callback(err);
 
-        async.eachLimit(objectsIDs,100,function(objectID, callback) {
+        async.eachSeries(objectsIDs, function(objectID, callback) {
             stmt.all(objectID, function(err, res) {
                 if(err) return callback(err);
                 rows.push.apply(rows, res);
@@ -392,20 +448,18 @@ WHERE objectsCounters.id = ?`, OCID, callback);
 
 /** Get counter IDs by specific counter names
  *
- * @param {Array[string]} countersNames - array of counter names
- * @param {function(Error)|function(null, Array)} callback - callback(err, rows) return error or array of rows like
+ * @param {Array<string>} countersNames an array of counter names
+ * @param {function(Error)|function(null, Array<Object>)} callback - callback(err, rows) where rows
  * [{name: <counterName>, id: <counterID>}]
  */
 countersDB.getCountersIDsByNames = function (countersNames, callback) {
     if(!countersNames || !countersNames.length) return callback(null, []);
-    //db.all('SELECT name, id FROM counters WHERE name IN (' +
-    //    (new Array(countersNames.length)).fill('?').join(',') + ') COLLATE NOCASE', countersNames, callback);
 
     var rows = [];
     var stmt = db.prepare('SELECT name, id FROM counters WHERE name = ? COLLATE NOCASE', function(err) {
         if(err) return callback(err);
 
-        async.eachLimit(countersNames,100,function(counterName, callback) {
+        async.eachSeries(countersNames,function(counterName, callback) {
             stmt.all(counterName, function(err, res) {
                 if(err) return callback(err);
                 rows.push.apply(rows, res);
@@ -420,8 +474,8 @@ countersDB.getCountersIDsByNames = function (countersNames, callback) {
 
 /** Get union from variables and variablesExpressions table for parent counters
  *
- * @param {Array[uint]} counterIDs - array of counter IDs
- * @param {function(Error)|function(null, Array[Object])} callback - callback(err, rows) return error or array of rows
+ * @param {Array<number>} counterIDs - array of counter IDs
+ * @param {function(Error)|function(null, Array<Object>)} callback - callback(err, rows) return error or array of rows
  * like [{counterID:<parentCounterID>, counterName:<parentCounterName>, variableName:<variableName>,
  * variableExpression:<variableExpression>,  variableDescription: <variableDescription>},...]
  */
@@ -453,6 +507,32 @@ GROUP BY variableName, variableExpression ORDER BY counterName`,
         twoArraysOfCountersIDs, callback);
 }
 
+/**
+ * @typedef {Object} counterData
+ * @property {Array<Object>} counters SELECT * FROM counters WHERE counters.id=?
+ * @property {Array<Object>} counterParameters SELECT * FROM counterParameters WHERE counterParameters.counterID=?
+ * @property {Array<Object>} countersUpdateEvents SELECT * FROM countersUpdateEvents WHERE countersUpdateEvents.counterID=?
+ * @property {Array<Object>} variables SELECT * FROM variables WHERE variables.counterID=?
+ * @property {Array<Object>} variablesExpressions SELECT * FROM variablesExpressions WHERE variablesExpressions.counterID=?
+ * @property {Array<Object>} countersGroups SELECT * FROM countersGroups WHERE countersGroups.id=?
+ * @property {Array<Object>} countersUnits SELECT * FROM countersUnits WHERE countersUnits.id=?
+ */
+/**
+ * Get data for the counter
+ * @param {number} counterID counterID
+ * @param {function(Error)|function(null, counterData)} callback callback(err, counterData) where counterData is
+ * described in the example
+ * @example
+ * counterData: {
+ *      counters: SELECT * FROM counters WHERE counters.id=?
+ *      counterParameters: SELECT * FROM counterParameters WHERE counterParameters.counterID=?
+ *      countersUpdateEvents: SELECT * FROM countersUpdateEvents WHERE countersUpdateEvents.counterID=?
+ *      variables: SELECT * FROM variables WHERE variables.counterID=?
+ *      variablesExpressions: SELECT * FROM variablesExpressions WHERE variablesExpressions.counterID=?
+ *      countersGroups: SELECT * FROM countersGroups WHERE countersGroups.id=?
+ *      countersUnits: SELECT * FROM countersUnits WHERE countersUnits.id=?
+ * }
+ */
 countersDB.getAllForCounter = function (counterID, callback) {
     db.all('SELECT * FROM counters WHERE counters.id=?', counterID, function(err, c) {
         if(err) return callback(err);
@@ -486,6 +566,12 @@ countersDB.getAllForCounter = function (counterID, callback) {
     });
 }
 
+/**
+ * Get OCIDs from variables (used in the dashboard ajax)
+ * @param {string} objectName object name
+ * @param {number} counterID counter ID
+ * @param {function} callback - callback(err, rows), where rows [{OCID: }, ...]
+ */
 countersDB.getOCIDsForVariables = function(objectName, counterID, callback) {
     db.all('\
 SELECT objectsCounters.id AS OCID FROM variables \
@@ -502,7 +588,14 @@ WHERE variables.counterID = $counterID',
     }, callback);
 }
 
-countersDB.getObjectsCountersInfo = function (countersIDs, callback) {
+/**
+ * Get data for the counterIDs
+ * @param {Array<number>} counterIDs an array with counter IDs
+ * @param {function} callback - callback(err, rows), where rows
+ * [{counterName, counterID, counterGroup, keepHistory, keepTrends, counterDescription, debug, disabled,
+ * taskCondition, objectName, objectID, OCID}]
+ */
+countersDB.getObjectsCountersInfo = function (counterIDs, callback) {
 
     var rows = [],
         stmt = db.prepare('SELECT counters.name AS counterName, counters.id AS counterID, ' +
@@ -515,7 +608,7 @@ countersDB.getObjectsCountersInfo = function (countersIDs, callback) {
         'WHERE objectsCounters.counterID = ?', function (err) {
         if(err) return callback(err);
 
-        async.eachLimit(countersIDs, 100, function(counterID, callback) {
+        async.eachSeries(counterIDs, function(counterID, callback) {
             stmt.all(counterID, function (err, _rows) {
                 if(err) return callback(err);
                 Array.prototype.push.apply(rows, _rows);

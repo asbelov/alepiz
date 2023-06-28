@@ -6,19 +6,16 @@
 const log = require('../lib/log')(module);
 const IPC = require('../lib/IPC');
 const thread = require('../lib/threads');
+const async = require('async');
+const tasksDB = require('../models_db/tasksDB');
+const tasks = require('./tasks');
+const actionClient = require('../serverActions/actionClient');
 const Conf = require('../lib/conf');
 const conf = new Conf('config/common.json');
 const confTaskServer = new Conf('config/taskServer.json');
 
-
-const async = require('async');
-const tasksDB = require('../models_db/tasksDB');
-const tasks = require('../lib/tasks');
-const actionClient = require('../serverActions/actionClient');
-
-
 var serverIPC,
-    conditionsQueue = new Set(),
+    conditionsQueue = new Map(),
     systemUser = conf.get('systemUser') || 'system',
     scheduledTasks = new Map();
 
@@ -142,12 +139,14 @@ function stop(callback) {
  * Add scheduled task
  * @param {number} taskID task ID
  * @param {number} timestamp time to run the scheduled task
- * @param {object} workflow workflow
+ * @param {Array} workflow workflow array with workflow objects, like [{action: "execute", message: ...}, ....]
  */
 function scheduleTask(taskID, timestamp, workflow) {
     var runTime = timestamp - Date.now();
     if(runTime < 30000) {
-        log.info('Run schedule task ', taskID, ' now, because time to run is ', new Date(timestamp).toLocaleString());
+        log.info('Run schedule task ', taskID, ' now, because the time for the run has expired: ',
+            new Date(timestamp).toLocaleString());
+
         tasks.runTask({
             userName: systemUser,
             taskID: taskID,
@@ -177,7 +176,7 @@ function scheduleTask(taskID, timestamp, workflow) {
  * @param {Object} message message object
  * @param {Array} message.conditionOCIDs Array with condition OCIDs
  * @param {0|1} message.runType 0 - run permanently, 1 - run once
- * @param {Object} message.workflow workflow
+ * @param {Array} message.workflow workflow
  */
 function addConditionTask(taskID, message) {
     log.info('Queuing task ', taskID,', runType: ', message.runType,' for waiting conditions ', message.conditionOCIDs);
@@ -217,9 +216,12 @@ function cancelTask(taskID) {
  */
 function queueCondition(message) {
     const OCID = Number(message.OCID);
+    if(conditionsQueue.has(OCID)) return;
 
-    log.info('Queuing task condition for ', OCID, ': ', message.objectName, ' (', message.counterName, ')');
-    conditionsQueue.add(OCID);
+    log.debug('Receiving message for checking task condition, add to queue: ',
+        message.objectName, ' (', message.counterName, ') OCID: ', OCID);
+    delete message.OCID;
+    conditionsQueue.set(OCID, message);
 }
 
 /**
@@ -228,9 +230,9 @@ function queueCondition(message) {
 function processConditionsQueue() {
     var processingConditionsInProgress = setTimeout(function() {
         if(conditionsQueue.size) {
-            const OCIDs = Array.from(conditionsQueue);
+            log.debug('Checking task condition for: ', conditionsQueue);
+            const OCIDs = Array.from(conditionsQueue.keys());
             conditionsQueue.clear();
-            log.info('Checking task condition for OCIDs: ', OCIDs);
             tasks.checkCondition(OCIDs);
         }
         processConditionsQueue();
@@ -241,7 +243,7 @@ function processConditionsQueue() {
 /**
  * Send message after task executed
  * @param {number} taskID task ID
- * @param {Object} workflow workflow
+ * @param {Array} workflow array with workflow objects, like [{action: "execute", message: ...}, ....]
  * @param {Error} [error] Error
  * @param {function(Error) | function()} [callback] callback(err)
  */

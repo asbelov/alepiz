@@ -7,7 +7,7 @@
     "staticDir": "static",
     "showWhenNoObjectsSelected": true,
     "onChangeObjectMenuEvent": "fullreload",
-    "icon": "settings",
+    "icon": "info",
 	"CSVDiv": ";",
 	"CSVDecimalSep": ","
 }

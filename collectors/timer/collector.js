@@ -9,9 +9,12 @@ module.exports = collector;
 
 var timers = new Map(), wakeUpper = null, shiftInterval = 13000;
 
-/** Check every 50ms, that required time interval was occurred for save long time timers
-
- */
+/** Check every 50ms, that required wakeup interval will be occurred. It's made for save long time timers
+ * @param {Object} param - collector parameters
+ * @param {number} param.$id OCID
+ * @param {number} param.wakeupInterval wakeup timer period in sec
+ * @param {function(Error)|function(null, timestamp)} callback callback(err, Date.now())
+ * */
 collector.get = function(param, callback) {
     if (!param || !param.wakeupInterval) return callback(new Error('Parameter "wakeupInterval" is not specified'));
 
@@ -27,7 +30,8 @@ collector.get = function(param, callback) {
         prevRest: -1,
         callback: callback,
     });
-    log.info('Adding a new timer for objectCounterID: ', param.$id, ' with interval ', wakeupInterval, 's; shift: ', shift, 'ms');
+    log.info('Adding a new timer for objectCounterID: ', param.$id, ' with interval ',
+        wakeupInterval, 's; shift: ', shift, 'ms');
 
     if(!wakeUpper) {
         log.info('Initializing timer collector');

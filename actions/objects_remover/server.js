@@ -45,23 +45,23 @@ module.exports = function(args, callback) {
         log.info('Objects for removing: ', objects);
 
         var objectNamesForRemove = [];
-        var objectsIDs = objects.map(function(obj) {
+        var objectIDs = objects.map(function(obj) {
             if(obj.id) {
                 objectNamesForRemove.push(obj.name);
                 return Number(obj.id);
             }
             else return 0;
         }).filter(function(id) {
-            return (id && id === parseInt(id, 10)); // return only integer objectsIDs > 0
+            return (id && id === parseInt(id, 10)); // return only integer objectIDs > 0
         });
 
-        if(!objectsIDs.length || objectsIDs.length !== objects.length) {
+        if(!objectIDs.length || objectIDs.length !== objects.length) {
             return callback(new Error('Incorrect object in ' + objects));
         }
 
         log.info('Checking user rights for removing objects for ', args.username,'...');
 
-        rightsWrapper.getObjectsCountersIDs(args.username, objectsIDs, function(err, rows) {
+        rightsWrapper.getObjectsCountersIDs(args.username, objectIDs, function(err, rows) {
             if(err) {
                 return callback(new Error('Error getting objectsCountersIDs: ' + err.message +
                     '; Objects: ' + objectNamesForRemove.join(', ')));
@@ -69,8 +69,8 @@ module.exports = function(args, callback) {
 
             var OCIDs = rows.map(row => row.id);
             if(!OCIDs || !OCIDs.length) {
-                log.info('Objects: ', objectNamesForRemove, ' has no counters.');
-                callback();
+                log.info('Objects do not have linked counters');
+                return removeObjectsFromDatabase(objectNamesForRemove, objectIDs, callback);
             }
 
             log.info('Sending message to server for stopping collect data for objects: ',
@@ -86,8 +86,7 @@ module.exports = function(args, callback) {
                 // remove objects without checking rights for speed up.
                 // We do it above at rightsWrapper.getObjectsCountersIDs()
                 async.parallel([function (callback) {
-                    log.info('Sending message to history for removing objects: ', objectNamesForRemove,
-                        ' OCIDs: ', OCIDs);
+                    log.info('Sending message to history for removing objects');
                     history.del(OCIDs, function (err) {
                         if (err) log.error(err.message);
                     });
@@ -96,13 +95,18 @@ module.exports = function(args, callback) {
                     // This can last a long time when the housekeeper is working.
                     callback();
                 }, function (callback) {
-                    log.info('Removing objects from database: ', objectNamesForRemove, '; object IDs: ', objectsIDs);
-                    rawObjectsDB.deleteObjects(objectsIDs, function (err) {
-                        if (err) log.error(err.message);
-                        callback();
-                    });
+                    removeObjectsFromDatabase(objectNamesForRemove, objectIDs, callback);
                 }], callback);
             });
         })
     });
 };
+
+function removeObjectsFromDatabase(objectNamesForRemove, objectIDs, callback) {
+    log.info('Removing objects from database: ', objectNamesForRemove.join(', '),
+        '; object IDs: ', objectIDs.join(', '));
+    rawObjectsDB.deleteObjects(objectIDs, function (err) {
+        if (err) log.error(err.message);
+        callback();
+    });
+}

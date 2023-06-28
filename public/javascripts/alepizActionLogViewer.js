@@ -5,27 +5,28 @@
 var alepizActionLogViewerNamespace = (function($) {
     var collapsibleInstance,
         logLastUpdateElm,
-        logBodyElm;
+        logBodyElm,
+        bodyElm;
 
     var retrievingLogRecordsInProgress = 0;
     var maxLogRecords = 200;
     var timeout = 60000;
 
     function init (parentElm) {
-        var html = '<div class="row"></div><div class="col s12 right-align" id="last-update"></div>' +
-            '<div class="col s12"><div class="divider"></div></div>' +
+        var html = '<div style="position: fixed; bottom: 10px; right: 30px; text-align: right" id="last-update"></div>' +
             '<ul class="collapsible z-depth-0" id="collapsible-log-body"></ul>';
 
         parentElm.html(html);
 
         logBodyElm = $('#collapsible-log-body');
         logLastUpdateElm = $('#last-update');
+        bodyElm = $('body');
 
         // return several instances
         collapsibleInstance = M.Collapsible.init(logBodyElm[0], {});
     }
 
-    function getLastLogRecords(sessionIDs, lastLogRecordIDs, getActionName) {
+    function getLastLogRecords(sessionIDs, lastLogRecordIDs, getActionName, dontClearLogWindow, messageFilter) {
         if(Date.now() - retrievingLogRecordsInProgress < timeout) return;
 
         retrievingLogRecordsInProgress = Date.now();
@@ -34,18 +35,25 @@ var alepizActionLogViewerNamespace = (function($) {
             logBodyElm.find('div.logRecord').length + ' log records, active sessions: ' + (sessionIDs.length - 1));
         //console.log('getLogRecords: ', lastLogRecordIDs, 'Sessions: ', sessionIDs.join(','));
 
-        if(!lastLogRecordIDs || typeof lastLogRecordIDs !== 'object' || !Object.keys(lastLogRecordIDs).length) {
-            logBodyElm.empty();
-        }
+        // next 2 lines used for every time retrieve log from beginning
+        lastLogRecordIDs = {};
+        dontClearLogWindow = false;
 
+        bodyElm.css({cursor: 'progress'});
         $.ajax('/mainMenu', {
             type: 'POST',
             data: $.param({
                 f: 'getLogRecords',
                 lastID: JSON.stringify(lastLogRecordIDs),
                 sessionIDs: sessionIDs.join(','),
+                messageFilter: messageFilter,
             }),
-            success: function(recordsObj) { processLogRecords(recordsObj, lastLogRecordIDs, getActionName) },
+            success: function(recordsObj) {
+                bodyElm.css({cursor: 'default'});
+                if(!dontClearLogWindow) logBodyElm.empty();
+                //console.log(recordsObj)
+                processLogRecords(recordsObj, lastLogRecordIDs, getActionName)
+            },
             error: ajaxError,
             timeout: timeout - 10,
             cache: false
@@ -180,7 +188,7 @@ var alepizActionLogViewerNamespace = (function($) {
                 '<i class="material-icons" sessionID="' + logSessionID + '">' + icon + '</i><b>' + actionName + '</b>' +
                 '. Session starting at&nbsp;<span sessionID="' + logSessionID + '">' + firstTimeStr +
                 '</span>, finished at&nbsp;' + lastTimeStr +
-                ', new records: ' + recordsSortedBySessions[logSessionID].lines +
+                ', messages: ' + recordsSortedBySessions[logSessionID].lines +
                 '&nbsp;[' + logSessionID + ']' +
                 '</div><div class="collapsible-body" id="' + logSessionID + '">' +
                 recordsSortedBySessions[logSessionID].html + '</div></li>';
@@ -215,15 +223,20 @@ var alepizActionLogViewerNamespace = (function($) {
         return  messageParts.map(function(data){
             var colorClass = colorCodes[data.slice(0, 3)];
             var part = data.slice(3);
-            //console.log('colorCode: "'+colorCode+'"='+colorCodes[colorCode]+', part: "'+ part+'"\n');
+            //console.log('colorCode: "' + colorCode + '"=' + colorCodes[colorCode] + ', part: "' + part + '"\n');
             if(!part) return '';
-            part = part.replace(/</gm, '&lt;').replace(/>/gm, '&gt;');
-            if(!colorClass) return '<span>'+part+'</span>';
-            return '<span class="'+colorClass+'">'+part+'</span>';
+            part = part
+                .replace(/</gm, '&lt;')
+                .replace(/>/gm, '&gt;')
+                .replace(/{{highlightOpen}}/g, '<span class="highLight">')
+                .replace(/{{highlightClose}}/g, '</span>');
+            if(!colorClass) return '<span>' + part + '</span>';
+            return '<span class="' + colorClass + '">' + part + '</span>';
         }).join('');
     }
 
     function ajaxError(jqXHR, exception) {
+        bodyElm.css({cursor: 'default'});
         retrievingLogRecordsInProgress = 0;
         var err;
         if (jqXHR.status === 404) {
@@ -258,5 +271,6 @@ var alepizActionLogViewerNamespace = (function($) {
         getLastLogRecords: getLastLogRecords,
         processLogRecords: processLogRecords,
         getLogRecordsNum: getLogRecordsNum,
+        clearLog: function () { logBodyElm.empty(); }
     }
 })(jQuery);

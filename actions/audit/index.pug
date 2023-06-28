@@ -7,10 +7,12 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         title= action.name
         link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
         link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        link(rel='stylesheet' href='/stylesheets/index.css')
         meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
         script(src='/jquery/jquery.min.js')
         script(src='/jquery-ui/jquery-ui.min.js')
         script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/resizer.js')
         script(src='/javascripts/escapeHTML.js')
         script(src='/javascripts/alepizActionLogViewer.js')
         script.
@@ -23,20 +25,57 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         script(src='/javascripts/objectsSelector.js')
         script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
         main
-        div#auditBody
-            div(style="padding: 0 10px 0 10px")#actionListHead
-            div(style="overflow: auto;padding: 0 10px 0 10px")#actionList
-            div(data-direction="vertical" style="width:100%; height:24px; padding-top:11px").resizer#resizer
-                div(style="width:100%; height:2px; background-color: #cbd5e0;")
-            div(style="overflow: auto;padding: 0 10px 0 10px")#actionLog
-
-        div#modalRunConfirm.modal
-            div.modal-content
-                h4 Action run confirmation
-                p Do you really want to run action for objects:
-                    span#selectedObjectsNames
-                    span ? Action will do nothing. Press F12 after run to view action result.
-            div.modal-footer
-                a(href='#!')#modalRunConfirmYes.modal-action.modal-close.waves-effect.waves-green.btn-flat Yes
-                a(href='#!')#modalRunConfirmNo.modal-action.modal-close.waves-effect.waves-green.btn-flat No
-            // end example of action
+            div#auditBody
+                div(style="padding: 0 10px 0 10px")
+                    ul.collapsible
+                        li
+                            div.collapsible-header.no-padding
+                                table.bordered(style="table-layout:fixed;")
+                                    thead(style="background-color: white; width: 100%")#sessionTableHeader
+                                        tr
+                                            th(style="width: 5%")
+                                                i.material-icons expand_more
+                                            th(style="width: 5%") Start
+                                            th(style="width: 5%") Stop
+                                            th(style="width: 10%") User
+                                            th(style="width: 10%") Action
+                                            th(style="width: 35%") Description
+                                            th(style="width: 20%") Error
+                                            th(style="width: 10%") Objects
+                            div.collapsible-body
+                                div.row.no-margin
+                                    div.input-field.col.s12.m4.l3
+                                        input(type='text')#taskIDFilter
+                                        label(for='taskIDFilter') Task IDs
+                                    div.col.s6.m4.l2.input-field
+                                        // value set to raise label
+                                        input(type='text' style="cursor:pointer").datepicker#startDate
+                                        label(for='startDate') From
+                                    div.col.s6.m4.l2.input-field
+                                        // value set to raise label
+                                        input(type='text' style="cursor:pointer").datepicker#endDate
+                                        label(for='endDate') To
+                                    div.input-field.col.s12.m6.l5
+                                        select#selectUsers(multiple)
+                                        label Users
+                                    div.input-field.col.s12.m6
+                                        select#selectActions(multiple)
+                                        label Actions
+                                    div.input-field.col.s12.m6
+                                        input(type='text')#descriptionFilter
+                                        label(for='descriptionFilter') Description or error
+                                    div.input-field.col.s12.m6.l8
+                                        input(type='text')#messageFilter
+                                        label(for='messageFilter') Log message
+                                    div.input-field.col.s6.m4.l2
+                                        label
+                                            input(type='checkbox' checked)#simpleFilterCB
+                                            span Simple filter
+                                    div.col.s3.m4.l1.input-field.col
+                                        a(href='#!')#modalFilterApply.waves-effect.waves-green.btn Apply
+                                    div.col.s3.m4.l1.input-field.col
+                                        a(href='#!')#modalFilterClear.waves-effect.waves-green.btn Clear
+                div(style="overflow: auto;padding: 0 10px 0 10px")#actionList
+                div(data-direction="vertical" style="width:100%; height:24px; padding-top:11px").resizer#resizer
+                    div(style="width:100%; height:2px; background-color: #cbd5e0;")
+                div(style="overflow: auto;padding: 0 10px 0 10px")#actionLog

@@ -26,7 +26,7 @@
             "default": 1
         },
         "warnTimeDirSizeCalculation": {
-            "description": "Maximum execution time for warningin the log (ms)",
+            "description": "Maximum execution time for warning the log (ms)",
             "checkAs": "UNZInteger",
             "default": 300000
         },

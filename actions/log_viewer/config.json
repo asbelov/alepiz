@@ -7,6 +7,7 @@
   "staticDir": "static",
   "onChangeObjectMenuEvent": "fullreload",
   "timeout": 60,
+  "icon": "text_snippet",
   "showOnlyForObjectsWithProperties": "SERVICE_PATH",
   "options": {
     "IDForm": "LogViewerForm",

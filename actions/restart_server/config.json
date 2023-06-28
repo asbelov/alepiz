@@ -13,5 +13,7 @@
   "timeout": 60,
   "showWhenNoObjectsSelected": true,
   "outputFormat": "text",
-  "descriptionTemplate": "Restarting server"
+  "descriptionTemplate": "Restarting server",
+  "noObjectsRequired": true,
+  "icon": "restart_alt"
 }

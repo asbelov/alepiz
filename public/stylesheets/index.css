@@ -230,8 +230,8 @@ ul#collapsible-log-body {
     border: 0 !important;
 }
 
-div.logRecord {
-    padding: 1em 0 !important;
+.log-record {
+    padding: 1em 0;
     border-bottom: 1px solid #ddd;
 }
 div.logIcon {
@@ -285,4 +285,10 @@ div.logDateStr {
 
 .logColor38m {
     color: grey !important;
+}
+
+.highLight {
+    background-color: #FFEDB9FF !important;
+    line-height: 2 !important;
+    box-shadow: 5px 0 0 0 #FFEDB9FF, -5px 0 0 0 #FFEDB9FF !important;
 }

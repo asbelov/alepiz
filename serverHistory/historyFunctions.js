@@ -16,13 +16,19 @@ module.exports = functions;
  */
 
 functions.avg = function(id, parameters, callback) {
-    if(parameters.length < 1) return callback(new Error('Error in parameters for "avg('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 1) {
+        return callback(new Error('Error in parameters for "avg(' +
+            parameters.join(', ') + ')" function for objectID: ' + id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
 
     history.get(id, shift, num, 1, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "avg('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "avg(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records) return callback(null, {records: rawRecords});
 
@@ -33,9 +39,9 @@ functions.avg = function(id, parameters, callback) {
 
         var result = sum / count;
         log.debug('FUNC: avg(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
 
@@ -100,9 +106,9 @@ functions.change = function(id, parameters, callback) {
         } else result = last === first ? 0: 1;
 
         log.debug('FUNC: [abs]change(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
         callback(null, {
@@ -174,11 +180,16 @@ var compare  = {
     'ilike': function(x,y) {return String(x).toUpperCase().indexOf(String(y).toUpperCase()) !== -1},
     'regexp': function(x,y) { return (new RegExp(y)).test(x); },
     'iregexp': function(x,y) { return (new RegExp(y, 'i')).test(x); },
-    'nearest': function(x,y,z) { return !isNaN(parseFloat(String(x))) && isFinite(x) && Number(x) > y-z && Number(x) < y+z }
+    'nearest': function(x,y,z) {
+        return !isNaN(parseFloat(String(x))) && isFinite(x) && Number(x) > y-z && Number(x) < y+z
+    }
 };
 
 functions.count = function(id, parameters, callback) {
-    if(parameters.length < 1) return callback(new Error('Error in parameters for "count('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 1) {
+        return callback(new Error('Error in parameters for "count(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
@@ -191,16 +202,26 @@ functions.count = function(id, parameters, callback) {
             var outlier = Number(operator);
             pattern = Number(pattern);
             operator = 'nearest';
-        } else return callback(new Error('Error occurred while getting data from history for "count('+parameters.join(', ')+')" function for objectID: '+ id +': <pattern> is not a number'));
+        } else {
+            return callback(new Error('Error occurred while getting data from history for "count(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': <pattern> is not a number'));
+        }
     } else {
         operator = operator.toLowerCase();
-        if(!(operator in compare)) return callback(new Error('Invalid compare operator "'+operator+'" in function count('+parameters.join(', ')+') for objectID '+id));
+        if(!(operator in compare)) {
+            return callback(new Error('Invalid compare operator "' + operator + '" in function count(' +
+                parameters.join(', ') + ') for objectID ' + id));
+        }
     }
 
-    var recordsType = ['eqstr', 'ieqstr', 'like', 'ilike', 'regexp', 'iregexp'].indexOf(operator) === -1 ? 1 : 2;
+    var recordsType =
+        ['eqstr', 'ieqstr', 'like', 'ilike', 'regexp', 'iregexp'].indexOf(operator) === -1 ? 1 : 2;
 
     history.get(id, shift, num, recordsType, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "count('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "count(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(records && records.length) {
             var result = 0;
@@ -210,16 +231,17 @@ functions.count = function(id, parameters, callback) {
                     try {
                         result += Number(compare[operator](record.data, pattern, outlier));
                     } catch (e) {
-                        log.error('Error occurred while calculating data from history for "count(' + parameters.join(', ') + ')" function for objectID: ' + id + ': ' + e.message);
+                        log.error('Error occurred while calculating data from history for "count(' +
+                            parameters.join(', ') + ')" function for objectID: ' + id + ': ' + e.message);
                     }
                 });
             }
         }
 
         log.debug('FUNC: count(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
         callback(null, {
@@ -261,13 +283,19 @@ functions.count.description = 'Number of values within the defined evaluation pe
 
 
 functions.delta = function(id, parameters, callback) {
-    if(parameters.length < 1) return callback(new Error('Error in parameters for "delta('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 1) {
+        return callback(new Error('Error in parameters for "delta(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
 
     history.get(id, shift, num, 1, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "delta('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "delta(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records) return callback(null, {records: rawRecords});
 
@@ -279,9 +307,9 @@ functions.delta = function(id, parameters, callback) {
 
         var result = min !== null && max !== null ? max - min : 0;
         log.debug('FUNC: delta(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
         callback(null, {
@@ -291,7 +319,8 @@ functions.delta = function(id, parameters, callback) {
     });
 };
 
-functions.delta.description = 'Difference between the maximum and minimum values within the defined evaluation period (\'max()\' minus \'min()\').\n' +
+functions.delta.description = 'Difference between the maximum and minimum values within the defined evaluation ' +
+    'period (\'max()\' minus \'min()\').\n' +
     '\n' +
     'delta(<period>, [<timeShift>])\n' +
     'period: evaluation period in milliseconds\n' +
@@ -318,17 +347,18 @@ functions.last = function(id, parameters, callback) {
 
     // set recordsType to null for get last record in any cases (see cache.get())
     history.get(id, shift, num, null, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "last('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "last(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records || !records.length) return callback(null, {records: rawRecords});
 
-        //if(!records[0]) return callback(new Error('Error in records returned for "last('+parameters.join(', ')+')" function for objectID: '+ id + ': ' + JSON.stringify(records)));
-
         var result = records[records.length - 1].data;
         log.debug('FUNC: last(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
         callback(null, {
@@ -339,23 +369,29 @@ functions.last = function(id, parameters, callback) {
 };
 
 functions.last.description = 'Return a last value.\n' +
-    'if a time interval is specified, then returns the last value for this time interval\n' +
     '\n' +
     'last([#<recordsShift>])\n' +
     'recordsShift: evaluation point is moved the number of records back. Default #0\n' +
     '\n' +
     'last(<timeShift>, [<period>])\n' +
     'timeShift: evaluation point is moved the number of milliseconds.\n' +
-    'period: evaluation period in milliseconds. If omitted, then <period> will be equal to <timeShift>\n';
+    'period: the evaluation period in milliseconds. Returns the value in this time interval. ' +
+    'If omitted, then <period> will be equal to <timeShift>\n';
 
 functions.max = function(id, parameters, callback) {
-    if(parameters.length < 1) return callback(new Error('Error in parameters for "max('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 1) {
+        return callback(new Error('Error in parameters for "max(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
 
     history.get(id, shift, num, 1, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "max('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "max(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records) return callback(null, {records: rawRecords});
 
@@ -365,9 +401,9 @@ functions.max = function(id, parameters, callback) {
         });
 
         log.debug('FUNC: max(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
         callback(null, {
@@ -392,13 +428,19 @@ functions.max.description = 'Highest value of an item within the defined evaluat
     'recordsShift: evaluation point is moved the number of records back\n';
 
 functions.min = function(id, parameters, callback) {
-    if(parameters.length < 1) return callback(new Error('Error in parameters for "min('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 1) {
+        return callback(new Error('Error in parameters for "min(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
 
     history.get(id, shift, num, 1, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "min('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "min(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records) return callback(null, {records: rawRecords});
 
@@ -408,9 +450,9 @@ functions.min = function(id, parameters, callback) {
         });
 
         log.debug('FUNC: min(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
         callback(null, {
@@ -446,9 +488,9 @@ functions.nodata = function(id, parameters, callback, prevResult) {
     history.get(id, 0, '#1', 0, function (err, records) {
         log.debug('nodata: history.get(', id, ', 0, #1, 0) parameters: ', parameters, '; records: ', records,
             ', err: ', err, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
             if(err) {
@@ -465,18 +507,18 @@ functions.nodata = function(id, parameters, callback, prevResult) {
 
             var difference = result - prevResult;
             // the difference should be about 30 seconds
-            if(records && records[0] && (difference < 20000 || difference > 40000)) {
+            if(records && records[0] && (difference < 20000 || difference > 70000)) {
                 log.warn('Nodata for ', id, ' more than ', Math.ceil(result / 3600000),
-                    'hours, prev result 30 sec ago was: ', Math.ceil(prevResult / 3600000), ' hours, difference: ',
+                    ' hours, prev result 30 sec ago was: ', Math.ceil(prevResult / 3600000), ' hours, difference: ',
                     result - prevResult, ' milliseconds, now: ', Date.now(), ' records: ', records);
             }
         }
 
         if(period) result = result > period ? 1 : 0;
         log.debug('FUNC: nodata() = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
         callback(null, {
@@ -498,7 +540,10 @@ functions.nodata.description = 'Checking for no data received.\n' +
     '         if no record found return time before 01.01.1970';
 
 functions.regexp =  function(id, parameters, callback) {
-    if(parameters.length < 2) return callback(new Error('Error in parameters for "regexp('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 2) {
+        return callback(new Error('Error in parameters for "regexp(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
 
     var pattern = parameters[0];
     var num = parameters[1];
@@ -508,11 +553,15 @@ functions.regexp =  function(id, parameters, callback) {
     try {
         var regExp = new RegExp(pattern, flags);
     } catch (err) {
-        return callback(new Error('Incorrect regular expression "'+pattern+'" in "regexp('+parameters.join(', ')+')" function for objectID: '+ id + ': ' + err.message))
+        return callback(new Error('Incorrect regular expression "' + pattern + '" in "regexp(' +
+            parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message))
     }
 
     history.get(id, shift, num, 2,function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "regexp('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "regexp(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records) return callback(null, {records: rawRecords});
 
@@ -526,9 +575,9 @@ functions.regexp =  function(id, parameters, callback) {
         }
 
         log.debug('FUNC: regexp(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
         callback(null, {
@@ -563,13 +612,19 @@ functions.regexp.description = 'Checking if the latest (most recent) value match
 
 
 functions.sum = function(id, parameters, callback){
-    if(parameters.length < 1) return callback(new Error('Error in parameters for "sum('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 1) {
+        return callback(new Error('Error in parameters for "sum(' + parameters.join(', ') +
+            ')" function for objectID: '+ id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
 
     history.get(id, shift, num, 1, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "sum('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "sum(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records) return callback(null, {records: rawRecords});
 
@@ -579,9 +634,9 @@ functions.sum = function(id, parameters, callback){
         });
 
         log.debug('FUNC: sum(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
         callback(null, {
@@ -605,22 +660,101 @@ functions.sum.description = 'Sum of collected values within the defined evaluati
     'recordsCnt: count of records from the recordsShift\n' +
     'recordsShift: evaluation point is moved the number of records back\n';
 
+functions.concat = function(id, parameters, callback){
+    if(parameters.length < 1) {
+        return callback(new Error('Error in parameters for "concat(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
+
+    var num = parameters[0];
+    var shift = parameters[1] ? parameters[1] : 0;
+    var separator = parameters[2] !== undefined ? String(parameters[2]) : ',';
+    var skipEqualValues = !!parameters[3];
+    var isReverse = !!parameters[4];
+
+    history.get(id, shift, num, 0, function(err, records, rawRecords) {
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "concat(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
+
+        if(!records) return callback(null, {records: rawRecords});
+
+        var resultArr = [], resultSet = new Set();
+        records.map(function(record) {
+            if(record.data === 0 || record.data) {
+                if(skipEqualValues) resultSet.add(record.data)
+                else resultArr.push(String(record.data));
+            }
+        });
+
+        if(resultSet.size) resultArr = Array.from(resultSet);
+        if(isReverse) resultArr = resultArr.reverse();
+
+        var result = resultArr.join(separator);
+
+        log.debug('FUNC: concat(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
+            vars: {
+                "EXPECTED_OCID": id
+            }
+        });
+        callback(null, {
+            data: result,
+            records: rawRecords
+        });
+    });
+};
+
+functions.concat.description = 'Concatenate the collected values to string within the defined evaluation period and ' +
+    'with defined separator.\n' +
+    '\n' +
+    'concat(<period>, [<timeShift>], [<separator>], [<skipEqualValues>], [<isReverse>])\n' +
+    'period: evaluation period in milliseconds\n' +
+    'timeShift: evaluation point is moved the number of milliseconds\n' +
+    'separator: separator for collected values. by default ","\n' +
+    'skipEqualValues: (1|0) if the equal values occur, add only the first of the equal values to the result. ' +
+    'Default 0\n' +
+    'isReverse: (1|0) add values to the result in reverse order. Default 0\n' +
+    '\n' +
+    'concat(<timestampFrom>, <timestampTo>, [<separator>], [<skipEqualValues>], [<isReverse>])\n' +
+    'timestampFrom: timestamp in milliseconds from 1970 - begin of time\n' +
+    'timestampTo: timestamp in milliseconds from 1970 - end of time\n' +
+    'separator: separator for collected values. by default ","\n' +
+    'skipEqualValues: (1|0) if the equal values occur, add only the first of the equal values to the result. ' +
+    'Default 0\n' +
+    'isReverse: (1|0) add values to the result in reverse order. Default 0\n' +
+    '\n' +
+    'concat(#<recordsCnt>, [#<recordsShift>], [<separator>], [<skipEqualValues>], [<isReverse>])\n' +
+    'recordsCnt: count of records from the recordsShift\n' +
+    'recordsShift: evaluation point is moved the number of records back\n' +
+    'separator: separator for collected values. by default ","\n' +
+    'skipEqualValues: (1|0) if the equal values occur, add only the first of the equal values to the result. ' +
+    'Default 0\n' +
+    'isReverse: (1|0) add values to the result in reverse order. Default 0\n';
+
 functions.outliersBrd = function(id, parameters, callback) {
     // https://en.wikipedia.org/wiki/Outlier
     // https://ru.m.wikihow.com/%D0%B2%D1%8B%D1%87%D0%B8%D1%81%D0%BB%D0%B8%D1%82%D1%8C-%D0%B2%D1%8B%D0%B1%D1%80%D0%BE%D1%81%D1%8B
 
-    if(parameters.length < 1) return callback(new Error('Error in parameters for "outliersBrd('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 1) {
+        return callback(new Error('Error in parameters for "outliersBrd(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
     var borderType = parameters[2] ? String(parameters[2]).toLowerCase() : 'min';
 
     if(borderType !== 'min' && borderType !== 'max')
-        return callback(new Error('Error in parameters for "outliersBrd('+parameters.join(', ')+')" function for objectID: '+
-            id + ': ' + parameters[2] + ' can be "min" or "max"'));
+        return callback(new Error('Error in parameters for "outliersBrd(' + parameters.join(', ') +
+            ')" function for objectID: ' + id + ': ' + parameters[2] + ' can be "min" or "max"'));
 
     history.get(id, shift, num,1, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "borderTF('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "borderTF(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records || !records.length || records.length < 3) return callback(null, {records: rawRecords});
 
@@ -632,17 +766,23 @@ functions.outliersBrd = function(id, parameters, callback) {
             I1 = len * 0.25, I1_floor = Math.floor(I1), I1_ceil = Math.ceil(I1),
             I3 = len * 0.75, I3_floor = Math.floor(I3), I3_ceil = Math.ceil(I3);
 
-        if(!numericRecords[I1_ceil] || !numericRecords[I1_floor] || !numericRecords[I3_ceil] || !numericRecords[I3_floor])
+        if(!numericRecords[I1_ceil] || !numericRecords[I1_floor] || !numericRecords[I3_ceil] ||
+            !numericRecords[I3_floor]) {
             return callback(null, {records: rawRecords});
+        }
 
-        var Q1 = I1 !== I1_ceil ? numericRecords[I1_ceil].data : ( numericRecords[I1_floor].data + numericRecords[I1_ceil].data ) / 2,
-            Q3 = I3 !== I3_ceil ? numericRecords[I3_ceil].data : ( numericRecords[I3_floor].data + numericRecords[I3_ceil].data ) / 2,
+        var Q1 = I1 !== I1_ceil ?
+                numericRecords[I1_ceil].data : ( numericRecords[I1_floor].data + numericRecords[I1_ceil].data ) / 2,
+
+            Q3 = I3 !== I3_ceil ?
+                numericRecords[I3_ceil].data : ( numericRecords[I3_floor].data + numericRecords[I3_ceil].data ) / 2,
+
             result = borderType === 'min' ? Q1 - (Q3 - Q1) * 1.5 : Q3 + (Q3 - Q1) * 1.5;
 
         log.debug('FUNC: outliersBrd(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
 
@@ -683,14 +823,21 @@ functions.lastRob = function(id, parameters, callback) {
     // https://en.wikipedia.org/wiki/Outlier
     // https://ru.m.wikihow.com/%D0%B2%D1%8B%D1%87%D0%B8%D1%81%D0%BB%D0%B8%D1%82%D1%8C-%D0%B2%D1%8B%D0%B1%D1%80%D0%BE%D1%81%D1%8B
 
-    if(parameters.length < 1) return callback(new Error('Error in parameters for "lastRob('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 1) {
+        return callback(new Error('Error in parameters for "lastRob(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
-    var recordIdx = Number(parameters[2]) === parseInt(String(parameters[2]), 10) ? Number(parameters[2]) : 0;
+    var recordIdx = Number(parameters[2]) === parseInt(String(parameters[2]), 10) ?
+        Number(parameters[2]) : 0;
 
     history.get(id, shift, num,1, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "lastRob('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "lastRob(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records || !records.length || records.length < 3) return callback(null, {records: rawRecords});
 
@@ -702,11 +849,17 @@ functions.lastRob = function(id, parameters, callback) {
             I1 = len * 0.25, I1_floor = Math.floor(I1), I1_ceil = Math.ceil(I1),
             I3 = len * 0.75, I3_floor = Math.floor(I3), I3_ceil = Math.ceil(I3);
 
-        if(!numericRecords[I1_ceil] || !numericRecords[I1_floor] || !numericRecords[I3_ceil] || !numericRecords[I3_floor])
+        if(!numericRecords[I1_ceil] || !numericRecords[I1_floor] || !numericRecords[I3_ceil] ||
+            !numericRecords[I3_floor]) {
             return callback(null, {records: rawRecords});
+        }
 
-        var Q1 = I1 !== I1_ceil ? numericRecords[I1_ceil].data : ( numericRecords[I1_floor].data + numericRecords[I1_ceil].data ) / 2,
-            Q3 = I3 !== I3_ceil ? numericRecords[I3_ceil].data : ( numericRecords[I3_floor].data + numericRecords[I3_ceil].data ) / 2,
+        var Q1 = I1 !== I1_ceil ?
+                numericRecords[I1_ceil].data : ( numericRecords[I1_floor].data + numericRecords[I1_ceil].data ) / 2,
+
+            Q3 = I3 !== I3_ceil ?
+                numericRecords[I3_ceil].data : ( numericRecords[I3_floor].data + numericRecords[I3_ceil].data ) / 2,
+
             interval = (Q3 - Q1) * 1.5,
             max = Q3 + interval,
             min = Q1 - interval,
@@ -725,9 +878,9 @@ functions.lastRob = function(id, parameters, callback) {
 
 
         log.debug('FUNC: lastRob(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
 
@@ -738,7 +891,8 @@ functions.lastRob = function(id, parameters, callback) {
     });
 };
 
-functions.lastRob.description = 'Getting robustness value of an item within the defined evaluation period excluding outliers.\n' +
+functions.lastRob.description = 'Getting robustness value of an item within the defined evaluation period ' +
+    'excluding outliers.\n' +
     '\n' +
     'https://en.wikipedia.org/wiki/Outlier\n' +
     'Using Tukey\'s fences algorithm for records: [71, 70, 73, 70, 69, 70, 72, 71, _300_, 71, 69]\n' +
@@ -769,14 +923,20 @@ functions.avgTF = function(id, parameters, callback) {
     // https://en.wikipedia.org/wiki/Outlier
     // https://ru.m.wikihow.com/%D0%B2%D1%8B%D1%87%D0%B8%D1%81%D0%BB%D0%B8%D1%82%D1%8C-%D0%B2%D1%8B%D0%B1%D1%80%D0%BE%D1%81%D1%8B
 
-    if(parameters.length < 1) return callback(new Error('Error in parameters for "avgTF('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 1) {
+        return callback(new Error('Error in parameters for "avgTF(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
     var avgCnt= Number(parameters[2]) === parseInt(String(parameters[2]), 10) ? Number(parameters[2]) : 0;
 
     history.get(id, shift, num,1, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "avgTF('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "avgTF(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records) return callback(null, {records: rawRecords});
 
@@ -790,11 +950,17 @@ functions.avgTF = function(id, parameters, callback) {
             I1 = len * 0.25, I1_floor = Math.floor(I1), I1_ceil = Math.ceil(I1),
             I3 = len * 0.75, I3_floor = Math.floor(I3), I3_ceil = Math.ceil(I3);
 
-        if(!numericRecords[I1_ceil] || !numericRecords[I1_floor] || !numericRecords[I3_ceil] || !numericRecords[I3_floor])
+        if(!numericRecords[I1_ceil] || !numericRecords[I1_floor] || !numericRecords[I3_ceil] ||
+            !numericRecords[I3_floor]) {
             return functions.avg(id, parameters, callback);
+        }
 
-        var Q1 = I1 !== I1_ceil ? numericRecords[I1_ceil].data : ( numericRecords[I1_floor].data + numericRecords[I1_ceil].data ) / 2,
-            Q3 = I3 !== I3_ceil ? numericRecords[I3_ceil].data : ( numericRecords[I3_floor].data + numericRecords[I3_ceil].data ) / 2,
+        var Q1 = I1 !== I1_ceil ?
+                numericRecords[I1_ceil].data : ( numericRecords[I1_floor].data + numericRecords[I1_ceil].data ) / 2,
+
+            Q3 = I3 !== I3_ceil ?
+                numericRecords[I3_ceil].data : ( numericRecords[I3_floor].data + numericRecords[I3_ceil].data ) / 2,
+
             interval = (Q3 - Q1) * 1.5,
             max = Q3 + interval,
             min = Q1 - interval,
@@ -820,9 +986,9 @@ functions.avgTF = function(id, parameters, callback) {
 
         var result = sum / count;
         log.debug('FUNC: avgTF(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
 
@@ -833,7 +999,8 @@ functions.avgTF = function(id, parameters, callback) {
     });
 };
 
-functions.avgTF.description = 'Robustness average value of an item within the defined evaluation period excluding outliers using Tukey\'s fences algorithm.\n' +
+functions.avgTF.description = 'Robustness average value of an item within the defined evaluation period excluding ' +
+    'outliers using Tukey\'s fences algorithm.\n' +
     '\n' +
     'https://en.wikipedia.org/wiki/Outlier\n' +
     'Algorithm for records: [71, 70, 73, 70, 69, 70, 72, 71, _300_, 71, 69]\n' +
@@ -864,18 +1031,24 @@ functions.avgTF.description = 'Robustness average value of an item within the de
 
 
 functions.avgMed = function(id, parameters, callback) {
-    if(parameters.length < 3) return callback(new Error('Error in parameters for "avgMed('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 3) {
+        return callback(new Error('Error in parameters for "avgMed(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1];
     var outliersPercent = Number(parameters[2]);
 
-    if(isNaN(parseFloat(String(outliersPercent))) || !isFinite(outliersPercent) || outliersPercent > 99 || outliersPercent < 1)
-        return callback(new Error('Error in parameters for "avgMed('+parameters.join(', ')+')" function for objectID: '+
-            id + ': outliersPercent not number or less than 1% or more than 99%'));
+    if(isNaN(parseFloat(String(outliersPercent))) || !isFinite(outliersPercent) || outliersPercent > 99 ||
+        outliersPercent < 1) {
+        return callback(new Error('Error in parameters for "avgMed(' + parameters.join(', ') +
+            ')" function for objectID: ' + id + ': outliersPercent not number or less than 1% or more than 99%'));
+    }
 
     history.get(id, shift, num,1,function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "avgMed('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) return callback(new Error('Error occurred while getting data from history for "avgMed(' +
+            parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
 
         if(!records || !records.length || records.length < 3) return callback(null, {records: rawRecords});
 
@@ -894,10 +1067,10 @@ functions.avgMed = function(id, parameters, callback) {
         }
 
         var result = sum / count;
-        log.debug('FUNC: avgMedustness(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+        log.debug('FUNC: avgMed(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
 
@@ -908,10 +1081,12 @@ functions.avgMed = function(id, parameters, callback) {
     });
 };
 
-functions.avgMed.description = 'Robustness average value of an item within the defined evaluation period excluding outliers using median algorithm.\n' +
+functions.avgMed.description = 'Robustness average value of an item within the defined evaluation period excluding ' +
+    'outliers using median algorithm.\n' +
     '\n' +
     'F.e. records: [1, 3, 4, 2, 6, 5, 7, 9, 8, 10]; outliersPercent=20\n' +
-    'outliers count is 10(records count) / 100 * 20(outliersPercent) = 2; result will be (3 + 4 + 6 + 5 + 7 + 8) / 6 = 5.5\n' +
+    'outliers count is 10(records count) / 100 * 20(outliersPercent) = 2; ' +
+    'result will be (3 + 4 + 6 + 5 + 7 + 8) / 6 = 5.5\n' +
     '\n' +
     'avgMed(<period>, <timeShift>, <outliersPercent>)\n' +
     'period: evaluation period in milliseconds\n'  +
@@ -930,7 +1105,10 @@ functions.avgMed.description = 'Robustness average value of an item within the d
 
 
 functions.avgNear = function(id, parameters, callback) {
-    if(parameters.length < 3) return callback(new Error('Error in parameters for "avgNear('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 3) {
+        return callback(new Error('Error in parameters for "avgNear(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1];
@@ -940,24 +1118,24 @@ functions.avgNear = function(id, parameters, callback) {
     var direction = Number(parameters[5]) || 0;
 
     if(isNaN(parseFloat(String(patternValue))) || !isFinite(patternValue)) {
-        return callback(new Error('Error in parameters for "avgNear(' + parameters.join(', ') + ')" function for objectID: ' +
-            id + ': patternValue is not number: ' + patternValue));
+        return callback(new Error('Error in parameters for "avgNear(' + parameters.join(', ') +
+            ')" function for objectID: ' + id + ': patternValue is not number: ' + patternValue));
     }
 
     if(isNaN(parseFloat(String(outliers))) || !isFinite(outliers) || outliers < 0) {
-        return callback(new Error('Error in parameters for "avgNear(' + parameters.join(', ') + ')" function for objectID: ' +
-            id + ': outliers is negative or not number: ' + outliers));
+        return callback(new Error('Error in parameters for "avgNear(' + parameters.join(', ') +
+            ')" function for objectID: ' +  id + ': outliers is negative or not number: ' + outliers));
     }
 
     if(count && count < 0) {
-        return callback(new Error('Error in parameters for "avgNear('+parameters.join(', ')+')" function for objectID: '+
-            id + ': num is negative: ' + count));
+        return callback(new Error('Error in parameters for "avgNear(' + parameters.join(', ') +
+            ')" function for objectID: ' + id + ': num is negative: ' + count));
     }
 
     history.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) {
-            return callback(new Error('Error occurred while getting data from history for "avgNear('+
-                parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+            return callback(new Error('Error occurred while getting data from history for "avgNear(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});
@@ -976,11 +1154,9 @@ functions.avgNear = function(id, parameters, callback) {
             for(var minIdx, maxIdx, i = 0; i < len && maxIdx === undefined; i++) {
                 var record = sortedRecords[i];
                 if (record <= patternValue && i - count + 1 >= 0 && sortedRecords[i - count + 1] >= record - outliers) {
-                // 31/03/21 was: if (record <= patternValue && i > count && sortedRecords[i - count + 1] >= record - outliers) {
                     minIdx = i;
                 }
                 if (record >= patternValue && i + count - 1 < len && sortedRecords[i + count - 1] <= record + outliers) {
-                // 31/03/21 was: if (record >= patternValue && i <= len - count && sortedRecords[i + count - 1] <= record + outliers) {
                     maxIdx = i;
                 }
             }
@@ -1030,9 +1206,9 @@ functions.avgNear = function(id, parameters, callback) {
 
         var result = count ? sum / count : null;
         log.debug('FUNC: avgNear(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
         callback(null, {
@@ -1042,11 +1218,13 @@ functions.avgNear = function(id, parameters, callback) {
     });
 };
 
-functions.avgNear.description = 'Average value of an items with values nearest to specific value within the defined evaluation period.\n' +
+functions.avgNear.description = 'Average value of an items with values nearest to specific value within the ' +
+    'defined evaluation period.\n' +
     '\n' +
     'ex#1. records: [1, 3, 4, 2, 6, 5, 7, 9, 8, 10]; patternValue=3; outliers=2\n' +
     'minimum value 3-2=1; maximum value 3+2=5; result will be (1 + 3 + 4 + 2 + 5) / 5 = 3\n' +
-    'ex#2. records:  [31,42,55,61,33,44,55,60,39,44,51,69,34,57,44,62,30,40,50,60]; patternValue=52; outliers=4, num=3, direction=-1\n' +
+    'ex#2. records:  [31,42,55,61,33,44,55,60,39,44,51,69,34,57,44,62,30,40,50,60]; patternValue=52; outliers=4, ' +
+    'num=3, direction=-1\n' +
     'sorted records: [30,31,33,34,39,40,42,44,44,44,50,51,55,55,57,60,60,61,62,69];\n' +
     'nearest value less than 52 taking into account outliers = 44,\n' +
     'minimum value 40; maximum value 44; result will be (44 + 44 + 44 + 42 + 40) / 5 = 42.8\n' +
@@ -1110,22 +1288,28 @@ function linearApprox(records, time, threshold) {
 }
 
 functions.forecast = function(id, parameters, callback){
-    if(parameters.length < 2) return callback(new Error('Error in parameters for "forecast('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 2) {
+        return callback(new Error('Error in parameters for "forecast(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
     var forecastTime = parameters[2] + Date.now();
 
     history.get(id, shift, num,1, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "forecast('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "forecast(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records) return callback(null, {records: rawRecords});
 
         var result = linearApprox(records, forecastTime);
         log.debug('FUNC: forecast(', parameters.join(', '), ') = ', result, '; records: ', records, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
 
@@ -1155,23 +1339,29 @@ functions.forecast.description = 'Future value of the item.\n' +
     'time: forecasting horizon in milliseconds from 1970\n';
 
 functions.timeLeft = function(id, parameters, callback){
-    if(parameters.length < 2) return callback(new Error('Error in parameters for "timeLeft('+parameters.join(', ')+')" function for objectID: '+ id));
+    if(parameters.length < 2) {
+        return callback(new Error('Error in parameters for "timeLeft(' + parameters.join(', ') +
+            ')" function for objectID: ' + id));
+    }
 
     var num = parameters[0];
     var shift = parameters[1] ? parameters[1] : 0;
     var threshold = parameters[2];
 
     history.get(id, shift, num,1, function(err, records, rawRecords) {
-        if (err) return callback(new Error('Error occurred while getting data from history for "timeLeft('+parameters.join(', ')+')" function for objectID: '+ id +': ' + err.message));
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "timeLeft(' +
+                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+        }
 
         if(!records) return callback(null, {records: rawRecords});
 
         var result = Math.round(linearApprox(records, null, threshold));
         log.debug('FUNC: timeLeft(', parameters.join(', '), ') = ', result, '(',
             (new Date(result)).toLocaleString(), '); records: ', records, {
-                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                 vars: {
-                    "RECEIVED_OCID": id
+                    "EXPECTED_OCID": id
                 }
             });
 

@@ -13,7 +13,8 @@
     "onChangeObjectMenuEvent": "nothing",
     "outputFormat": "text",
     "descriptionTemplate": "Create a new interface %:config:%",
-    "icon": "settings",
+    "icon": "fullscreen",
+    "noObjectsRequired": true,
     "canAddParametersToAction": true,
     "parameters": {
         "config": {

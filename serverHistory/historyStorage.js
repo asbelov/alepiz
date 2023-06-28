@@ -184,9 +184,10 @@ function childFunc() {
         selectQueryQueue.add(args);
 
         /*if(!storageModifyingProcess || !storageQueryingProcesses)*/
-        setTimeout(function() {
+        var t = setTimeout(function() {
             if (selectQueryQueue.size) childFunc.apply(this, setShift(selectQueryQueue));
-        }, 2000).unref();
+        }, 2000);
+        t.unref();
 
         return;
     }

@@ -243,6 +243,8 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                     p Можно выбрать условия выполнения действия:
                     ol
                         li.
+                            Run anyway - запустить действие в любом случае
+                        li.
                             Run if previous action completed without errors - запустить действие, если предыдущее
                             действие завершилось без ошибок
                         li.
@@ -261,12 +263,12 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                     p.
                         Поэтому если стоит задача обработки ошибок, то действие для обработки ошибок нужно ставить в конец задачи.
                         Например, есть задача по обновлению сервиса и его последующего запуска. Если обновление
-                        сервиса прошло неуспешно, то необходимо скопировать файлы в каталог сервиса из бэкапа.
+                        сервиса прошло неуспешно, то необходимо скопировать файлы в каталог сервиса из резервной копии.
                         Действия для подобной задачи необходимо располагать в следующем порядке:
                     ol
                         li Обновить сервис (условие "Run if previous action completed without errors")
                         li Запустить сервис (условие "Run if previous action completed without errors")
-                        li Вернуть в сервис файлы из бэкапа (условие "Run if someone of previous actions executed with an errors")
+                        li Вернуть в сервис файлы из резервной копии (условие "Run if someone of previous actions executed with an errors")
 
                     h3 Действие
                     p.
@@ -575,6 +577,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         li 0 - Run if previous action completed without errors;
                         li 1 - Run if someone of previous actions executed with an errors;
                         li 2 - Run and don't wait until the previous action will be completed
+                        li 3 - Run anyway
 
                     h4 Пример настройки шаблона сообщения workflow для email:
                     p.

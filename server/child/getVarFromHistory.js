@@ -2,6 +2,7 @@
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
+const log = require('../../lib/log')(module);
 const async = require("async");
 const fromHuman = require('../../lib/utils/fromHuman');
 const variablesReplace = require('../../lib/utils/variablesReplace');
@@ -15,6 +16,25 @@ const historyFunctionList = new Set(history.getFunctionList().map(func => func.n
 
 module.exports = getVarFromHistory;
 
+/**
+ * Calculate historical variable and return variable value
+ * @param {Object} historyVariable object with historical variable parameters
+ * @param {string} historyVariable.name historical variable name
+ * @param {string} historyVariable.function historical variable function
+ * @param {string} historyVariable.functionParameters historical variable function parameters
+ * @param {string} historyVariable.OCID OCID for get historical data
+ * @param {string} historyVariable.objectName object name for get historical data
+ * @param {string} historyVariable.objectVariable variable with the object name for get historical data
+ * @param {string} historyVariable.parentCounterName parent counter name for get historical data
+ * @param {string} historyVariable.parentCounterID parent counter ID for get historical data
+ * @param {Object} variables list of the variables, like {<name>: <value>, ....}
+ * @param {function(string, function)} getVariableValue function for get variable value for unresolved variable
+ * @param {Object} param for debug information
+ * @param {string} param.objectName object name
+ * @param {string} param.counterName counterName
+ * @param {string} param.counterID counterID
+ * @param {function(Error, *, Object)} callback callback(err, result, variablesDebugInfo)
+ */
 function getVarFromHistory(historyVariable, variables, getVariableValue, param, callback) {
 
     var functionParametersStr = historyVariable.functionParameters;
@@ -47,13 +67,23 @@ function getVarFromHistory(historyVariable, variables, getVariableValue, param, 
             '(' + historyVariable.parentCounterName + '): ' + historyVariable.function + '(' +
             funcParameters.join(', ') + ')';
 
-        calcObjectName(historyVariable, variables, getVariableValue, param,
+        // getting the OCID for getting the history data
+        calcOCID(historyVariable, variables, getVariableValue, param,
             function(err, OCID, variableObjectName) {
 
             if(err) {
                 variablesDebugInfo.result = err.message;
+                log.options(param.objectName, '(', param.counterName, ' #', param.counterID, '): ', err.message, {
+                    filenames: ['counters/' + param.counterID, 'counters'],
+                    level: 'I'
+                });
+                // Do not return an error if the OCID for getting history data cannot be found
+                return callback(null, null, variablesDebugInfo);
+
+                /*
                 return callback(new Error(param.objectName + '(' + param.counterName +
                     ' #' + param.counterID + '): ' + err.message), null, variablesDebugInfo);
+                */
             }
 
             funcParameters.unshift(OCID);
@@ -93,6 +123,13 @@ function getVarFromHistory(historyVariable, variables, getVariableValue, param, 
     });
 }
 
+/**
+ * Calculate historical function parameters
+ * @param {string} functionParametersStr string with comma separate function parameters
+ * @param {Object} variables list of the variables, like {<name>: <value>, ....}
+ * @param {function(string, function)} getVariableValue function for get variable value for unresolved variable
+ * @param {function(Error)|function(null, Array)} callback callback(err, arrayOfFunctionParameters)
+ */
 function calcFunctionParameters(functionParametersStr, variables, getVariableValue, callback) {
     var functionParameters = [];
     if(!functionParametersStr) return callback(null, functionParameters);
@@ -139,16 +176,39 @@ function calcFunctionParameters(functionParametersStr, variables, getVariableVal
     });
 }
 
+/**
+ * Convert human readable parameter to the number
+ * @param {*} parameter
+ * @return {number|*|undefined|string}
+ */
 function parameterValueFromHuman(parameter) {
     // try to convert Gb, Mb, Kb, B or date\time to numeric or return existing parameter
     if (String(parameter).charAt(0) !== '!') return fromHuman(parameter);
     return '!' + fromHuman(parameter.slice(1));
 }
 
-function calcObjectName(historyVariable, variables, getVariableValue, param, callback) {
+/**
+ * Get OCID for getting historical data
+ * @param {Object} historyVariable object with historical variable parameters
+ * @param {string} historyVariable.name historical variable name
+ * @param {string} historyVariable.function historical variable function
+ * @param {string} historyVariable.functionParameters historical variable function parameters
+ * @param {string} historyVariable.OCID OCID for get historical data
+ * @param {string} historyVariable.objectName object name for get historical data
+ * @param {string} historyVariable.objectVariable variable with the object name for get historical data
+ * @param {string} historyVariable.parentCounterName parent counter name for get historical data
+ * @param {string} historyVariable.parentCounterID parent counter ID for get historical data
+ * @param {Object} variables list of the variables, like {<name>: <value>, ....}
+ * @param {function(string, function)} getVariableValue function for get variable value for unresolved variable
+ * @param {Object} param for debug information
+ * @param {string} param.objectName object name
+ * @param {string} param.counterName counterName
+ * @param {string} param.counterID counterID
+ * @param {function(Error)|function(null, number, string)} callback callback(err, OCID, variableObjectName)
+ */
+function calcOCID(historyVariable, variables, getVariableValue, param, callback) {
 
-    // calculate and add objectCounterID as first parameter for history function
-    if (historyVariable.objectVariable) { // objectVariable is right, not param.objectName
+    if (historyVariable.objectVariable) { // use the objectVariable, do not use param.objectName
 
         var res = variablesReplace(historyVariable.objectVariable, variables);
         if (res) {
@@ -161,13 +221,18 @@ function calcObjectName(historyVariable, variables, getVariableValue, param, cal
                     if(err) return callback(err);
 
                     var res = variablesReplace(historyVariable.objectVariable, variables);
-                    if(!res) return callback(null, String(historyVariable.objectVariable).toUpperCase());
 
-                    if (res.unresolvedVariables.length) {
-                        return callback(new Error('Found unresolved variables while calculating object name from ' +
-                            historyVariable.objectVariable + ': ' + res.unresolvedVariables.join(', ')));
+                    if(!res) {
+                        return callback(new Error('Can\'t get OCID for object variable "' +
+                            historyVariable.objectVariable + '" and counterID: ' + historyVariable.parentCounterName));
                     }
-                    variableObjectName = String(res.value).toUpperCase();
+                    else {
+                        if (res.unresolvedVariables.length) {
+                            return callback(new Error('Found unresolved variables while calculating object name from ' +
+                                historyVariable.objectVariable + ': ' + res.unresolvedVariables.join(', ')));
+                        }
+                        variableObjectName = String(res.value).toUpperCase();
+                    }
 
                     var OCID = param.countersObjects.objectName2OCID.has(variableObjectName) ?
                         param.countersObjects.objectName2OCID.get(variableObjectName).get(Number(historyVariable.parentCounterID)) : null;
@@ -178,6 +243,7 @@ function calcObjectName(historyVariable, variables, getVariableValue, param, cal
 
                     callback(null, OCID, variableObjectName);
                 });
+
                 return;
             } else variableObjectName = String(res.value).toUpperCase();
         } else variableObjectName = String(historyVariable.objectVariable).toUpperCase();

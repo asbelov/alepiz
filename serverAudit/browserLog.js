@@ -29,8 +29,6 @@ browserLog.log = function (level, argsStr, sessionID, callback){
             ') not specified or invalid log level: ' + level));
     }
 
-
-
     if(!countOfLogMessagesFromBrowser.has(sessionID)) countOfLogMessagesFromBrowser.set(sessionID, 1);
     else {
         var n = countOfLogMessagesFromBrowser.get(sessionID);

@@ -7,9 +7,14 @@ const confLog = new Conf('config/log.json');
 
 var configurations = new Map();
 
+/**
+ * Create a log configuration for specific log label from log.json file
+ * @param {string} label log label (path to the js file, where was called the log function)
+ * @return {Object} log configuration
+ */
 module.exports = function(label) {
     var confObj = configurations.get(label);
-    // update configuration not often than every 3 minutes
+    // update configuration every 3 minutes
     if(confObj && Date.now() - confObj.timestamp < 180000) return confObj.cfg;
 
     var commonCfg = confLog.get();

@@ -6,7 +6,7 @@
         "transport": {
             "host": "localhost",
             "localAddress": "127.0.0.1",
-            "proxyHost": "proxy.mydomain.com",
+            "proxyHost": "proxy.my-domain.com",
             "proxyPort": 3128,
             "proxyUser": "proxyUserName",
             "proxyPass": "proxyUserPassword"

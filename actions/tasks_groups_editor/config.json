@@ -13,10 +13,9 @@
   "staticDir": "static",
   "timeout": 60,
   "showWhenNoObjectsSelected": true,
-  "outputFormat": "text",
   "descriptionTemplate": "Edit groups: %:o:%.",
   "icon": "format_list_bulleted",
-  "hideObjectsList": true,
+  "noObjectsRequired": true,
   "parameters": {
     "groupName": {
       "description": "New group name fro selected or new group"

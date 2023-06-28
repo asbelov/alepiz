@@ -57,7 +57,7 @@ media.send = function (param, callback) {
 users: array of objects [{address: <address>, fullName: <full name>}, ...]
  */
 function createAddress(users) {
-    if(!Array.isArray(users) || !users.length) return callback();
+    if(!Array.isArray(users) || !users.length) return '';
 
     var re = /^(([^<>()\[\].,;:\s@"]+(\.[^<>()\[\].,;:\s@"]+)*)|(".+"))@(([^<>()\[\].,;:\s@"]+\.)+[^<>()\[\].,;:\s@"]{2,})$/i;
 

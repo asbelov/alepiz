@@ -7,7 +7,6 @@
  */
 
 var log = require('../lib/log')(module);
-var async = require('async');
 var IPC = require('../lib/IPC');
 var proc = require('../lib/proc');
 const setShift = require('../lib/utils/setShift')
@@ -21,15 +20,12 @@ const actionsDBSave = require('../models_db/modifiers/actionsDB');
 
 const actionConf = require('../lib/actionsConf');
 
-var userDB = require('../models_db/usersDB');
-var sessionDB = require('../models_db/modifiers/auditUsersDB');
-var transaction = require('../models_db/modifiers/transaction');
 const thread = require("../lib/threads");
 const path = require("path");
 const runAction = require('./runAction');
 
 var systemUser = conf.get('systemUser') || 'system';
-var runActionProcess, runActionThread, runActionThreadUser;
+var runActionProcess, runActionThread, runActionThreadByUser;
 
 // initialize exit handler: dumping update events status on exit
 log.info('Starting the action runner server...');
@@ -45,13 +41,13 @@ var actionsQueueSystem = new Set(),
 
 var cfg = confActions.get();
 
-attachRunAction(cfg.serverNumber || 5, function (err, _runActionSystem) {
+attachRunAction(cfg.serverNumber || 5, function (err, _runActionBySystemUser) {
     if(err) throw err;
 
-    attachRunAction(cfg.userServerNumber || 3, function (err, _runActionUser) {
+    attachRunAction(cfg.userServerNumber || 3, function (err, _runActionByUser) {
         if (err) throw err;
-        runActionThread = _runActionSystem;
-        runActionThreadUser = _runActionUser;
+        runActionThread = _runActionBySystemUser;
+        runActionThreadByUser = _runActionByUser;
 
         cfg.id = 'actionServer';
         new IPC.server(cfg, function (err, msg, socket, callback) {
@@ -142,7 +138,7 @@ function addActionToQueue(param, callback) {
         // run ajax, addTask and notInQueue actions without queue
         // param.notInQueue set in routes/actions.js for run the action started by the user without a queue
         if(param.executionMode !== 'server' || actionConf.notInQueue || param.notInQueue) {
-            const myRunAction = actionConf.runActionInline ? runAction : runActionThreadUser;
+            const myRunAction = actionConf.runActionInline ? runAction : runActionThreadByUser;
             ++processedNotInQueue;
             myRunAction(param, function (err, data) {
                 --processedNotInQueue;

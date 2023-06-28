@@ -18,21 +18,22 @@ module.exports = rightsWrapper;
 
 /**
  * Check user rights for specific action
- * @param {string} username username
+ * @param {string|number} user username or userID
  * @param {string} actionIDOrFolder action ID (action dir name) or actions folder from Actions menu
  * @param {string|null} executionMode one of:
  *      null - don't check, only return rights
  *     'server' (run action);
  *     'ajax' (view action);
  *     'makeTask' (create task with specific action)
+ *     'audit' (allow to view the execution log from auditDB for non-own actions)
  * @param {function(Error)|function(null, Object)} callback callback(err, rights) err when err or no rights. rights is
- * object like {view: 0|1, run: 0|1, makeTask: 0|1,}
+ * object like {view: 0|1, run: 0|1, makeTask: 0|1, audit: 0|1}
  */
-rightsWrapper.checkActionRights = function (username, actionIDOrFolder, executionMode, callback) {
-    username = prepareUser(username);
+rightsWrapper.checkActionRights = function (user, actionIDOrFolder, executionMode, callback) {
+    if(typeof user === 'string') user = prepareUser(user);
 
     // the user 'system' has full rights to all actions
-    if(username === systemUser) return callback(null, {view: 1, run: 1, makeTask: 1});
+    if(user === systemUser || user === 0) return callback(null, {view: 1, run: 1, makeTask: 1, audit: 0});
 
     var actionsLayout = confActions.get('layout');
     for (var actionFolder in actionsLayout) {
@@ -40,29 +41,31 @@ rightsWrapper.checkActionRights = function (username, actionIDOrFolder, executio
     }
 
     if(!actionFolder) {
-        return callback(new Error('Can\'t find action folder for action ' + actionIDOrFolder + ', user: ' + username));
+        return callback(new Error('Can\'t find action folder for action ' + actionIDOrFolder + ', user: ' + user));
     }
 
     rightsDB.getRightsForActions(function(err, setWithActionsRights) {
         if(err) {
             return callback(new Error('Error getting rights for all actions for check rights for action "' +
-                actionIDOrFolder + '", action folder "' + actionFolder + '", user "' + username + '": ' + err.message));
+                actionIDOrFolder + '", action folder "' + actionFolder + '", user "' + user + '": ' + err.message));
         }
 
         var rights  = {
             view: 0,
             run: 0,
             makeTask: 0,
+            audit: 0,
             priority: 0,
         };
 
         setWithActionsRights.forEach(row => {
-            if(username !== row.username) return;
+            if(user !== row.username && user !== row.userID) return;
 
+            var currentPriority = 0;
             // low priority: default user rights to all actions are set
-            var currentPriority = 1;
+            if (row.actionName === null) currentPriority = 1;
             // medium priority: the user rights to a actions in the action folder are set
-            if (row.actionName === actionFolder) currentPriority = 2;
+            else if (row.actionName === actionFolder) currentPriority = 2;
             // high priority: the user rights to specific action are set
             else if (row.actionName === actionIDOrFolder) currentPriority = 3;
 
@@ -71,37 +74,59 @@ rightsWrapper.checkActionRights = function (username, actionIDOrFolder, executio
                     view: row.view,
                     run: row.run,
                     makeTask: row.makeTask,
+                    audit: row.audit,
                     priority: currentPriority,
                 }
+                //log.debug('!!!< action: ', actionIDOrFolder , '(', actionFolder, ') username: ', username, ', row: ', row, ', rights: ', rights)
             } else if(rights.priority === currentPriority) {
                 rights = {
                     view: row.view || rights.view,
-                    run: row.run || rights.view,
-                    makeTask: row.makeTask || rights.view,
+                    run: row.run || rights.run,
+                    makeTask: row.makeTask || rights.makeTask,
+                    audit: row.audit || rights.audit,
                     priority: currentPriority,
                 }
+                //log.debug('!!!== action: ', actionIDOrFolder , '(', actionFolder, ') username: ', username, ', row: ', row, ', rights: ', rights)
             }
         });
 
-        log.debug('Execution mode: ',executionMode, '; user: ', username, '; rights: ', rights);
+        log.debug(actionIDOrFolder, '(', actionFolder, '): execution mode: ',executionMode, '; user: ', user,
+            '; rights: ', rights, {
+            func: (vars) => vars.EXPECTED_USERNAME === vars.USERNAME,
+            vars: {
+                "EXPECTED_USERNAME": user,
+            }
+        });
         delete rights.priority;
 
         if(executionMode === null) return callback(null, rights);
 
         if(executionMode === 'ajax') {
-            if (!rights.view) return callback(new Error('User "' + username + '" doesn\'t have rights for view action "' + actionIDOrFolder + '"'));
-            else return callback(null, rights);
+            if (!rights.view) {
+                return callback(new Error('User "' + user + '" doesn\'t have rights for view action "' +
+                    actionIDOrFolder + '"'));
+            } else return callback(null, rights);
         }
         if(executionMode === 'server') {
-            if (!rights.run) return callback(new Error('User "' + username + '" doesn\'t have rights for run action "' + actionIDOrFolder + '"'));
-            else return callback(null, rights);
+            if (!rights.run) {
+                return callback(new Error('User "' + user + '" doesn\'t have rights for run action "' +
+                    actionIDOrFolder + '"'));
+            } else return callback(null, rights);
         }
         if(executionMode === 'makeTask') {
-            if (!rights.makeTask) return callback(new Error('User "' + username + '" doesn\'t have rights for create task with action "' + actionIDOrFolder + '"'));
-            else return callback(null, rights);
+            if (!rights.makeTask) {
+                return callback(new Error('User "' + user + '" doesn\'t have rights for create task with action "' +
+                    actionIDOrFolder + '"'));
+            } else return callback(null, rights);
+        }
+        if(executionMode === 'audit') {
+            if (!rights.audit) {
+                return callback(new Error('User "' + user + '" doesn\'t have rights to view the audit ' +
+                    'of non-own action "' + actionIDOrFolder + '"'));
+            } else return callback(null, rights);
         }
 
-        callback(new Error('Can\'t check rights for action "' + actionIDOrFolder + '", user "' + username +
+        callback(new Error('Can\'t check rights for action "' + actionIDOrFolder + '", user "' + user +
             '": unknown execution mode ' + executionMode));
     });
 };

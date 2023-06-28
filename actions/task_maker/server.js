@@ -5,16 +5,35 @@
 /**
  * Created by Alexander Belov on 25.03.2017.
  */
-var log = require('../../lib/log')(module);
-var transactionsDB = require('../../models_db/modifiers/transaction');
-var tasksDB = require('../../rightsWrappers/tasksDB');
-var tasks = require('../../lib/tasks');
-var taskServer = require('../../serverTask/taskServerClient');
-var async = require('async');
+const log = require('../../lib/log')(module);
+const transactionsDB = require('../../models_db/modifiers/transaction');
+const tasksDB = require('../../rightsWrappers/tasksDB');
+const tasks = require('../../serverTask/tasks');
+const taskServer = require('../../serverTask/taskClient');
+const async = require('async');
+const unique = require('../../lib/utils/unique');
 
-
+/**
+ * Save the task
+ * @param {Object} args parameters from the task maker web interface
+ * @param {string} args.actionName "Task maker"
+ * @param {string} args.removedTaskIDs comma separated string with task IDs for remove
+ * @param {string} args.taskID stringified task ID
+ * @param {string} args.username username
+ * @param {string} args.taskActionID stringified taskActionID
+ * @param {string} args.actionsOrder comma separated taskActionID in the order of action execution
+ * @param {string} args.newTaskGroup stringified new task group
+ * @param {string} args.taskName task name
+ * @param {string} args.actionsOrder comma separated taskActionID in the order of action execution
+ * @param {string} args.newTaskGroup stringified new task group
+ * @param {'dontRun'|'runNow'|'runAtTime'|'runByActions'} args.taskExecutionCondition
+ * @param {string} args.runTaskAtDateTimestamp stringified timestamp of the date when the task should be started
+ * @param {string} args.runTaskAtTime time (HH:MM) when task should be started
+ * @param {string} args.runTaskOnce should the task be running only once
+ * @param {function(Error)|function()} callback callback(err)
+ */
 module.exports = function(args, callback) {
-    log.debug('Starting action \"'+args.actionName+'\" with parameters', args);
+    log.debug('Starting action "' + args.actionName + '" with parameters', args);
 
     try {
         taskServer.connect('taskMaker:server', function (err) {
@@ -26,6 +45,24 @@ module.exports = function(args, callback) {
     }
 };
 
+/**
+ * Save the task
+ * @param {Object} args parameters from the task maker web interface
+ * @param {string} args.removedTaskIDs comma separated string with task IDs for remove
+ * @param {string} args.taskID stringified task ID
+ * @param {string} args.username username
+ * @param {string} args.taskActionID stringified taskActionID
+ * @param {string} args.actionsOrder comma separated taskActionID in the order of action execution
+ * @param {string} args.newTaskGroup stringified new task group
+ * @param {string} args.taskName task name
+ * @param {string} args.actionsOrder comma separated taskActionID in the order of action execution
+ * @param {string} args.newTaskGroup stringified new task group
+ * @param {'dontRun'|'runNow'|'runAtTime'|'runByActions'} args.taskExecutionCondition
+ * @param {string} args.runTaskAtDateTimestamp stringified timestamp of the date when the task should be started
+ * @param {string} args.runTaskAtTime time (HH:MM) when task should be started
+ * @param {string} args.runTaskOnce should the task be running only once
+ * @param {function(Error)|function()} callback callback(err)
+ */
 function saveTask(args, callback) {
     if(args.taskID && typeof args.taskID === 'string') {
         var taskID = Number(args.taskID);
@@ -41,74 +78,76 @@ function saveTask(args, callback) {
     // From comma separated string with removed task IDs args.removedTaskIDs
     if(args.removedTaskIDs) {
         if(typeof args.removedTaskIDs !== 'string') {
-            return callback(new Error('Incorrect taskID parameter for remove "'+args.removedTaskIDs+'"'));
+            return callback(new Error('Incorrect taskID parameter for remove "' +
+                JSON.stringify(args.removedTaskIDs) + '"'));
         }
 
-        removedTaskIDs = args.removedTaskIDs.split(/\s*,\s*/).map(function(removedTaskIDStr){
+        removedTaskIDs = args.removedTaskIDs.split(/ *, */).map(function(removedTaskIDStr) {
             var removedTaskID = Number(removedTaskIDStr);
             // if removed task ID is not integer, set to 0
-            if(!removedTaskID || removedTaskID !== parseInt(String(removedTaskID), 10)) return 0;
+            if(isNaN(removedTaskID) || removedTaskID < 1) return 0;
             return removedTaskID;
         });
-    }
 
-    // checking removed task array for incorrect task ID
-    for(var i = 0; i < removedTaskIDs.length; i++) {
-        if(!removedTaskIDs[i]) return callback(new Error('Incorrect taskID for remove: "'+args.removedTaskIDs+'"'));
-    }
+        // checking removed task array for incorrect task ID
+        for(var i = 0; i < removedTaskIDs.length; i++) {
+            if(!removedTaskIDs[i]) return callback(new Error('Incorrect taskID for remove: "'+args.removedTaskIDs+'"'));
+        }
+        log.debug('Tasks for removing: ', args.removedTaskIDs, ': ', removedTaskIDs)
+    } else log.debug('No tasks for removing');
 
-    var actions = {}, actionsIDsObj = {}, newApproves = {}, filterSessionIDs = [];
+    var actions = {}, actionsIDsObj = {}, newApproves = {}, filterTaskActionIDs = [];
     Object.keys(args).forEach(function(arg) {
         if(arg.indexOf('startupOptions-') === 0) {
-            var sessionID = Number(arg.slice('startupOptions-'.length));
-            if(!sessionID || sessionID !== parseInt(String(sessionID), 10) || !args[arg]) return;
+            var taskActionID = Number(arg.slice('startupOptions-'.length));
+            if(!taskActionID || taskActionID !== parseInt(String(taskActionID), 10) || !args[arg]) return;
 
-            // 0 - runOnPrevSuccess; 1 - runOnPrevUnSuccess; 2 - doNotWaitPrevious
+            // 0 - runOnPrevSuccess; 1 - runOnPrevUnSuccess; 2 - doNotWaitPrevious; 4 - runAnyway
             var startupOptions = Number(args[arg]);
-            if(!startupOptions) startupOptions = 0;
+            if([0,1,2,3].indexOf(startupOptions) === -1) startupOptions = 3;
 
-            if(!actions[sessionID] || !actions[sessionID].args) actions[sessionID] = {args:{}};
+            if(!actions[taskActionID] || !actions[taskActionID].args) actions[taskActionID] = {args:{}};
 
-            actions[sessionID].startupOptions = startupOptions;
+            actions[taskActionID].startupOptions = startupOptions;
 
         } else if(arg.indexOf('prm_') === 0) {
-            sessionID = Number(arg.replace(/^prm_(\d+)-.*$/, '$1'));
-            if(!sessionID || sessionID !== parseInt(String(sessionID), 10)) return;
+            taskActionID = Number(arg.replace(/^prm_(\d+)-.*$/, '$1'));
+            if(!taskActionID || taskActionID !== parseInt(String(taskActionID), 10)) return;
 
-            if(!actions[sessionID] || !actions[sessionID].args) actions[sessionID] = {args:{}};
+            if(!actions[taskActionID] || !actions[taskActionID].args) actions[taskActionID] = {args:{}};
 
             // prm_149786456059798-objectsOrder -> objectsOrder
-            var parameterName = arg.slice(String('prm_'+sessionID+'_').length);
-            actions[sessionID].args[parameterName] = args[arg];
+            var parameterName = arg.slice(String('prm_'+taskActionID+'_').length);
+            actions[taskActionID].args[parameterName] = args[arg];
         } else if(arg.indexOf('actionName-') === 0) {
-            sessionID = Number(arg.slice('actionName-'.length));
-            if(!sessionID || sessionID !== parseInt(String(sessionID), 10)) return;
+            taskActionID = Number(arg.slice('actionName-'.length));
+            if(!taskActionID || taskActionID !== parseInt(String(taskActionID), 10)) return;
 
-            if(!actions[sessionID] || !actions[sessionID].args) actions[sessionID] = {args:{}};
+            if(!actions[taskActionID] || !actions[taskActionID].args) actions[taskActionID] = {args:{}};
 
-            actions[sessionID].name = args[arg];
+            actions[taskActionID].name = args[arg];
         } else if(arg.indexOf('actionID-') === 0) {
-            sessionID = Number(arg.slice('actionID-'.length));
-            if(!sessionID || sessionID !== parseInt(String(sessionID), 10)) return;
+            taskActionID = Number(arg.slice('actionID-'.length));
+            if(!taskActionID || taskActionID !== parseInt(String(taskActionID), 10)) return;
 
-            if(!actions[sessionID] || !actions[sessionID].args) actions[sessionID] = {args:{}};
+            if(!actions[taskActionID] || !actions[taskActionID].args) actions[taskActionID] = {args:{}};
 
-            actions[sessionID].id = args[arg]; // actionID is a directory name
+            actions[taskActionID].id = args[arg]; // actionID is a directory name
 
-            if(!actionsIDsObj[args[arg]]) actionsIDsObj[args[arg]] = [sessionID];
-            else actionsIDsObj[args[arg]].push(sessionID);
+            if(!actionsIDsObj[args[arg]]) actionsIDsObj[args[arg]] = [taskActionID];
+            else actionsIDsObj[args[arg]].push(taskActionID);
         } else if(arg.indexOf('taskRunType_') === 0) {
             // newApproves[taskID] = runType
             newApproves[arg.slice('taskRunType_'.length)] = Number(args[arg])
         } else if (arg.indexOf('selected-') === 0 && args[arg] === '1') {
-            filterSessionIDs.push(Number(arg.slice('selected-'.length)));
-        } else if (arg.indexOf('addNewSessionID-') === 0) {
-            sessionID = Number(arg.slice('addNewSessionID-'.length));
-            if(!sessionID || sessionID !== parseInt(String(sessionID), 10)) return;
+            filterTaskActionIDs.push(Number(arg.slice('selected-'.length)));
+        } else if (arg.indexOf('addNewTaskActionID-') === 0) {
+            taskActionID = Number(arg.slice('addNewTaskActionID-'.length));
+            if(!taskActionID || taskActionID !== parseInt(String(taskActionID), 10)) return;
 
-            if(!actions[sessionID] || !actions[sessionID].args) actions[sessionID] = {args:{}};
+            if(!actions[taskActionID] || !actions[taskActionID].args) actions[taskActionID] = {args:{}};
 
-            actions[sessionID].addNewSessionID = Number(args[arg]);
+            actions[taskActionID].addNewTaskActionID = Number(args[arg]);
         }
     });
 
@@ -127,7 +166,7 @@ function saveTask(args, callback) {
                 taskID = 0;
             }
 
-            updateTask(args, taskID, actions, actionsIDsObj, filterSessionIDs, workflow, function (err) {
+            updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs, workflow, function (err) {
                 if (err) log.error(err.message);
 
                 if(!Object.keys(newApproves).length) {
@@ -135,7 +174,7 @@ function saveTask(args, callback) {
                     return callback();
                 }
 
-                processApproves(args.username, args.sessionID, newApproves, workflow, function (err) {
+                processApproves(args.username, Number(args.taskActionID), newApproves, workflow, function (err) {
                     if (err) log.error(err.message);
 
                     callback();
@@ -145,29 +184,59 @@ function saveTask(args, callback) {
     });
 }
 
-function updateTask(args, taskID, actions, actionsIDsObj, filterSessionIDs, workflow, callback) {
+/**
+ * Update task parameters
+ * @param {Object} args parameters from the task maker web interface
+ * @param {string} args.username username
+ * @param {string} args.actionsOrder comma separated taskActionID in the order of action execution
+ * @param {string} args.newTaskGroup stringified new task group
+ * @param {string} args.taskName task name
+ * @param {string} args.taskActionID stringified taskActionID
+ * @param {'dontRun'|'runNow'|'runAtTime'|'runByActions'} args.taskExecutionCondition
+ * @param {string} args.runTaskAtDateTimestamp stringified timestamp of the date when the task should be started
+ * @param {string} args.runTaskAtTime time (HH:MM) when task should be started
+ * @param {string} args.runTaskOnce should the task be running only once
+ * @param {number} taskID task ID
+ * @param {Object} actions object with task actions (see example)
+ * @param {Object} actionsIDsObj actionsIDsObj[actionID] = [taskActionID1, taskActionID2,..]
+ * @param {Array<number>} filterTaskActionIDs array of the filtered taskActionIDs
+ * @param {Object} workflow workflow
+ * @param {function(Error)|function(null, number)} callback callback(err, taskID)
+ * @example
+ * actions:
+ * {
+ *     taskActionID1: {
+ *         startupOptions: [0|1|2|3] // 0 - runOnPrevSuccess; 1 - runOnPrevUnSuccess; 2 - doNotWaitPrevious; 3 - runAnyway
+ *         parameters: [{name:..., val:..}, {},...]
+ *     },
+ *     taskActionID2: {},
+ *     ....
+ * }
+ */
+function updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs, workflow, callback) {
     if(taskID === 0) return callback();
 
-    log.info('Starting update task ', taskID, '; actions: ', actionsIDsObj);
+    log.info('Starting update task ', taskID, '; actions: ', actions);
 
     if(!args.actionsOrder || typeof args.actionsOrder !== 'string') {
-        return callback(new Error('Incorrect actionsOrder parameter "'+args.actionsOrder+'"'));
+        return callback(new Error('Incorrect actionsOrder parameter "' + args.actionsOrder + '"'));
     }
-    var actionsOrder = args.actionsOrder.split(/\s*,\s*/).map(function(sessionIDStr) {
-        var sessionID = Number(sessionIDStr);
-        if(!sessionID || sessionID !== parseInt(String(sessionID), 10)) return 0;
-        return sessionID;
+    var actionsOrder = args.actionsOrder.split(/\s*,\s*/).map(function(taskActionIDStr) {
+        var taskActionID = Number(taskActionIDStr);
+        if(!taskActionID || isNaN(taskActionID) || !isFinite(taskActionID)) return 0;
+        return taskActionID;
     });
 
-    // checking actionsOrder array for incorrect session ID
-    for(var i = 0; i < actionsOrder.length; i++) {
-        if(!actionsOrder[i]) return callback(new Error('Incorrect session ID in actionsOrder: "'+args.actionsOrder+'"'));
+    // checking actionsOrder array for incorrect taskActionID
+    if(!actionsOrder.length || actionsOrder.indexOf(0) !== -1) {
+        return callback(new Error('Incorrect taskActionID in actionsOrder: "' + args.actionsOrder + '"'));
     }
 
     var newTaskGroup = Number(args.newTaskGroup);
 
     // getting user rights for actions in selected task
-    tasksDB.checkActionsRights(args.username, Object.keys(actionsIDsObj), null, function(err, actionsRights) {
+    tasksDB.checkActionsRights(args.username, Object.keys(actionsIDsObj), null,
+        function(err, actionsRights) {
         if(err) {
             return callback(new Error('Error getting actions rights for user ' + args.username +
                 ' for task ID ' + taskID + ': ' + err.message))
@@ -179,11 +248,11 @@ function updateTask(args, taskID, actions, actionsIDsObj, filterSessionIDs, work
                 return callback(new Error('User ' + args.username +
                     ' has no rights for view actions in task ID ' + taskID + ': ' + err.message));
             }
-            // skip rights check for an unselected action. actionsIDsObj[actionID] = [sessionID1, sessionID2,..]
+            // skip rights check for an unselected action. actionsIDsObj[actionID] = [taskActionID1, taskActionID2,..]
             if(!hasRightsForRunByActions) continue;
             var thisActionNotSelected = false;
-            actionsIDsObj[actionID].forEach(function (sessionID) {
-                if(filterSessionIDs.indexOf(sessionID) === -1) thisActionNotSelected = true;
+            actionsIDsObj[actionID].forEach(function (taskActionID) {
+                if(filterTaskActionIDs.indexOf(taskActionID) === -1) thisActionNotSelected = true;
             });
             if(thisActionNotSelected) continue;
 
@@ -207,25 +276,33 @@ function updateTask(args, taskID, actions, actionsIDsObj, filterSessionIDs, work
 
                 // don't change task group for task with empty task name
                 if(taskData && !args.taskName) newTaskGroup = taskData.groupID;
-
-                // running all tasks in series for correct transaction processing, and if error occurred in any of running tasks, we will run
-                // rollback for transaction
-                tasksDB.addTask(args.username, {
+                var param = {
                     name: args.taskName,
                     groupID: newTaskGroup,
                     actionsOrder: actionsOrder,
                     taskID: taskID,
-                    sessionID: args.sessionID,
-                }, actions, function(err, taskID) {
+                    taskActionID: Number(args.taskActionID),
+                }
+
+                if(!taskID) {
+                    param.newTaskID = unique.createHash(JSON.stringify(param) + unique.createID());
+                }
+
+                // running all tasks in series for correct transaction processing, and if error occurred in any of
+                // running tasks, we will run rollback for transaction
+                tasksDB.addOrUpdateTask(args.username, param, actions, function(err, taskID) {
                     if(err) return transactionsDB.rollback(err, callback);
 
                     var runType = taskData ? taskData.runType : null;
 
-                    processTaskExecutionCondition(args,
-                        taskID, hasRightsForRunByActions, filterSessionIDs, workflow, function(err) {
+                    log.debug('Process task execution condition');
+                    processTaskExecutionCondition(args, taskID, hasRightsForRunByActions, filterTaskActionIDs, workflow,
+                        function(err) {
+
                         if(err) return transactionsDB.rollback(err, callback);
 
                         // remove approval for this task if something changed
+                        log.debug('Remove approval for task ', taskID ,' because something changed');
                         removeApproval(args.username, taskID, taskParams, runType, conditionsOCIDs, workflow,
                             function(err, taskNotChanged) {
 
@@ -234,7 +311,8 @@ function updateTask(args, taskID, actions, actionsIDsObj, filterSessionIDs, work
                             if(!taskData || newTaskGroup === taskData.groupID) {
                                 if(taskNotChanged) return transactionsDB.end(callback);
 
-                                sendMessage(args.username, taskID, workflow, 'change', null,function(err) {
+                                sendMessage(args.username, taskID, workflow, 'change', null,
+                                    function(err) {
                                     if (err) log.error(err.message);
                                     transactionsDB.end(callback);
                                 });
@@ -274,6 +352,13 @@ function updateTask(args, taskID, actions, actionsIDsObj, filterSessionIDs, work
     });
 }
 
+/**
+ * Remove the task
+ * @param {string} username username
+ * @param {Array<number>} removedTaskIDs an array with task IDs for remove
+ * @param {Object} workflow workflow
+ * @param {function()|function(Error)} callback callback(err)
+ */
 function removeTasks(username, removedTaskIDs, workflow, callback) {
     if(!Array.isArray(removedTaskIDs) || !removedTaskIDs.length) return callback();
 
@@ -308,6 +393,35 @@ function removeTasks(username, removedTaskIDs, workflow, callback) {
     });
 }
 
+/**
+ * Get the task parameters
+ * @param {string} username username
+ * @param {number} taskID taskID
+ * @param {function(Error)|function()|function(null, Object, Object, Array<number>)} callback
+ *      callback(null, params, taskData, conditionOCIDs)
+ * @example
+ * param:
+ * {
+ *      tasksActionsID: row.tasksActionsID,
+ *      actionID: row.actionID,
+ *      parameterName: row.name,
+ *      parameterValue: row.value,
+ *      actionsOrder: row.actionsOrder,
+ *      startupOptions: row.startupOptions,
+ * }
+ * taskData: {
+ *      id: <taskID>,
+ *      name: <taskName>,
+ *      timestamp: <taskCreatedTime>,
+ *      group: <taskGroupName>,
+ *      ownerName: <task creator login>,
+ *      ownerFullName: <task creator full name>,
+ *      runType: <task condition runType>,
+ *      conditionTimestamp: <task condition timestamp>
+ * }
+ *
+ * conditionOCIDs: [<OCID1>, <OCID2>, ....]
+ */
 function getTaskParameters(username, taskID, callback) {
     if(!taskID) return callback();
 
@@ -316,7 +430,7 @@ function getTaskParameters(username, taskID, callback) {
 
         var params = taskParameters.map(function(row) {
             return {
-                sessionID: row.sessionID,
+                tasksActionsID: row.tasksActionsID,
                 actionID: row.actionID,
                 parameterName: row.name,
                 parameterValue: row.value,
@@ -329,6 +443,16 @@ function getTaskParameters(username, taskID, callback) {
     });
 }
 
+/**
+ * Remove task approval
+ * @param {string} username username
+ * @param {number} taskID taskID
+ * @param {Object} taskParams task parameters
+ * @param {number} runType task run type
+ * @param {Array<number>} conditionsOCIDs conditionsOCIDs
+ * @param {Object} workflow workflow
+ * @param {function(Error)|function(null, true)|function()} callback callback(err, true|undefined) true if no changes were made
+ */
 function removeApproval(username, taskID, taskParams, runType, conditionsOCIDs, workflow, callback) {
     if(!taskParams) {
         log.info('Removing previous approval from new task ', taskID);
@@ -350,12 +474,22 @@ function removeApproval(username, taskID, taskParams, runType, conditionsOCIDs, 
             return callback(null, true);
         }
 
-        log.info('Removing previous approval from changed task ', taskID, '; runType was\\now: ', runType, '\\', newTaskData.runType,
-            '; changes: was: ', JSON.stringify(taskParams), '; now: ', JSON.stringify(newTaskParams));
+        log.info('Removing previous approval from changed taskID ', taskID,
+            '; runType was\\now: ', runType, '\\', newTaskData.runType,
+            '; changes: was: ', taskParams, '; now: ', newTaskParams);
         tasksDB.removeApproval(taskID, callback);
     });
 }
 
+/**
+ * Send message when a task is moved to another group
+ * @param {string} username username
+ * @param {number} taskID taskID
+ * @param {Object} workflows workflow
+ * @param {string} action string like "<sourceTaskGroup>,<destTaskGroup>"
+ * @param {Error} err error when moving the task
+ * @param {function()|function(Error)} callback callback(err)
+ */
 function sendMessage(username, taskID, workflows, action, err, callback) {
     log.info('Send message from user: ', username, ' taskID: ', taskID, ' action: ', action,
         ' workflows: ', workflows, '; err: ', err);
@@ -371,7 +505,21 @@ function sendMessage(username, taskID, workflows, action, err, callback) {
     }, callback);
 }
 
-function processTaskExecutionCondition(args, taskID, hasRightsForRunByActions, filterSessionIDs, workflow, callback) {
+/**
+ *
+ * @param {Object} args parameters from the task maker web interface
+ * @param {'dontRun'|'runNow'|'runAtTime'|'runByActions'} args.taskExecutionCondition
+ * @param {string} args.runTaskAtDateTimestamp stringified timestamp of the date when the task should be started
+ * @param {string} args.runTaskAtTime time (HH:MM) when task should be started
+ * @param {string} args.username username
+ * @param {string} args.runTaskOnce should the task be running only once
+ * @param {number} taskID task ID
+ * @param {Boolean} hasRightsForRunByActions does the user have the rights to run action in the task
+ * @param {Array<number>} filterTaskActionIDs filtered taskActionIDs
+ * @param {Object} workflow workflow
+ * @param {function()|function(Error)} callback callback(err)
+ */
+function processTaskExecutionCondition(args, taskID, hasRightsForRunByActions, filterTaskActionIDs, workflow, callback) {
     if(args.taskExecutionCondition === 'dontRun') return tasksDB.deleteRunCondition(taskID, callback);
 
     if(args.taskExecutionCondition === 'runNow') return tasksDB.addRunCondition(taskID, 2, null, callback);
@@ -391,8 +539,7 @@ function processTaskExecutionCondition(args, taskID, hasRightsForRunByActions, f
         taskServer.runTask({
             userName: args.username,
             taskID: taskID,
-            filterSessionIDs: filterSessionIDs,
-            mySessionID: args.sessionID,
+            filterTaskActionIDs: filterTaskActionIDs,
             runTaskFrom: 'taskMaker',
         }, function(err) {
             if(err) log.error(err.message);
@@ -416,34 +563,42 @@ function processTaskExecutionCondition(args, taskID, hasRightsForRunByActions, f
     //return callback(new Error('Unknown task execution condition: ' + JSON.stringify(args.taskExecutionCondition)));
 }
 
-function processApproves(userName, mySessionID, newApproves, workflow, callback) {
+/**
+ * Process approves
+ * @param {string} username username
+ * @param {number} tasksActionsID taskActionID
+ * @param {Object} newApproves {<taskID>: <runType>, ...}
+ * @param {Object} workflow workflow
+ * @param {function(Error)|function()} callback callback()
+ */
+function processApproves(username, tasksActionsID, newApproves, workflow, callback) {
 
     log.info('Processing approves: ', newApproves);
     async.eachSeries(Object.keys(newApproves), function (taskID, callback) {
         var runType = newApproves[taskID];
 
-        tasksDB.checkTaskRights(userName, taskID, 'run', function (err) {
+        tasksDB.checkTaskRights(username, taskID, 'run', function (err) {
             if(err) return callback(new Error('Error checking the rights to run task ' + taskID + ': ' + err.message));
 
             // [2 - ask to run now; 12 - run now already started; 32 - canceled run now] => run task now
             if(runType === 2 || runType === 12 || runType === 32) {
                 taskServer.runTask({
-                    userName: userName,
+                    userName: username,
                     taskID: taskID,
-                    mySessionID: mySessionID,
+                    tasksActionsID: tasksActionsID,
                     runTaskFrom: 'taskMaker',
                 }, function(err) {
                     if(err) log.error(err.message);
-                    sendMessage(userName, taskID, workflow, 'execute', err, function(err) {
+                    sendMessage(username, taskID, workflow, 'execute', err, function(err) {
                         if(err) log.error(err.message);
 
                         transactionsDB.begin(function(err) {
                             if(err) {
                                 return callback(new Error('Can\'t start transaction for save approve for task ID ' +
-                                    taskID + ', user: ' + userName + ': ' + err.message));
+                                    taskID + ', user: ' + username + ': ' + err.message));
                             }
 
-                            tasksDB.approveTask(userName, taskID, function (err) {
+                            tasksDB.approveTask(username, taskID, function (err) {
                                 if(err) return transactionsDB.rollback(err, callback);
 
                                 // 12 - run now already started
@@ -460,31 +615,33 @@ function processApproves(userName, mySessionID, newApproves, workflow, callback)
                 return;
             }
 
-            if(runType < 10) { // there was a request for approval and is now approved
-                log.info('Approve task ID ', taskID, ' for runType ', runType, ' user: ', userName);
-                tasksDB.approveTask(userName, taskID, function (err) {
+            // there was a request for approval and is now approved
+            if(runType < 10) {
+                log.info('Approve task ID ', taskID, ' for runType ', runType, ' user: ', username);
+                tasksDB.approveTask(username, taskID, function (err) {
                     if(err) return callback(err);
                     addTaskToTaskServer(taskID, runType, workflow,function(err) {
                         if(err) return callback(err);
 
-                        sendMessage(userName, taskID, workflow, 'approve', null, function(err) {
+                        sendMessage(username, taskID, workflow, 'approve', null, function(err) {
                             if(err) log.error(err.message);
                             callback();
                         });
                     });
                 });
-            } else if(runType >= 10 && runType < 20 || runType >= 30) { // was launched, but again approved to run, or was canceled, but again approved
+            // was launched, but again approved to run, or was canceled, but again approved
+            } else if(runType >= 10 && runType < 20 || runType >= 30) {
                 log.info('Approve task ID ', taskID, ' and reset previous runType ', runType, ' to ', String(runType)[1],
-                    ' user: ', userName);
+                    ' user: ', username);
                 transactionsDB.begin(function(err) {
                     if(err) {
                         return callback(new Error('Can\'t start transaction for save approve for task ID ' +
-                            taskID + ', user: ' + userName + ': ' + err.message));
+                            taskID + ', user: ' + username + ': ' + err.message));
                     }
                     tasksDB.addRunCondition(taskID, runType % 10, null, function(err) {
                         if (err) return transactionsDB.rollback(err, callback);
 
-                        tasksDB.approveTask(userName, taskID, function(err) {
+                        tasksDB.approveTask(username, taskID, function(err) {
                             if(err) return transactionsDB.rollback(err, callback);
 
                             addTaskToTaskServer(taskID, runType % 10, workflow, function(err) {
@@ -492,7 +649,7 @@ function processApproves(userName, mySessionID, newApproves, workflow, callback)
                                 transactionsDB.end(function(err) {
                                     if(err) return callback(err);
 
-                                    sendMessage(userName, taskID, workflow, 'approve', null, function(err) {
+                                    sendMessage(username, taskID, workflow, 'approve', null, function(err) {
                                         if(err) log.error(err.message);
                                         callback();
                                     });
@@ -501,24 +658,29 @@ function processApproves(userName, mySessionID, newApproves, workflow, callback)
                         });
                     });
                 });
-            } else if(runType >= 20 && runType < 30) { // has been approved and is now being canceled
-                log.info('Cancel task ID ', taskID, ' for runType ', runType, ' user: ', userName);
-                tasksDB.cancelTask(userName, taskID, function(err) {
+            // has been approved and is now being canceled
+            } else if(runType >= 20 && runType < 30) {
+                log.info('Cancel task ID ', taskID, ' for runType ', runType, ' user: ', username);
+                tasksDB.cancelTask(username, taskID, function(err) {
                     if(err) return callback(err);
                     taskServer.cancelTask(taskID);
 
-                    sendMessage(userName, taskID, workflow, 'cancel', null,  function(err) {
+                    sendMessage(username, taskID, workflow, 'cancel', null,  function(err) {
                         if(err) log.error(err.message);
                         callback();
                     });
                 });
-            } else callback(new Error('Unknown runType: ' + runType + ' for task ID ' + taskID + ' user: ' + userName));
+            } else callback(new Error('Unknown runType: ' + runType + ' for task ID ' + taskID + ' user: ' + username));
         });
     }, callback);
 }
 
-/*
-runType = [0,1,2,9]
+/**
+ * Add a task to the task server
+ * @param {number} taskID task ID
+ * @param {0|1|2|9} runType task run type
+ * @param {Object} workflow workflow
+ * @param {function()|function(Error)} callback callback(err)
  */
 function addTaskToTaskServer(taskID, runType, workflow, callback) {
     log.debug('Add task to taskServer: ', taskID, '; runType: ', runType);
@@ -555,11 +717,10 @@ function addTaskToTaskServer(taskID, runType, workflow, callback) {
     });
 }
 
-/*
-    Converting time string in format HH:MM to ms
-
-    timeStr: time string in format HH:MM
-    return time in ms
+/**
+ * Converting time string in format HH:MM to ms
+ * @param {string} timeStr  time string in format HH:MM
+ * @return {number|undefined} time in ms or undefined whe error occurred
  */
 function getTimeFromStr(timeStr) {
     if(!timeStr) return;

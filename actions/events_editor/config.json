@@ -17,7 +17,7 @@
     "callbackBeforeExec": "callbackBeforeExec",
     "outputFormat": "text",
     "descriptionTemplate": "Make some action with objects %:o:%",
-    "icon": "settings",
+    "icon": "edit_calendar",
     "canAddParametersToAction": true,
     "parameters": {
         "objects": {

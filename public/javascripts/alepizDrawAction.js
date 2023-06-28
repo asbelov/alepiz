@@ -17,7 +17,7 @@ getting HTML page for active action and show or hide runAction and makeTask butt
 
 callback(html), where html is a string with HTML page for active action
  */
-    function getActionHTMLAndShowActionButtons(reqForUpdate, callback){
+    function getActionHTMLAndShowActionButtons(reqForUpdate, callback) {
         bodyElm.css("cursor", "wait");
         $(iframeDOMElm.contentWindow).find('body').css("cursor", "wait");
 
@@ -60,7 +60,7 @@ callback(html), where html is a string with HTML page for active action
 
         var activeActionLink = activeAction.link;
         var onChangeObjectMenuEvent = activeAction.onChangeObjectMenuEvent;
-        if (!onChangeObjectMenuEvent || onChangeObjectMenuEvent.toLowerCase() === 'fullreload') {
+        if (!onChangeObjectMenuEvent || onChangeObjectMenuEvent.toLowerCase() === 'fullReload'.toLowerCase()) {
             return getActionHTMLAndShowActionButtons(false, drawAction);
         }
 

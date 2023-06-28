@@ -13,8 +13,8 @@
   "callbackBeforeExec": "callbackBeforeExec",
   "onChangeObjectMenuEvent": "nothing",
   "cleanInputIDs": "deleteMedia",
-  "icon": "directions_run",
+  "icon": "email",
   "timeout": 60,
   "showWhenNoObjectsSelected": true,
-  "outputFormat": "text"
+  "noObjectsRequired": true
 }

@@ -42,8 +42,6 @@ var JQueryNamespace = (function ($) {
         objectsNamesInObjectsListElm,
         objectsNamesInModalDialogElm,
         deleteWithChildrenElm,
-
-        parentObjectsNamesStr,
         objectNamesStr;
 
     return { init: init };

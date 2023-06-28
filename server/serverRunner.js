@@ -46,7 +46,8 @@ function startServer(message, callback) {
             log.warn('A request was received to start the server, but a server stop operation is in progress. ' +
                 'Start the server later for "', message, '"');
             if (startServerDelayTimer) clearTimeout(startServerDelayTimer);
-            startServerDelayTimer = setTimeout(startServer, 15000, message, callback).unref();
+            startServerDelayTimer = setTimeout(startServer, 15000, message, callback);
+            startServerDelayTimer.unref();
             return;
         }
     }
@@ -59,7 +60,7 @@ function startServer(message, callback) {
         log.warn('Waiting while all socket are closed and all processes are killed...');
     }
 
-    setTimeout(function () {
+    var t = setTimeout(function () {
         log.info('Starting active collectors for operation "', message, '"');
         activeCollector.startAll(killTimeout, function(collectorName) {
             stopServer('Active collector '+ collectorName + ' terminated unexpectedly', function() {
@@ -75,7 +76,8 @@ function startServer(message, callback) {
             startServerDelayTimer = null;
             if (typeof callback === "function") callback(err);
         });
-    }, startTimeout).unref();
+    }, startTimeout);
+    t.unref();
 }
 
 function stopServer(message, callback, isQuiet) {
@@ -94,7 +96,8 @@ function stopServer(message, callback, isQuiet) {
             log.warn('A request was received to stop the server, but a server start operation is in progress. ' +
                 'Stop the server later for "', message, '"');
             if (stopServerDelayTimer) clearTimeout(stopServerDelayTimer);
-            stopServerDelayTimer = setTimeout(stopServer, 10000, message, callback).unref();
+            stopServerDelayTimer = setTimeout(stopServer, 10000, message, callback);
+            stopServerDelayTimer.unref();
             return;
         }
     }

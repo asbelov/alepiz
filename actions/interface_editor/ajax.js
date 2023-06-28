@@ -9,7 +9,6 @@ var Conf = require('../../lib/conf');
 const confActions = new Conf('config/actions.json');
 const confNavBarLinks = new Conf('config/navBarLinks.json');
 const confObjectGroups = new Conf('config/objectGroups.json');
-const confObjectFilters = new Conf('config/objectFilters.json');
 
 
 module.exports = function(args, callback) {

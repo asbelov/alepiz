@@ -30,7 +30,7 @@ var oneDay = 86400000;
 module.exports = function(connect) {
 
     /**
-    * Connect's Store.
+    * Connect Store.
     */
 
     var Store = (connect.session) ? connect.session.Store : connect.Store;
@@ -74,7 +74,8 @@ module.exports = function(connect) {
         self.client.emit('connect');
         //log.warn('!!!Connect');
         dbCleanup(self);
-        setInterval(dbCleanup, oneDay, self).unref();
+        var t = setInterval(dbCleanup, oneDay, self);
+        t.unref();
     }
   
     /**

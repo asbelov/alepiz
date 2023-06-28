@@ -8,5 +8,6 @@
   "showWhenNoObjectsSelected": true,
   "onChangeObjectMenuEvent": "fullreload",
   "timeout": 60,
-  "outputFormat": "text"
+  "outputFormat": "text",
+  "icon": "data_exploration"
 }

@@ -43,21 +43,24 @@ module.exports = historyGet;
  */
 function getFromHistory(id, shift, num, recordsType, callback) {
 
-    var isRequiredAllRecords = false;
-    if(String(num).charAt(0) === '!') {
-        num = num.slice(1);
+    var isRequiredAllRecords = false,
+        clearNum = num,
+        clearShift = shift;
+
+    if(String(clearNum).charAt(0) === '!') {
+        clearNum = clearNum.slice(1);
         isRequiredAllRecords = true;
     }
 
-    if(String(num).charAt(0) === '#') {
+    if(String(clearNum).charAt(0) === '#') {
         var getFromHistory =getByIdx;
-        num = num.slice(1);
+        clearNum = clearNum.slice(1);
         var isTime = false;
     }
 
-    if(String(shift).charAt(0) === '#') {
+    if(String(clearShift).charAt(0) === '#') {
         getFromHistory = getByIdx;
-        shift = shift.slice(1);
+        clearShift = clearShift.slice(1);
         isTime = false;
     }
 
@@ -66,17 +69,18 @@ function getFromHistory(id, shift, num, recordsType, callback) {
         isTime = true;
     }
 
-    if(String(num).charAt(0) === '!') {
-        num = num.slice(1);
+    if(String(clearNum).charAt(0) === '!') {
+        clearNum = clearNum.slice(1);
         isRequiredAllRecords = true;
     }
 
-    getFromHistory(id, shift, num, 0, function (err, rawRecords, isGotAllRecords) {
-        log.debug('getFromHistory(id: ', id, ', shift: ', shift, ', num: ', num, ', maxRecordCnt: 0): rawRecords: ',
-            rawRecords, ', isGotAllRecords: ', isGotAllRecords, ', err: ', err, {
-                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+    getFromHistory(id, clearShift, clearNum, 0, function (err, rawRecords, isGotAllRecords) {
+        log.debug('getFromHistory(id: ', id, ', shift: ', shift, '=>', clearShift, ', num: ', num, '=>', clearNum,
+            ', maxRecordCnt: 0): rawRecords: ', rawRecords, ', isGotAllRecords: ', isGotAllRecords,
+            ', recordsType: ', recordsType, ', err: ', err, {
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                 vars: {
-                    "RECEIVED_OCID": id
+                    "EXPECTED_OCID": id
                 }
             });
         if(err) {
@@ -112,8 +116,8 @@ function getFromHistory(id, shift, num, recordsType, callback) {
 
         if(!isTime) {
             // return less the 90% of requirement records
-            if(!num || records.length / num < 0.9) {
-                rawRecords.push('records: ' + records.length + '; num: ', num);
+            if(!clearNum || records.length / clearNum < 0.9) {
+                rawRecords.push('records: ' + records.length + '; num: ', clearNum);
                 return callback(null, null, rawRecords);
             }
             return callback(null, records, records);
@@ -130,7 +134,7 @@ function getFromHistory(id, shift, num, recordsType, callback) {
 
             // checking for the 1477236595310 = 01/01/2000. shift is a timeFrom or timeShift; num is a timeTo or
             // timeInterval
-            var timeFrom = shift > 1477236595310 ? shift : Date.now() - shift - num;
+            var timeFrom = clearShift > 1477236595310 ? clearShift : Date.now() - clearShift - clearNum;
 
             // checking for the last record timestamp is near the timeFrom timestamp
             // r.timestamp = 14:05:00, avgInterval = 30, timeFrom = 14:04:25

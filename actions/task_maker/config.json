@@ -17,6 +17,8 @@
     "cleanInputIDs": "taskName",
     "timeout": 60,
     "showWhenNoObjectsSelected": true,
+    "noObjectsRequired": true,
+    "icon": "task",
     "refreshTaskList": 15000,
     "offsetDaysForRunTask": 1,
     "defaultTimeForRunTask": "00:20",

@@ -3,7 +3,7 @@
  */
 
 /*
-* Created on Fri Mar 23 2018 12:48:16 GMT+0700 (Новосибирское стандартное время)
+* Created on Fri Mar 23 2018 12:48:16 GMT+0700
 */
 
 
@@ -597,7 +597,7 @@ var JQueryNamespace = (function ($) {
             setActionConfig(actionConfig);
         }
         try {
-            new Audio(parameters.action.link + '/static/beep.wav').play();
+            new Audio(parameters.action.link + '/static/beep.wav').play().then(() => {});
             // use convertToSpeech() for able to change the phrase "Voice pronunciation of events enabled"
             window.speechSynthesis.speak(new SpeechSynthesisUtterance(
                 convertToSpeech('Voice pronunciation of events enabled')
@@ -963,7 +963,7 @@ var JQueryNamespace = (function ($) {
             if(!updatePaused) updatePaused = Date.now();
             if(soundIconElm.text() === 'volume_up' && Date.now() - updatePaused > 300000) {
                 try {
-                    new Audio(parameters.action.link + '/static/beep.wav').play();
+                    new Audio(parameters.action.link + '/static/beep.wav').play().then(() => {});
                     // use convertToSpeech() for able to change the phrase "Update paused"
                     window.speechSynthesis.speak(new SpeechSynthesisUtterance(
                         convertToSpeech('Update paused')
@@ -2017,13 +2017,13 @@ var JQueryNamespace = (function ($) {
             if(subject) {
                 var objectsList = Object.keys(objectsNames).join(', ');
                 if (template.objectsListLength && objectsList.length > template.objectsListLength) {
-                    objectsList = objectsList.substr(0, template.objectsListLength - 7);
+                    objectsList = objectsList.substring(0, template.objectsListLength - 7);
                     objectsList += '... (' + Object.keys(objectsNames).length + ')';
                 }
 
                 var countersList = Object.keys(countersNames).join('; ');
                 if (template.countersListLength && countersList.length > template.countersListLength) {
-                    countersList = countersList.substr(0, template.countersListLength - 7);
+                    countersList = countersList.substring(0, template.countersListLength - 7);
                     countersList += '... (' + Object.keys(countersNames).length + ')';
                 }
 
@@ -2043,13 +2043,17 @@ var JQueryNamespace = (function ($) {
                         '_________________________________________________________________________________________' +
                         '<br/><em>Previous information: ' +
                         (info.subject || '') + '</em><br/><br/>' + info.text;
-                    quill.clipboard.dangerouslyPasteHTML(messageBody);
+                    quill.setText('');
+                    quill.clipboard.dangerouslyPasteHTML(0, messageBody);
+                    quill.setSelection(0, 0);
                     //quill.insertText(index, messageBody, {}, "user");
                 });
                 return;
             }
 
-            quill.clipboard.dangerouslyPasteHTML(messageBody);
+            quill.setText('');
+            quill.clipboard.dangerouslyPasteHTML(0, messageBody);
+            quill.setSelection(0, 0);
             //quill.insertText(index, messageBody, {}, "user");
 
             if(messageTopImportance === undefined || maxImportance < messageTopImportance) messageTopImportance = maxImportance;

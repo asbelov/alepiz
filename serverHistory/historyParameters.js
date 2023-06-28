@@ -16,6 +16,7 @@ var parameters = {
     initCachedRecords: 5,
     queryMaxResultNumbers: 5000,
     queryMaxResultStrings: 50,
+    timestampMaxTimeDiff: 2592000000, // 30 days
     dbPath: 'db',
     tempDir: 'temp',
     dbFile: 'history.db',

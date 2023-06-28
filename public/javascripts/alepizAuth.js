@@ -8,7 +8,7 @@ var alepizAuthSystem = (function($) {
 
     function init() {
         initAuthorizationSystem();
-    };
+    }
 
     function initAuthorizationSystem() {
 

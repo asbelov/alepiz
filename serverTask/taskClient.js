@@ -93,7 +93,7 @@ taskServer.addTask = function(taskID, runType, workflow, conditionOCIDs) {
 
     clientIPC.send({
         taskID: taskID,
-        runType: runType, // 0 - run permanently, 0 run once, timestamp - run by schedule
+        runType: runType, // 0 - run permanently, 1 run once, timestamp - run by schedule
         workflow: workflow,
         conditionOCIDs: conditionOCIDs, // array of objects counters IDs
     });

@@ -25,8 +25,6 @@ document.addEventListener('DOMContentLoaded', function () {
     makeFooter();
     initTranslation();
 
-    //M.Materialbox.init(document.querySelectorAll('.materialboxed'), {});
-    //M.Collapsible.init(document.querySelectorAll('.collapsible'), {});
     M.AutoInit();
     var elems = document.querySelectorAll('.slider');
     M.Slider.init(elems, {
@@ -78,9 +76,6 @@ function makeTableOfContents(divElm) {
 
         contentArray.push('<li' + paddingLeft + '><a href="#bookmark' + idx + '">' + escapeHtml(hdr.innerText) + '</a></li>');
         hdr.id = 'bookmark'+idx;
-        //hdr.innerHTML += '&nbsp;[<a href="#top"><i class="material-icons skiptranslate">publish</i></a>]';
-        //hdr.innerHTML = '<a name="' + idx + '">' + hdr.innerHTML + '</a>';
-        //console.log(hdr.tagName, hdr.innerText);
     });
 
     var isActive = contentArray.length > 20 ? '' : ' class="active"';

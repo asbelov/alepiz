@@ -17,7 +17,7 @@ collector.get = function(prms, callback) {
 
     OIDs = OIDs.map(function(OID) {
         OID = OID.trim();
-        if(OID.charAt(0) === '.') return OID.substr(1); // remove first dot from OIDs
+        if(OID.charAt(0) === '.') return OID.substring(1); // remove first dot from OIDs
         else return OID;
     });
 

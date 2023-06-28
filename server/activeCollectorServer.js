@@ -173,9 +173,9 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
 
                                         log.debug('Received for OCID ', message.data.$id, ': ', result, ': ', message,
                                             '; err: ', err, {
-                                                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                                                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                                                 vars: {
-                                                    "RECEIVED_OCID": message.data.$id
+                                                    "EXPECTED_OCID": message.data.$id
                                                 }
                                             });
 

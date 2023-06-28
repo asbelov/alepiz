@@ -5,39 +5,12 @@
 /**
  * Created by Alexander Belov on 25.03.2017.
  */
-function onChangeObjects(objects){
+function onChangeObjects(objects) {
     JQueryNamespace.setSharedCounters(objects);
 }
 
 function callbackBeforeExec(callback) {
-
-    if($('#taskExecutionCondition').val() === 'runAtTime') {
-
-        var timeParts = $('#runTaskAtTime').val().match(/^(\d\d?):(\d\d?)$/);
-        var startTime = timeParts ? Number(timeParts[1]) * 3600000 + Number(timeParts[2]) * 60000 : 0;
-
-        var timeToRun = Number($('#runTaskAtDateTimestamp').val()) + startTime;
-
-        if (timeToRun < Date.now() - 30000) {
-            var modalTimePassedConfirmElm = $('#modalTimePassedConfirm'),
-                modalTimePassedConfirmNoElm = $('#modalTimePassedConfirmNo'),
-                modalTimePassedConfirmYesElm = $('#modalTimePassedConfirmYes');
-
-            modalTimePassedConfirmElm.modal({dismissible: false});
-            modalTimePassedConfirmElm.modal('open');
-
-            modalTimePassedConfirmNoElm.unbind('click').click(function () {
-                callback(new Error('Operation is canceled because task start time has passed: ' +
-                    new Date(timeToRun).toLocaleString()));
-            });
-            modalTimePassedConfirmYesElm.unbind('click').click(function () {
-                callback();  // modalTimePassedConfirmYesElm.click(callback) will return an event as callback argument
-            });
-            return;
-        }
-    }
-
-    callback();
+    JQueryNamespace.beforeExec(callback);
 }
 
 function callbackAfterExec(parameterNotUsed, callback) {
@@ -45,8 +18,10 @@ function callbackAfterExec(parameterNotUsed, callback) {
 }
 
 var JQueryNamespace = (function ($) {
+    /**
+     * Run after the page drawing is finished
+     */
     $(function () {
-
         taskParametersAreaElm = $('#taskParametersArea');
         taskExecuteConditionSettingsAreaElm = $('#taskExecuteConditionSettingsArea');
         taskNameDivElm = $('#taskNameDiv');
@@ -57,6 +32,18 @@ var JQueryNamespace = (function ($) {
         taskExecutionConditionDivElm = taskExecutionConditionElm.parent();
         runTaskAtDateElm = $('#runTaskAtDate');
         runTaskAtDateTimestampElm = $('#runTaskAtDateTimestamp');
+        modalPressAddOnTaskConfirmElm = $('#modalPressAddOnTaskConfirm');
+        modalPressAddOnTaskConfirmNoElm = $('#modalPressAddOnTaskConfirmNo');
+        modalPressAddOnTaskConfirmYesElm = $('#modalPressAddOnTaskConfirmYes');
+        modalPressAddOnTaskConfirmTaskName = $('[data-modal-add-on-task-confirm-taskname]');
+        modalChangeTaskConfirmElm = $('#modalChangeTaskConfirm');
+        modalChangeTaskConfirmNoElm = $('#modalChangeTaskConfirmNo');
+        modalChangeTaskConfirmYesElm = $('#modalChangeTaskConfirmYes');
+        modalTimePassedConfirmElm = $('#modalTimePassedConfirm');
+        modalTimePassedConfirmNoElm = $('#modalTimePassedConfirmNo');
+        modalTimePassedConfirmYesElm = $('#modalTimePassedConfirmYes');
+
+        initResizer();
 
         var todayMidnight = new Date();
         todayMidnight.setHours(0,0,0,0);
@@ -101,6 +88,22 @@ var JQueryNamespace = (function ($) {
 
         init(function() {
             initTaskExecutionCondition();
+
+            // change the direction of opening the "select" drop-down list to "down"
+            // so that the list is visible even on a small screen for taskGroup selector
+            $('#newTaskGroupParent').click(function () {
+                setTimeout(function () {
+                    $('ul.select-dropdown').css({top: 0});
+                }, 100);
+            });
+
+            // change the direction of opening the "select" drop-down list to "down"
+            // so that the list is visible even on a small screen for taskCondition selector
+            $('#taskExecutionConditionParent').click(function () {
+                setTimeout(function () {
+                    $('ul.select-dropdown').css({top: 0});
+                }, 100);
+            });
 
             taskExecutionConditionElm.change(function() {
                 var selectedOptions = $(this).val();
@@ -150,8 +153,8 @@ var JQueryNamespace = (function ($) {
 
                     actionSelectorBtnElms.click(function (e) {
                         e.stopPropagation();
-                        var sessionID = $(this).attr('data-action-selector-btn');
-                        var actionSelectorInputElm = $('[name=selected-' + sessionID + ']');
+                        var taskActionID = $(this).attr('data-action-selector-btn');
+                        var actionSelectorInputElm = $('[name=selected-' + taskActionID + ']');
                         if($(this).hasClass('red')) {
                             $(this).removeClass('red');
                             actionSelectorInputElm.val('');
@@ -189,7 +192,7 @@ var JQueryNamespace = (function ($) {
             runTaskOnceElm.click(taskUpdated);
 
             M.Collapsible.init(document.querySelectorAll('.collapsible'), {});
-            M.Tooltip.init(document.querySelectorAll('.tooltipped'), {inDuration: 500});
+            M.Tooltip.init(document.querySelectorAll('.toolTipped'), {inDuration: 500});
             M.FormSelect.init(document.querySelectorAll('select'), {});
             M.updateTextFields(); // update active inputs
         });
@@ -201,16 +204,15 @@ var JQueryNamespace = (function ($) {
         removedTasks = {},
         workflow = {},
         unnamedTaskName = 'New unnamed task',
-        //actionsIDs = [],
-        confirmYes,
-        confirmNo,
+        mergeTasksData = {},
         taskListParameters = {
             onClick: onClickOnTask,
             onAdd: onAddTask,
             onRemove: onRemoveTask,
             onComplete: onCompleteDrawingTaskList,
-            removedTasks: []
-        };
+            removedTasks: [],
+        },
+        removeTasksToastNowShowing = false;
 
     var taskExecuteConditionSettingsAreaElm,
         taskNameDivElm,
@@ -224,76 +226,147 @@ var JQueryNamespace = (function ($) {
         runTaskAtDateTimestampElm,
         runTaskAtDateInstance,
         runTaskAtTimeElm,
-        taskGroupForSearchElm;
+        taskGroupForSearchElm,
+        modalPressAddOnTaskConfirmElm,
+        modalPressAddOnTaskConfirmNoElm,
+        modalPressAddOnTaskConfirmYesElm,
+        modalPressAddOnTaskConfirmTaskName,
+        modalChangeTaskConfirmElm,
+        modalChangeTaskConfirmNoElm,
+        modalChangeTaskConfirmYesElm,
+        modalTimePassedConfirmElm,
+        modalTimePassedConfirmNoElm,
+        modalTimePassedConfirmYesElm;
 
     return {
         init: init,
+        beforeExec: beforeExec,
         afterExec: afterExec,
-        setSharedCounters: function(_objects, callback) {
+        setSharedCounters: function(_objects) {
             objects = _objects;
-            setSharedCounters(_objects, callback);
-        }
+            setSharedCounters(_objects, null, null, function() {
+                M.FormSelect.init(taskExecutionConditionElm[0], {});
+            });
+        },
     };
 
+    /**
+     * Run function after user press button to run action, but before running action
+     * @param {function(Error)|function()} callback callback(err) if an error has occurred, then the action will not be started
+     */
+    function beforeExec(callback) {
+        if($('#taskExecutionCondition').val() === 'runAtTime') {
+            var timeParts = $('#runTaskAtTime').val().match(/^(\d\d?):(\d\d?)$/);
+            var startTime = timeParts ? Number(timeParts[1]) * 3600000 + Number(timeParts[2]) * 60000 : 0;
+
+            var timeToRun = Number($('#runTaskAtDateTimestamp').val()) + startTime;
+
+            if (timeToRun < Date.now() - 30000) {
+                modalTimePassedConfirmElm.modal({dismissible: false});
+                modalTimePassedConfirmElm.modal('open');
+
+                modalTimePassedConfirmNoElm.unbind().click(function () {
+                    callback(new Error('Operation is canceled because task start time has expired: ' +
+                        new Date(timeToRun).toLocaleString()));
+                });
+                modalTimePassedConfirmYesElm.unbind().click(function () {
+                    // modalTimePassedConfirmYesElm.click(callback) will return an event as callback argument
+                    callback();
+                });
+                return;
+            }
+        }
+        callback();
+    }
+
+    /**
+     * Run after the action is executed
+     * @param {*} result action execution result. not used
+     * @param {function()} callback callback()
+     */
     function afterExec(result, callback) {
+        clearRemovedTasks();
         delete taskListParameters.aprovedTasks;
-        drawTasksList(taskListParameters, callback);
+        // task list will be refreshed automatically
+        //drawTasksList(taskListParameters, callback);
+        callback();
     }
 
     function onClickOnTask(taskID, taskName, callback) {
 
         if($('#taskUpdated').val()) {
-            var modalChangeTaskConfirmElm = $('#modalChangeTaskConfirm'),
-                modalChangeTaskConfirmNoElm = $('#modalChangeTaskConfirmNo'),
-                modalChangeTaskConfirmYesElm = $('#modalChangeTaskConfirmYes');
-
             modalChangeTaskConfirmElm.modal({dismissible: false});
             modalChangeTaskConfirmElm.modal('open');
 
-            if(confirmNo) modalChangeTaskConfirmNoElm.unbind('click', confirmNo);
-            if(confirmYes) modalChangeTaskConfirmYesElm.unbind('click', confirmYes);
-
-            confirmYes = function () {
-                drawTask(callback);
-            };
-
-            confirmNo = function () {
+            modalChangeTaskConfirmNoElm.unbind().click(function () {
                 callback(new Error('Change task operation canceled'));
-            };
-
-            modalChangeTaskConfirmNoElm.click(confirmNo);
-            modalChangeTaskConfirmYesElm.click(confirmYes);
+            });
+            modalChangeTaskConfirmYesElm.unbind().click(function () {
+                drawTask(callback);
+            });
 
         } else drawTask(callback);
 
         function drawTask(callback) {
-            drawTaskParameters(taskID, taskName, true, function(err) {
-                if(!taskID || err) $('#taskSettings').addClass('hide');
+            drawTaskParameters(taskID, taskName, !mergeTasksData.taskID, function (err) {
+                if (!taskID || err) $('#taskSettings').addClass('hide');
                 else $('#taskSettings').removeClass('hide');
+                mergeTasksData = {};
                 callback();
             });
         }
     }
 
-    function onAddTask(taskID, taskName, isSelected) {
-        drawTaskParameters(taskID, taskName, false, function(err) {
-            if(isSelected) $('#taskID').val(''); // create a new task, when click "+" on a selected task
-            if(!taskID || err) $('#taskSettings').addClass('hide');
-            else $('#taskSettings').removeClass('hide');
+    /**
+     * Run when user press '+' button for add actions from the task to selected task
+     * @param {number} taskID task ID
+     * @param {string} taskName task name
+     */
+    function onAddTask(taskID, taskName) {
+        modalPressAddOnTaskConfirmTaskName.html(taskName);
+        modalPressAddOnTaskConfirmElm.modal({dismissible: false});
+        modalPressAddOnTaskConfirmElm.modal('open');
+
+        modalPressAddOnTaskConfirmNoElm.unbind().click(function () {
+            mergeTasksData = {};
+            M.toast({html: 'The task merge operation has been canceled', displayLength: 4000});
+        });
+
+        modalPressAddOnTaskConfirmYesElm.unbind().click(function () {
+            taskUpdated('');
+            mergeTasksData = {
+                taskID: Number(taskID),
+                taskName: taskName,
+            };
         });
     }
 
+    /**
+     * Run when user press 'x' button for remove the selected task
+     * @param {number} taskID task ID
+     * @param {string} taskName task name
+     */
     function onRemoveTask(taskID, taskName) {
         removedTasks[Number(taskID)] = taskName;
-        $('#removedTaskList').val(Object.values(removedTasks).join('\n'));
         $('#removedTaskIDs').val(Object.keys(removedTasks).join(','));
-        $('#removedTaskCard').removeClass('hide');
-        M.updateTextFields();
 
         taskListParameters.removedTasks = Object.keys(removedTasks);
         drawTasksList(taskListParameters);
+
+        // remove tasks animation icon
+        $('#removedTask').removeClass('hide');
+        $('#removedTaskNum').text(Object.values(removedTasks).length);
+        $('#removedTaskIcon').text('recycling').css({color: 'green'});
+        setTimeout(function () {
+            $('#removedTaskIcon').text('delete').css({color: 'red'});
+        }, 300);
     }
 
+    /**
+     * Run when complete drawing the task list
+     * @param {number} taskID selected task ID
+     * @param {string} taskName selected task name
+     */
     function onCompleteDrawingTaskList(taskID, taskName) {
         drawTaskParameters(taskID, taskName, true, function(err) {
             if(!taskID || err) $('#taskSettings').addClass('hide');
@@ -301,7 +374,11 @@ var JQueryNamespace = (function ($) {
         });
     }
 
-    function init(callback){
+    /**
+     * Initialize the task_maker action interface
+     * @param {function()} callback callback()
+     */
+    function init(callback) {
 
         initTaskList($('#taskListArea'), taskListParameters, function() {
             // set variable after draw element
@@ -314,14 +391,18 @@ var JQueryNamespace = (function ($) {
             } catch (e) {}
         });
 
-        $('#clearListOfRemovedTasks').click(function(){
-            removedTasks = {};
-            $('#removedTaskList').val('');
-            $('#removedTaskIDs').val('');
-            $('#removedTaskCard').addClass('hide');
-
-            taskListParameters.removedTasks = [];
-            drawTasksList(taskListParameters);
+        $('#removedTask').click(clearRemovedTasks).mouseover(function () { // show hint
+            if(removeTasksToastNowShowing) return;
+            removeTasksToastNowShowing = true;
+            M.toast({
+                html: 'Click on the trash to restore the tasks:<br/>' +
+                    Object.keys(removedTasks).map(function (taskID) {
+                        //var humanTaskID = String(taskID).replace(/^(.*)(.{5})$/, '$1 $2');
+                        var humanTaskID = String(taskID).replace(/^(.*)(.{5})$/, '$2');
+                        return '#' + humanTaskID + ': ' + removedTasks[taskID];
+                    }).join('<br/>'),
+                completeCallback: function () { removeTasksToastNowShowing = false; }
+            });
         });
 
         $('#taskName').change(function () {
@@ -335,6 +416,28 @@ var JQueryNamespace = (function ($) {
         if(typeof(callback) === 'function') callback();
     }
 
+    /**
+     * Clear removed task from the trash, redraw task list and hide the trash
+     */
+    function clearRemovedTasks() {
+        $('#removedTaskIDs').val('');
+        $('#removedTaskNum').text('');
+
+        taskListParameters.removedTasks = [];
+        drawTasksList(taskListParameters);
+
+        // restore tasks animation icon
+        $('#removedTaskIcon').text('restore_from_trash').css({color: 'green'});
+        setTimeout(function () {
+            $('#removedTaskIcon').text('delete').css({color: 'red'});
+            $('#removedTask').addClass('hide');
+            removedTasks = {};
+        }, 500);
+    }
+
+    /**
+     * Init taskCondition select element
+     */
     function initTaskExecutionCondition() {
         taskExecutionConditionElm.html(
             '<option data-requiredOption value="dontRun">Save but don\'t run the task</option>' +
@@ -343,6 +446,28 @@ var JQueryNamespace = (function ($) {
             '<option data-requiredOption="last" value="runAtTime">Ask to run the task at</option>');
     }
 
+    /**
+     * Get counters with run condition for specific objects
+     * @param {Array<number>} objectIDs an array with object IDs
+     * @param {function(Array<Object>)} callback callback(counterArray) where counterArray is
+     * [{id:.., name:.., taskCondition:…, unitID:…, collectorID:…, debug:…, sourceMultiplier:…, groupID:…, OCID:…,
+     * objectID:…, objectName:…, objectDescription:..}, …]
+     */
+    function getCounters(objectIDs, callback) {
+        // add objectCache support in the future
+        $.post(serverURL, {
+            func: 'getCounters',
+            objectsIDs: objectIDs.join(',')
+        }, callback);
+    }
+
+    /**
+     * Set shared counters
+     * @param {Array<Object>} objects [{id:.., }]
+     * @param {string|null} label optGroup label
+     * @param {string|null} id exclusive attribute for options
+     * @param {function()} callback callback()
+     */
     function setSharedCounters(objects, label, id, callback) {
         var shared = !!label;
         if(!label) label = 'From selected objects';
@@ -350,19 +475,20 @@ var JQueryNamespace = (function ($) {
 
         // remove option with equal OCID
         taskExecutionConditionElm.find('[' + id + ']').remove();
-        M.FormSelect.init(taskExecutionConditionElm[0], {});
         if(!objects.length) {
             if(typeof callback === 'function') callback();
             return;
         }
 
-        var objectsIDs = objects.map(function(obj) {
+        var objectIDs = objects.map(function(obj) {
             return obj.id;
         });
-        // [{id:.., name:.., unitID:..., collector:..., sourceMultiplier:..., groupID:..., OCID:..., objectID:..., objectName:..., objectDescription:..}, ...]
-        $.post(serverURL, {func: 'getCounters', objectsIDs: objectsIDs.join(',')}, function (rows) {
+        // [{id:.., name:.., unitID:..., collector:..., sourceMultiplier:..., groupID:..., OCID:..., objectID:...,
+        // objectName:..., objectDescription:..}, ...]
+        //$.post(serverURL, {func: 'getCounters', objectIDs: objectIDs.join(',')}, function (rows) {
+        getCounters(objectIDs, function(rows) {
 
-            if(shared) rows = Object.values(getSharedCountersFromAllCounters(objectsIDs.length, rows));
+            if(shared) rows = Object.values(getSharedCountersFromAllCounters(objectIDs.length, rows));
 
             if(!Array.isArray(rows) || !rows.length) {
                 if(typeof callback === 'function') callback();
@@ -388,62 +514,77 @@ var JQueryNamespace = (function ($) {
                     taskExecutionConditionElm.append(html);
                 }
             }
-            M.FormSelect.init(taskExecutionConditionElm[0], {});
             if(typeof callback === 'function') callback();
         });
-
-        /*
-        get array with shared counters for specific objects from all cpounters fro specific objects
-
-        objectsCnt: count of objects
-        countersArray: [{id: <counterID>, .....}, ]
-
-        return sharedCounters: [{id: <counterID>, .....}, ]
-
-     */
-        function getSharedCountersFromAllCounters(objectsCnt, countersArray) {
-            if(!countersArray || !countersArray.length) return [];
-
-            var counters = {};
-            countersArray.forEach(function (counter) {
-                if(!counters[counter.id]) counters[counter.id] = [];
-                counters[counter.id].push(counter);
-            });
-
-            var sharedCounters = {};
-            for(var counterID in counters) {
-                if(counters[counterID].length === objectsCnt) {
-                    counters[counterID].forEach(function (counter) {
-                        if(!sharedCounters[counterID]) {
-                            sharedCounters[counterID] = {
-                                name: counter.name,
-                                objectsNames: [counter.objectName],
-                                OCIDs: [counter.OCID],
-                            }
-                        } else {
-                            sharedCounters[counterID].OCIDs.push(counter.OCID);
-                            sharedCounters[counterID].objectsNames.push(counter.objectName);
-                        }
-                    });
-                }
-            }
-
-            return sharedCounters;
-        }
     }
 
-    /*
-    Update input value with comma separated actions sessionID, sorted by order as you see
+    /**
+     * get array with shared counters for specific objects from all counters fro specific objects
+     * @param {number} objectsNum number of objects
+     * @param {Array<Object>} countersArray an array of the counters
+     * @return {Object} sharedCounters[<counterID>] = {
+     *  name: <counterName>,
+     *  objectsNames: <array with object names>,
+     *  OCIDs: <array with OCIDs>}
+     */
+    function getSharedCountersFromAllCounters(objectsNum, countersArray) {
+        if(!countersArray || !countersArray.length) return {};
+
+        var counters = {};
+        countersArray.forEach(function (counter) {
+            if(!counters[counter.id]) counters[counter.id] = [];
+            counters[counter.id].push(counter);
+        });
+
+        var sharedCounters = {};
+        for(var counterID in counters) {
+            if(counters[counterID].length === objectsNum) {
+                counters[counterID].forEach(function (counter) {
+                    if(!sharedCounters[counterID]) {
+                        sharedCounters[counterID] = {
+                            name: counter.name,
+                            objectsNames: [counter.objectName],
+                            OCIDs: [counter.OCID],
+                        }
+                    } else {
+                        sharedCounters[counterID].OCIDs.push(counter.OCID);
+                        sharedCounters[counterID].objectsNames.push(counter.objectName);
+                    }
+                });
+            }
+        }
+
+        return sharedCounters;
+    }
+
+    /**
+     * Update input value with comma separated actions taskActionID, sorted by order as you see
      */
     function updateActionsOrder() {
-        var actionsOrder = $('li[sessionID]').map(function(){return $(this).attr("sessionID");}).get();
+        var actionsOrder = $('li[data-tasks-actions-id]').map(function() {
+            return $(this).attr("data-tasks-actions-id");
+        }).get();
         if(actionsOrder) $('#actionsOrder').val(actionsOrder.join(','));
+        else console.error('Error create actionOrder');
     }
 
+    /**
+     * Set flag that task parameters was updated for prevent change the edited task and loss changes.
+     * Value will be added to the <input id="taskUpdated">
+     * @param {*} [val] value for indicate what was updates in the task. Set '' for remove that task was updated
+     */
     function taskUpdated(val) {
         $('#taskUpdated').val(val === undefined ? '1' : String(val));
     }
 
+    /**
+     * Draw task actions and parameters (in the bottom window)
+     * @param {number} taskID task ID
+     * @param {string} taskName task name
+     * @param {boolean} isCleanup clear the data in the window and draw task actions
+     *      or add task actions from another task to the current task
+     * @param {function(Error)|function()} callback callback(err)
+     */
     function drawTaskParameters(taskID, taskName, isCleanup, callback) {
 
         if(!taskID) {
@@ -463,239 +604,188 @@ var JQueryNamespace = (function ($) {
             var OCIDs = data.OCIDs || [];
             var objectsForOCIDs = data.objects || {};
             var countersForOCIDs = data.counters;
-            if(isCleanup) {
 
-                var actionsRemain = Object.keys(actions).length;
-                $('#taskExecutionConditionsDescription').text('');
+            var actionsRemain = Object.keys(actions).length;
+            $('#taskExecutionConditionsDescription').text('');
 
-                for(var sessionID in actions) {
-                    var hasOParam = false;
-                    actions[sessionID].parameters.forEach(function (prm) {
-                        if(prm.name !== 'o' || !prm.value) return;
-                        hasOParam = true;
+            for(var taskActionID in actions) {
+                var hasOParam = false;
+                actions[taskActionID].parameters.forEach(function (actionParam) {
+                    if(actionParam.name !== 'o' || !actionParam.value) return;
+                    hasOParam = true;
 
-                        try {
-                            var _objects = JSON.parse(prm.value);
-                        }  catch(err) {
-                            _objects = [];
-                            //console.log('Error parsing o parameter: ', err.message);
-                        }
+                    try {
+                        var _objects = JSON.parse(String(actionParam.value));
+                    }  catch(err) {
+                        _objects = [];
+                        //console.log('Error parsing o parameter: ', err.message);
+                    }
 
-                        setSharedCounters(_objects, 'From task actions',
-                            'data-value="OCIDsFromTaskActions"',function() {
+                    setSharedCounters(_objects, 'From task actions',
+                        'data-value="OCIDsFromTaskActions"',function() {
 
-                            // run setSharedCounters(objects); after draw all 'From task actions' options
-                            if(--actionsRemain) return;
-                            setSharedCounters(objects, null,null, function () {
-                                if (!OCIDs.length) return;
+                        // run setSharedCounters(objects); after draw all 'From task actions' options
+                        M.FormSelect.init(taskExecutionConditionElm[0], {});
+                        if(--actionsRemain) return;
+                        setSharedCounters(objects, null,null, function () {
+                            M.FormSelect.init(taskExecutionConditionElm[0], {});
+                            if (!OCIDs.length) return;
 
-                                // convert array to string
-                                taskExecutionConditionElmPrevValue = OCIDs.map(function (OCID) {
-                                    return String(OCID);
+                            // convert array to string
+                            taskExecutionConditionElmPrevValue = OCIDs.map(function (OCID) {
+                                return String(OCID);
+                            });
+                            var optionsHtml =
+                                '<optgroup label="From task saved data" data-value="savedTaskExecutionCondition">';
+                            var selected = task.runType === 11 ? '' : ' selected';
+                            if(OCIDs.length > 20) { // on many conditions for task
+
+                                var counters = {};
+                                OCIDs.forEach(function (OCID) {
+                                    var counterName = countersForOCIDs[OCID];
+                                    if(!counters[counterName]) counters[counterName] = [objectsForOCIDs[OCID]];
+                                    else counters[counterName].push(objectsForOCIDs[OCID]);
                                 });
-                                var optionsHtml = '<optgroup label="From task saved data" data-value="savedTaskExecutionCondition">';
-                                var selected = task.runType === 11 ? '' : ' selected';
-                                if(OCIDs.length > 20) { // on many conditions for task
 
-                                    var counters = {};
-                                    OCIDs.forEach(function (OCID) {
-                                        var counterName = countersForOCIDs[OCID];
-                                        if(!counters[counterName]) counters[counterName] = [objectsForOCIDs[OCID]];
-                                        else counters[counterName].push(objectsForOCIDs[OCID]);
-                                    });
-
-                                    var conditionStrs = [];
-                                    for(var counterName in counters) {
-                                        conditionStrs.push(counterName + ' for ' + counters[counterName].join(','));
-                                    }
-
-                                    $('#taskExecutionConditionsDescription').text('Condition description: ' +
-                                        conditionStrs.join('; '));
-
-                                    optionsHtml += '<option value="' + OCIDs.join(',') +
-                                        '"' + selected + ' data-value="savedTaskExecutionCondition">' +
-                                        'Ask to run for ' + OCIDs.length + ' saved task conditions</option>';
-                                } else {
-                                    OCIDs.forEach(function (OCID) {
-                                        // remove option with equal OCID
-                                        taskExecutionConditionElm.find('option[value="' + OCID + '"]').remove();
-                                        optionsHtml += '<option value="' + OCID +
-                                            '"' + selected + ' data-value="savedTaskExecutionCondition">Ask to run when ' +
-                                            countersForOCIDs[OCID] + ' for ' + objectsForOCIDs[OCID] + '</option>';
-                                    });
+                                var conditionStrings = [];
+                                for(var counterName in counters) {
+                                    conditionStrings.push(counterName + ' for ' + counters[counterName].join(','));
                                 }
-                                optionsHtml += '</optgroup>';
-                                if(task.runType !== 11) taskExecutionConditionElm.val('');
-                                taskExecutionConditionElm.append(optionsHtml);
+
+                                $('#taskExecutionConditionsDescription').text('Condition description: ' +
+                                    conditionStrings.join('; '));
+
+                                optionsHtml += '<option value="' + OCIDs.join(',') +
+                                    '"' + selected + ' data-value="savedTaskExecutionCondition">' +
+                                    'Ask to run for ' + OCIDs.length + ' saved task conditions</option>';
+                            } else {
+                                OCIDs.forEach(function (OCID) {
+                                    // remove option with equal OCID
+                                    taskExecutionConditionElm.find('option[value="' + OCID + '"]').remove();
+                                    optionsHtml += '<option value="' + OCID +
+                                        '"' + selected +
+                                        ' data-value="savedTaskExecutionCondition">Ask to run when ' +
+                                        countersForOCIDs[OCID] + ' for ' + objectsForOCIDs[OCID] + '</option>';
+                                });
+                            }
+                            optionsHtml += '</optgroup>';
+                            if(task.runType !== 11) taskExecutionConditionElm.val('');
+                            taskExecutionConditionElm.append(optionsHtml);
+
+                            setActiveTaskConditionOption(task.runType, function () {
+                                // disable option for running task immediately after saving
+                                $('option[value=runByActions]').prop('disabled', !data.canExecuteTask);
+
                                 M.FormSelect.init(taskExecutionConditionElm[0], {});
                             });
                         });
                     });
-                    if(!hasOParam) --actionsRemain;
-                }
-
-                taskExecutionConditionElm.find('[data-value="savedTaskExecutionCondition"]').remove();
-                taskExecutionConditionElm.find('[data-value="completed"]').remove();
-                switch (task.runType) {
-                    case 11: // run once completed
-                    case 0: // run permanently
-                    case 1: // run once
-                        if(task.runType === 11) {
-                            $('option[data-requiredOption="last"]').
-                            after('<option data-value="completed" value="runCompleted">' +
-                                'Task execution completed (Run the task when the condition is met)</option>');
-                            taskExecutionConditionElmPrevValue = ['runCompleted'];
-                            taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
-                        }
-                        runTaskOnceElm.prop('checked', task.runType === 1 || task.runType === 11); // true for run once
-                        taskExecuteTimeSettingsAreaElm.addClass('hide');
-                        taskExecutionConditionDivElm.removeClass('l4').addClass('l6');
-                        //taskExecutionConditionDivElm.removeClass('l6').addClass('l4');
-                        //taskExecuteConditionSettingsAreaElm.removeClass('hide');
-                        break;
-                    case 2: // run now
-                        taskExecutionConditionElmPrevValue = ['runNow'];
-                        taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
-                        setSharedCounters(objects);
-                        taskExecuteConditionSettingsAreaElm.addClass('hide');
-                        taskExecuteTimeSettingsAreaElm.addClass('hide');
-                        taskExecutionConditionDivElm.removeClass('l4').addClass('l6');
-                        break;
-                    case 12: // run now completed
-                        $('option[value="runNow"]').after('<option data-value="completed" value="runCompleted">' +
-                            'Task execution completed (Run the task immediately)</option>');
-                        taskExecutionConditionElmPrevValue = ['runCompleted'];
-                        taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
-                        setSharedCounters(objects);
-                        taskExecuteConditionSettingsAreaElm.addClass('hide');
-                        taskExecuteTimeSettingsAreaElm.addClass('hide');
-                        taskExecutionConditionDivElm.removeClass('l4').addClass('l6');
-                        break;
-                    case null: // only save
-                        taskExecutionConditionElmPrevValue = ['dontRun'];
-                        taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
-                        setSharedCounters(objects);
-                        taskExecuteConditionSettingsAreaElm.addClass('hide');
-                        taskExecuteTimeSettingsAreaElm.addClass('hide');
-                        taskExecutionConditionDivElm.removeClass('l4').addClass('l6');
-                        break;
-                    default: // run by time
-                        taskExecutionConditionElmPrevValue = ['runAtTime']
-                        taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
-                        setSharedCounters(objects);
-                        var midnight = new Date(task.runType);
-                        midnight.setHours(0,0,0,0);
-                        runTaskAtDateInstance.setDate(midnight);
-                        runTaskAtDateElm.val(runTaskAtDateInstance.toString());
-                        runTaskAtDateTimestampElm.val(midnight.getTime());
-                        var d = new Date(task.runType);
-                        runTaskAtTimeElm.val(d.getHours() + ':' + (d.getMinutes() < 10 ? '0' + d.getMinutes() : d.getMinutes()));
-                        taskExecuteConditionSettingsAreaElm.addClass('hide');
-                        taskExecutionConditionDivElm.removeClass('l6').addClass('l4');
-                        taskExecuteTimeSettingsAreaElm.removeClass('hide');
-                        break;
-                }
-
-                // disable option for running task immediately after saving
-                $('option[value=runByActions]').prop('disabled', !data.canExecuteTask);
-
-                var groupID = taskGroupForSearchElm.val();
-                var nextGroupIdx = workflow[groupID];
-                if(typeof nextGroupIdx === 'number') groupID = nextGroupIdx;
-
-                if(groupID) newTaskGroupElm.val(groupID);
-                else newTaskGroupElm.val(taskGroupForSearchElm.val());
-
-                $('#taskID').val(taskID || '');
-
-                taskUpdated('')
-            } else {
-                taskUpdated();
-
-                for(sessionID in actions) {
-                    var newSessionID = sessionID;
-                    while($('li[sessionID="' + newSessionID + '"]').length) {
-                        newSessionID = parseInt(String(Date.now()) + String(parseInt(String(Math.random() * 100), 10)), 10);
-                    }
-                    if(newSessionID !== sessionID) {
-                        actions[newSessionID] = actions[sessionID];
-                        delete actions[sessionID];
-                        actions[newSessionID].addNewSessionID = true;
-                    }
-                }
+                });
+                if(!hasOParam) --actionsRemain;
             }
 
-            var sessionIDs = Object.keys(actions);
-            var html = isCleanup ? '' : taskParametersAreaElm.html();
+            var groupID = taskGroupForSearchElm.val();
+            var nextGroupIdx = workflow[groupID];
+            if(typeof nextGroupIdx === 'number') groupID = nextGroupIdx;
+
+            if(groupID) newTaskGroupElm.val(groupID);
+            else newTaskGroupElm.val(taskGroupForSearchElm.val());
+
+            $('#taskID').val(taskID || '');
+
+            if(!isCleanup) {
+                taskUpdated();
+                for(taskActionID in actions) {
+                    var newTaskActionID = taskActionID;
+                    while($('li[data-tasks-actions-id="' + newTaskActionID + '"]').length) {
+                        newTaskActionID = parseInt(String(Date.now()) +
+                            String(parseInt(String(Math.random() * 100), 10)), 10);
+                    }
+                    if(newTaskActionID !== taskActionID) {
+                        actions[newTaskActionID] = actions[taskActionID];
+                        delete actions[taskActionID];
+                        actions[newTaskActionID].addNewTaskActionID = true;
+                    }
+                }
+            } else taskUpdated('');
+
+            var taskActionIDs = Object.keys(actions);
+            var html = '';
             // sort actions without actionsOrder for a new task
             if (taskName === unnamedTaskName || !taskName) {
-                if(isCleanup) $('#taskName').val('');
+                $('#taskName').val('');
 
                 var actionsWithOrder = [], actionsWithoutOrder = [];
-                sessionIDs.forEach(function (sessionID) {
-                    if (actions[sessionID].actionsOrder !== null) actionsWithOrder.push(sessionID);
-                    else actionsWithoutOrder.push(sessionID);
+                taskActionIDs.forEach(function (taskActionID) {
+                    if (actions[taskActionID].actionsOrder !== null) actionsWithOrder.push(taskActionID);
+                    else actionsWithoutOrder.push(taskActionID);
                 });
 
-                sessionIDs = actionsWithOrder;
-                Array.prototype.push.apply(sessionIDs, actionsWithoutOrder);
-            } else if(isCleanup) $('#taskName').val(taskName);
+                taskActionIDs = actionsWithOrder;
+                Array.prototype.push.apply(taskActionIDs, actionsWithoutOrder);
+            } else $('#taskName').val(taskName);
 
             var newObjectSelectors = [];
-            sessionIDs.forEach(function (sessionID) {
-                //if(!actions.hasOwnProperty(sessionID) || !actions[sessionID].name) continue;
+            taskActionIDs.forEach(function (taskActionID) {
+                //if(!actions.hasOwnProperty(taskActionID) || !actions[taskActionID].name) continue;
+                taskActionID = Number(taskActionID);
 
-
-                var action = actions[sessionID];
+                var action = actions[taskActionID];
                 var actionName = escapeHtml(action.name);
 
-                /*
-                if(!isCleanup && $('li[sessionID=' + sessionID + ']').attr('sessionID')) {
-                    M.toast({html: 'Try to add same action ' + actionName + ' (' + sessionID + ') to task', displayLength: 10000});
-                    //console.log(sessionIDs, sessionID);
-                    return;
-                }
-                 */
-
-                var actionDescription = (action.descriptionHTML ? action.descriptionHTML : 'no description for this action');
-                var actionIcon = (action.configuration && action.configuration.icon ? escapeHtml(action.configuration.icon) : 'bookmark');
+                var actionDescription = (action.descriptionHTML ?
+                    action.descriptionHTML : 'no description for this action');
+                var actionIcon = (action.configuration && action.configuration.icon ?
+                    escapeHtml(action.configuration.icon) : 'bookmark');
                 var canAddParametersToAction = action.configuration && action.configuration.canAddParametersToAction;
                 var actionID = escapeHtml(action.ID);
                 //actionsIDs.push(actionID); // fill array of actions IDs for setSharedCounters()
 
                 // 0 - Run action only if previous action completed without errors
-                // binary 1 - Run action only if last executed actionhas an errors
+                // binary 1 - Run action only if last executed action has an errors
                 // binary 10 - Do not wait until previous actions will be completed
-                var startupOptions = action.startupOptions ? Number(action.startupOptions) : 0;
+                var startupOptions = [0,1,2,3].indexOf(action.startupOptions) !== -1 ?
+                    action.startupOptions : 3;
 
                 html += '\
-<li sessionID="' +sessionID+ '">\
-    <input type="hidden" name="actionName-'+sessionID+'" value="'+actionName+'"/>\
-    <input type="hidden" name="actionID-'+sessionID+'" value="'+actionID+'"/>\
-    <input type="hidden" name="selected-'+sessionID+'" data-action-selector-input/>\
-    <input type="hidden" name="addNewSessionID-'+sessionID+'" value="' + (actions[sessionID].addNewSessionID ? 1 : 0) + '"/>\
+<li data-tasks-actions-id="' +taskActionID+ '">\
+    <input type="hidden" name="actionName-'+taskActionID+'" value="'+actionName+'"/>\
+    <input type="hidden" name="actionID-'+taskActionID+'" value="'+actionID+'"/>\
+    <input type="hidden" name="selected-'+taskActionID+'" data-action-selector-input/>\
+    <input type="hidden" name="addNewTaskActionID-'+taskActionID+'" value="' +
+                    (actions[taskActionID].addNewTaskActionID ? 1 : 0) + '"/>\
     <div class="collapsible-header no-padding">\
         <ul class="collection" style="width: 100%">\
             <li class="collection-item avatar">\
-                <i class="material-icons circle" data-action-selector-btn="' + sessionID + '">'+actionIcon+'</i>\
+                <i class="material-icons circle" data-action-selector-btn="' + taskActionID + '">'+actionIcon+'</i>\
                 <p class="title section">'+actionName.toUpperCase()+'</p>\
                 <p class="section">'+actionDescription.replace(/[\r\n]/g, '<br>')+'</p>\
                 <div class="row">\
-                    <div class="col s12 m4 l4 no-padding">\
+                    <div class="col s12 m3 l3 no-padding">\
                         <label>\
-                            <input type="radio" name="startupOptions-'+sessionID+'" value="0" id="runOnPrevSuccess-'+sessionID+'"'+(!startupOptions ? ' checked' : '')+'/>\
-                            <span>Run if previous action completed without errors</>\
+                            <input type="radio" name="startupOptions-' + taskActionID +
+                    '" value="4" id="runOnPrevSuccess-' + taskActionID+'"'+(startupOptions === 3 ? ' checked' : '')+'/>\
+                            <span>Run anyway</span>\
                         </label>\
                     </div>\
-                    <div class="col s12 m4 l4 no-padding">\
+                    <div class="col s12 m3 l3 no-padding">\
                         <label>\
-                            <input type="radio" name="startupOptions-'+sessionID+'" value="1" id="runOnPrevUnSuccess-'+sessionID+'"'+(startupOptions === 1 ? ' checked' : '')+'/>\
+                            <input type="radio" name="startupOptions-' + taskActionID +
+                    '" value="0" id="runOnPrevSuccess-' + taskActionID+'"'+(startupOptions === 0 ? ' checked' : '')+'/>\
+                            <span>Run if previous action completed without errors</span>\
+                        </label>\
+                    </div>\
+                    <div class="col s12 m3 l3 no-padding">\
+                        <label>\
+                            <input type="radio" name="startupOptions-' + taskActionID +
+                    '" value="1" id="runOnPrevUnSuccess-' + taskActionID+'"'+(startupOptions === 1 ? ' checked' : '')+'/>\
                             <span>Run if someone of previous actions executed with an errors</span>\
                         </label>\
                     </div>\
-                    <div class="col s12 m4 l4 no-padding">\
+                    <div class="col s12 m3 l3 no-padding">\
                         <label>\
-                            <input type="radio" name="startupOptions-'+sessionID+'" value="2" id="doNotWaitPrevious-'+sessionID+'"'+(startupOptions === 2 ? ' checked' : '')+'/>\
+                            <input type="radio" name="startupOptions-' + taskActionID +
+                    '" value="2" id="doNotWaitPrevious-'+taskActionID+'"'+(startupOptions === 2 ? ' checked' : '')+'/>\
                             <span>Run and don\'t wait until the previous action will be completed</>\
                         </label>\
                     </div>\
@@ -705,32 +795,38 @@ var JQueryNamespace = (function ($) {
         </ul>\
     </div>\
     <div class="collapsible-body row">\
-        <div class="secondary-content">* insert %:PREV_ACTION_RESULT:% variable for using result of previous action</div><div>&nbsp;</div>';
+        <div class="secondary-content">* insert %:PREV_ACTION_RESULT:% variable for using result of previous action\
+        </div><div>&nbsp;</div>';
 
-                var objectsSelectorOptions, objectsSelectorJSONString = '', objectsDescription = '', actionParametersHTML = '';
-                action.parameters.forEach(function(prm){
+                var objectsSelectorOptions,
+                    objectsSelectorJSONString = '',
+                    objectsDescription = '',
+                    actionParametersHTML = '';
+                action.parameters.forEach(function(actionParam){
 
                     var prmDescription = '', canBeDeleted;
                     if(action.configuration && action.configuration.parameters) {
-                        if (action.configuration.parameters[prm.name]) {
+                        if (action.configuration.parameters[actionParam.name]) {
 
-                            if (action.configuration.parameters[prm.name].description)
-                                prmDescription = escapeHtml(action.configuration.parameters[prm.name].description);
+                            if (action.configuration.parameters[actionParam.name].description)
+                                prmDescription = escapeHtml(action.configuration.parameters[actionParam.name].description);
 
-                            if (action.configuration.parameters[prm.name].canBeDeleted) canBeDeleted = true;
+                            if (action.configuration.parameters[actionParam.name].canBeDeleted) canBeDeleted = true;
 
                         } else {
                             var isFoundTemplate = false;
                             for(var name in action.configuration.parameters) {
                                 if(name.indexOf('*') === -1) continue;
-                                var reStr = escapeRegExp(name.replace(/\*/g, '%:!ASTERISK!:%')).replace(/%:!ASTERISK!:%/g, '(.*?)');
+                                var reStr = escapeRegExp(name
+                                    .replace(/\*/g, '%:!ASTERISK!:%'))
+                                    .replace(/%:!ASTERISK!:%/g, '(.*?)');
                                 try {
                                     var re = new RegExp(reStr, 'i');
                                 } catch (e) {
                                     continue;
                                 }
 
-                                if(re.test(prm.name)) {
+                                if(re.test(actionParam.name)) {
                                     if (action.configuration.parameters[name].description)
                                         prmDescription = escapeHtml(action.configuration.parameters[name].description);
 
@@ -745,37 +841,42 @@ var JQueryNamespace = (function ($) {
                         }
                     }
 
-                    if(prm.name === 'o') {
+                    if(actionParam.name === 'o') {
                         objectsSelectorOptions = '';
                         objectsDescription = prmDescription ? prmDescription : 'Objects list';
 
-                        if(!prm.value) return;
+                        if(!actionParam.value) return;
 
                         try {
-                            JSON.parse(prm.value).forEach(function(obj) {
+                            JSON.parse(String(actionParam.value)).forEach(function(obj) {
                                 objectsSelectorOptions += '<option value="'+obj.id+'">'+obj.name+'</option>';
                             });
                         } catch(err) {
-                            objectsSelectorOptions += '<option value="'+prm.value+'">'+prm.value+'</option>';
+                            objectsSelectorOptions += '<option value="'+actionParam.value+'">'+actionParam.value+'</option>';
                         }
 
-                        objectsSelectorJSONString = prm.value;
+                        objectsSelectorJSONString = actionParam.value;
 
-                    } else actionParametersHTML += actionParameter(sessionID, prm.name, prm.value, prmDescription, canBeDeleted);
+                    } else {
+                        actionParametersHTML += addActionParameter(Number(taskActionID), actionParam.name,
+                            String(actionParam.value), prmDescription, canBeDeleted);
+                    }
                 });
 
                 if(objectsSelectorOptions !== undefined) {// action has 'o' parameter
-                    var objectSelectorID = escapeHtml('select_' + sessionID + '-o');
+                    var objectSelectorID = escapeHtml('select_' + taskActionID + '-o');
 
                     html += '<select class="objects-selector browser-default" title="' + objectsDescription +
                         '" id="' + objectSelectorID + '" add-custom-object="variable" no-border=1 ' +
                         'description="Add objects or variable. Variable used for running task in action. ' +
                         'Variable name can be with or without \'%:\' and \':%\'. ' +
                         'Variable value can be an object ID, array of objects IDs, object name, array of objects names or ' +
-                        'array of objects with objects IDs and objects names like [{name: object1Name, id: object1ID}, {name: object2Name, id: object2ID}, ...]. ' +
+                        'array of objects with objects IDs and objects names like [{name: object1Name, id: object1ID}, ' +
+                        '{name: object2Name, id: object2ID}, ...]. ' +
                         'Also all of this except of single object ID can be a stringify JSON object.">'
                         + objectsSelectorOptions + '</select>' +
-                        '<input type="hidden" id="' + escapeHtml('prm_' + sessionID + '-o') + '" value="' + escapeHtml(objectsSelectorJSONString) + '"/>';
+                        '<input type="hidden" id="' + escapeHtml('prm_' + taskActionID + '-o') + '" value="' +
+                        escapeHtml(objectsSelectorJSONString) + '"/>';
 
                     newObjectSelectors.push(objectSelectorID);
                 }
@@ -784,18 +885,19 @@ var JQueryNamespace = (function ($) {
                 if(canAddParametersToAction) {
                     html += '\
         <div class="col s11 input-field">\
-            <input type="text" id="newParameterName-'+sessionID+'">\
-            <label for="newParameterName-'+sessionID+'">Enter new parameter name for add to parameters list for action "'+actionName+'"</label>\
+            <input type="text" id="newParameterName-' + taskActionID + '">\
+            <label for="newParameterName-' + taskActionID +
+                        '">Enter new parameter name for add to parameters list for action "' + actionName + '"</label>\
         </div>\
-        <a href="#!" add-parameter-action="'+sessionID+'" class="secondary-content"><i class="material-icons">add</i></a>';
+            <a href="#" data-add-action-parameter="' + taskActionID +
+                    '" class="secondary-content"><i class="material-icons">add</i></a>';
                 }
 
-                html += '\
-    </div>\
-</li>';
+                html += '</div></li>';
             });
 
-            // don\'t use empty().append(html) because it will be slow redrawing
+            if(!isCleanup) html += taskParametersAreaElm.html();
+
             taskParametersAreaElm.html(html);
             updateActionsOrder();
 
@@ -806,11 +908,9 @@ var JQueryNamespace = (function ($) {
 
                     var objects = selectElm.children('option').map(function() {
                         var val = $(this).val();
-                        if(val && Number(val) === parseInt(String(val), 10)) val = Number(val);
-
                         return {
                             name: $(this).text(),
-                            id: val
+                            id: isNaN(Number(val)) ? val : Number(val),
                         }
                     }).get();
 
@@ -829,33 +929,34 @@ var JQueryNamespace = (function ($) {
             $('input[type=radio]').change(taskUpdated);
             $('[data-actionParameter]').change(taskUpdated);
 
-            $('a[delete-action]').click(function(){
+            $('a[delete-action]').click(function() {
                 $(this).parent().parent().parent().parent().remove();
                 updateActionsOrder();
                 taskUpdated();
             });
 
-            $('a[delete-parameter]').click(function(){
+            $('a[delete-parameter]').click(function() {
                 $(this).parent().remove();
                 taskUpdated();
             });
 
-            $('a[add-parameter-action]').click(function(){
+            $('a[data-add-action-parameter]').click(function() {
 
                 var newParameterNameElm = $(this).prev().children('input');
                 var name = newParameterNameElm.val();
                 if(/^[_a-zA-Z][_\-\da-zA-Z]*$/.test(name)) {
                     if(name.toLowerCase() !== 'username' &&
-                        name.toLowerCase() !== 'actionname' &&
-                        name.toLowerCase() !== 'actionid' &&
-                        name.toLowerCase() !== 'sessionid'
+                        name.toLowerCase() !== 'actionName'.toLowerCase() &&
+                        name.toLowerCase() !== 'actionID'.toLowerCase() &&
+                        name.toLowerCase() !== 'taskActionID'.toLowerCase()
                     ) {
-                        var sessionID = $(this).attr('add-parameter-action');
-                        if (sessionID) {
-                            sessionID = Number(sessionID);
-                            if (sessionID && sessionID === parseInt(String(sessionID), 10)) {
-                                // actionParameter(sessionID, name, value, description, canBeDeleted)
-                                $(this).prev().before(actionParameter(sessionID, name, '', null, true));
+                        var taskActionID = $(this).attr('data-add-action-parameter');
+                        if (taskActionID) {
+                            taskActionID = Number(taskActionID);
+                            if (taskActionID && taskActionID === parseInt(String(taskActionID), 10)) {
+                                // addActionParameter(taskActionID, name, value, description, canBeDeleted)
+                                $(this).prev().before(addActionParameter(taskActionID, name, '',
+                                    null, true));
 
                                 $('a[delete-parameter]').click(function () {
                                     $(this).parent().remove();
@@ -863,8 +964,21 @@ var JQueryNamespace = (function ($) {
                                 newParameterNameElm.val('');
                             }
                         }
-                    } else M.toast({html: 'You can\'t use parameters name like "username" or "actionName"', displayLength: 5000});
-                } else M.toast({html: 'Incorrect or empty parameter name. Parameter name can contain only english alphabet symbols, digits, "-" and "_"', displayLength: 5000});
+                    } else {
+                        M.toast({
+                            html: 'You can\'t use parameter name like "username", "actionName", ' +
+                                '"actionID", "taskActionID"',
+                            displayLength: 5000,
+                        });
+                    }
+                } else {
+                    M.toast({
+                        html: 'Incorrect or empty parameter name. Parameter name can contain only english alphabet ' +
+                            'symbols, digits, "-" and "_"',
+                        displayLength: 5000,
+                    });
+                }
+
                 taskUpdated();
                 M.updateTextFields(); // update active inputs and textAreas
                 M.textareaAutoResize($('textarea'));
@@ -874,31 +988,110 @@ var JQueryNamespace = (function ($) {
         });
     }
 
+    /**
+     * Set active task condition in the "Task execute condition" select element
+     * @param {number} runType task.runType
+     * @param {function()} callback callback()
+     */
+    function setActiveTaskConditionOption(runType, callback) {
+        taskExecutionConditionElm.find('[data-value="savedTaskExecutionCondition"]').remove();
+        taskExecutionConditionElm.find('[data-value="completed"]').remove();
+        switch (runType) {
+            case 11: // run once completed
+            case 0: // run permanently
+            case 1: // run once
+                if(runType === 11) {
+                    $('option[data-requiredOption="last"]').
+                    after('<option data-value="completed" value="runCompleted">' +
+                        'Task execution completed (Run the task when the condition is met)</option>');
+                    taskExecutionConditionElmPrevValue = ['runCompleted'];
+                    taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
+                }
+                runTaskOnceElm.prop('checked', runType === 1 || runType === 11); // true for run once
+                taskExecuteTimeSettingsAreaElm.addClass('hide');
+                taskExecutionConditionDivElm.removeClass('l4').addClass('l6');
+                //taskExecutionConditionDivElm.removeClass('l6').addClass('l4');
+                //taskExecuteConditionSettingsAreaElm.removeClass('hide');
+                callback();
+                break;
+            case 2: // run now
+                taskExecutionConditionElmPrevValue = ['runNow'];
+                taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
+                taskExecuteConditionSettingsAreaElm.addClass('hide');
+                taskExecuteTimeSettingsAreaElm.addClass('hide');
+                taskExecutionConditionDivElm.removeClass('l4').addClass('l6');
+                setSharedCounters(objects, null, null, callback);
+                break;
+            case 12: // run now completed
+                $('option[value="runNow"]').after('<option data-value="completed" value="runCompleted">' +
+                    'Task execution completed (Run the task immediately)</option>');
+                taskExecutionConditionElmPrevValue = ['runCompleted'];
+                taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
+                taskExecuteConditionSettingsAreaElm.addClass('hide');
+                taskExecuteTimeSettingsAreaElm.addClass('hide');
+                taskExecutionConditionDivElm.removeClass('l4').addClass('l6');
+                setSharedCounters(objects, null, null, callback);
+                break;
+            case null: // only save
+                taskExecutionConditionElmPrevValue = ['dontRun'];
+                taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
+                taskExecuteConditionSettingsAreaElm.addClass('hide');
+                taskExecuteTimeSettingsAreaElm.addClass('hide');
+                taskExecutionConditionDivElm.removeClass('l4').addClass('l6');
+                setSharedCounters(objects, null, null, callback);
+                break;
+            default: // run by time
+                taskExecutionConditionElmPrevValue = ['runAtTime']
+                taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
+                var midnight = new Date(runType);
+                midnight.setHours(0,0,0,0);
+                runTaskAtDateInstance.setDate(midnight);
+                runTaskAtDateElm.val(runTaskAtDateInstance.toString());
+                runTaskAtDateTimestampElm.val(midnight.getTime());
+                var d = new Date(runType);
+                runTaskAtTimeElm.val(d.getHours() + ':' +
+                    (d.getMinutes() < 10 ? '0' + d.getMinutes() : d.getMinutes()));
+                taskExecuteConditionSettingsAreaElm.addClass('hide');
+                taskExecutionConditionDivElm.removeClass('l6').addClass('l4');
+                taskExecuteTimeSettingsAreaElm.removeClass('hide');
+                setSharedCounters(objects, null, null, callback);
+                break;
+        }
+    }
+
+    /**
+     * Escape regExp characters in the string for make a regExp from the string
+     * @param {string} string string for regExp
+     * @return {string} string with escaped regExp characters
+     */
     function escapeRegExp(string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
     }
 
-    function actionParameter(sessionID, name, val, description, canBeDeleted) {
+    /**
+     * Add action parameter to the action
+     * @param {number} taskActionID
+     * @param {string} name parameter name
+     * @param {string} val parameter value
+     * @param {string|null} description parameter description
+     * @param {boolean} canBeDeleted is parameter can be deleted by user
+     * @return {string} HTML with new parameter form
+     */
+    function addActionParameter(taskActionID, name, val, description, canBeDeleted) {
 
-        var id = escapeHtml('prm_'+sessionID+'-'+name);
-
-        // if object with this id exists, return ''
-        /*
-        if($('#'+id).attr('id')){
-            M.toast({html: 'Parameter with name "'+name+'" already exists', displayLength: 5000});
-            return '';
-        }
-        */
+        var id = escapeHtml('prm_' + taskActionID + '-' + name);
 
         if(description === undefined) description = '';
         if(val === undefined) val = '';
 
         return('<div>\
                     <div class="col s11 input-field">\
-                        <textarea data-actionParameter id="'+id+'" class="materialize-textarea">'+ escapeHtml(val) +'</textarea>\
-                        <label class="active" for="'+id+'">' + escapeHtml(name) + (description ? ': '+description : '') + '</label>\
-                    </div>\
-                    ' + (canBeDeleted ? '<a href="#!" delete-parameter class="secondary-content"><i class="material-icons">close</i></a>' : '') + '\
-                </div>')
+                        <textarea data-actionParameter id="' + id + '" class="materialize-textarea">' +
+            escapeHtml(val) + '</textarea>\
+                        <label class="active" for="'+id+'">' + escapeHtml(name) +
+            (description ? ': '+description : '') + '</label>\
+                    </div>' + (canBeDeleted ?
+                '<a href="#" delete-parameter class="secondary-content"><i class="material-icons">close</i></a>' : '') +
+                '</div>');
     }
 })(jQuery); // end of jQuery name space

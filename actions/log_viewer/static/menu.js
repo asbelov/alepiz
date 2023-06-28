@@ -16,7 +16,7 @@ function Menu(cInitCfg, initMainObject, callback) {
     var selectServiceElm;
 
     var searchBackLabel = String.fromCharCode(8593);  //Up arrow in utf-8
-    var regExpLabel = '<a href="http://ru.wikipedia.org/wiki/Regexp" target="_blank">re</a>&nbsp;';
+    var regExpLabel = '<a href="https://ru.wikipedia.org/wiki/Regexp" target="_blank">re</a>&nbsp;';
     var replaceAllLabel = 'все';
 
     var searchElmMaxSize = 40;
@@ -216,7 +216,7 @@ function Menu(cInitCfg, initMainObject, callback) {
 
             var selectedUncPathFile;
             for (var i = 0; i < fileList[cInitCfg.objectID].length; i++) {
-                var items = fileList[cInitCfg.objectID][i].split('\r'); //ID\runcdir\rfile
+                var items = fileList[cInitCfg.objectID][i].split('\r'); //ID\r<uncdir>\r<file>
                 if (items[1] === undefined || items[2] === undefined) continue;
                 var uncPathFile = items[1] + '\\' + items[2];
                 var fileName = items[2];
@@ -257,7 +257,7 @@ function Menu(cInitCfg, initMainObject, callback) {
                 return callback(false);
             }
             fileList[ID] = [];
-            for (var i = 0; i < List.length; i++) if (List[i]) fileList[ID].push(List[i]); //ID\runcdir\rfile
+            for (var i = 0; i < List.length; i++) if (List[i]) fileList[ID].push(List[i]); //ID\r<uncdir>\r<file>
 
             callback(true);
         }, true);

@@ -94,12 +94,12 @@ function getImportanceAndMontNames(callback) {
 
 function getEvents(user, objectsIDs, callback) {
 
-    getOCIDs(user, objectsIDs, function (err, OCIDsrows) {
+    getOCIDs(user, objectsIDs, function (err, OCIDsRows) {
         if(err) return callback(err);
 
         var countersIDs = [], OCIDs = {};
-        if(OCIDsrows) {
-            OCIDsrows.forEach(function (row) {
+        if(OCIDsRows) {
+            OCIDsRows.forEach(function (row) {
                 countersIDs.push(row.counterID);
                 OCIDs[row.id] = row;
             });
@@ -146,7 +146,7 @@ function getEvents(user, objectsIDs, callback) {
                 });
 
                 var disabledEvents = {};
-                if(OCIDsrows) {
+                if(OCIDsRows) {
                     disabledRows.forEach(function (disabled) {
                         var OCID = OCIDs[disabled.OCID];
                         if (OCID) {
@@ -164,7 +164,7 @@ function getEvents(user, objectsIDs, callback) {
                         return;
                     }
                     if(rowCounter.collectorID === 'event-generator' &&
-                        (!OCIDsrows || countersIDs.indexOf(rowCounter.id) !== -1)) {
+                        (!OCIDsRows || countersIDs.indexOf(rowCounter.id) !== -1)) {
 
                         filteredCounters[rowCounter.id] = {
                             counterID: rowCounter.id,

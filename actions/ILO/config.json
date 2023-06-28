@@ -9,7 +9,7 @@
     "showWhenNoObjectsSelected": false,
     "onChangeObjectMenuEvent": "callback:onChangeObjects",
     "descriptionTemplate": "ILO connection",
-    "icon": "settings",
+    "icon": "laptop",
     "canAddParametersToAction": false,
     "suffix": "_ilo",
     "regExp": "^.+?\\[([^\\]]+)\\]$",

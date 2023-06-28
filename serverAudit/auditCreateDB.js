@@ -3,7 +3,7 @@
  */
 
 
-const log = require('../lib/log')(module);
+//const log = require('../lib/log')(module);
 
 module.exports = createDB;
 
@@ -15,11 +15,14 @@ module.exports = createDB;
 function createDB(db, callback) {
 
     try {
+        // taskSession used when run one task with one taskID several times
         db.prepare('\
 CREATE TABLE IF NOT EXISTS sessions (\
 id INTEGER PRIMARY KEY ASC AUTOINCREMENT,\
 sessionID INTEGER NOT NULL UNIQUE,\
 userID INTEGER NOT NULL,\
+taskID INTEGER,\
+taskSession INTEGER,\
 actionID TEXT NOT NULL,\
 startTimestamp INTEGER NOT NULL,\
 stopTimestamp INTEGER)\
@@ -58,6 +61,32 @@ stopTimestamp INTEGER)\
         return callback(new Error('Can\'t create stopTimestamp index in sessions table in audit DB: ' + err.message));
     }
 
+    // descriptions(rowid) = sessions(id)
+    try {
+        db.prepare('CREATE VIRTUAL TABLE IF NOT EXISTS descriptions USING FTS5(description, error)').run();
+    } catch (err) {
+        return callback(new Error('Can\'t create descriptions table in audit DB: ' + err.message));
+    }
+
+    try {
+        // taskSession used when run one task with one taskID several times
+        db.prepare('\
+CREATE TABLE IF NOT EXISTS taskReferences (\
+taskSession INTEGER PRIMARY KEY,\
+taskNameRowID INTEGER NOT NULL UNIQUE)\
+').run();
+    } catch (err) {
+        return callback(new Error('Can\'t create taskReferences table in audit DB: ' + err.message))
+    }
+
+    // taskNames(rowid) = taskReferences(taskNameRowID)
+    try {
+        db.prepare('CREATE VIRTUAL TABLE IF NOT EXISTS taskNames USING FTS5(name)').run();
+    } catch (err) {
+        return callback(new Error('Can\'t create taskNames table in audit DB: ' + err.message));
+    }
+
+
     try {
         db.prepare('\
 CREATE TABLE IF NOT EXISTS objects (\
@@ -80,13 +109,6 @@ objectName TEXT NOT NULL)\
         db.prepare('CREATE INDEX IF NOT EXISTS objectName_objects_index on objects(objectName)').run();
     } catch (err) {
         return callback(new Error('Can\'t create objectName index in objects table in audit DB: ' + err.message));
-    }
-
-    // descriptions(rowid) = sessions(id)
-    try {
-        db.prepare('CREATE VIRTUAL TABLE IF NOT EXISTS descriptions USING FTS5(description, error)').run();
-    } catch (err) {
-        return callback(new Error('Can\'t create descriptions table in audit DB: ' + err.message));
     }
 
     // level is a ASCII code of the level character

@@ -6,8 +6,6 @@ const log = require('../lib/log')(module);
 const express = require('express');
 const path = require('path');
 const async = require('async');
-const Conf = require('../lib/conf');
-const confActions = new Conf('config/actions.json');
 const prepareUser = require('../lib/utils/prepareUser');
 const rightsWrapper = require('../rightsWrappers/actions');
 const actions = require('../lib/actionsConf');
@@ -16,6 +14,10 @@ const unique = require('../lib/utils/unique');
 const actionClient = require('../serverActions/actionClient');
 const objectFilterDB = require("../models_db/objectsFilterDB");
 
+const Conf = require('../lib/conf');
+const confActions = new Conf('config/actions.json');
+
+
 var router = express.Router();
 module.exports = router;
 
@@ -23,7 +25,8 @@ var actionsForUpdate = new Map(); // {<actionLink>: {updateAjax: true|false, upd
 
 
 // Initializing action, load and save user action configuration
-router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
+router.post('/'+confActions.get('dir')+'/:action',
+    function(req, res, next) {
 
     browserLog.deleteSession(module.sessionID);
     delete module.sessionID;
@@ -67,7 +70,8 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
 
         var sessionID = unique.createID();
         module.sessionID = sessionID;
-        log.debug('Creating a new session for user: ', username, ',  action: ', actionCfg.name, ', sessionID: ', sessionID);
+        log.debug('Creating a new session for user: ', username, ',  action: ', actionCfg.name,
+            ', sessionID: ', sessionID);
 
         if (!'o' in req.body) {
             log.error('Error while initialisation action "', actionID, '": ',
@@ -139,7 +143,8 @@ router.post('/'+confActions.get('dir')+'/:action', function(req, res, next) {
 });
 
 // sending static files from action's static dir
-router.all('/' + confActions.get('dir') + '/:action_sessionID/' + confActions.get('staticDir') + '/*', function(req, res){
+router.all('/' + confActions.get('dir') + '/:action_sessionID/' + confActions.get('staticDir') + '/*',
+    function(req, res) {
 
     var actionID = req.params.action_sessionID.replace(/^(.+)_\d+$/, '$1');
     var sessionID = Number(req.params.action_sessionID.replace(/^.+_(\d+)$/, '$1'));
@@ -161,7 +166,8 @@ router.all('/' + confActions.get('dir') + '/:action_sessionID/' + confActions.ge
         }
 
         if(cfg.staticDir && staticDir === cfg.staticDir){
-            rightsWrapper.checkActionRights(username, actionID, 'ajax', function(err/*, rights */) {
+            rightsWrapper.checkActionRights(username, actionID, 'ajax',
+                function(err/*, rights */) {
                 if(err) {
                     log.error('Can\'t check user rights for ', actionID, ' for sending static file: ', err.message);
                     return res.send();
@@ -178,11 +184,14 @@ router.all('/' + confActions.get('dir') + '/:action_sessionID/' + confActions.ge
 
 // running ajax or server script for view action or for executing action
 // :mode can be: server|ajax|makeTask
-router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, res, next){
-
+router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode',
+    function(req, res, next) {
 
     var actionID = req.params.action_sessionID.replace(/^(.+)_\d+$/, '$1');
-    var sessionID = Number(req.params.action_sessionID.replace(/^.+_(\d+)$/, '$1'));
+    if(!actionID) {
+        log.error('Trying to execute action but action ID is not defined');
+        return next();
+    }
 
     if(req.method !== 'GET' && req.method !== 'POST') {
         log.error('Trying to execute action "', actionID, '" with unsupported method ', req.method,
@@ -190,6 +199,7 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
         return next();
     }
 
+    var sessionID = Number(req.params.action_sessionID.replace(/^.+_(\d+)$/, '$1'));
     if(!sessionID) {
         if(req.params.mode.toLowerCase() !== 'help') {
             log.error('Trying to execute action "', actionID, '" with undefined session ID');
@@ -200,11 +210,6 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
     var username = prepareUser(req.session.username);
     var executionMode = req.params.mode;
     module.sessionID = sessionID;
-
-    if(!actionID) {
-        log.error('Trying to execute action but action ID is not defined');
-        return next();
-    }
 
     if(executionMode !== 'server' && executionMode !== 'ajax' && executionMode !== 'makeTask') {
         log.error('Unknown execution mode for action "', actionID, '": ', executionMode);
@@ -247,16 +252,16 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
             debug: actionCfg.debug,
             sessionID: sessionID,
             updateAction: actionsForUpdate.has(actionID) ? actionsForUpdate.get(actionID)[executionMode] : false
-        }, function(err, data){
-            if(!data) data = {actionError: ''};
-            if(err) {
-                log.error('Error in action "', actionID, '": ', err.message);
-                data.actionError = err.message;
-            }
-
+        }, function(err, data) {
             if(actionsForUpdate.has(actionID)) actionsForUpdate.get(actionID)[executionMode] = false;
 
             if(executionMode === 'ajax') {
+                if(!data) data = {actionError: ''};
+                if(err) {
+                    log.error('Error in action "', actionID, '": ', err.message);
+                    data.actionError = err.message;
+                }
+
                 log.debug('Sending back for action "',actionID,'", mode: ajax: ', data,
                     ': ', (Buffer.isBuffer(data) ? '(buffer)' : typeof data));
                 if(typeof data === 'string') return res.send(data);
@@ -264,7 +269,8 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
 
                     res.set({
                         'Content-Type': 'application/octet-stream',
-                        'Content-Disposition': 'attachment' + (data.fileName ? ('; filename="' + data.fileName + '"') : ''),
+                        'Content-Disposition': 'attachment' +
+                            (data.fileName ? ('; filename="' + data.fileName + '"') : ''),
                     });
                     res.write(Buffer.from(data.data), 'binary');
                     res.end();
@@ -272,24 +278,30 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode', function(req, 
                 } return res.json(data);
             }
 
-            if(executionMode === 'server') {
-                log.info('Complete executing action ', actionID, ' with result: ', data);
-            } else if(executionMode === 'makeTask') {
-                log.info('Completed saving action ', actionID);
-            }
-
             // when action is finished, clear old and create new session ID
-            browserLog.deleteSession(sessionID);
-            var newSessionID = unique.createID();
-            data.sessionID = newSessionID;
-            data.oldSessionID = sessionID;
-            data.actionID = actionID;
-            data.actionName = actionCfg.name;
-            log.debug('Sending back for action ', actionID, ', mode: ', executionMode, ': ', data);
-            res.json(data);
+            var oldSessionID = sessionID;
+            sessionID = unique.createID();
+            module.sessionID = sessionID;
 
-            module.sessionID = newSessionID;
-            log.debug('New sessionID for user: ', username, ',  action: ', actionCfg.name, ': ', newSessionID);
+            browserLog.deleteSession(oldSessionID);
+
+            var returnedObj = {
+                actionName: actionCfg.name,
+                sessionID: sessionID,
+                result: data,
+                actionError: err && err.message,
+            };
+
+            log.debug('Sending back for action ', actionID, ', mode: ', executionMode, ': ', returnedObj);
+            res.json(returnedObj);
+
+            if(executionMode === 'server') {
+                log.info('Complete executing action ', actionID, ' with result: ', returnedObj,
+                    '; username: ', username, '; sessions: ', oldSessionID, '=>', sessionID);
+            } else if(executionMode === 'makeTask') {
+                log.info('Completed saving action ', actionID,
+                    '; username: ', username, '; sessions: ', oldSessionID, '=>', sessionID);
+            }
         });
     });
 });

@@ -28,7 +28,10 @@ function jadeEditor(c){
         highlightSelectionMatches: {showToken: /\w/},
         extraKeys: {
             "Ctrl-Space": 'autocomplete',
-            "Ctrl-Y": 'deleteLine'
+            "Ctrl-Y": 'deleteLine',
+            "Tab": function(cm) {
+                cm.replaceSelection("    ", "end");
+            }
         },
         mode: {name: "pug", alignCDATA: true},
     });
@@ -49,6 +52,10 @@ function jadeEditor(c){
     });
 
     editor.refresh();
+    editor.init = function() {
+        setSize(editor);
+        editor.refresh();
+    }
     return editor;
 
     function setSize(cm) {
@@ -93,7 +100,7 @@ function __initjadeEditor() {
         for(var j=0; j<linkElms.length; j++) {
             if(linkElms[j].getAttribute('href') && linkElms[j].getAttribute('href').toLowerCase() === cssFile[i].toLowerCase()) {
                 isHasThisStylesheet = true;
-                //console.log('skipe '+cssFile[i]);
+                //console.log('skip '+cssFile[i]);
                 break;
             }
         }
@@ -113,7 +120,7 @@ function __initjadeEditor() {
         for(j=0; j<jsElms.length; j++) {
             if(jsElms[j].getAttribute('src') && jsElms[j].getAttribute('src').toLowerCase() === jsFile[i].toLowerCase()) {
                 isHasThisJS = true;
-                //console.log('skipe '+jsFile[i]);
+                //console.log('skip '+jsFile[i]);
                 break;
             }
         }

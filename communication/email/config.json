@@ -14,12 +14,12 @@
             "auth": {
                 "type": "login",
                 "user": "userName",
-                "pass": "smpt_password"
+                "pass": "smtp_password"
             },
             "tls": {
                 "rejectUnauthorized": false
             },
-            "name": "myhost.domain.com",
+            "name": "my-host.domain.com",
             "connectionTimeout": 120000,
             "greetingTimeout": 30000,
             "socketTimeout": 600000,

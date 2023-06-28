@@ -162,9 +162,9 @@ history.getFunctionList = function() { return functionsArray; };
  */
 history.add = function(initID, data) {
     log.debug('history.add(initID: ', initID, ', data: ', data, ')', {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": initID
+                "EXPECTED_OCID": initID
             }
         });
     // don't add empty value
@@ -190,8 +190,9 @@ history.add = function(initID, data) {
             // checking timestamp
             var timestamp = Number(data.timestamp);
             if(!timestamp || timestamp !== parseInt(String(timestamp), 10) ||
-                timestamp < 1477236595310 || timestamp > now + 60000) { // 1477236595310 = 01/01/2000
-                log.warn('Try to add data to history with invalid timestamp or very old timestamp or timestamp ' +
+                //timestamp < 1477236595310 || timestamp > now + 60000) { // 1477236595310 = 01/01/2000
+                timestamp < now - parameters.timestampMaxTimeDiff || timestamp > now + 60000) { // 1477236595310 = 01/01/2000
+                log.debug('Try to add data to history with invalid timestamp or very old timestamp or timestamp ' +
                     'from a future for id: ', id, '; data: ', data, '; now: ', now, '; now - timestamp = ', now - timestamp);
                 timestamp = now;
             }
@@ -256,8 +257,6 @@ history.del = function(IDs, callback) {
     if(!IDs.length) return callback();
 
     allClientIPC.forEach(clientIPC => {
-        if(!clientIPC.isConnected()) return;
-
         clientIPC.sendExt({
             msg: 'del',
             IDs: IDs
@@ -341,8 +340,6 @@ function getByIdx (id, offset, cnt, maxRecordsCnt, callback) {
     }
     var results = [], isGotAllRequiredRecords;
     async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
-        if(!clientIPC.isConnected()) return callback();
-
         clientIPC.sendExt({
             msg: 'getByIdx',
             id: Number(id),
@@ -356,9 +353,9 @@ function getByIdx (id, offset, cnt, maxRecordsCnt, callback) {
         }, function (err, result) {
             log.debug(hostPort, ': getByIdx(id: ', id, ', offset: ', offset, ', cnt: ', cnt,
                 ', maxRecordsCnt: ', maxRecordsCnt, '): result: ', result, ', err: ', err, {
-                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                 vars: {
-                    "RECEIVED_OCID": id
+                    "EXPECTED_OCID": id
                 }
             });
 
@@ -420,8 +417,6 @@ function getByTime (id, time, interval, maxRecordsCnt, callback) {
 
     var results = [], isGotAllRequiredRecords;
     async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
-        if(!clientIPC.isConnected()) return callback();
-
         clientIPC.sendExt( {
             msg: 'getByTime',
             id: Number(id),
@@ -435,9 +430,9 @@ function getByTime (id, time, interval, maxRecordsCnt, callback) {
         }, function(err, result) {
             log.debug(hostPort, ': getByTime(id: ', id, ', time: ', time, ', interval: ', interval,
                 ', maxRecordsCnt: ', maxRecordsCnt, '): result: ', result, ', err: ', err, {
-                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                     vars: {
-                        "RECEIVED_OCID": id
+                        "EXPECTED_OCID": id
                     }
                 });
             if (err && !result) {
@@ -482,8 +477,6 @@ history.getByValue = function(id, value, callback){
 
     var minTimestamp;
     async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
-        if(!clientIPC.isConnected()) return callback();
-
         clientIPC.sendExt( {
         msg: 'getByValue',
         id: Number(id),
@@ -494,6 +487,7 @@ history.getByValue = function(id, value, callback){
         }, function(err, timestamp) {
             if(err) log.warn('Can\'t getByValue from ', hostPort, ': ', err.message);
             if(timestamp && (!minTimestamp || timestamp < minTimestamp)) minTimestamp = timestamp;
+            callback();
         });
     }, function () {
         callback(null, minTimestamp);

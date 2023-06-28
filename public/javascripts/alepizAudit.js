@@ -31,20 +31,16 @@ var alepizAuditNamespace = (function($) {
 
     //  Open log window, start retrieving log, auto close log window after 30 minutes
     function openLogWindow() {
-        if(!alepizMainNamespace.getSessionIDs().length) {
-            M.toast({html: 'No actions are running in this window. Please run any action before', displayLength: 5000});
-            return;
-        }
         // Auto close log window after 30 min after  last show log window
         autoCloseLogWindow(closeLogWindowsTimeout);
-        // Run getLastLogRecords() only if it is not running or not updated more than 1 minutes
-        //if(retrievingLogRecordsInProgress === 0 || (Date.now() - retrievingLogRecordsInProgress) > 60000) {
-        //getLastLogRecords(force);
-        //}
+
         clearInterval(logTimer);
+        var sessionIDs = alepizMainNamespace.getSessionIDs();
+        alepizActionLogViewerNamespace.getLastLogRecords(sessionIDs, lastLogRecordIDs, getActionName, true);
+
         logTimer = setInterval(function () {
             var sessionIDs = alepizMainNamespace.getSessionIDs();
-            alepizActionLogViewerNamespace.getLastLogRecords(sessionIDs, lastLogRecordIDs, getActionName);
+            alepizActionLogViewerNamespace.getLastLogRecords(sessionIDs, lastLogRecordIDs, getActionName, true);
         }, 1000);
         modalLogWindowsInstance.open();
     }
@@ -85,10 +81,24 @@ var alepizAuditNamespace = (function($) {
      * @param {string} returnedObj.actionID action directory
      * @param {string} returnedObj.actionName action name
      * @param {string|undefined} returnedObj.actionError action error or undefined
+     * @param {*|Array} returnedObj.result action result. If runActionOnRemoteServers set to false,
+     * then return action result, else return array of results received from all Alepiz instances
      */
     function printMessageThatActionFinished(returnedObj) {
 
         if(typeof returnedObj !== 'object') return;
+
+        var actionResultStr = 'not returned or empty';
+
+        if(returnedObj.result && typeof returnedObj.result === 'object') {
+            if (Object.keys(returnedObj.result).length) {
+                if (Array.isArray(returnedObj.result)) actionResultStr = returnedObj.result.join('; ');
+                else actionResultStr = JSON.stringify(returnedObj.result, null, 4);
+            }
+        } else if (returnedObj.result !== undefined && returnedObj.result !== null) {
+            actionResultStr = String(returnedObj.result);
+        }
+
         alepizActionLogViewerNamespace.processLogRecords({'lastRecord': [{
             lastID: -1,
             timestamp: Date.now(),
@@ -97,7 +107,8 @@ var alepizAuditNamespace = (function($) {
             level: returnedObj.actionError ? 'E' : 'I',
             // xxxThe for procession message in coloringLogMessage(message)
             message: 'xxxThe "' + returnedObj.actionName + '" action was finished ' +
-                (returnedObj.actionError ? ('with error: ' + returnedObj.actionError) : 'successfully.'),
+                (returnedObj.actionError ? ('with error: ' + returnedObj.actionError) : 'successfully.') +
+                ' Result: ' + actionResultStr,
         }]}, lastLogRecordIDs, getActionName);
     }
 

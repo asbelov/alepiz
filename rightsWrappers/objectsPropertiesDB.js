@@ -20,7 +20,7 @@ module.exports = rightsWrapper;
  *
  * @param {string} user - username for check right for objects
  * @param {Array|string|number} objectIDs - array or comma separated string with objects IDs
- * @param {boolean} errorOnNoRights - return error if user has not rights for some objects from obkectIDs
+ * @param {boolean} errorOnNoRights - return error if user has not rights for some objects from objectIDs
  * @param {function(Error)|function(null, Array)} callback - return error or an Array with all object properties
  *  using SELECT * FROM objectsProperties WHERE objectID = ?
  */
@@ -58,7 +58,6 @@ rightsWrapper.getSharedProperties = function(user, objectsIDs, noCache, callback
     sortProperties(user, objectsIDs, [], true, function(err, obj) {
         if(err) return callback(err);
 
-        log.info('SharedProps: ', Object.values(obj.shared));
         callback(null, Object.values(obj.shared).map(function (properties) {
             return {
                 name: properties[0].name,
@@ -137,10 +136,10 @@ rightsWrapper.getPropertiesByOCIDs = function (user, OCIDs, mode, callback) {
     });
 }
 
-/** Get object property by property name (SQL LIKE sintaxis)
+/** Get object property by property name (SQL LIKE syntax)
  *
  * @param {string} user - username for check right for objects
- * @param {string} propertyName - SQL Like property name (wildcards: "%" any simbols, "_" one simbol, "\\";"\%";"\_" - for escape)
+ * @param {string} propertyName - SQL Like property name (wildcards: "%" any symbols, "_" one symbol, "\\";"\%";"\_" - for escape)
  * @param {function(Error)|function(null, Array)} callback - return error or an Array with object properties
  * [{objectName:..., objectID:..., propName:..., propVal:..., propMode:... propDescription:...}, ....]
  */
@@ -241,11 +240,11 @@ rightsWrapper.saveObjectsProperties = function (user, objectsIDs, propertiesForS
  * @example
  * // returned properties object
  * {
- *      insert: {<objectID1>: propertiyForSave1 ,...}, // props for insert
- *      update: {<objectID1>: propertiyForSave1 ,...}, // props for update
+ *      insert: {<objectID1>: propertyForSave1 ,...}, // props for insert
+ *      update: {<objectID1>: propertyForSave1 ,...}, // props for update
  *      updateDescription: propertiesForSave, // properties with different descriptions,
  *      deleteShared: deleteNotListedProperties ? Object.keys(sharedPropertiesNamesForDelete) : undefined,
- *      shared: {<objectID1>: propertiyForSave1 ,...}, // sharedPropertiesNamesForDelete
+ *      shared: {<objectID1>: propertyForSave1 ,...}, // sharedPropertiesNamesForDelete
  * } */
 function sortProperties(user, objectsIDs, initProperties, deleteNotListedProperties, callback) {
 

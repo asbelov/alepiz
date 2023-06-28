@@ -28,7 +28,9 @@ var log = (function($) {
     }
 
     function _log(level, args) {
-        if(!args) return;
+        if(!Array.isArray(args)) return;
+        var args1 = args.filter(function(arg) { return !!arg}); // remove message with array of the empty args
+        if(!args1.length) return;
 
         var sessionID = alepizMainNamespace.getSessionID();
         var activeActionLink = $('li[data-action-link].active').attr('data-action-link') || '';
@@ -48,7 +50,11 @@ var log = (function($) {
                 var message = actionName + '<span class="red-text">' +
                     escapeHtml(JSON.stringify(args).replace(/^\["Error: (.*?)\\n.*$/i, '$1')) +
                     '</span>';
-            } else message = JSON.stringify(args);
+                console.error(level, message, ': ', args);
+            } else {
+                message = JSON.stringify(args);
+                console.log(level, message, ': ', args);
+            }
             modalLogMessageElm.html(message);
 
             modalLogInstance.open();

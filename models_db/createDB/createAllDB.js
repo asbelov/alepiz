@@ -7,7 +7,6 @@ var initDB = require('../../models_db/createDB/initDB');
 var objectsDB = require('../../models_db/createDB/createObjectsDB');
 var countersDB = require('../../models_db/createDB/createCountersDB');
 var usersRolesRightsDB = require('../../models_db/createDB/createUsersRolesRightsDB');
-var auditUsersDB = require('../../models_db/createDB/createAuditUsersDB');
 var tasksDB = require('../../models_db/createDB/createTasksDB');
 var actionsConfig = require('../../models_db/createDB/createActions');
 
@@ -22,10 +21,12 @@ module.exports = function(callback) {
                 countersDB,
                 actionsConfig,
                 function(callback) {
-                    usersRolesRightsDB(function(err){
+                    usersRolesRightsDB(function(err) {
                         if(err) return callback(err);
-                        async.series([auditUsersDB, tasksDB], callback);
-                    })
+                        tasksDB(function (err) {
+                            callback(err);
+                        });
+                    });
                 },
             ], callback);
         })

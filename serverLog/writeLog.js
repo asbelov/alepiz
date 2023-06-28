@@ -14,61 +14,75 @@ module.exports = writeLog;
 closeUnusedLogFiles();
 
 var dateSuffix = setDateSuffix();
-
 /**
  * Write log message to the log file
- * @param {Object|string} messageObj object with data for create log message and log file name
- * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} messageObj.level log level
+ * @param {Object|undefined} messageObj object with data for create log message and log file name
+ * @param {undefined|"#"|"*"} [messageObj.additionalLabel] label for: "" - normal log, # - direct log to the file without
+ *  log server, * - simple log used in the serverLog functions where log is not initialized
  * @param {string} messageObj.messageBody pure the log message
- * @param {Object} messageObj.cfg configuration from config/log.json for current log label
- * @param {string} [messageObj.label] log message label
- * @param {number} [messageObj.timestamp] log message timestamp
+ * @param {number} messageObj.equalPrevMessagesNum number of repetitions of the last message
+ * @param {{dir: string, logLevel: string, logToConsole: boolean, exitLogFileName: string, file: string, errorLogFileName: string }} messageObj.cfg
+ *  configuration from config/log.json for current log label
+ * @param {string} messageObj.label log message label
+ * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} messageObj.level log level
+ * @param {number} messageObj.timestamp log message timestamp
  * @param {number} [messageObj.sessionID] sessionID for action
- * @param {Object} [messageObj.options] log options
+ * @param {string} messageObj.TID_PID string [<threadID>:]<process ID>
+ * @param {Array<string>} messageObj.filenames additional file names for logging (log.option()
  */
 function writeLog(messageObj) {
-    if(!messageObj) return;
+    if(!messageObj || !messageObj.messageBody) return;
 
-    if (!messageObj.messageBody) return;
+    var cfg = messageObj.cfg;
 
     // get default configuration
-    var cfg = messageObj.cfg;
     const logDir = String(cfg.dir) || 'logs';
 
     var date = messageObj.timestamp ? new Date(messageObj.timestamp) : new Date();
-    var message = cfg.logLevel === 'D' ? messageObj.messageBody.replace(/[\r\n]/g, '\n\t') : messageObj.messageBody.replace(/[\r\n]/g, '');
-    message = createMessage.createHeader(messageObj.level, messageObj.label, messageObj.sessionID, date) +
+    var message = cfg.logLevel === 'D' ?
+        messageObj.messageBody.replace(/[\r\n]/g, '\n\t') :
+        messageObj.messageBody.replace(/[\r\n]/g, '');
+
+    message =
+        createMessage.createHeader(messageObj.level, messageObj.label, messageObj.sessionID, date, messageObj.TID_PID) +
         (messageObj.additionalLabel ? messageObj.additionalLabel : '') +
         messageObj.messageBody;
-    if(cfg.logToConsole) console.log(message);
+
+    var repeatedMessage = '\t...the last message was repeated ' + messageObj.equalPrevMessagesNum + ' times'
+    if (cfg.logToConsole) {
+        if(messageObj.equalPrevMessagesNum) console.log(repeatedMessage);
+        console.log(message);
+    }
 
     message = message
         .replace(/[\r\n]/g, (cfg.wrapLines ? '' : '\n\t'))
         .replace(/\x1B\[\d+m/g, '') + '\n';
 
+    if(messageObj.equalPrevMessagesNum) {
+        message = repeatedMessage + '\n' + message;
+    }
     var mainLogFile =
         path.join(logDir, String(messageObj.level === 'EXIT' ?
             (cfg.exitLogFileName || 'exit.log') : (cfg.file || 'log.log') + dateSuffix));
 
-    var logFiles = (messageObj.options && Array.isArray(messageObj.options.filenames) ?
-        messageObj.options.filenames.map(filePath => path.join(logDir, filePath + '.log' + dateSuffix)) :
-        [mainLogFile]);
+    var logFiles = Array.isArray(messageObj.filenames) ?
+        messageObj.filenames.map(filePath => path.join(logDir, filePath + '.log' + dateSuffix)) :
+        [mainLogFile];
 
-    if(messageObj.level === 'W' || messageObj.level === 'E') {
+    if (messageObj.level === 'W' || messageObj.level === 'E') {
         logFiles.push(path.join(String(logDir), (cfg.errorLogFileName || 'error.log') + dateSuffix))
     }
 
     logFiles.forEach(logFilePath => {
         var stream = openLog(logFilePath);
         stream.fd.write(message);
-        stream.timestamp = Date.now();
     });
 }
 
 /**
  * Open stream for log file
  * @param {string} logFilePath path to the log file
- * @returns {stream} stream log file stream
+ * @returns {Object} stream log file stream
  */
 function openLog(logFilePath) {
     if(!logFD.has(logFilePath)) {

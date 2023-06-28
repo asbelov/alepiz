@@ -40,9 +40,11 @@ module.exports = function(args, callback) {
                 var fileNameToSave = fileToSave.slice(fileToSave.length - fileName.length);
                 var newFilePath = path.join(filePath, fileNameToSave);
 
-                log.info('Saving file to ' + newFilePath);
-
-                return saveFile(newFilePath, args.editorResult, callback);
+                return bcpFile(args, filePath, fileName, function(err) {
+                    if (err) return callback(new Error(err));
+                    log.info('Saving file to ' + newFilePath);
+                    saveFile(newFilePath, args.editorResult, callback);
+                });
             }
         }
 
@@ -70,6 +72,67 @@ function saveFile(filePath, content, callback) {
                 return;
             }
             log.info('Save file ', filePath, ' complete');
+            callback();
+        });
+    });
+}
+
+function bcpFile(args, filePath, fileName, callback) {
+    let bcpPath = args.actionCfg.options.bcpFilePath,
+        vars = bcpPath.match(/%:.+?:%/g),
+        date = new Date();
+
+    if (vars) {
+        vars.forEach(variable => {
+            switch (variable) {
+                case "%:YYYY:%":
+                    {
+                        bcpPath = bcpPath.replace(/%:YYYY:%/, date.getFullYear());
+                        break;
+                    }
+                case "%:MM:%":
+                    {
+                        let MM = ("0" + date.getMonth()).slice(-2);
+                        bcpPath = bcpPath.replace("%:MM:%", MM);
+                        break;
+                    }
+                case "%:dd:%":
+                    {
+                        let dd = ("0" + date.getDate()).slice(-2);
+                        bcpPath = bcpPath.replace("%:dd:%", dd);
+                        break;
+                    }
+                case "%:HH:%":
+                    {
+                        let HH = ("0" + date.getHours()).slice(-2);
+                        bcpPath = bcpPath.replace("%:HH:%", HH);
+                        break;
+                    }
+                case "%:mm:%":
+                    {
+                        let mm = ("0" + date.getMinutes()).slice(-2);
+                        bcpPath = bcpPath.replace("%:mm:%", mm);
+                        break;
+                    }
+                case "%:ss:%":
+                    {
+                        let ss = ("0" + date.getSeconds()).slice(-2);
+                        bcpPath = bcpPath.replace("%:ss:%", ss);
+                        break;
+                    }
+            }
+        });
+    }
+
+    let bcpFilePath = path.join(filePath, bcpPath, fileName);
+    bcpPath = path.join(filePath, bcpPath);
+    filePath = path.join(filePath, fileName);
+
+    fs.mkdir(bcpPath, function(err) {
+        if (err) return callback(new Error(err));
+        fs.copyFile(filePath, bcpFilePath, function(err) {
+            if (err) return callback(new Error(err));
+            log.info('Backup file created: ' + bcpPath);
             callback();
         });
     });

@@ -248,9 +248,7 @@ var JQueryNamespace = (function ($) {
         // format of inputs id and value is "interact_<XXX> = <interactionType>:<objectID>"
         // <XXX> is an objectID and used only as a interaction unique key and not used for parsing parameters
 
-        var multipleInteraction = '<td class="center-align"></td>';
-        if(interactionType === 'different') {
-            multipleInteraction =
+        var multipleInteraction = interactionType !== 'different' ? '<td class="center-align"></td>' :
                 '<td class="center-align">' +
                 '<label><input type="radio" name="interact_' + objectID + '" id="different_' + objectID + '" ' +
                 'value="different:' + objectID + '" class="with-gap" checked/>' +
@@ -258,7 +256,6 @@ var JQueryNamespace = (function ($) {
                 'data-tooltip="' + escapeHtml(objectName) + ' interact with ' +
                 escapeHtml(differentInteractions.join(', ')) + '"></span></label>' +
                 '</td>';
-        }
 
         $('#interactions').append(
             '<tr objectID="'+objectID+'">' +

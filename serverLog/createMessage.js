@@ -3,14 +3,9 @@
  */
 
 const util = require('util');
-const {threadId} = require('worker_threads');
-const PID = process.pid;
 
 var createMessage = {};
 module.exports = createMessage;
-
-// TID_PID = ":<TID>:<PID>" or ":<PID>"
-const TID_PID = (threadId ? ':' + threadId + ':' : ':') + PID;
 
 // colors for different log level and object types
 var colorsLabels = {
@@ -61,6 +56,8 @@ var consoleColors = {
     attrHidden:     '\u001b[8m'
 };
 
+var prevMessage = '', equalPrevMessagesNum = 0;
+
 /** Set color for a string
  * @param {string} str part of the log message for se color
  * @param {string} colorLabel message color label
@@ -79,9 +76,10 @@ function setColor(str, colorLabel) {
  * @param {string} label label for log message. Usually it is a path to the .js file, separated by ":"
  * @param {number|null} sessionID sessionID or null
  * @param {Date} [date] log message timestamp
+ * @param {string} TID_PID string [<threadID>:]<process ID>
  * @returns {string} log message header
  */
-createMessage.createHeader = function (level, label, sessionID, date) {
+createMessage.createHeader = function (level, label, sessionID, date, TID_PID) {
     if(!date) date = new Date();
     const timeStr = date.toLocaleTimeString() + '.' +
         String('00' + date.getMilliseconds()).replace(/^0*?(\d\d\d)$/, '$1');
@@ -96,10 +94,11 @@ createMessage.createHeader = function (level, label, sessionID, date) {
  * @param {Array} args array of the message parts. Parts can be any types
  * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} level message debug level
  * @param {number} objectDepth object depth for log object
- * @returns {string} lo message body
+ * @returns {{message: string, equalPrevMessagesNum: number}|null} message: message body,
+ *      equalPrevMessagesNum number of the equal previous messages.
  */
 createMessage.createBody = function (args, level, objectDepth) {
-    return args.map(arg => {
+    var message = args.map(arg => {
         if (typeof arg === 'number'/* || !isNaN(arg)*/) return setColor(String(arg), 'number');
         if (typeof arg === 'string') return setColor(arg.replace(/[\r\n]+$/, ''), level);
         if (typeof arg === 'boolean') return setColor(String(arg), 'boolean');
@@ -116,4 +115,18 @@ createMessage.createBody = function (args, level, objectDepth) {
             return '(ERROR CONVERTING OBJECT TO STRING: ' + err.message+')'
         }
     }).join('');
+
+
+    var returnedResult = {
+        message: message,
+        equalPrevMessagesNum: equalPrevMessagesNum,
+    }
+    if(message === prevMessage) {
+        ++equalPrevMessagesNum;
+        return null;
+    } else {
+        prevMessage = message;
+        equalPrevMessagesNum = 0;
+    }
+    return returnedResult
 }

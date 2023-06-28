@@ -9,5 +9,5 @@
   "onChangeObjectMenuEvent": "callback:onChangeObjects",
   "timeout": 60,
   "outputFormat": "text",
-  "icon": "settings"
+  "icon": "bug_report"
 }

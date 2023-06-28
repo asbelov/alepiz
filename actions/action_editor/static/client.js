@@ -104,7 +104,7 @@ var JQueryNamespace = (function ($) {
         serverJSEditor = javaScriptEditor({parentID: 'serverJSEditorParent'});
         ajaxJSEditor = javaScriptEditor({parentID: 'ajaxJSEditorParent'});
         clientJSEditor = javaScriptEditor({parentID: 'clientJSEditorParent'});
-        homePageEditor = pugEditor({parentID: 'indexPugEditorParent'});
+        homePageEditor = jadeEditor({parentID: 'indexPugEditorParent'});
         confEditor = javaScriptEditor({parentID: 'confEditorParent', jsonMode: true});
 
         $('#ajaxJSEditorTab').click(function() {
@@ -211,7 +211,7 @@ var JQueryNamespace = (function ($) {
                 $('#help').click(function () {
                     if(!helpEditor) {
                         setTimeout(function () {
-                            helpEditor = pugEditor({parentID: 'helpEditor'});
+                            helpEditor = jadeEditor({parentID: 'helpEditor'});
                         }, 100);
                     } else setTimeout(function() {helpEditor.init();}, 100);
                 });

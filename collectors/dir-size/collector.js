@@ -107,13 +107,13 @@ function getDirSize(dirName, excluded, sleepTime, paramStr, dontLogErrors, callb
 
             var filePath = path.join(dirName, dirEntObj.name);
             if (dirEntObj.isDirectory()) {
-                getDirSize(filePath, excluded, sleepTime, paramStr, dontLogErrors, function(err, childSize, chilObjectsNum, childfilesNum) {
+                getDirSize(filePath, excluded, sleepTime, paramStr, dontLogErrors, function(err, childSize, childObjectsNum, childFilesNum) {
                     if (err) {
                         if (!dontLogErrors) log.warn(err.message);
                         return callback();
                     }
-                    if (!isNaN(chilObjectsNum)) allObjectsNum += chilObjectsNum;
-                    if (!isNaN(childfilesNum)) filesNum += childfilesNum;
+                    if (!isNaN(childObjectsNum)) allObjectsNum += childObjectsNum;
+                    if (!isNaN(childFilesNum)) filesNum += childFilesNum;
                     if (!isNaN(childSize)) size += childSize;
                     callback();
                 });

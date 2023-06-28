@@ -86,7 +86,8 @@ usersDB.gerPriorityDescriptions = function(callback) {
 /**
  * Get information for all users or for specific user
  * @param {string|null} username username or null for get information for all users
- * @param {function(err)|function(Error, Object)} callback callback(err, userInfoArray), where userInfoArray is array like
+ * @param {function(err)|function(Error, Array<{id: number, name: string, fullName: string, roleID: number,
+ *     roleName: string}>)} callback callback(err, userInfoArray), where userInfoArray is array like
  *     [{id: <user ID>, name: <username>, fullName: <full user name>, roleID: <user role ID>,
  *     roleName: <user role name>}, ...]
  */

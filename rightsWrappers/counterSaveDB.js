@@ -19,20 +19,20 @@ module.exports = rightsWrapper;
 
 /**
  * Delete counter with counterID for db and all counters data from history. counterName used only for log information
- * @param {string} user - username who removed counter
- * @param {Number} counterID - counter ID for removing
- * @param {string} counterName - counter name for removing. Used only for information
- * @param {function} callback - callback(err)
+ * @param {string} username username who removed counter
+ * @param {number} counterID counter ID for removing
+ * @param {string} counterName counter name for removing. Used only for information
+ * @param {function(Error)|function()} callback callback(err)
  * @returns {*}
  */
-rightsWrapper.deleteCounter = function(user, counterID, counterName, callback) {
+rightsWrapper.deleteCounter = function(username, counterID, counterName, callback) {
 
     if (!counterID || Number(counterID) !== parseInt(String(counterID), 10))
         return callback(new Error('Delete counter: unexpected counter: ' + counterName + '; id: ' + counterID));
     else counterID = Number(counterID);
 
     rightsDB.checkCounterID({
-        user: prepareUser(user),
+        user: prepareUser(username),
         id: counterID,
         checkChange: true
     }, function (err, counterID) {
@@ -59,7 +59,7 @@ rightsWrapper.deleteCounter = function(user, counterID, counterName, callback) {
                     counterName, '(', counterID, '); OCIDs: ', objectsCountersIDs);
                 server.sendMsg({
                     removeCounters: objectsCountersIDs,
-                    description: 'Counter' + counterName + '(' + counterID + ') was removed by user ' + user
+                    description: 'Counter' + counterName + '(' + counterID + ') was removed by user ' + username
                 });
                 history.connect('actionCounterSettings', function () {
                     history.del(objectsCountersIDs, function(err) {
@@ -79,12 +79,13 @@ rightsWrapper.deleteCounter = function(user, counterID, counterName, callback) {
 /**
  * Save not existing object counter relations and does not save existing object counter relation
  * I.e. checks existing object counter relationships and does not save if the relationship already exists
- * @param {string} user - username
+ * @param {string} username - username
  * @param {Array} initObjectIDs - array of object IDs
  * @param {Array} initCountersIDs - array of counter IDs
- * @param {function} callback - callback(err, objectsCountersIDs), where objectsCountersIDs = [{objectID:, counterID:}, ...]
+ * @param {function(Error)|function()|function(null, Array<Object>)} callback - callback(err, objectsCountersIDs), where
+ * objectsCountersIDs is [{objectID:, counterID:}, ...]
  */
-rightsWrapper.saveObjectsCountersIDs = function(user, initObjectIDs, initCountersIDs,  callback) {
+rightsWrapper.saveObjectsCountersIDs = function(username, initObjectIDs, initCountersIDs,  callback) {
 
     if(!initCountersIDs) return callback();
     checkIDs(initCountersIDs, function(err, countersIDs) {
@@ -97,10 +98,10 @@ rightsWrapper.saveObjectsCountersIDs = function(user, initObjectIDs, initCounter
                 return callback(new Error('Incorrect objects IDs: ' + err.message));
             }
 
-            user = prepareUser(user);
+            username = prepareUser(username);
 
             rightsDB.checkObjectsIDs({
-                user: user,
+                user: username,
                 IDs: checkedObjectsIDs,
                 checkChange: true,
                 errorOnNoRights: true
@@ -109,7 +110,8 @@ rightsWrapper.saveObjectsCountersIDs = function(user, initObjectIDs, initCounter
 
                 if(!objectsIDs || !objectsIDs.length) {
                     return callback(new Error('Objects IDs are not defined: ' +
-                        JSON.stringify(initObjectIDs) + ':' + JSON.stringify(objectsIDs)));
+                        JSON.stringify(initObjectIDs, null, 4) + ':' +
+                        JSON.stringify(objectsIDs, null, 4)));
                 }
 
                 countersDB.getCountersForObjects(objectsIDs, function(err, rows) {
@@ -155,8 +157,19 @@ rightsWrapper.saveObjectsCountersIDs = function(user, initObjectIDs, initCounter
     });
 };
 
-
-rightsWrapper.saveCounter = function(user, counterData, callback) {
+/**
+ * Save the counter
+ * @param {string} username username
+ * @param {Object} counterData counter data
+ * @param {Array<number>} counterData.initObjectsIDs linked object IDs
+ * @param {Object} counterData.counter counter properties
+ * @param {Object} counterData.counterParameters counter parameters
+ * @param {Array<Object>} counterData.updateEvents counter update events parameters
+ * @param {Object} counterData.variables counter variables data
+ * @param {number} counterData.sessionID unique counter sessionID for create unique new counterID
+ * @param {function(Error)|function(null, number)} callback callback(err, counterID)
+ */
+rightsWrapper.saveCounter = function(username, counterData, callback) {
 
     var initObjectsIDs = counterData.initObjectsIDs;
     var counter = counterData.counter;
@@ -170,9 +183,9 @@ rightsWrapper.saveCounter = function(user, counterData, callback) {
             return callback(new Error('Incorrect objects IDs: ' + err.message));
         }
 
-        user = prepareUser(user);
+        username = prepareUser(username);
         rightsDB.checkObjectsIDs({
-            user: user,
+            user: username,
             IDs: checkedIDs,
             errorOnNoRights: true
         }, function (err, objectsIDs) {
@@ -228,7 +241,7 @@ rightsWrapper.saveCounter = function(user, counterData, callback) {
 
             // in rightsDB.checkCounterID set if(counter.counterID) return callback()
             rightsDB.checkCounterID({
-                user: prepareUser(user),
+                user: prepareUser(username),
                 id: counter.counterID,
                 checkChange: true
             },function(err) {
@@ -241,6 +254,16 @@ rightsWrapper.saveCounter = function(user, counterData, callback) {
     });
 };
 
+/**
+ * Save the counter
+ * @param {Array<number>} objectsIDs linked object IDs
+ * @param {Object} counter counter properties
+ * @param {Object} counterParameters counter parameters
+ * @param {Array<Object>} updateEvents counter update events parameters
+ * @param {Object} variables counter variables data
+ * @param {number} sessionID unique counter sessionID for create unique new counterID
+ * @param {function(Error)|function(null, number)} callback callback(err, counterID)
+ */
 function saveCounter(objectsIDs, counter, counterParameters, updateEvents, variables, sessionID, callback) {
 
     collectors.checkParameters(counter.collectorID, counterParameters, variables,
@@ -320,11 +343,20 @@ function saveCounter(objectsIDs, counter, counterParameters, updateEvents, varia
     });
 }
 
+/**
+ * Update the counter
+ * @param {Array<number>} objectsIDs linked object IDs
+ * @param {Object} counter counter properties
+ * @param {Object} counterParameters counter parameters
+ * @param {Array<Object>} updateEvents counter update events parameters
+ * @param {Object} variables counter variables data
+ * @param {function(Error)|function()} callback callback(err)
+ */
 function updateCounter(objectsIDs, counter, counterParameters, updateEvents, variables, callback) {
 
     counterSaveDB.updateCounter(counter, function(err, counterID) {
         if(err) return callback(new Error('Error updating counter in counters table: ' + err.message +
-        ': "' + JSON.stringify(counter) + '"'));
+        ': "' + JSON.stringify(counter, null, 4) + '"'));
 
         updateCounterParameters(counterID, counterParameters, function(err) {
             if(err) return callback(err);
@@ -334,7 +366,7 @@ function updateCounter(objectsIDs, counter, counterParameters, updateEvents, var
 
                 counterSaveDB.insertVariables(counterID, variables, function(err) {
                     if(err) return callback(new Error('Error inserting counter ' + counterID + ': ' + err.message +
-                        '; variables: ' + JSON.stringify(variables)));
+                        '; variables: ' + JSON.stringify(variables, null, 4)));
 
                     updateUpdateEvents(counterID, updateEvents, function(err) {
                         if(err) return callback(err);
@@ -362,27 +394,37 @@ function updateCounter(objectsIDs, counter, counterParameters, updateEvents, var
     })
 }
 
+/**
+ * Insert the counter
+ * @param {Array<number>} objectsIDs linked object IDs
+ * @param {Object} counter counter properties
+ * @param {Object} counterParameters counter parameters
+ * @param {Array<Object>} updateEvents counter update events parameters
+ * @param {Object} variables counter variables data
+ * @param {number} sessionID unique counter sessionID for create unique new counterID
+ * @param {function(Error)|function(null, number)} callback callback(err, counterID)
+ */
 function insertCounter(objectsIDs, counter, counterParameters, updateEvents, variables, sessionID, callback) {
     counterSaveDB.insertCounter(counter, sessionID, function(err, counterID) {
         if(err) return callback(new Error('Error inserting counter into counters table: ' + err.message +
-        ': ' + JSON.stringify(counter)));
+        ': ' + JSON.stringify(counter, null, 4)));
 
         counterSaveDB.insertCounterParameters(counterID, counterParameters, function(err) {
             if(err) {
                 return callback(new Error('Error inserting counter ' + counterID +': ' + err.message +
-                    '; parameters: '+ JSON.stringify(counterParameters)));
+                    '; parameters: '+ JSON.stringify(counterParameters, null, 4)));
             }
 
             counterSaveDB.insertVariables(counterID, variables, function(err) {
                 if(err) {
                     return callback(new Error('Error inserting counter ' + counterID + ': ' + err.message +
-                        '; variables: ' + JSON.stringify(variables)));
+                        '; variables: ' + JSON.stringify(variables, null, 4)));
                 }
 
                 counterSaveDB.insertUpdateEvents(counterID, updateEvents, function(err) {
                     if(err) {
                         return callback(new Error('Error inserting counter ' + counterID + ': ' + err.message +
-                            '; update events: '+ JSON.stringify(updateEvents)));
+                            '; update events: '+ JSON.stringify(updateEvents, null, 4)));
                     }
 
                     var objectsCountersIDs = objectsIDs.map(function (objectID) {
@@ -396,7 +438,8 @@ function insertCounter(objectsIDs, counter, counterParameters, updateEvents, var
                         if(err) {
                             return callback(new Error('Error inserting counter ' + counterID + ': ' +
                                 err.message +
-                                '; objects to counter relations: ' + JSON.stringify(objectsCountersIDs)));
+                                '; objects to counter relations: ' +
+                                JSON.stringify(objectsCountersIDs, null, 4)));
                         }
 
                         callback(null, counterID);
@@ -407,14 +450,12 @@ function insertCounter(objectsIDs, counter, counterParameters, updateEvents, var
     })
 }
 
-/*
-    update counter parameters
-
-    counterID: counter ID
-    counterParameters object with counter parameters: { name1: val1, name2: val2, ... }
-    callback(err);
+/**
+ * Update counter parameters
+ * @param {number} counterID counter ID
+ * @param {Object} counterParameters object with counter parameters: { name1: val1, name2: val2, ... }
+ * @param {function(Error)|function()} callback callback(err)
  */
-
 function updateCounterParameters(counterID, counterParameters, callback) {
     // existingParameters: [{name:..., value: ...}, {}, ....]
     countersDB.getCounterParameters(counterID, function(err, existingParameters) {
@@ -455,16 +496,23 @@ function updateCounterParameters(counterID, counterParameters, callback) {
     });
 }
 
+/**
+ * Update counter update events
+ * @param {number} counterID counter ID
+ * @param {Array<Object>} updateEvents array of the objects with update events like
+ * [{counterID:, objectID:, expression:, mode: 0|1|2|3, objectFilter:, description:, updateEventOrder:}, …]
+ * @param {function(Error)|function()} callback callback(err)
+ */
 function updateUpdateEvents(counterID, updateEvents, callback) {
     countersDB.getUpdateEvents(counterID, function(err, existingEvents) {
         if(err) return callback(new Error('Error getting update events for counter ' + counterID + ': ' + err.message));
 
         var eventsForRemoving = existingEvents.filter(function(event) {
-            return updateEventCompare(updateEvents, event);
+            return !searchUpdateEvent(updateEvents, event);
         });
 
         var eventsForInserting = updateEvents.filter(function(event) {
-            return updateEventCompare(existingEvents, event);
+            return !searchUpdateEvent(existingEvents, event);
         });
 
         log.debug('Existing events: ', existingEvents);
@@ -476,37 +524,51 @@ function updateUpdateEvents(counterID, updateEvents, callback) {
         counterSaveDB.deleteUpdateEvents(counterID, eventsForRemoving, function(err) {
             if(err) {
                 return callback(new Error('Error deleting counter ' + counterID + ': ' + err.message +
-                    ' update events ' + JSON.stringify(eventsForRemoving)));
+                    ' update events ' + JSON.stringify(eventsForRemoving, null, 4)));
             }
 
             // in counterSaveDB.insertUpdateEvents set if(!eventsForInserting.length) return callback();
             counterSaveDB.insertUpdateEvents(counterID, eventsForInserting, function(err) {
                 if(err) {
                     return callback(new Error('Error inserting counter ' + counterID + ': ' + err.message +
-                        '; update events: '+ JSON.stringify(eventsForInserting)));
+                        '; update events: '+ JSON.stringify(eventsForInserting, null, 4)));
                 }
 
                 callback();
             })
         })
     })
-
-    function updateEventCompare(updateEvents, event) {
-        for(var i = 0; i < updateEvents.length; i++) {
-            if(updateEvents[i].counterID === event.counterID &&
-                updateEvents[i].objectID === event.objectID &&
-                updateEvents[i].expression === event.expression &&
-                updateEvents[i].mode === event.mode &&
-                updateEvents[i].objectFilter === event.objectFilter &&
-                updateEvents[i].description === event.description &&
-                updateEvents[i].updateEventOrder === event.updateEventOrder
-            ) return false;
-        }
-        return true;
-    }
 }
 
-function updateObjectsCountersRelations(counterID, objectsIDs, counterName, callback) {
+/**
+ * Try to find updateEvent in an array of the updateEvents
+ * @param {Array<Object>} updateEvents
+ * @param {Object} updateEvent
+ * @return {boolean} true if updateEvent was found in the updateEvents array, else false
+ */
+function searchUpdateEvent(updateEvents, updateEvent) {
+    for(var i = 0; i < updateEvents.length; i++) {
+        if(updateEvents[i].counterID === updateEvent.counterID &&
+            updateEvents[i].objectID === updateEvent.objectID &&
+            updateEvents[i].expression === updateEvent.expression &&
+            updateEvents[i].mode === updateEvent.mode &&
+            updateEvents[i].objectFilter === updateEvent.objectFilter &&
+            updateEvents[i].description === updateEvent.description &&
+            updateEvents[i].updateEventOrder === updateEvent.updateEventOrder
+        ) return true;
+    }
+    return false;
+}
+
+
+/**
+ * Update objects to counter relations
+ * @param {number} counterID counter ID
+ * @param {Array<number>} objectIDs array with object IDs
+ * @param {string} counterName counter name
+ * @param {function(Error)|function()} callback callback(err)
+ */
+function updateObjectsCountersRelations(counterID, objectIDs, counterName, callback) {
 
     counterSaveDB.getObjectsToCounterRelations(counterID, function(err, existingObjectsIDsObj) {
         if (err) {
@@ -526,7 +588,7 @@ function updateObjectsCountersRelations(counterID, objectsIDs, counterName, call
 
             // also remove duplicates
             var objectsCountersPairsForDeleting = existingObjectsIDs.filter(function(objectID, pos) {
-                return objectsIDs.indexOf(objectID) === -1 && existingObjectsIDs.indexOf(objectID) === pos;
+                return objectIDs.indexOf(objectID) === -1 && existingObjectsIDs.indexOf(objectID) === pos;
             }).map(function (objectID) {
                 return {
                     objectID: objectID,
@@ -581,8 +643,8 @@ function updateObjectsCountersRelations(counterID, objectsIDs, counterName, call
                     //existing 5,9,10
                     //new      9,10,12
                     // also remove duplicates
-                    var objectsCountersPairsForInserting = objectsIDs.filter(function(objectID, pos) {
-                        return existingObjectsIDs.indexOf(objectID) === -1 && objectsIDs.indexOf(objectID) === pos;
+                    var objectsCountersPairsForInserting = objectIDs.filter(function(objectID, pos) {
+                        return existingObjectsIDs.indexOf(objectID) === -1 && objectIDs.indexOf(objectID) === pos;
                     }).map(function (objectID) {
                         return {
                             objectID: objectID,
@@ -591,7 +653,7 @@ function updateObjectsCountersRelations(counterID, objectsIDs, counterName, call
                     });
 
                     log.debug('Current ObjectsIDs for counter ', counterName, ' is: ', existingObjectsIDs,
-                        ', new objectsIDs: ', objectsIDs,
+                        ', new objectIDs: ', objectIDs,
                         ' objectsCountersIDs for inserting: ', objectsCountersPairsForInserting,
                         ' objectsCountersIDs for deleting: ', objectsCountersPairsForDeleting);
 

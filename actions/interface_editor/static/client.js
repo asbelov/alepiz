@@ -34,10 +34,6 @@ JQueryNamespace = (function ($) {
             navBarLinksEditor.setValue(JSON.stringify(data.navBarLinks || {}, null, 4));
             groupEditor.setValue(JSON.stringify(data.objectGroups || {}, null, 4));
 
-            /*
-            actionEditor.setOption('readOnly', 'nocursor'); will hide the cursor, but you won't be able to copy the
-            contents of the editor to the clipboard
-             */
             actionEditor.setOption('readOnly', true);
             navBarLinksEditor.setOption('readOnly', true);
             groupEditor.setOption('readOnly', true);

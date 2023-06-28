@@ -29,7 +29,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         div.row
             div.col.s12
                 script(src='/javascripts/javaScriptEditor.js')
-                script(src='/javascripts/pugEditor.js')
+                script(src='/javascripts/jadeEditor.js')
                 script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
                 div.col.s12.m12.l12
                     ul#mainTabs.tabs
@@ -176,7 +176,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                     var modalDeleteConfirmInstance = M.Modal.init(document.getElementById('modalRunConfirm'), {dismissible: false});
                                     modalDeleteConfirmInstance.open();
                                     $('#modalRunConfirmNo').unbind('click').click(function(){
-                                        callback(new Error('Action has been canceled for objects ' + objectsNames.join(';') + '. server.js didn\'t start'));
+                                        callback(new Error('Action has been canceled for objects ' + objectsNames.join(';') + '. server.js did not start'));
                                     });
 
                                     $('#modalRunConfirmYes').unbind('click').click(function(){

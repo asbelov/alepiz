@@ -72,6 +72,10 @@ function callbackAfterExec(counterData, callback) {
     }, 2000);
 }
 
+// The functions will be passed from the parent frame
+// describe the function here to prevent the error message
+if(!getActionParametersFromBrowserURL) getActionParametersFromBrowserURL = function (callback) {callback();}
+
 var JQueryNamespace = (function ($) {
     $(function () {
         objects = parameters.objects;

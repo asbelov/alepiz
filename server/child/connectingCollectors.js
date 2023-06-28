@@ -63,7 +63,7 @@ function connectingCollectors(callback) {
 
             if (collectorsObj[collectorName].runCollectorAsThread) {
                 //log.info('Starting passive collector ', collectorName, ' in thread: ', collectorPath);
-                runInThread(collectorPath, null,function (err, collectorObj) {
+                runInThread(collectorPath, {},function (err, collectorObj) {
                     if (err) {
                         log.error('Error starting passive collector ', collectorName, ' code ', collectorPath,
                             ' as a thread: ', err.message);

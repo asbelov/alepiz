@@ -3,7 +3,7 @@
  */
 
 const mssql = require("msnodesqlv8");
-var log = require('../../lib/log')(module);
+const log = require('../../lib/log')(module);
 
 
 var collector = {};

@@ -9,6 +9,6 @@
     "showWhenNoObjectsSelected": true,
     "onChangeObjectMenuEvent": "callback:onChangeObjects",
     "outputFormat": "text",
-    "icon": "settings",
+    "icon": "policy",
     "applyToOwnObjects": true
 }

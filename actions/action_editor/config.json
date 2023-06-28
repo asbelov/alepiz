@@ -13,7 +13,8 @@
   "callbackBeforeExec": "callbackBeforeExec",
   "onChangeObjectMenuEvent": "nothing",
   "cleanInputIDs": "deleteAction",
-  "icon": "directions_run",
+  "icon": "check_box",
   "timeout": 60,
-  "showWhenNoObjectsSelected": true
+  "showWhenNoObjectsSelected": true,
+  "noObjectsRequired": true
 }

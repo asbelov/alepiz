@@ -30,6 +30,9 @@
             font-style:italic;
             display:inline-block;
         }
+        .task-action-startup[data-startup-option="3"]::after {
+            content: "(Run anyway):";
+        }
         .task-action-startup[data-startup-option="0"]::after {
             content: "(Run if previous action completed without errors):";
         }

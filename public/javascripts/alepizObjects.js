@@ -23,10 +23,12 @@ var alepizObjectsNamespace = (function($) {
         walletIconElm,
         objectGroupIconCrossOutElm,
         searchIconElm,
+        bodyElm,
 
         objectsTooltipInstances,
 
         useGlobalSearch = false,
+        globalSearchLastParam = {},
         prevSearchStrLength = 0,
         minSearchStrLength = 2,
         timeWhenNoObjectsWereFound = 0,
@@ -87,6 +89,7 @@ var alepizObjectsNamespace = (function($) {
         walletIconElm = $('#walletIcon');
         objectGroupIconCrossOutElm = $('#objectGroupIconCrossOut');
         searchIconElm = $('#searchIcon');
+        bodyElm = $('body');
     }
 
     function initEvents() {
@@ -360,12 +363,28 @@ var alepizObjectsNamespace = (function($) {
             return;
         }
 
+        if(globalSearchLastParam.inProgress) {
+            globalSearchLastParam = {
+                inProgress: true,
+                searchStr: searchStr,
+                callback: callback,
+            };
+            if(typeof globalSearchLastParam.callback === 'function') globalSearchLastParam.callback();
+            return;
+        }
+        globalSearchLastParam = {
+            inProgress: true,
+            searchStr: searchStr,
+            callback: callback,
+        };
+
         var searchStrAdd = searchObjectsAddElm.val();
         if(!searchStrAdd.length) useGlobalSearch = true;
 
         // if active tab for objects
         // replace new string to "+"
         // set first object to @search for correct search request processing in createFilterMenu
+        bodyElm.css({cursor: 'progress'})
         $.post('/mainMenu', {
             f: 'searchObjects',
             searchStr: searchStr.replace(/[\r\n]+/g, '|'),
@@ -374,6 +393,7 @@ var alepizObjectsNamespace = (function($) {
         }, function(objects) {
             // objects: [{name: objectName1, description: objectDescription1, id: objectID1, color: <color>:<shade>, disabled: <1|0>},...]
 
+            bodyElm.css({cursor: 'auto'});
             if((!objects || !objects.length) && Date.now() - timeWhenNoObjectsWereFound > 4000) {
                 timeWhenNoObjectsWereFound = Date.now();
                 //M.toast({html: 'No objects found or too many objects found', displayLength: 3000});
@@ -389,6 +409,12 @@ var alepizObjectsNamespace = (function($) {
             };
 
             setCheckedObjectCounter();
+
+            if(globalSearchLastParam.inProgress) {
+                globalSearchLastParam.inProgress = false;
+                globalSearchObjects(globalSearchLastParam.searchStr, globalSearchLastParam.callback);
+            }
+
             if(typeof callback === 'function') callback(isDrawObjects);
         });
     }
@@ -399,6 +425,10 @@ var alepizObjectsNamespace = (function($) {
     // selectedObjectsNames: array of selected objects names
     // callback()
     function createObjectsList(uncheckedObjectNames, checkedObjectNames, callback) {
+        if(globalSearchLastParam.inProgress) {
+            globalSearchLastParam.inProgress = false;
+            if (typeof globalSearchLastParam.callback === 'function') globalSearchLastParam.callback();
+        }
 
         // if parameters were not set, get checked and unchecked object lists from the URL
         if(!uncheckedObjectNames && !checkedObjectNames) {
@@ -416,6 +446,7 @@ var alepizObjectsNamespace = (function($) {
 
         var objectNamesStr = Object.keys(objectNames).join(',');
 
+        bodyElm.css({cursor: 'progress'})
         $.post('/mainMenu', {
                 f: 'getObjectsByName',
                 name: objectNamesStr,
@@ -424,6 +455,7 @@ var alepizObjectsNamespace = (function($) {
             },
             // objects: [{id:.., name:.., description:.., color: <color>:<shade>}, {..}, ...]
             function(objects) {
+                bodyElm.css({cursor: 'auto'})
                 if(objects && objects.length) {
                     if (Array.isArray(checkedObjectNames) && checkedObjectNames.length) {
                         /*
@@ -459,10 +491,15 @@ var alepizObjectsNamespace = (function($) {
     // selectedObjectsNames: array of selected objects names
     // callback()
     function createObjectsListByInteractions(parentObjectNames, isClearObjectListWhenObjectNotFound, callback) {
+        if(globalSearchLastParam.inProgress) {
+            globalSearchLastParam.inProgress = false;
+            if (typeof globalSearchLastParam.callback === 'function') globalSearchLastParam.callback();
+        }
 
         var objectsNamesStr = Array.isArray(parentObjectNames) && parentObjectNames.length ?
             parentObjectNames.join(',') : '';
 
+        bodyElm.css({cursor: 'progress'});
         $.post('/mainMenu', {
                 f: 'filterObjectsByInteractions',
                 name: objectsNamesStr,
@@ -471,6 +508,7 @@ var alepizObjectsNamespace = (function($) {
             },
             // objects: [{id:.., name:.., description:..}, {..}, ...]
             function(objects) {
+                bodyElm.css({cursor: 'auto'});
                 if(!isClearObjectListWhenObjectNotFound && (!objects || !objects.length)) {
                     if(typeof(callback) === 'function') callback();
                     return;

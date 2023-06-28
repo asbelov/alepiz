@@ -14,9 +14,8 @@
     "callbackBeforeExec": "callbackBeforeExec",
     "callbackAfterExec": "callbackAfterExec",
     "onChangeObjectMenuEvent": "none",
-    "icon": "person",
+    "icon": "people",
     "timeout": 60,
     "showWhenNoObjectsSelected": true,
-    "outputFormat": "text",
-    "hideObjectsList": true
+    "noObjectsRequired": true
 }

@@ -6,6 +6,10 @@
  * Created by Alexander Belov on 12.02.2017.
  */
 
+// The functions will be passed from the parent frame
+// describe the function here to prevent the error message
+if(!getActionParametersFromBrowserURL) getActionParametersFromBrowserURL = function (callback) {callback();}
+
 var dataBrowserNamespace = (function ($) {
     $(function () {
 

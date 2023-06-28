@@ -91,13 +91,13 @@ collector.get = function(param, callback) {
 };
 
 /*
-    destroy objects when reinit collector
+    destroy objects when reinitialize collector
     destroy function is not required and can be skipping
 
     callback(err);
 */
 collector.destroy = function(callback) {
-    /* if has an objects, that can be destroyed while reinit collectors
+    /* if has an objects, that can be destroyed while reinitialize collectors
         do this here
     */
     if(db) {

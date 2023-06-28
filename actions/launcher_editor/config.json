@@ -13,8 +13,8 @@
   "callbackBeforeExec": "callbackBeforeExec",
   "onChangeObjectMenuEvent": "nothing",
   "cleanInputIDs": "deleteLauncher",
-  "icon": "directions_run",
+  "icon": "launch",
   "timeout": 60,
   "showWhenNoObjectsSelected": true,
-  "outputFormat": "text"
+  "noObjectsRequired": true
 }

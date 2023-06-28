@@ -140,7 +140,8 @@ module.exports = function(param, args, callback) {
         exitTimer = setTimeout(function() {
             log.warn('[exec] ', executable, ': stdout was not closet. exiting by timeout');
             finishing(code);
-        }, timeLeft < 0 ? 0 : timeLeft).unref();
+        }, timeLeft < 0 ? 0 : timeLeft);
+        exitTimer.unref();
     });
 
     function finishing(code) {

@@ -8,6 +8,7 @@
     "showWhenNoObjectsSelected": true,
     "onChangeObjectMenuEvent": "callback:onChangeObjects",
     "showOnlyForObjectsWithProperties": "SERVICE_NAME",
+    "icon": "alarm",
     "startTimeCounterName": "I: Service start time",
     "stopTimeCounterName": "I: Service stop time",
     "serviceStatus": "I: Service state",

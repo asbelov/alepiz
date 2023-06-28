@@ -83,7 +83,7 @@ function Editor(initCfg) {
 
         try {
             changesElm = document.getElementById(c.IDChanges);
-            changesElm.id = 'changes_' + c.id;
+            //changesElm.id = 'changes_' + c.id;
             changesElm.style.display = 'none';
         } catch (e) {
             alert('Can\'t initialize element for saving result of changes in file with ID: ' + c.IDChanges + ': ' + e.message);
@@ -271,6 +271,9 @@ function Editor(initCfg) {
     function loadFilePart(codePage, callback) {
         var prms = 'function=getFilePart&fileName=' + encodeURIComponent(c.fileName) + '&codePage=' + codePage;
         var ai = new AJAXInteraction('', script, function (text) {
+            if (text === '{}' || !text) text = (c.fileName ? 'Error while processing file ' + c.fileName : 'Can\'t found files') + ' for service ' + c.serviceName;
+            else text = text.slice(Number(text.indexOf('\n', text.indexOf('\n') + 1) + 1), text.length);
+            text = text.split('\r').join('');
             textareaSav = text;
             text2Editor(text);
             if(typeof callback === 'function') callback(text);
@@ -279,13 +282,8 @@ function Editor(initCfg) {
     }
 
     function text2Editor(text) {
-        if (text === '{}' || !text) text = (c.fileName ? 'Error while processing file ' + c.fileName : 'Can\'t found files') + ' for service ' + c.serviceName;
-        else text = text.slice(Number(text.indexOf('\n', text.indexOf('\n') + 1) + 1), text.length);
-
-        text = text.split('\r').join('');
 // when submit, textareaElm.value set to result of editing
         textareaElm.value = text;
-
         editor.setValue(text);
         resultElm.value = '';
         changesElm.value = '';
@@ -354,6 +352,7 @@ function Editor(initCfg) {
         if (!diffResult[1]) diffResult = [' Изменений нет<br>', ' Изменений нет\n'];
         if (c.useTextResult) var result = c.fileName + '\nСделаны следующие изменения:\n' + diffResult[1];
         else result = c.fileName + '<br>Сделаны следующие изменения:<br>' + diffResult[0];
+
         try {
             changesElm.innerHTML = result;
         } catch (e) {
@@ -394,10 +393,12 @@ function Editor(initCfg) {
             changes.push([i, pos1, j, pos2]);
             i = pos1;
             j = pos2;
+
         }
 
         var changeLogHTML = '';
         var changeLog = '';
+
         for (i = 0; i < changes.length; i++) {
 // For understanding
             var firstStr1 = changes[i][0];
@@ -405,12 +406,15 @@ function Editor(initCfg) {
             var firstStr2 = changes[i][2];
             var lastStr2 = changes[i][3];
             delta = firstStr2 - firstStr1;
+
             if (!origTextStrsCnt) {
                 if (isIniFileFormat) origTextStrsCnt = 2;
                 else origTextStrsCnt = 5;
             }
             if ((firstStr1 - origTextStrsCnt) < 0) var origTextStrs = firstStr1;
             else origTextStrs = origTextStrsCnt;
+
+
 //			changeLogHTML += '<br><span style="font-weight:bold;">Строка '+(firstStr1-origTextStrs)+', фрагмент '+firstStr1+'-'+lastStr1+'=&gt;'+firstStr2+'-'+lastStr2+':</span><br><span style="font-style:italic;">';
 //			changeLog += '\nСтрока '+(firstStr1-origTextStrs)+', фрагмент '+firstStr1+'-'+lastStr1+'=>;'+firstStr2+'-'+lastStr2+':\n';
 
@@ -473,7 +477,7 @@ function Editor(initCfg) {
             alert('Error while compile RegExp for hiding password in e-mail:' + err.message);
         }
 
-		return([changeLogHTML.replace(/\n/g, ''), changeLog]);
+        return([changeLogHTML.replace(/\n/g, ''), changeLog]);
 //        return ([changeLog, changeLog]);
 
         function toHTML(str) {

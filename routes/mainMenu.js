@@ -49,7 +49,13 @@ router.post('/mainMenu', function(req, res/*, next*/) {
         searchObjects(req.body.searchStr, req.session.username, req.body.filterNames,
             req.body.filterExpression, sendBackResult);
     } else if(functionName === 'getLogRecords') {
-        log.getAuditData(req.body.lastID, req.session.username, req.body.sessionIDs, sendBackResult);
+        log.getAuditData({
+            auditData: 'logRecords',
+            lastRecordID: req.body.lastID,
+            user: req.session.username,
+            sessionIDs: req.body.sessionIDs,
+            message: req.body.messageFilter,
+        }, sendBackResult);
     } else if(functionName === 'getObjectsByID') {
         getObjectsByIDs(req.body.IDs, req.session.username, req.body.filterNames,
             req.body.filterExpression, sendBackResult);

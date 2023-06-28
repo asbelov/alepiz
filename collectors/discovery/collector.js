@@ -226,7 +226,10 @@ function scan(IPs, param, ID, callback) {
             }
 
             if (Object.keys(result).length === 1 || (Object.keys(result).length === 2 && result.ping === 0)) asyncCallback();
-            else setTimeout(asyncCallback, param.sleep).unref();
+            else {
+                var t = setTimeout(asyncCallback, param.sleep);
+                t.unref();
+            }
         });
     }, function(stop) {
         if (stop) {
@@ -259,7 +262,8 @@ function scan(IPs, param, ID, callback) {
                 Math.round((Date.now() - startTime) / 1000), 'sec');
 
             IPs = prepareIPsForScan(param.ranges, param.$id, true);
-            setTimeout(scan, Number(param.scanRepetitionTime) * 1000, IPs, param, ID, callback).unref();
+            var t = setTimeout(scan, Number(param.scanRepetitionTime) * 1000, IPs, param, ID, callback);
+            t.unref();
         } else {
             scanIDs.get(param.$id).delete(ID);
             if (!scanIDs.get(param.$id).size) scanIDs.delete(param.$id);

@@ -41,8 +41,8 @@ module.exports = function(args, callback) {
     for(var inputID in args) {
         if(!args.hasOwnProperty(inputID)) continue;
 
-        if(inputID.toLowerCase().indexOf('collectorparameter_') === 0) {
-            var name = inputID.substring(String('collectorparameter_').length);
+        if(inputID.toLowerCase().indexOf('collectorParameter_'.toLowerCase()) === 0) {
+            var name = inputID.substring(String('collectorParameter_'.toLowerCase()).length);
             collectorParameters[name] = args[inputID];
             continue;
         }
@@ -186,12 +186,12 @@ module.exports = function(args, callback) {
             debug: (args.debug ? 1 : 0),
             taskCondition: (args.taskCondition ? 1 : 0),
             updateVariablesRef: args.updateVariablesRef, //= oldCounterName: update variables references when counter name is changed
-            sessionID: args.sessionID,
             timestamp: args.timestamp,
         },
         counterParameters: collectorParameters,
         updateEvents: updateEvents,
         variables: variables,
+        sessionID: args.sessionID,
     };
 
     if(args.exportCounter && args.counterID) {

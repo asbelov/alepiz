@@ -7,23 +7,23 @@ var db = require('../db');
 var async = require('async');
 var encrypt = require('../../lib/encrypt');
 
-module.exports = function(callback){
+module.exports = function(callback) {
     log.debug('Creating users and roles tables in database');
 
     async.series({
         users: createUsersTable,
         roles: createRolesTable
-    }, function(err, fillTables){
+    }, function(err, fillTables) {
         if(err) return callback(err);
 
         async.series([
-            function(callback){
+            function(callback) {
                 createUsersRolesTable((fillTables.users && fillTables.roles), callback);
             },
-            function(callback){
+            function(callback) {
                 createRightsForObjectsTable(fillTables.roles, callback);
             },
-            function(callback){
+            function(callback) {
                 createRightsForActionsTable(fillTables.roles, callback);
             },
             function(callback) {
@@ -33,7 +33,7 @@ module.exports = function(callback){
     });
 };
 
-function createUsersTable(callback){
+function createUsersTable(callback) {
     db.run('CREATE TABLE IF NOT EXISTS users (' +
         'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
         'name TEXT NOT NULL,' +
@@ -43,30 +43,35 @@ function createUsersTable(callback){
         function(err) {
             if (err) return callback(new Error('Can\'t create users table in database: ' + err.message));
 
-            db.get('SELECT COUNT(*) as count FROM users', [], function(err, row) {
-                if (err || row.count) return callback();
+            db.run('CREATE INDEX IF NOT EXISTS name_users_index on users(name)',function (err) {
+                if (err) {
+                    return callback(new Error('Can\'t create users name index in database: ' + err.message));
+                }
 
-                log.debug('Table users is empty, inserting initial values into this table');
+                db.get('SELECT COUNT(*) as count FROM users', [], function (err, row) {
+                    if (err || row.count) return callback();
 
-                var adminPassHash = encrypt('admin');
-                var businessPassHash = encrypt('business');
-                var watcherPassHash = encrypt('watcher');
+                    log.debug('Table users is empty, inserting initial values into this table');
 
-                db.run('INSERT OR IGNORE INTO users (id, name, fullName, password, isDeleted) VALUES ' +
-                    '(0, "system", "System user", "", 0),' +
-                    '(1, "admin", "System administrator", "' + adminPassHash + '", 0),' +
-                    '(2, "business", "Business viewer and task creator", "' + businessPassHash + '", 0),' +
-                    '(3, "watcher", "Watcher with a view only rights", "' + watcherPassHash + '", 0),' +
-                    '(4, "guest", "User with minimal rights", "", 0)',
-                    function (err) {
-                        if (err) return callback(new Error('Can\'t insert initial users into users table in database: ' + err.message));
-                        callback(null, true);
-                    }
-                );
+                    var adminPassHash = encrypt('admin');
+                    var businessPassHash = encrypt('business');
+                    var watcherPassHash = encrypt('watcher');
+
+                    db.run('INSERT OR IGNORE INTO users (id, name, fullName, password, isDeleted) VALUES ' +
+                        '(0, "system", "System user", "", 0),' +
+                        '(1, "admin", "System administrator", "' + adminPassHash + '", 0),' +
+                        '(2, "business", "Business viewer and task creator", "' + businessPassHash + '", 0),' +
+                        '(3, "watcher", "Watcher with a view only rights", "' + watcherPassHash + '", 0),' +
+                        '(4, "guest", "User with minimal rights", "", 0)',
+                        function (err) {
+                            if (err) return callback(new Error('Can\'t insert initial users into users table in database: ' + err.message));
+                            callback(null, true);
+                        }
+                    );
+                });
             });
         }
     );
-
 }
 
 function createCommunicationTable(fillTable, callback) {
@@ -112,7 +117,7 @@ function createCommunicationTable(fillTable, callback) {
     });
 }
 
-function createRolesTable(callback){
+function createRolesTable(callback) {
     db.run('CREATE TABLE IF NOT EXISTS roles (' +
         'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
         'name TEXT NOT NULL,' +
@@ -140,7 +145,7 @@ function createRolesTable(callback){
     );
 }
 
-function createUsersRolesTable(fillTable, callback){
+function createUsersRolesTable(fillTable, callback) {
     db.run('CREATE TABLE IF NOT EXISTS usersRoles (' +
         'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
         'userID INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
@@ -170,7 +175,7 @@ function createUsersRolesTable(fillTable, callback){
     );
 }
 
-function createRightsForObjectsTable(fillTable, callback){
+function createRightsForObjectsTable(fillTable, callback) {
     db.run('CREATE TABLE IF NOT EXISTS rightsForObjects (' +
         'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
         'objectID INTEGER REFERENCES objects(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
@@ -204,14 +209,15 @@ function createRightsForObjectsTable(fillTable, callback){
     );
 }
 
-function createRightsForActionsTable(fillTable, callback){
+function createRightsForActionsTable(fillTable, callback) {
     db.run('CREATE TABLE IF NOT EXISTS rightsForActions (' +
         'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
         'actionName TEXT,' +
         'roleID INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
         'view BOOLEAN,' +
         'run BOOLEAN,' +
-        'makeTask BOOLEAN)',
+        'makeTask BOOLEAN,' +
+        'audit BOOLEAN)',
         function(err) {
             if (err) return callback(new Error('Can\'t create rightsForActions table in database: ' + err.message));
             //if(!fillTable) return callback();
@@ -221,14 +227,14 @@ function createRightsForActionsTable(fillTable, callback){
 
                 log.debug('Table rightsForObjects is empty, inserting initial values into this table');
 
-                db.run('INSERT OR IGNORE INTO rightsForActions (id, actionName, roleID, view, run, makeTask) VALUES ' +
-                    '(1, null, 1, 1, 1, 1),' + // Administrators - full
-                    '(2, null, 2, 1, 0, 1),' + // Businesses - view and make task
-                    '(3, null, 3, 1, 0, 0),' + // Watchers - view
-                    '(4, null, 4, 0, 0, 0), ' + // Guests - no rights
-                    '(5, "task_maker", 2, 1, 1, 0), ' +  // add execute rights for task_maker action for the Businesses role
-                    '(6, "Configurations", 3, 0, 0, 0), ' +  // Watchers - no rights to Configurations
-                    removeActionsRights([2,3,4], ['Administration', 'Development', 'counter_settings'], 7),
+                db.run('INSERT OR IGNORE INTO rightsForActions (id, actionName, roleID, view, run, makeTask, audit) VALUES ' +
+                    '(1, null, 1, 1, 1, 1, 1),' + // Administrators - full
+                    '(2, null, 2, 1, 0, 1, 1),' + // Businesses - view, make task and audit
+                    '(3, null, 3, 1, 0, 0, 0),' + // Watchers - view
+                    '(4, null, 4, 0, 0, 0, 0), ' + // Guests - no rights
+                    '(5, "task_maker", 2, 1, 1, 0, 0), ' +  // add execute rights for task_maker action for the Businesses role
+                    '(7, "Configurations", 3, 0, 0, 0, 0), ' +  // Watchers - no rights to Configurations
+                    denyActionsRights([2,3,4], ['Administration', 'Development', 'counter_settings'], 7),
                     function(err) {
                         if (err) return callback(new Error('Can\'t insert initial values into rightsForActions table in database: ' + err.message));
                         callback();
@@ -239,17 +245,21 @@ function createRightsForActionsTable(fillTable, callback){
     );
 }
 
-/*
-Remove rights for specific roles for action in specific folders or actions ID
-f.e. removeActionsRights([2,3,4], ['Administration', 'Development', 'counter_settings'], 6):
-    will removed rights fro actions n folders 'Administration', 'Development' and action 'counter_settings'
-    for roles 2, 3, 4 (Businesses, Watchers, Guests) and start rightsForActions.id from 6
+/**
+ * Return part of the SQL query for deny rights for specific roles for action in specific folders or actions ID
+ * f.e. denyActionsRights([2,3,4], ['Administration', 'Development', 'counter_settings'], 7):
+ *     will removed rights for the actions and folders 'Administration', 'Development' and action 'counter_settings'
+ *     for roles 2, 3, 4 (Businesses, Watchers, Guests) and start rightsForActions.id from 7
+ * @param {Array<number>} roles array jf the user roles
+ * @param {Array<string>} actionIDs array of the action IDs or action groups
+ * @param {number} startID the initial value of the ID in the rightsForObjects table
+ * @return {string} part of the SQL query
  */
-function removeActionsRights(roles, actionsIDs, startID) {
+function denyActionsRights(roles, actionIDs, startID) {
     var rights = [];
     roles.forEach(function (role) {
-        actionsIDs.forEach(function (actionID) {
-            rights.push('(' + (startID++) + ', "' + actionID + '", ' + role + ', 0, 0, 0)');
+        actionIDs.forEach(function (actionID) {
+            rights.push('(' + (startID++) + ', "' + actionID + '", ' + role + ', 0, 0, 0, 0)');
         });
     });
 

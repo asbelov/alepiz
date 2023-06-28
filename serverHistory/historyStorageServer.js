@@ -316,9 +316,9 @@ historyStorageServer.getRecordsFromStorageByIdx = function (id, offset, cnt, fir
     log.debug('getRecordsFromStorageByIdx(id: ', id, ', offset: ', offset, ', cnt: ', cnt,
         ', firstTimestamp: ', firstTimestamp, ', maxRecordsCnt: ', maxRecordsCnt, ', recordsType: ', recordsType,
         ') tableType: ', tableType, ': ', records1, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
 
@@ -361,9 +361,9 @@ historyStorageServer.getRecordsFromStorageByIdx = function (id, offset, cnt, fir
         ') tableType: strings: ', records2,
         ', result: ', result,
         {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
 
@@ -412,9 +412,9 @@ historyStorageServer.getRecordsFromStorageByTime = function (id, timeFrom, timeT
             ', timeTo: ', (new Date(timeTo)).toLocaleString(), '(', timeTo, ')',
             ', maxRecordsCnt: ', maxRecordsCnt, ', recordsType: ', recordsType,
             ') tableType: ', tableType, ': ', records1, {
-                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                 vars: {
-                    "RECEIVED_OCID": id
+                    "EXPECTED_OCID": id
                 }
             });
 
@@ -473,9 +473,9 @@ historyStorageServer.getRecordsFromStorageByTime = function (id, timeFrom, timeT
             ') tableType: strings: ', records2,
             ', result: ', records1,
             {
-                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                 vars: {
-                    "RECEIVED_OCID": id
+                    "EXPECTED_OCID": id
                 }
             });
         return callback(null, records1);
@@ -533,9 +533,9 @@ function getTableName(id, timeFrom, timeTo, maxRecordsCnt, recordsType, callback
         '; required time interval: ', Math.round(requiredTimeInterval), 'min; ',
         ' records in trends: ', debugInfo.join('; '),
         {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
     return callback('numbers');
@@ -564,9 +564,9 @@ historyStorageServer.getLastRecordTimestampForValue = function (id, value, callb
     else
         log.debug('getLastRecordTimestampForValue(id: ', id, ', value: ', value, ') table: ', table, ': ', row,
             {
-                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                 vars: {
-                    "RECEIVED_OCID": id
+                    "EXPECTED_OCID": id
                 }
             });
     callback(null, row ? row.timestamp : undefined);
@@ -847,9 +847,9 @@ function delRecords(IDs, daysToKeepHistory, daysToKeepTrends, _callback) {
         log.debug('delRecords(id: ', id, ', daysToKeepHistory: ', daysToKeepHistory,
             ', daysToKeepTrends: ', daysToKeepTrends, ') was finished: ', deleteRecordsDebugInfo,
             {
-                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                 vars: {
-                    "RECEIVED_OCID": id
+                    "EXPECTED_OCID": id
                 }
             });
         }
@@ -878,9 +878,9 @@ function delRecords(IDs, daysToKeepHistory, daysToKeepTrends, _callback) {
         log.debug('delRecords(id: ', id, ', daysToKeepHistory: ', daysToKeepHistory,
             ', daysToKeepTrends: ', daysToKeepTrends, ') was finished for all records: ', deleteRecordsDebugInfo,
             {
-                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                 vars: {
-                    "RECEIVED_OCID": id
+                    "EXPECTED_OCID": id
                 }
             });
     }
@@ -1009,9 +1009,9 @@ historyStorageServer.saveRecordsForObject = function (id, newObjectParameters, r
         ', recordsForSave', recordsForSave, ') was finished: savedTrends: ', savedTrends,
         ': trends: ', trendsStr,
         {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
 

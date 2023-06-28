@@ -26,6 +26,9 @@ var dataAlreadyDumped = false,
     lastPrintStat = Date.now(),
     lastObjectsCleanup = Date.now()
 
+/*
+    initializing debug server
+ */
 fs.readFile(dumpFile, 'utf8', function(err, counterDebuggerDataObjStr) {
     var cfg = confDebugServer.get();
 
@@ -76,7 +79,7 @@ fs.readFile(dumpFile, 'utf8', function(err, counterDebuggerDataObjStr) {
                     processMessage(message, null, callback);
                 },
                 onDisconnect: function() {  // exit on disconnect from parent (then server will be restarted)
-                    log.exit('Counter debugger was disconnected from server unexpectedly. Exiting');
+                    log.exit('Debugger was disconnected from server unexpectedly. Exiting');
                     dumpData(function() {
                         log.disconnect(function () { process.exit(2) });
                     });
@@ -88,6 +91,15 @@ fs.readFile(dumpFile, 'utf8', function(err, counterDebuggerDataObjStr) {
     });
 });
 
+/**
+ * Process received message
+ * @param {Array|Object} message if Array, then message is a cached debugging data for add to memory. If object, then
+ *      message is a require for get data from memory
+ * @param {string} message.tag tag of the data
+ * @param {number} message.id data id
+ * @param socket IPC socket
+ * @param {function(null, Array)} callback callback(null, arrayOfDebuggingData)
+ */
 function processMessage(message, socket, callback) {
     if(message.tag && message.id) { // get data from counterDebugger
         var key = message.tag + ':' + String(message.id), logObject = counterDebuggerData.get(key);
@@ -103,24 +115,28 @@ function processMessage(message, socket, callback) {
         message.forEach(item => logObjectsCache.add(item));
     }
 }
+
+/**
+ * Periodically add data from cache to the debugData
+ */
 function processCache() {
     var cfg = confDebugServer.get();
     isDisableNow = cfg.disable;
     var pushIntervalSec = isDisableNow ? 90 : (cfg.pushIntervalSec || 3);
 
-    setTimeout(function () {
+    var t = setTimeout(function () {
         processCache();
 
         if(isDisableNow) {
             if(isDisableBefore) return;
             isDisableBefore = true;
-            log.info('Counter debugger was disabled in configuration');
+            log.info('Debugger was disabled in configuration');
             logObjectsCache.clear();
             counterDebuggerData.clear();
             return;
         } else if(isDisableBefore) {
             isDisableBefore = false;
-            log.info('Counter debugger was enabled in configuration');
+            log.info('Debugger was enabled in configuration');
         }
 
         if(addObjectsInProgress || !logObjectsCache.size) return;
@@ -136,22 +152,20 @@ function processCache() {
         if(now - lastPrintStat > 120000) printStat(now);
         if(now - lastObjectsCleanup > 300000) objectsClean();
 
-    }, (pushIntervalSec * 1000)).unref();
+    }, (pushIntervalSec * 1000));
+    t.unref();
 }
 
-/*
-logObjects: Set({
-        tag: tag,
-        id: id,
-        data: data,
-        important: !!important
-    }, ...)
+/**
+ * Add data to cache
+ * @param {Set<{tag: string, id: number, data: Object, important: Boolean}>} logObjects
+ * @param {Object} cfg debugger configuration parameters
  */
 function addToLog(logObjects, cfg) {
     logObjects.forEach(function(newLogObject) {
         var tag = newLogObject.tag, id = newLogObject.id, data = newLogObject.data;
         if (!tag || !data) return;
-        if (!id) return log.warn('Message ID is not set when adding data to counter debugger');
+        if (!id) return log.warn('Message ID is not set when adding data to Debugger');
 
         ++dataReceived;
         var key = tag + ':' + String(id), logObject = counterDebuggerData.get(key);
@@ -182,6 +196,10 @@ function addToLog(logObjects, cfg) {
     });
 }
 
+/**
+ * Printing statistic to the log file
+ * @param {number} now Date.now();
+ */
 function printStat(now) {
     log.info('Received: ', Math.round(dataReceived /  ((now - lastPrintStat) / 60000) ),
         '/min. OCIDs in debug: ', counterDebuggerData.size);
@@ -189,8 +207,8 @@ function printStat(now) {
     lastPrintStat = now;
 }
 
-/** Read counters from DB and clean counters debug cache from counters without debug attribute
- *
+/**
+ * Read counters from DB and clean counters debug cache from counters without debug attribute
  */
 function objectsClean() {
     lastObjectsCleanup = Date.now();
@@ -232,10 +250,11 @@ function objectsClean() {
     });
 }
 
-/*
-Create cache dump (JSON) to file before exit.
-Data from dump file will be loaded to cache on next startup
-*/
+/**
+ * Create cache dump (JSON) to file before exit.
+ * Data from dump file will be loaded to cache on next startup
+ * @param {function(void)} [callback] callback()
+ */
 function dumpData(callback) {
     if(!dataAlreadyDumped) {
         dataAlreadyDumped = true;
@@ -263,9 +282,9 @@ function dumpData(callback) {
             fs.writeFileSync(dumpFile, JSON.stringify(counterDebuggerDataObj), 'utf8');
             // for debug
             //fs.writeFileSync(dumpFile, JSON.stringify(counterDebuggerDataObj, null, 4), 'utf8');
-            log.exit('Dumping counter debugger data is finished to ' + dumpFile);
+            log.exit('Dumping Debugger data is finished to ' + dumpFile);
         } catch (err) {
-            log.exit('Can\'t dump counter debugger data to file ', dumpFile, ': ', err.message);
+            log.exit('Can\'t dump Debugger data to file ', dumpFile, ': ', err.message);
         }
     }
     if(typeof callback === 'function') return callback();

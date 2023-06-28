@@ -235,9 +235,9 @@ historyCache.add = function (id, newRecord){
         }
 
         log.debug('cache: add(id: ', id, ', newRecord: ', newRecord, '): cache[',id,']: ', cacheObj, {
-                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                 vars: {
-                    "RECEIVED_OCID": id
+                    "EXPECTED_OCID": id
                 }
             });
     }
@@ -282,9 +282,9 @@ historyCache.del = function (IDs, daysToKeepHistory, daysToKeepTrends, callback)
             id = Number(id);
             var cacheObj = cache.get(id);
             log.debug('cache: del(id:', id, '): cache[',id,']: ', cacheObj, {
-                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                     vars: {
-                        "RECEIVED_OCID": id
+                        "EXPECTED_OCID": id
                     }
                 });
 
@@ -356,9 +356,9 @@ historyCache.getByValue = function(id, value, callback) {
         });
         log.debug('from cache: getByValue(id: ', id, ', value: ', value, '): cache[',id,']: ', cacheObj,
             ', requiredTimestamp: ', requiredTimestamp, {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
 
@@ -368,9 +368,9 @@ historyCache.getByValue = function(id, value, callback) {
     storage.getLastRecordTimestampForValue(id, value, function(err, requiredTimestamp) {
         log.debug('from storage: getByValue(id: ', id, ', value: ', value, '): cache[', id ,']: ', cacheObj,
             ', requiredTimestamp: ', requiredTimestamp, ', err: ', err, {
-                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                 vars: {
-                    "RECEIVED_OCID": id
+                    "EXPECTED_OCID": id
                 }
             });
 
@@ -430,9 +430,9 @@ function getLastValue (id, callback) {
         //log.info('Get last value for ', id,' from history cache: ', cacheObj.lastValue);
         ++recordsFromCacheCnt;
         log.debug('from cache: getLastValue(id: ', id, '): cacheObj.lastValue: ', cacheObj.lastValue, {
-                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                 vars: {
-                    "RECEIVED_OCID": id
+                    "EXPECTED_OCID": id
                 }
             });
 
@@ -447,9 +447,9 @@ function getLastValue (id, callback) {
         log.debug('from storage: getLastValue(id: ', id, '): recordsFromStorage: ', recordsFromStorage,
             ', err: ', err,
             {
-            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
             vars: {
-                "RECEIVED_OCID": id
+                "EXPECTED_OCID": id
             }
         });
         if (err) return callback(err);
@@ -502,6 +502,7 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
 
     if(cacheObj && cacheObj.records && cacheObj.records.size) {
         var recordsArray = Array.from(cacheObj.records);
+
         var recordsFromCache =
             recordsArray.slice( -(offset + cnt), offset ? -offset : cacheObj.records.size);
         recordsFromCacheCnt += recordsFromCache.length;
@@ -511,9 +512,9 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
             log.debug('from cache: getByIdx(id: ', id, ', offset: ', offset,', cnt: ', cnt,
                 ', maxRecordsCnt: ',maxRecordsCnt, ', recordsType: ', recordsType,
                 '): recordsFromCache: ', recordsFromCache, {
-                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                     vars: {
-                        "RECEIVED_OCID": id
+                        "EXPECTED_OCID": id
                     }
                 });
 
@@ -567,9 +568,9 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
                 '): \nrecordsFromCache: ', recordsFromCache,
                 '\nrecordsFromStorage: ', recordsFromStorage, '\nerr: ', err,
                 {
-                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                     vars: {
-                        "RECEIVED_OCID": id
+                        "EXPECTED_OCID": id
                     }
                 });
 
@@ -673,9 +674,9 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
                 log.debug('from cache: getByTime(id: ', id, ', timeShift: ', timeShift, ', timeInterval: ', timeInterval,
                     ', maxRecordsCnt: ', maxRecordsCnt, ', recordsType: ', recordsType,
                     '): recordsFromCache: ', recordsFromCache, {
-                        expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                        func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                         vars: {
-                            "RECEIVED_OCID": id
+                            "EXPECTED_OCID": id
                         }
                     });
 
@@ -699,9 +700,9 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
                 '\nrecordsFromCache: ', recordsFromCache,
                 '\nrecordsFromStorage: ', recordsFromStorage, '\nerr: ', err,
                 {
-                    expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                    func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                     vars: {
-                        "RECEIVED_OCID": id
+                        "EXPECTED_OCID": id
                     }
                 });
 
@@ -837,9 +838,9 @@ function cacheService(callback) {
                 async.eachOfSeries(Object.fromEntries(cache), function (cacheObj, id, callback) {
                     if (terminateCacheService) return callback();
                     log.debug('cacheService() for cache[', id, ']: ', cacheObj, {
-                            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                             vars: {
-                                "RECEIVED_OCID": id
+                                "EXPECTED_OCID": id
                             }
                         });
 
@@ -847,9 +848,9 @@ function cacheService(callback) {
                     if(!houseKeeperData[id] || !houseKeeperData[id].history) {
                         log.debug('cacheService() skip to save for cache[', id, ']: ', cacheObj,
                             ', houseKeeperData[', id ,']', houseKeeperData[id], {
-                            expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                             vars: {
-                                "RECEIVED_OCID": id
+                                "EXPECTED_OCID": id
                             }
                         });
                         return callback();
@@ -941,9 +942,9 @@ function cacheService(callback) {
 
                         */
                         log.debug('cacheService() savedData for cache[', id, ']: ', savedData, {
-                                expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                                 vars: {
-                                    "RECEIVED_OCID": id
+                                    "EXPECTED_OCID": id
                                 }
                             });
                         if (savedData && savedData[0] && savedData[0].result) {
@@ -1010,9 +1011,9 @@ function cacheService(callback) {
                                     '\nunnecessary: ', unnecessaryCachedRecordsCnt,
                                     '\nremoved: ', recordsForRemoveFromCache,
                                     '\ncacheObj: ', cacheObj, {
-                                        expr: '%:RECEIVED_OCID:% == %:OCID:%',
+                                        func: (vars) => vars.EXPECTED_OCID === vars.OCID,
                                         vars: {
-                                            "RECEIVED_OCID": id
+                                            "EXPECTED_OCID": id
                                         }
                                     });
                             });
