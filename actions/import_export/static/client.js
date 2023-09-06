@@ -236,7 +236,7 @@ var JQueryNamespace = (function ($) {
                     externalObjectNames.map(obj => {
                         return '<li>object:&nbsp;&nbsp; <b>' + '<a href="/?a=%2Factions%2Fimport_export&c=' +
                             encodeURIComponent(obj.name) +
-                            '" target="_blank">"' + escapeHtml(obj.name) + '"</a> (#' + String(obj.id).slice(-5) +
+                            '" target="_blank">"' + escapeHtml(obj.name) + '"</a> (#' + obj.id +
                             ')</b> for ' + obj.where + '</li>';
                     }).join('') +
                     externalCounterNames.map(counter => {
@@ -244,7 +244,7 @@ var JQueryNamespace = (function ($) {
                             (counter.id ?
                                 '<a href="/?a=%2Factions%2Fcounter_settings&cid=' + counter.id +
                                 '" target="_blank">"' + escapeHtml(counter.name) +
-                                '"</a> (#' + String(counter.id).slice(-5) + ')' :
+                                '"</a> (#' + counter.id + ')' :
                                 '<span class="red-text">Not selected</span>') +
                             '</b> for ' + counter.where + '</li>';
                     }).join('')

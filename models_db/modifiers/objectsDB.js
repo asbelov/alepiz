@@ -57,14 +57,13 @@ objectsDB.renameObjects = function(objects, callback) {
  * @param {number} order - object sort order in the object list
  * @param {0|1} disabled - is object disabled
  * @param {string|null} color - object color
- * @param {number} sessionID - sessionID for create unique objectID
  * @param {number} createdTimestamp - timestamp when object was created
  * @param {function(Error)|function(null, newObjectsIDs:Array, newObjectName:Object)} callback -
  *  callback(err, newObjectsIDs, newObjectName), where newObjectsIDs - array with
  *  new object IDs, newObjectName - object like {<objectName1>: <objectID1>, ...}
  */
 objectsDB.addObjects = function(newObjectsNames, description, order, disabled,
-                                color, sessionID, createdTimestamp, callback){
+                                color, createdTimestamp, callback){
     log.debug('Add objects: ', newObjectsNames, ', description: ', description, ', order: ', order, ', disabled: ', disabled);
 
     // Prepare statement for inserting new objects into a database
@@ -76,7 +75,7 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled,
         var newObjectsIDs = [], newObjects = {};
 
         async.eachSeries(newObjectsNames, function(name, callback) {
-            const id = unique.createHash(name + description + order + disabled + color + sessionID);
+            const id = unique.createHash(name + description + order + disabled + color);
 
             stmt.run({
                 $id: id,
@@ -143,8 +142,8 @@ objectsDB.insertInteractions = function(interactions, callback){
 
         // eachSeries used for possible transaction rollback if error occurred
         async.eachSeries(interactions, function(interaction, callback) {
-            const id = unique.createHash(interaction.id1.toString() + interaction.id2.toString() +
-                interaction.type.toString());
+            const id = unique.createHash(interaction.id1.toString(36) + interaction.id2.toString(36) +
+                interaction.type.toString(36));
 
             stmt.run([id, interaction.id1, interaction.id2, interaction.type], callback);
         }, function(err) {

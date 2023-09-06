@@ -9,7 +9,7 @@ const log = require('../../lib/log')(module);
 const transactionsDB = require('../../models_db/modifiers/transaction');
 const tasksDB = require('../../rightsWrappers/tasksDB');
 const tasks = require('../../serverTask/tasks');
-const taskServer = require('../../serverTask/taskClient');
+const taskClient = require('../../serverTask/taskClient');
 const async = require('async');
 const unique = require('../../lib/utils/unique');
 
@@ -23,6 +23,7 @@ const unique = require('../../lib/utils/unique');
  * @param {string} args.taskActionID stringified taskActionID
  * @param {string} args.actionsOrder comma separated taskActionID in the order of action execution
  * @param {string} args.newTaskGroup stringified new task group
+ * @param {string} args.newTaskGroupName new task group name if task will be moved to
  * @param {string} args.taskName task name
  * @param {string} args.actionsOrder comma separated taskActionID in the order of action execution
  * @param {string} args.newTaskGroup stringified new task group
@@ -36,7 +37,7 @@ module.exports = function(args, callback) {
     log.debug('Starting action "' + args.actionName + '" with parameters', args);
 
     try {
-        taskServer.connect('taskMaker:server', function (err) {
+        taskClient.connect('taskMaker:server', function (err) {
             if(err) return callback(err);
             saveTask(args, callback);
         });
@@ -54,6 +55,7 @@ module.exports = function(args, callback) {
  * @param {string} args.taskActionID stringified taskActionID
  * @param {string} args.actionsOrder comma separated taskActionID in the order of action execution
  * @param {string} args.newTaskGroup stringified new task group
+ * @param {string} args.newTaskGroupName new task group name if task will be moved to
  * @param {string} args.taskName task name
  * @param {string} args.actionsOrder comma separated taskActionID in the order of action execution
  * @param {string} args.newTaskGroup stringified new task group
@@ -70,8 +72,8 @@ function saveTask(args, callback) {
         if (taskID && taskID !== parseInt(String(taskID), 10)) {
             return callback(new Error('Incorrect taskID parameter "' + args.taskID + '"'));
         }
-        log.debug('Updating task with task ID ', taskID);
-    } else log.debug('Adding a new task');
+        log.debug('User ', args.username, ': updating task with task ID ', taskID);
+    } else log.debug('User ', args.username, ': adding a new task');
 
     var removedTaskIDs = [];
     // Getting IDs of removed tasks into the removedTaskIDs array.
@@ -93,8 +95,8 @@ function saveTask(args, callback) {
         for(var i = 0; i < removedTaskIDs.length; i++) {
             if(!removedTaskIDs[i]) return callback(new Error('Incorrect taskID for remove: "'+args.removedTaskIDs+'"'));
         }
-        log.debug('Tasks for removing: ', args.removedTaskIDs, ': ', removedTaskIDs)
-    } else log.debug('No tasks for removing');
+        log.debug('User ', args.username, ': tasks for removing: ', args.removedTaskIDs, ': ', removedTaskIDs)
+    } else log.debug('User ', args.username, ': no tasks for removing');
 
     var actions = {}, actionsIDsObj = {}, newApproves = {}, filterTaskActionIDs = [];
     Object.keys(args).forEach(function(arg) {
@@ -151,31 +153,32 @@ function saveTask(args, callback) {
         }
     });
 
-    log.debug('Actions: ', actions);
+    log.debug('User ', args.username, ': actions: ', actions);
 
     tasks.getWorkflow(args.username, function(err, workflow) {
         if (err) return callback(err);
 
         log.debug('Workflow for user ', args.username, ': ', workflow);
         removeTasks(args.username, removedTaskIDs, workflow, function(err) {
-            if(err) log.error(err.message);
+            if(err) log.error('User ', args.username, ': ', err.message);
 
-            // don\'t update task
+            // don't update task
             if (removedTaskIDs.indexOf(taskID) !== -1 /*|| taskID === 0 || !args.taskUpdated*/) {
-                log.info('Skipping update task ID ', taskID, ' it will be removed');
+                log.info('User ', args.username, ': do not update the task because the task ', taskID,
+                    ' will be deleted');
                 taskID = 0;
             }
 
             updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs, workflow, function (err) {
-                if (err) log.error(err.message);
+                if (err) log.error('User ', args.username, ': ', err.message);
 
                 if(!Object.keys(newApproves).length) {
-                    log.info('No new approves');
+                    log.info('User ', args.username, ': no new approves');
                     return callback();
                 }
 
                 processApproves(args.username, Number(args.taskActionID), newApproves, workflow, function (err) {
-                    if (err) log.error(err.message);
+                    if (err) log.error('User ', args.username, ': ', err.message);
 
                     callback();
                 });
@@ -190,6 +193,7 @@ function saveTask(args, callback) {
  * @param {string} args.username username
  * @param {string} args.actionsOrder comma separated taskActionID in the order of action execution
  * @param {string} args.newTaskGroup stringified new task group
+ * @param {string} args.newTaskGroupName new task group name if task will be moved to
  * @param {string} args.taskName task name
  * @param {string} args.taskActionID stringified taskActionID
  * @param {'dontRun'|'runNow'|'runAtTime'|'runByActions'} args.taskExecutionCondition
@@ -200,7 +204,7 @@ function saveTask(args, callback) {
  * @param {Object} actions object with task actions (see example)
  * @param {Object} actionsIDsObj actionsIDsObj[actionID] = [taskActionID1, taskActionID2,..]
  * @param {Array<number>} filterTaskActionIDs array of the filtered taskActionIDs
- * @param {Object} workflow workflow
+ * @param {Array} workflows workflow
  * @param {function(Error)|function(null, number)} callback callback(err, taskID)
  * @example
  * actions:
@@ -213,10 +217,12 @@ function saveTask(args, callback) {
  *     ....
  * }
  */
-function updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs, workflow, callback) {
+function updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs,
+                    workflows, callback) {
     if(taskID === 0) return callback();
 
-    log.info('Starting update task ', taskID, '; actions: ', actions);
+    log.info('User ', args.username, ': starting update task ', taskID, '; actions num: ', Object.keys(actions).length);
+    log.debug('Actions: ', actions);
 
     if(!args.actionsOrder || typeof args.actionsOrder !== 'string') {
         return callback(new Error('Incorrect actionsOrder parameter "' + args.actionsOrder + '"'));
@@ -271,10 +277,10 @@ function updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs, w
                 // when remove task name
                 if(taskData && taskData.name && !args.taskName) {
                     args.taskName = taskData.name;
-                    log.warn('Task name was removed. Repair task name to ', args.taskName);
+                    log.warn('User ', args.username, ': task name was removed. Repair task name to ', args.taskName);
                 }
 
-                // don't change task group for task with empty task name
+                // don't change task group for task without task name (initializing task in the Default group)
                 if(taskData && !args.taskName) newTaskGroup = taskData.groupID;
                 var param = {
                     name: args.taskName,
@@ -285,9 +291,13 @@ function updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs, w
                 }
 
                 if(!taskID) {
-                    param.newTaskID = unique.createHash(JSON.stringify(param) + unique.createID());
+                    param.newTaskID = unique.createHash(JSON.stringify(param));
                 }
 
+                if(taskData && taskData.groupID !== newTaskGroup) {
+                    log.info('User ', args.username, ': move task ', taskID, ' from "', taskData.groupName,
+                        '" (', taskData.groupID ,') to "', args.newTaskGroupName, '" (', newTaskGroup, ')');
+                }
                 // running all tasks in series for correct transaction processing, and if error occurred in any of
                 // running tasks, we will run rollback for transaction
                 tasksDB.addOrUpdateTask(args.username, param, actions, function(err, taskID) {
@@ -295,54 +305,26 @@ function updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs, w
 
                     var runType = taskData ? taskData.runType : null;
 
-                    log.debug('Process task execution condition');
-                    processTaskExecutionCondition(args, taskID, hasRightsForRunByActions, filterTaskActionIDs, workflow,
+                    log.debug('User ', args.username, ': process task execution condition');
+                    processTaskExecutionCondition(args, taskID, hasRightsForRunByActions, filterTaskActionIDs, workflows,
                         function(err) {
 
                         if(err) return transactionsDB.rollback(err, callback);
 
                         // remove approval for this task if something changed
-                        log.debug('Remove approval for task ', taskID ,' because something changed');
-                        removeApproval(args.username, taskID, taskParams, runType, conditionsOCIDs, workflow,
-                            function(err, taskNotChanged) {
+                        log.debug('User ', args.username, ': remove approval for task ', taskID ,
+                            ' because something changed');
+
+                        removeApproval(args.username, taskID, taskParams, runType, conditionsOCIDs, workflows,
+                            function(err/*, taskNotChanged*/) {
 
                             if(err) return transactionsDB.rollback(err, callback);
-                            // new task or task group was not changed
-                            if(!taskData || newTaskGroup === taskData.groupID) {
-                                if(taskNotChanged) return transactionsDB.end(callback);
 
-                                sendMessage(args.username, taskID, workflow, 'change', null,
-                                    function(err) {
-                                    if (err) log.error(err.message);
-                                    transactionsDB.end(callback);
-                                });
-                                return;
-                            }
-
-                            tasksDB.getTasksGroupsList(function(err, rows) {
-                                if(err) {
-                                    return transactionsDB.rollback(new Error('Can\'t get tasks groups list: ' +
-                                        err.message), callback);
-                                }
-
-                                var oldTaskGroupName = '', newTaskGroupName = '';
-                                rows.forEach(function (row) {
-                                    if(row.id === taskData.groupID) oldTaskGroupName = row.name;
-                                    else if(row.id === newTaskGroup) newTaskGroupName = row.name;
-                                });
-
-                                if(!oldTaskGroupName || !newTaskGroupName) {
-                                    return transactionsDB.rollback(new Error('Undefined task old group "' +
-                                        oldTaskGroupName +
-                                        '"(' + taskData.groupID + ') or new task group "' + newTaskGroupName +
-                                        '"(' + args.newTaskGroup + ')'), callback);
-                                }
-
-                                sendMessage(args.username, taskID, workflow,
-                                    oldTaskGroupName + ',' + newTaskGroupName, null,function (err) {
-                                        if (err) log.error(err.message);
-                                        transactionsDB.end(callback);
-                                    });
+                            // this hack is used for save the old group name in the workFlows[0].oldGroupName
+                            if(workflows.length) workflows[0].oldGroupName = taskData.groupName;
+                            tasks.processWorkflows(args.username, taskID, workflows, 'change', null,
+                            null,function() {
+                                transactionsDB.end(callback);
                             });
                         });
                     });
@@ -356,13 +338,13 @@ function updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs, w
  * Remove the task
  * @param {string} username username
  * @param {Array<number>} removedTaskIDs an array with task IDs for remove
- * @param {Object} workflow workflow
+ * @param {Array} workflow workflow
  * @param {function()|function(Error)} callback callback(err)
  */
 function removeTasks(username, removedTaskIDs, workflow, callback) {
     if(!Array.isArray(removedTaskIDs) || !removedTaskIDs.length) return callback();
 
-    log.info('Tasks for removing: ', removedTaskIDs);
+    log.info('User ', username, ': tasks for removing: ', removedTaskIDs);
 
     transactionsDB.begin(function (err) {
         if (err) {
@@ -375,8 +357,8 @@ function removeTasks(username, removedTaskIDs, workflow, callback) {
             first we send the message, then we delete the task, because we cannot get the properties of the task
             to send the message after deleting the task
              */
-            sendMessage(username, removedTaskID, workflow, 'remove', null,function(err) {
-                if(err) log.error(err.message);
+            tasks.processWorkflows(username, removedTaskID, workflow, 'remove', null, null,
+                function() {
                 tasksDB.removeTask(username, removedTaskID, callback);
             });
         }, function(err) {
@@ -402,7 +384,7 @@ function removeTasks(username, removedTaskIDs, workflow, callback) {
  * @example
  * param:
  * {
- *      tasksActionsID: row.tasksActionsID,
+ *      taskActionID: row.taskActionID,
  *      actionID: row.actionID,
  *      parameterName: row.name,
  *      parameterValue: row.value,
@@ -425,12 +407,12 @@ function removeTasks(username, removedTaskIDs, workflow, callback) {
 function getTaskParameters(username, taskID, callback) {
     if(!taskID) return callback();
 
-    tasksDB.getTaskParameters(username, taskID, function(err, taskParameters, taskData, conditionOCIDs) {
+    tasksDB.getTaskParameters(username, taskID, function(err, taskParams, taskData, conditionOCIDs) {
         if(err) return callback(err);
 
-        var params = taskParameters.map(function(row) {
+        var params = taskParams.map(function(row) {
             return {
-                tasksActionsID: row.tasksActionsID,
+                taskActionID: row.taskActionID,
                 actionID: row.actionID,
                 parameterName: row.name,
                 parameterValue: row.value,
@@ -450,12 +432,12 @@ function getTaskParameters(username, taskID, callback) {
  * @param {Object} taskParams task parameters
  * @param {number} runType task run type
  * @param {Array<number>} conditionsOCIDs conditionsOCIDs
- * @param {Object} workflow workflow
+ * @param {Array} workflow workflow
  * @param {function(Error)|function(null, true)|function()} callback callback(err, true|undefined) true if no changes were made
  */
 function removeApproval(username, taskID, taskParams, runType, conditionsOCIDs, workflow, callback) {
     if(!taskParams) {
-        log.info('Removing previous approval from new task ', taskID);
+        log.info('User ', username, ': removing previous approval from new task ', taskID);
         tasksDB.removeApproval(taskID, callback);
         return;
     }
@@ -465,44 +447,21 @@ function removeApproval(username, taskID, taskParams, runType, conditionsOCIDs, 
 
         var conditionsOCIDsForCompare = conditionsOCIDs ? conditionsOCIDs.sort().join(',') : '';
         var newConditionOCIDsForCompare = newConditionOCIDs ? newConditionOCIDs.sort().join(',') : '';
+        var isActionParametersChanged = JSON.stringify(taskParams) !== JSON.stringify(newTaskParams)
         // if runType, action parameters and actions are not changed, do not remove the approval
         if(runType === newTaskData.runType &&
             ((newTaskData.runType !== 0 && newTaskData.runType !== 1 && newTaskData.runType !== 11) ||
-            conditionsOCIDsForCompare === newConditionOCIDsForCompare) &&
-            JSON.stringify(taskParams) === JSON.stringify(newTaskParams)) {
-            log.info('No changes found to delete approval from previously approved task ', taskID);
+            conditionsOCIDsForCompare === newConditionOCIDsForCompare) && !isActionParametersChanged) {
+            log.info('User ', username, ': no changes found to delete approval from previously approved task ', taskID);
             return callback(null, true);
         }
 
-        log.info('Removing previous approval from changed taskID ', taskID,
+        log.info('User ', username, ': removing previous approval from changed taskID ', taskID,
             '; runType was\\now: ', runType, '\\', newTaskData.runType,
-            '; changes: was: ', taskParams, '; now: ', newTaskParams);
+            '; action parameters were changed: ', isActionParametersChanged);
+        log.debug('Action parameters: was: ', taskParams, '; now: ', newTaskParams);
         tasksDB.removeApproval(taskID, callback);
     });
-}
-
-/**
- * Send message when a task is moved to another group
- * @param {string} username username
- * @param {number} taskID taskID
- * @param {Object} workflows workflow
- * @param {string} action string like "<sourceTaskGroup>,<destTaskGroup>"
- * @param {Error} err error when moving the task
- * @param {function()|function(Error)} callback callback(err)
- */
-function sendMessage(username, taskID, workflows, action, err, callback) {
-    log.info('Send message from user: ', username, ' taskID: ', taskID, ' action: ', action,
-        ' workflows: ', workflows, '; err: ', err);
-
-    if(action.indexOf(',') !== -1) action = 'Move from ' + action.split(/ *, */).join(' to ');
-    action = action.toLowerCase();
-    async.eachSeries(workflows, function (workflow, callback) {
-        if(typeof workflow.action !== 'string') return callback();
-        if(workflow.action.indexOf(',') !== -1) workflow.action = 'Move from ' + workflow.action.split(/ *, */).join(' to ');
-        if(workflow.action.toLowerCase() === action) {
-            tasks.sendMessage(username, taskID, workflow.message, (err ? err.message : action), callback);
-        } else callback();
-    }, callback);
 }
 
 /**
@@ -516,10 +475,11 @@ function sendMessage(username, taskID, workflows, action, err, callback) {
  * @param {number} taskID task ID
  * @param {Boolean} hasRightsForRunByActions does the user have the rights to run action in the task
  * @param {Array<number>} filterTaskActionIDs filtered taskActionIDs
- * @param {Object} workflow workflow
+ * @param {Array} workflow workflow
  * @param {function()|function(Error)} callback callback(err)
  */
-function processTaskExecutionCondition(args, taskID, hasRightsForRunByActions, filterTaskActionIDs, workflow, callback) {
+function processTaskExecutionCondition(args, taskID, hasRightsForRunByActions,
+                                       filterTaskActionIDs, workflow, callback) {
     if(args.taskExecutionCondition === 'dontRun') return tasksDB.deleteRunCondition(taskID, callback);
 
     if(args.taskExecutionCondition === 'runNow') return tasksDB.addRunCondition(taskID, 2, null, callback);
@@ -536,18 +496,16 @@ function processTaskExecutionCondition(args, taskID, hasRightsForRunByActions, f
             return callback(new Error('User ' + args.username + ' has no rights for executing task ID ' + taskID));
         }
 
-        taskServer.runTask({
+        taskClient.runTask({
             userName: args.username,
             taskID: taskID,
             filterTaskActionIDs: filterTaskActionIDs,
             runTaskFrom: 'taskMaker',
-        }, function(err) {
-            if(err) log.error(err.message);
+            runOnLocalNode: true,
+        }, function(err, taskResult) {
+            if(err) log.error('User ', args.username, ': run task: ', err.message);
 
-            sendMessage(args.username, taskID, workflow, 'execute', err, function(err) {
-                if(err) log.error(err.message);
-                callback();
-            });
+            tasks.processWorkflows(args.username, taskID, workflow, 'execute', err, taskResult, callback);
         });
 
         return;
@@ -566,14 +524,14 @@ function processTaskExecutionCondition(args, taskID, hasRightsForRunByActions, f
 /**
  * Process approves
  * @param {string} username username
- * @param {number} tasksActionsID taskActionID
+ * @param {number} taskActionID taskActionID
  * @param {Object} newApproves {<taskID>: <runType>, ...}
- * @param {Object} workflow workflow
+ * @param {Array} workflow workflow
  * @param {function(Error)|function()} callback callback()
  */
-function processApproves(username, tasksActionsID, newApproves, workflow, callback) {
+function processApproves(username, taskActionID, newApproves, workflow, callback) {
 
-    log.info('Processing approves: ', newApproves);
+    log.info('User ', username, ': processing approves: ', newApproves);
     async.eachSeries(Object.keys(newApproves), function (taskID, callback) {
         var runType = newApproves[taskID];
 
@@ -582,20 +540,22 @@ function processApproves(username, tasksActionsID, newApproves, workflow, callba
 
             // [2 - ask to run now; 12 - run now already started; 32 - canceled run now] => run task now
             if(runType === 2 || runType === 12 || runType === 32) {
-                taskServer.runTask({
+                taskClient.runTask({
                     userName: username,
                     taskID: taskID,
-                    tasksActionsID: tasksActionsID,
+                    taskActionID: taskActionID,
                     runTaskFrom: 'taskMaker',
-                }, function(err) {
-                    if(err) log.error(err.message);
-                    sendMessage(username, taskID, workflow, 'execute', err, function(err) {
-                        if(err) log.error(err.message);
+                    runOnLocalNode: true,
+                }, function(err, taskResult) {
+                    if(err) log.error('User ', username, ': run task when processed approves: ', err.message);
+
+                    tasks.processWorkflows(username, taskID, workflow, 'execute', err, taskResult,
+                        function() {
 
                         transactionsDB.begin(function(err) {
                             if(err) {
                                 return callback(new Error('Can\'t start transaction for save approve for task ID ' +
-                                    taskID + ', user: ' + username + ': ' + err.message));
+                                    taskID + ': ' + err.message));
                             }
 
                             tasksDB.approveTask(username, taskID, function (err) {
@@ -617,26 +577,24 @@ function processApproves(username, tasksActionsID, newApproves, workflow, callba
 
             // there was a request for approval and is now approved
             if(runType < 10) {
-                log.info('Approve task ID ', taskID, ' for runType ', runType, ' user: ', username);
+                log.info('User ', username, ': approve task ID ', taskID, ' for runType ', runType);
                 tasksDB.approveTask(username, taskID, function (err) {
                     if(err) return callback(err);
-                    addTaskToTaskServer(taskID, runType, workflow,function(err) {
+                    addTaskToTaskServer(username, taskID, runType, workflow,function(err) {
                         if(err) return callback(err);
 
-                        sendMessage(username, taskID, workflow, 'approve', null, function(err) {
-                            if(err) log.error(err.message);
-                            callback();
-                        });
+                        tasks.processWorkflows(username, taskID, workflow, 'approve', null,
+                            null, callback);
                     });
                 });
             // was launched, but again approved to run, or was canceled, but again approved
             } else if(runType >= 10 && runType < 20 || runType >= 30) {
-                log.info('Approve task ID ', taskID, ' and reset previous runType ', runType, ' to ', String(runType)[1],
-                    ' user: ', username);
+                log.info('User ', username, ': approve task ID ', taskID, ' and reset previous runType ', runType,
+                    ' to ', String(runType)[1]);
                 transactionsDB.begin(function(err) {
                     if(err) {
                         return callback(new Error('Can\'t start transaction for save approve for task ID ' +
-                            taskID + ', user: ' + username + ': ' + err.message));
+                            taskID + ': ' + err.message));
                     }
                     tasksDB.addRunCondition(taskID, runType % 10, null, function(err) {
                         if (err) return transactionsDB.rollback(err, callback);
@@ -644,15 +602,13 @@ function processApproves(username, tasksActionsID, newApproves, workflow, callba
                         tasksDB.approveTask(username, taskID, function(err) {
                             if(err) return transactionsDB.rollback(err, callback);
 
-                            addTaskToTaskServer(taskID, runType % 10, workflow, function(err) {
+                            addTaskToTaskServer(username, taskID, runType % 10, workflow, function(err) {
                                 if(err) return transactionsDB.rollback(err, callback);
                                 transactionsDB.end(function(err) {
                                     if(err) return callback(err);
 
-                                    sendMessage(username, taskID, workflow, 'approve', null, function(err) {
-                                        if(err) log.error(err.message);
-                                        callback();
-                                    });
+                                    tasks.processWorkflows(username, taskID, workflow, 'approve', null,
+                                        null,callback);
                                 });
                             })
                         });
@@ -660,43 +616,42 @@ function processApproves(username, tasksActionsID, newApproves, workflow, callba
                 });
             // has been approved and is now being canceled
             } else if(runType >= 20 && runType < 30) {
-                log.info('Cancel task ID ', taskID, ' for runType ', runType, ' user: ', username);
+                log.info('User ', username, ': cancel task ID ', taskID, ' for runType ', runType);
                 tasksDB.cancelTask(username, taskID, function(err) {
                     if(err) return callback(err);
-                    taskServer.cancelTask(taskID);
+                    taskClient.cancelTask(taskID);
 
-                    sendMessage(username, taskID, workflow, 'cancel', null,  function(err) {
-                        if(err) log.error(err.message);
-                        callback();
-                    });
+                    tasks.processWorkflows(username, taskID, workflow, 'cancel', null,  null, callback);
                 });
-            } else callback(new Error('Unknown runType: ' + runType + ' for task ID ' + taskID + ' user: ' + username));
+            } else callback(new Error('Unknown runType: ' + runType + ' for task ID ' + taskID));
         });
     }, callback);
 }
 
 /**
  * Add a task to the task server
+ * @param {string} username username
  * @param {number} taskID task ID
  * @param {0|1|2|9} runType task run type
- * @param {Object} workflow workflow
+ * @param {Array} workflow workflow
  * @param {function()|function(Error)} callback callback(err)
  */
-function addTaskToTaskServer(taskID, runType, workflow, callback) {
-    log.debug('Add task to taskServer: ', taskID, '; runType: ', runType);
+function addTaskToTaskServer(username, taskID, runType, workflow, callback) {
+    log.debug('User ', username, ': adding the task to taskServer: ', taskID, '; runType: ', runType);
 
     if(runType === 9) { // scheduled task by time
         tasksDB.getTaskConditions(taskID, function (err, rows) { // get task schedule time
             if(err) return callback(err);
 
             if(rows[0].runType < Date.now()) {
-                log.warn('Skip to add scheduled task to task server. Task start time has passed: ',
-                    new Date(rows[0].runType).toLocaleString());
+                log.warn('User ', username, ': skip to add scheduled task to task server. Task start time has passed: ',
+                    new Date(rows[0].runType).toLocaleString(), ', now: ', new Date().toLocaleString());
                 return callback();
             }
 
-            log.info('Add task: ', taskID, ', time: ', new Date(rows[0].runType).toLocaleString());
-            taskServer.addTask(taskID, rows[0].runType, workflow);
+            log.info('User ', username, ': added the scheduled task: ', taskID,
+                ', time: ', new Date(rows[0].runType).toLocaleString());
+            taskClient.addTask(taskID, username, rows[0].runType, workflow);
             callback();
         });
         return;
@@ -704,6 +659,8 @@ function addTaskToTaskServer(taskID, runType, workflow, callback) {
 
     if(runType !== 0 && runType !== 1) return callback();
 
+    // runType 0  run permanently by condition
+    // runType 1  run once by condition
     tasksDB.getRunConditionOCIDs(taskID, function (err, rows) {
         if(err) return  callback(err);
 
@@ -711,8 +668,15 @@ function addTaskToTaskServer(taskID, runType, workflow, callback) {
             return row.OCID;
         });
 
-        log.info('Add task: ', taskID, '; mode: ', runType, '; OCIDs: ', conditionsOCIDs);
-        taskServer.addTask(taskID, runType, workflow, conditionsOCIDs);
+        if(!conditionsOCIDs.length) {
+            return callback(new Error('Error add the task ' + taskID + '; runType: ' +
+                (runType === 1 ? '1 (run once by condition)' : '0 (run permanently by condition)') +
+                ' to queue: no objects-counter links were found to calculate the meet of the condition: conditionsOCIDs: ' +
+                conditionsOCIDs));
+        }
+        log.info('User ', username, ': added the task: ', taskID, '; mode: ', runType,
+            '; conditionsOCIDs: ', conditionsOCIDs);
+        taskClient.addTask(taskID, username, runType, workflow, conditionsOCIDs);
         callback();
     });
 }

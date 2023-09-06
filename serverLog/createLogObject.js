@@ -4,35 +4,37 @@
 
 /**
  * Log object for debug, info, warn, error, exit or throw log level
- * @param {NodeModule} parentModule
- * @param {function("D"|"I"|"W"|"E"|"EXIT"|"THROW", Array, NodeModule)} writeToLog
+ * @param {{filename: string, sessionID: number}|NodeModule} parentModule
+ * @param {number} sessionID sessionID
+ * @param {string} label label
+ * @param {function("D"|"I"|"W"|"E"|"EXIT"|"THROW", Array, {filename: string, sessionID: number}|NodeModule, number, string)} writeToLog
  * @returns {{warn: function, exit: function, debug: function, throw: function, error: function, info: function}}
  */
-module.exports = function (parentModule, writeToLog) {
+module.exports = function (parentModule, sessionID, label, writeToLog) {
 
     return {
         debug: function () {
-            writeToLog('D', Array.prototype.slice.call(arguments), parentModule)
+            return writeToLog('D', Array.prototype.slice.call(arguments), parentModule, sessionID, label);
         },
 
         info: function () {
-            writeToLog('I', Array.prototype.slice.call(arguments), parentModule)
+            return writeToLog('I', Array.prototype.slice.call(arguments), parentModule, sessionID, label);
         },
 
         warn: function () {
-            writeToLog('W', Array.prototype.slice.call(arguments), parentModule)
+            return writeToLog('W', Array.prototype.slice.call(arguments), parentModule, sessionID, label);
         },
 
         error: function () {
-            writeToLog('E', Array.prototype.slice.call(arguments), parentModule)
+            return writeToLog('E', Array.prototype.slice.call(arguments), parentModule, sessionID, label);
         },
 
         exit: function () {
-            writeToLog('EXIT', Array.prototype.slice.call(arguments), parentModule)
+            return writeToLog('EXIT', Array.prototype.slice.call(arguments), parentModule, sessionID, label);
         },
 
         throw: function () {
-            writeToLog('THROW', Array.prototype.slice.call(arguments), parentModule)
+            return writeToLog('THROW', Array.prototype.slice.call(arguments), parentModule, sessionID, label);
         },
     }
 }

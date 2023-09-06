@@ -11,12 +11,10 @@ const tasksDB = require('../models_db/tasksDB');
 const tasks = require('./tasks');
 const actionClient = require('../serverActions/actionClient');
 const Conf = require('../lib/conf');
-const conf = new Conf('config/common.json');
 const confTaskServer = new Conf('config/taskServer.json');
 
 var serverIPC,
     conditionsQueue = new Map(),
-    systemUser = conf.get('systemUser') || 'system',
     scheduledTasks = new Map();
 
 processConditionsQueue();
@@ -96,16 +94,15 @@ tasks.startCheckConditions(function (err) {
                     log.info('Loading task ID ', taskID, '. runType: run ',
                         (tasksRunCondition.runType ? 'once' : 'every time'),
                         ' when update event occurred, for OCIDs: ', tasksRunCondition.OCIDs,
-                        '; approved user: ',tasksRunCondition.username, '; workflow: ', workflow);
+                        '; approved user: ', tasksRunCondition.username);
 
                     tasks.runTask({
-                        userName: systemUser,
                         taskID: taskID,
-                        conditionOCIDs: tasksRunCondition.OCIDs, // Using Object.values for save Number type for OCID
+                        conditionOCIDs: tasksRunCondition.OCIDs,
                         runType: tasksRunCondition.runType,
-                    }, function (err) {
+                    }, function (err, taskResult, username) {
                         if(err) log.error('Error running task ', taskID, ', by conditions : ', err.message);
-                        sendMessage(taskID, workflow, err, callback);
+                        tasks.processWorkflows(username, taskID, workflow, 'execute', err, taskResult, callback);
                     });
                 });
             }, function (err) {
@@ -148,46 +145,47 @@ function scheduleTask(taskID, timestamp, workflow) {
             new Date(timestamp).toLocaleString());
 
         tasks.runTask({
-            userName: systemUser,
             taskID: taskID,
-        }, function (err) {
+        }, function (err, taskResult, username) {
             if(err) log.error('Error running task ', taskID, ' at ', new Date(timestamp).toLocaleString(), ': ', err.message);
-            sendMessage(taskID, workflow, err);
+            tasks.processWorkflows(username, taskID, workflow, 'execute', err, taskResult, function() {});
         });
         return;
     }
 
     log.info('Schedule task ', taskID, ' to run at ', new Date(timestamp).toLocaleString());
-    scheduledTasks.set(taskID, setTimeout(function () {
+    var scheduledTaskTimer = setTimeout(function () {
         scheduledTasks.delete(taskID);
         tasks.runTask({
-            userName: systemUser,
             taskID: taskID,
-        }, function (err) {
+        }, function (err, taskResult, username) {
             if (err) log.error('Error running task ', taskID, ' at ', new Date(timestamp).toLocaleString(), ': ', err.message);
-            sendMessage(taskID, workflow, err);
+            tasks.processWorkflows(username, taskID, workflow, 'execute', err, taskResult, function() {});
         });
-    }, runTime));
+    }, runTime);
+    scheduledTasks.set(taskID, scheduledTaskTimer);
 }
 
 /**
  * Add condition task
  * @param {number} taskID task ID
  * @param {Object} message message object
+ * @param {string} message.username username who approve the task
  * @param {Array} message.conditionOCIDs Array with condition OCIDs
  * @param {0|1} message.runType 0 - run permanently, 1 - run once
  * @param {Array} message.workflow workflow
  */
 function addConditionTask(taskID, message) {
-    log.info('Queuing task ', taskID,', runType: ', message.runType,' for waiting conditions ', message.conditionOCIDs);
+    log.info('Queuing task ', taskID, ' username: ', message.username, ', runType: ', message.runType,
+        ' for waiting conditions ', message.conditionOCIDs);
+
     tasks.runTask({
-        userName: systemUser,
         taskID: taskID,
         conditionOCIDs: message.conditionOCIDs,
         runType: message.runType,
-    }, function (err) {
+    }, function (err, taskResult, username) {
         if(err) log.error('Error running task ', taskID, ', by conditions : ', err.message);
-        sendMessage(taskID, message.workflow, err);
+        tasks.processWorkflows(username, taskID, message.workflow, 'execute', err, taskResult, function() {});
     });
 }
 
@@ -238,23 +236,4 @@ function processConditionsQueue() {
         processConditionsQueue();
     }, parseInt(confTaskServer.get('waitingConditionsTime'), 10) || 30000);
     processingConditionsInProgress.unref();
-}
-
-/**
- * Send message after task executed
- * @param {number} taskID task ID
- * @param {Array} workflow array with workflow objects, like [{action: "execute", message: ...}, ....]
- * @param {Error} [error] Error
- * @param {function(Error) | function()} [callback] callback(err)
- */
-function sendMessage(taskID, workflow, error, callback) {
-    async.each(workflow, function (obj, callback) {
-        if(typeof(obj.action) === 'string' && obj.action.toLowerCase() === 'execute') {
-            var action = error ? error.message : 'execute';
-            tasks.sendMessage(systemUser, taskID, obj.message, action, callback);
-        } else callback();
-    }, function(err) {
-        if(typeof callback === 'function') return callback(err);
-        if(err) log.error(err.message);
-    });
 }

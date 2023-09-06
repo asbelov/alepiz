@@ -157,7 +157,7 @@ function truncateWal() {
         if (err) {
             if (err.code !== 'ENOENT') log.error('Can\'t stat ', dbPath + '-wal: ', err.message);
         } else if (stat.size > 104857600) { // 100Mb
-            log.warn('Size of ', dbPath + '-wal file is a ',
+            log.info('Size of ', dbPath + '-wal file is a ',
                 Math.round(stat.size/1048576), 'Mb. Truncating wal and optimizing DB...');
             try {
                 db.pragma('wal_checkpoint(TRUNCATE)');

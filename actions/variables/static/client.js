@@ -81,7 +81,7 @@ var JQueryNamespace = (function ($) {
                     else name = counter.objectName + ': ' + counter.name;
                     counterID2OCID[counter.id] = counter.OCID;
                     return '<option value="' + counter.OCID + '" data-counter-id="' + counter.id + '">' +
-                        escapeHtml(name) + ' #' + String(counter.id).slice(-5) + '</option>';
+                        escapeHtml(name) + ' #' + counter.id + '</option>';
                 }).join('');
             }
 

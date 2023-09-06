@@ -4,7 +4,6 @@
 
 const createMessage = require('./createMessage');
 const createConfig = require('./createConfig');
-const createLabel = require('./createLabel');
 const {threadId} = require('worker_threads');
 
 module.exports = prepareLogMessage;
@@ -22,7 +21,7 @@ const TID_PID = (threadId ? ':' + threadId + ':' : ':') + process.pid;
  * @param {object|undefined} [options] log options
  * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} options.level log level when used log.options() function
  * @param {Array<string>} options.filenames log file names when used log.options() function
- * @param {NodeModule} parentModule parent node module
+ * @param {string} label label
  * @returns {undefined|{
  *      level: ("D"|"I"|"W"|"E"|"EXIT"|"THROW"),
  *      label: string,
@@ -32,13 +31,11 @@ const TID_PID = (threadId ? ':' + threadId + ':' : ':') + process.pid;
  *      filenames: Array,
  *      TID_PID: string,
  *      messageBody: string,
- *      equalPrevMessagesNum: number,
  * }}
  */
-function prepareLogMessage(level, args, options, parentModule) {
+function prepareLogMessage(level, args, options, label) {
     if(!args.length) return;
 
-    var label = createLabel(parentModule);
     if(options && options.level) level = options.level;
 
     var cfg = createConfig(label);
@@ -53,9 +50,8 @@ function prepareLogMessage(level, args, options, parentModule) {
         if(!calcDebugCondition(condition, cfg.vars)) return;
     }
 
-    var messageObj =
+    var message =
         createMessage.createBody(args, level, Number(cfg.printObjectWithDepth) || 10);
-    if(!messageObj) return;
 
     return {
         level: level,
@@ -65,8 +61,7 @@ function prepareLogMessage(level, args, options, parentModule) {
         cfg: cfg,
         filenames: options && options.filenames,
         TID_PID: TID_PID,
-        messageBody: messageObj.message,
-        equalPrevMessagesNum: messageObj.equalPrevMessagesNum,
+        messageBody: message,
     };
 }
 

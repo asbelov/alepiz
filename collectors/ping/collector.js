@@ -384,7 +384,7 @@ function initServerCommunication() {
         // Reply from 192.168.236.200: bytes=32 time<1ms TTL=64
         // Request timed out.
         // Превышен интервал ожидания для запроса.
-        regExpForExtractRTT = /^.*[=<]([\d]+)[^ \s\d][\s\S]*$/;
+        regExpForExtractRTT = /^.*[=<](\d+)[^ \s\d][\s\S]*$/;
 
         // forking and remember child object to global variable for kill it, if needed
         var child = externalPingProcesses[target.address] = spawn(externalProgram, externalProgramArguments);

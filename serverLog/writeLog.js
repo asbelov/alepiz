@@ -20,7 +20,6 @@ var dateSuffix = setDateSuffix();
  * @param {undefined|"#"|"*"} [messageObj.additionalLabel] label for: "" - normal log, # - direct log to the file without
  *  log server, * - simple log used in the serverLog functions where log is not initialized
  * @param {string} messageObj.messageBody pure the log message
- * @param {number} messageObj.equalPrevMessagesNum number of repetitions of the last message
  * @param {{dir: string, logLevel: string, logToConsole: boolean, exitLogFileName: string, file: string, errorLogFileName: string }} messageObj.cfg
  *  configuration from config/log.json for current log label
  * @param {string} messageObj.label log message label
@@ -48,19 +47,14 @@ function writeLog(messageObj) {
         (messageObj.additionalLabel ? messageObj.additionalLabel : '') +
         messageObj.messageBody;
 
-    var repeatedMessage = '\t...the last message was repeated ' + messageObj.equalPrevMessagesNum + ' times'
     if (cfg.logToConsole) {
-        if(messageObj.equalPrevMessagesNum) console.log(repeatedMessage);
-        console.log(message);
+        if(message) console.log(message);
     }
 
     message = message
         .replace(/[\r\n]/g, (cfg.wrapLines ? '' : '\n\t'))
         .replace(/\x1B\[\d+m/g, '') + '\n';
 
-    if(messageObj.equalPrevMessagesNum) {
-        message = repeatedMessage + '\n' + message;
-    }
     var mainLogFile =
         path.join(logDir, String(messageObj.level === 'EXIT' ?
             (cfg.exitLogFileName || 'exit.log') : (cfg.file || 'log.log') + dateSuffix));

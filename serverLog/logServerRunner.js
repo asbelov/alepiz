@@ -27,7 +27,7 @@ module.exports = logServer;
 logServer.start = function (callback) {
     new thread.parent({
         childrenNumber: 1,
-        childProcessExecutable: path.join(__dirname, 'logRouter.js'),
+        childProcessExecutable: path.join(__dirname, 'auditDataRouter.js'),
         restartAfterErrorTimeout: 0,
         killTimeout: 300,
         module: 'log',

@@ -33,6 +33,9 @@ module.exports = getVarFromHistory;
  * @param {string} param.objectName object name
  * @param {string} param.counterName counterName
  * @param {string} param.counterID counterID
+ * @param {string} param.childThread object for send data to parent
+ * @param {Object} param.countersObjects
+ * @param {number} param.objectID object ID
  * @param {function(Error, *, Object)} callback callback(err, result, variablesDebugInfo)
  */
 function getVarFromHistory(historyVariable, variables, getVariableValue, param, callback) {
@@ -88,38 +91,34 @@ function getVarFromHistory(historyVariable, variables, getVariableValue, param, 
 
             funcParameters.unshift(OCID);
 
-            // add callback as last parameter to history function
-            (function (_historyVariable, _param, _callback) {
-                funcParameters.push(function (err, _result) {
-                    funcParameters.pop(); // remove callback for debugging
-                    funcParameters.shift();
+            param.childThread.sendAndReceive({
+                func: historyVariable.function,
+                funcParameters: funcParameters,
+            }, function(err, rawResult) {
+                funcParameters.pop(); // remove callback for debugging
+                funcParameters.shift();
 
-                    var result = _result ? (_result.data === undefined ? null : _result.data) : null;
+                var result = rawResult ? (rawResult.data === undefined ? null : rawResult.data) : null;
 
-                    var variablesDebugInfo = {
-                        timestamp: Date.now(),
-                        name: _historyVariable.name,
-                        expression: variableObjectName + '(' + _historyVariable.parentCounterName + '): ' +
-                            _historyVariable.function + '(' + funcParameters.join(', ') + ')',
-                        variables: variables,
-                        functionDebug: _result ? _result.records : undefined,
-                        result: JSON.stringify(result),
-                    };
+                var variablesDebugInfo = {
+                    timestamp: Date.now(),
+                    name: historyVariable.name,
+                    expression: variableObjectName + '(' + historyVariable.parentCounterName + '): ' +
+                        historyVariable.function + '(' + funcParameters.join(', ') + ')',
+                    variables: variables,
+                    functionDebug: rawResult ? rawResult.records : undefined,
+                    result: JSON.stringify(result),
+                };
 
-                    if (err) {
-                        variablesDebugInfo.result += ': Error: ' + err.message
-                        return _callback(new Error(_param.objectName + '(' + _param.counterName +
-                            ' #' + _param.counterID + '): ' + err.message), result, variablesDebugInfo);
-                    }
+                if (err) {
+                    variablesDebugInfo.result += ': Error: ' + err.message
+                    return callback(new Error(param.objectName + '(' + param.counterName +
+                        ' #' + param.counterID + '): ' + err.message), result, variablesDebugInfo);
+                }
 
-                    _callback(null, result, variablesDebugInfo);
-                });
-            }) (historyVariable, param, callback);
-
-            // send array as a function parameters, i.e. func.apply(this, [prm1, prm2, prm3, ...]) = func(prm1, prm2, prm3, ...)
-            // funcParameters = [objectCounterID, prm1, prm2, prm3,..., callback]; callback(err, result, variablesDebugInfo), where result = [{data:<data>, }]
-            history[historyVariable.function].apply(this, funcParameters);
-        })
+                callback(err, result, variablesDebugInfo);
+            });
+        });
     });
 }
 
@@ -204,6 +203,8 @@ function parameterValueFromHuman(parameter) {
  * @param {string} param.objectName object name
  * @param {string} param.counterName counterName
  * @param {string} param.counterID counterID
+ * @param {Object} param.countersObjects
+ * @param {number} param.objectID
  * @param {function(Error)|function(null, number, string)} callback callback(err, OCID, variableObjectName)
  */
 function calcOCID(historyVariable, variables, getVariableValue, param, callback) {

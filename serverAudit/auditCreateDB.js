@@ -69,6 +69,34 @@ stopTimestamp INTEGER)\
     }
 
     try {
+        db.prepare('\
+CREATE TABLE IF NOT EXISTS actionCommentsReferences (\
+actionCommentRowID INTEGER PRIMARY KEY,\
+sessionID INTEGER NOT NULL,\
+timestamp INTEGER NOT NULL\
+)\
+').run();
+    } catch (err) {
+        return callback(new Error('Can\'t create actionCommentsReferences table in audit DB: ' + err.message))
+    }
+
+    try {
+        db.prepare('CREATE INDEX IF NOT EXISTS sessionID_actionCommentsReferences_index on ' +
+            'actionCommentsReferences(sessionID)').run();
+    } catch (err) {
+        return callback(new Error('Can\'t create sessionID index in actionCommentsReferences table in ' +
+            'audit DB: ' + err.message));
+    }
+
+    // actionComments(rowid) = actionCommentsReferences(actionCommentRowID) and
+    // sessions(id) = actionCommentsReferences(sessionsID)
+    try {
+        db.prepare('CREATE VIRTUAL TABLE IF NOT EXISTS actionComments USING FTS5(comment)').run();
+    } catch (err) {
+        return callback(new Error('Can\'t create actionComments table in audit DB: ' + err.message));
+    }
+
+    try {
         // taskSession used when run one task with one taskID several times
         db.prepare('\
 CREATE TABLE IF NOT EXISTS taskReferences (\
@@ -86,6 +114,33 @@ taskNameRowID INTEGER NOT NULL UNIQUE)\
         return callback(new Error('Can\'t create taskNames table in audit DB: ' + err.message));
     }
 
+    try {
+        db.prepare('\
+CREATE TABLE IF NOT EXISTS taskCommentsReferences (\
+taskCommentRowID INTEGER PRIMARY KEY,\
+taskSession INTEGER NOT NULL,\
+timestamp INTEGER NOT NULL\
+)\
+').run();
+    } catch (err) {
+        return callback(new Error('Can\'t create taskCommentsReferences table in audit DB: ' + err.message))
+    }
+
+    try {
+        db.prepare('CREATE INDEX IF NOT EXISTS taskSession_taskCommentsReferences_index on ' +
+            'taskCommentsReferences(taskSession)').run();
+    } catch (err) {
+        return callback(new Error('Can\'t create taskSession index in taskCommentsReferences table in ' +
+            'audit DB: ' + err.message));
+    }
+
+    // taskComments(rowid) = taskCommentsReferences(taskCommentRowID) and
+    // taskNames(rowid) = taskCommentsReferences(taskNameRowID)
+    try {
+        db.prepare('CREATE VIRTUAL TABLE IF NOT EXISTS taskComments USING FTS5(comment)').run();
+    } catch (err) {
+        return callback(new Error('Can\'t create taskComments table in audit DB: ' + err.message));
+    }
 
     try {
         db.prepare('\

@@ -1,0 +1,34 @@
+{
+    "name": "Run powershell script",
+    "description": "Run powershell script",
+    "homePage": "index",
+    "execMethod": "post",
+    "launcher": "exec",
+    "launcherPrms": {
+        "executable": "C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe",
+        "returnStdout": true,
+        "returnCode": true,
+        "returnStderr": true,
+        "dontSplitOutput": true
+    },
+    "staticDir": "static",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": true,
+    "descriptionTemplate": "Run C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe %:programArgsStr:%. Working dir: %:cwd:%. STDIN: %:stdinData:%",
+    "icon": "run",
+    "canAddParametersToAction": false,
+    "applyToOwnObjects": true,
+    "runActionOnRemoteServers": false,
+    "returnActionResult": true,
+    "parameters": {
+        "programArgsStr": {
+            "description": "Command line arguments for powershell.exe"
+        },
+        "cwd": {
+            "description": "Working dir"
+        },
+        "stdinData": {
+            "description": "Data will be send to script stdin"
+        }
+    }
+}

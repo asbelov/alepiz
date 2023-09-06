@@ -223,8 +223,8 @@ functions.count = function(id, parameters, callback) {
                 parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
         }
 
+        var result = 0;
         if(records && records.length) {
-            var result = 0;
             if (pattern === undefined || pattern === null) result = records.length;
             else {
                 records.forEach(function (record) {

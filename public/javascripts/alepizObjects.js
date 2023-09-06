@@ -11,7 +11,6 @@ var alepizObjectsNamespace = (function($) {
         filterExpressionEditorElm,
         searchObjectsElm,
         searchActionsElm,
-        searchFiltersElm,
         searchObjectsAddElm,
         filterCounterElm,
         filterCounterContainerElm,
@@ -34,7 +33,7 @@ var alepizObjectsNamespace = (function($) {
         timeWhenNoObjectsWereFound = 0,
         redrawObjectsInProgress = false,
         /** used for get data about objects when used object grouping
-         * @type {Object.<objectID: Object>}
+         * @type {{id: number, name: string, description: string, color: string, disabled: number, sortPosition: number}}
          * @example
          * {
          *      <id1>: {id, name, description, sortPosition, color, disabled, created},
@@ -77,7 +76,6 @@ var alepizObjectsNamespace = (function($) {
         filterExpressionEditorElm = $('#filterExpressionEditor');
         searchObjectsElm = $('#searchObjects');
         searchActionsElm = $('#searchActions');
-        searchFiltersElm = $('#searchFilters');
         searchObjectsAddElm = $('#searchObjectsAdd');
         filterCounterElm = $('#filterCounter');
         filterCounterContainerElm = $('#filterCounterContainer');
@@ -98,63 +96,42 @@ var alepizObjectsNamespace = (function($) {
         searchObjectsElm.keyup(function(e) {
             // When pressing Esc, clear search field ang go to the top of the object list
             var searchStr = searchObjectsElm.val();
-            var searchStrAdd = searchObjectsAddElm.val();
 
             // Esc pressed in search string or search string is empty
             if(e.which === 27 || !searchStr.trim().length) {
                 // if not empty, make it empty
                 searchObjectsElm.val('');
                 searchIconElm.removeClass('hide');
-                if(searchStrAdd.trim().length) {
-                    globalSearchObjects(searchStrAdd,function (isDrawObjects) {
-                        if(!isDrawObjects) return;
-                        alepizActionsNamespace.createActionsList(null, function () {
-                            alepizMainNamespace.setBrowserHistory();
-                            alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
-                        });
-                    });
-                } else {
-                    if(e.which === 27) reDrawObjects(objectDrawFunctionBeforeSearch);
-                    else reDrawObjects();
-                }
+                if(e.which === 27 && useGlobalSearch === true) reDrawObjects(objectDrawFunctionBeforeSearch);
+                else reDrawObjects();
                 useGlobalSearch = false;
             } else {
                 searchIconElm.addClass('hide');
-                if(searchStrAdd.trim().length) {
-                    globalSearchObjects(searchStrAdd, function (isDrawObjects) {
+                // switch form global search mode to filter mode
+                // if search string length < minSearchStrLength or < prevSearchStrLength
+                if(useGlobalSearch === true &&
+                    (searchStr.length < minSearchStrLength || searchStr.length < prevSearchStrLength)) {
+                    useGlobalSearch = false;
+                    reDrawObjects(objectDrawFunctionBeforeSearch, function () {
+                        // when find nothing, try to use globalSearch again
+                        if(!filterObject() && searchStr.length >= minSearchStrLength) {
+                            globalSearchObjects(searchStr,function (isDrawObjects) {
+                                if(!isDrawObjects) return;
+                                alepizActionsNamespace.createActionsList(null, function () {
+                                    alepizMainNamespace.setBrowserHistory();
+                                    alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
+                                });
+                            });
+                        }
+                    });
+                } else if(useGlobalSearch === true || !filterObject()) {
+                    globalSearchObjects(searchStr,function (isDrawObjects) {
                         if(!isDrawObjects) return;
                         alepizActionsNamespace.createActionsList(null, function () {
                             alepizMainNamespace.setBrowserHistory();
                             alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
                         });
                     });
-                } else {
-                    // switch form global search mode to filter mode
-                    // if search string length < minSearchStrLength or < prevSearchStrLength
-                    if(useGlobalSearch === true &&
-                        (searchStr.length < minSearchStrLength || searchStr.length < prevSearchStrLength)) {
-                        useGlobalSearch = false;
-                        reDrawObjects(objectDrawFunctionBeforeSearch, function () {
-                            // when find nothing, try to use globalSearch again
-                            if(!filterObject() && searchStr.length >= minSearchStrLength) {
-                                globalSearchObjects(searchStr,function (isDrawObjects) {
-                                    if(!isDrawObjects) return;
-                                    alepizActionsNamespace.createActionsList(null, function () {
-                                        alepizMainNamespace.setBrowserHistory();
-                                        alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
-                                    });
-                                });
-                            }
-                        });
-                    } if(useGlobalSearch === true || !filterObject()) {
-                        globalSearchObjects(searchStr,function (isDrawObjects) {
-                            if(!isDrawObjects) return;
-                            alepizActionsNamespace.createActionsList(null, function () {
-                                alepizMainNamespace.setBrowserHistory();
-                                alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
-                            });
-                        });
-                    }
                 }
             }
 
@@ -170,15 +147,9 @@ var alepizObjectsNamespace = (function($) {
             } else if(!searchStrAdd.trim().length) { // search string is empty
                 reDrawObjects();
             } else {
-                globalSearchObjects(searchStrAdd,function (isDrawObjects) {
-                    if(!isDrawObjects) return;
-                    alepizActionsNamespace.createActionsList(null, function () {
-                        alepizMainNamespace.setBrowserHistory();
-                        alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
-                    });
-                });
+                filterObject();
                 var checkedFiltersNum = alepizFiltersNamespace.getCheckedFilterNames().length;
-                if(searchObjectsAddElm.val()) ++checkedFiltersNum;
+                if(searchStrAdd) ++checkedFiltersNum;
                 filterCounterContainerElm.removeClass('hide');
                 filterCounterElm.text(checkedFiltersNum);
                 filterTabSwitchElm.text('FILTERS [' + checkedFiltersNum + ']');
@@ -299,32 +270,44 @@ var alepizObjectsNamespace = (function($) {
         setTimeout(function () { searchObjectsElm.focus() }, 200);
         if(searchActionStr) {
             searchObjectsElm.val(searchActionStr);
-            if(!searchObjectsAddElm.val().length) useGlobalSearch = true;
+            useGlobalSearch = true;
             searchObjectsElm.trigger('keyup');
         }
     }
 
     function filterObject() {
-        return filterList(searchObjectsElm.val(), objectsListElm, 'data-object-name');
+        var res = filterList(searchObjectsAddElm.val(), objectsListElm, 'data-object-name');
+        if(useGlobalSearch === true) return res;
+
+        return filterList(searchObjectsElm.val(), objectsListElm, 'data-object-name', true);
     }
 
-    function filterList(initSearchStr, listElm, objectNameAttr) {
+    function filterList(initSearchStr, listElm, objectNameAttr, savePrevFilter) {
 
         var listRows = listElm.find('li');
         if (!initSearchStr.length) {
-            listRows.removeClass('hide');
+            if(!savePrevFilter) listRows.removeClass('hide');
             return;
         }
 
         var searchStrRE = '(.*' + initSearchStr.
-            replace(/[-\/\\^$+?.()|[\]{}]/g, '\\$&'). // escape regExp symbols except *
-            replace(/[&|]\**[&|]/, '&'). // replace '|*&' or '&*|' to '&', don't ask why
-            replace(/\*+/g, '.*'). // replace '*' characters to '.*'
-            replace(/_/g, '.'). // replace '_' characters to '.'
-            replace(/\s*[|\r\n]+\s*/g, '.*)|(.*').// replace spaces around and '|', '\r', '\n' characters to '.*)|(.*'
-            replace(/\s*&+\s*/g, '.*)&(.*'). // replace spaces around and '&' characters to '.*)&(.*'
-            replace(/^\s+/, '').replace(/\s+$/, '')  // remove forward and backward spaces characters
-            +'.*)';
+            // remove empty strings
+            split(/[\r\n]/).filter(str => str.trim()).join('\n').
+            // escape regExp symbols except *
+            replace(/[-\/\\^$+?.()|[\]{}]/g, '\\$&').
+            // replace '|*&' or '&*|' to '&', don't ask why
+            replace(/[&|]\**[&|]/, '&').
+            // replace '*' characters to '.*'
+            replace(/\*+/g, '.*').
+            // replace '_' characters to '.'
+            replace(/_/g, '.').
+            // replace spaces around and ',', '|', '\r', '\n' characters to '.*)|(.*'
+            replace(/\s*[,|\r\n]+\s*/g, '.*)|(.*').
+            // replace spaces around and '&' characters to '.*)&(.*'
+            replace(/\s*&+\s*/g, '.*)&(.*').
+            // remove forward and backward spaces characters
+            replace(/^\s+/, '').replace(/\s+$/, '')
+            + '.*)';
 
         try {
             var searchRE = new RegExp(searchStrRE, 'ig');
@@ -337,7 +320,7 @@ var alepizObjectsNamespace = (function($) {
         // try to find the search string in the names of the current objects and hide the objects that do
         // not match the search string
         var numberOfFoundedObjects = 0;
-        $('input[' + objectNameAttr + ']').closest('li').removeClass('hide');
+        if(!savePrevFilter) $('input[' + objectNameAttr + ']').closest('li').removeClass('hide');
         listRows.find('input[' + objectNameAttr + ']').each(function () {
             var objectName = $(this).attr(objectNameAttr);
             if (!searchRE.test(objectName) && !$(this).is(':checked')) {
@@ -346,7 +329,7 @@ var alepizObjectsNamespace = (function($) {
             searchRE.lastIndex = 0;
         });
 
-        // nothing was not filtered. show all objects
+        // nothing was filtered out. show all objects
         if (!numberOfFoundedObjects) listRows.removeClass('hide');
 
         return numberOfFoundedObjects;
@@ -356,7 +339,7 @@ var alepizObjectsNamespace = (function($) {
 
         if(!searchStr) searchStr = searchObjectsElm.val();
 
-        // begin global search only after print 2 characters
+        // start global search only after print 2 characters
         if(searchStr.length < minSearchStrLength) {
             useGlobalSearch = false;
             if(typeof callback === 'function') callback();
@@ -415,6 +398,7 @@ var alepizObjectsNamespace = (function($) {
                 globalSearchObjects(globalSearchLastParam.searchStr, globalSearchLastParam.callback);
             }
 
+            filterObject();
             if(typeof callback === 'function') callback(isDrawObjects);
         });
     }
@@ -480,6 +464,7 @@ var alepizObjectsNamespace = (function($) {
                 };
 
                 setCheckedObjectCounter();
+                filterObject();
                 if(typeof(callback) === 'function') return callback(isDrawObjects);
             }
         );
@@ -510,6 +495,7 @@ var alepizObjectsNamespace = (function($) {
             function(objects) {
                 bodyElm.css({cursor: 'auto'});
                 if(!isClearObjectListWhenObjectNotFound && (!objects || !objects.length)) {
+                    filterObject();
                     if(typeof(callback) === 'function') callback();
                     return;
                 }
@@ -520,10 +506,11 @@ var alepizObjectsNamespace = (function($) {
                 lastObjectDrawFunction = {
                     func: createObjectsListByInteractions,
                     search: false,
-                    param: [parentObjectNames, true],
+                    param: [parentObjectNames, isClearObjectListWhenObjectNotFound],
                 };
 
                 setCheckedObjectCounter();
+                filterObject();
                 if(typeof(callback) === 'function') return callback(isDrawObjects);
             }
         );
@@ -623,6 +610,18 @@ var alepizObjectsNamespace = (function($) {
         return true;
     }
 
+    /**
+     * Grouping objects
+     * @param {Array<{
+     *      id: number,
+     *      name: string,
+     *      description: string,
+     *      color: string,
+     *      disabled: 0|1,
+     *      sortPosition: number,
+     *      selected: *,
+     *      }>} objects
+     */
     function groupingObjects(objects) {
         currentObjects = {};
         objects.forEach(obj => { currentObjects[obj.id] = obj });
@@ -768,9 +767,7 @@ var alepizObjectsNamespace = (function($) {
 
     function goToTop(callback) {
         // go to the top
-        searchObjectsElm.val('');
-        searchObjectsAddElm.val('');
-        createObjectsListByInteractions(null, true, callback);
+        createObjectsListByInteractions(null, false, callback);
     }
 
     return {

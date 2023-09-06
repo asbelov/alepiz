@@ -7,7 +7,8 @@ var alepizAuditNamespace = (function($) {
     var modalLogWindowsInstance;
 
     var lastLogRecordIDs = {};
-    var logTimer;
+    var logTimer, stopUpdateLog = false;
+    var logWindowElm, bodyElm;
     var closeLogWindowsTimeout = 30; // close log window after 30 minutes
 
 
@@ -27,6 +28,30 @@ var alepizAuditNamespace = (function($) {
         modalLogWindowsInstance = M.Modal.init(document.getElementById('modal-log-window'), {
             onCloseEnd: function () {clearInterval(logTimer);}
         });
+
+        logWindowElm = $('#modal-log-window');
+        bodyElm = $('body');
+
+        // the update is paused and the selected text is copied to the clipboard
+        logWindowElm.mousedown(function () {
+            stopUpdateLog = true;
+            bodyElm.css({cursor: 'default'});
+        })
+        logWindowElm.mouseup(function () {
+            var text = window.getSelection().toString();
+
+            if(text.length) {
+                navigator.clipboard.writeText(text).then(function () {
+                    M.toast({
+                        html: 'The selected text "' + text + '" has been copied to the clipboard',
+                        displayLength: 5000,
+                    });
+                }, function (err) {
+                    console.error('Could not copy selected text: ', err);
+                });
+            }
+            stopUpdateLog = false;
+        })
     }
 
     //  Open log window, start retrieving log, auto close log window after 30 minutes
@@ -39,6 +64,7 @@ var alepizAuditNamespace = (function($) {
         alepizActionLogViewerNamespace.getLastLogRecords(sessionIDs, lastLogRecordIDs, getActionName, true);
 
         logTimer = setInterval(function () {
+            if(stopUpdateLog) return;
             var sessionIDs = alepizMainNamespace.getSessionIDs();
             alepizActionLogViewerNamespace.getLastLogRecords(sessionIDs, lastLogRecordIDs, getActionName, true);
         }, 1000);
@@ -78,6 +104,7 @@ var alepizAuditNamespace = (function($) {
      * @param returnedObj the object returned from the server after the action is finished. if typeof returnedObj is
      *  not an object then return
      * @param {number} returnedObj.sessionID new sessionID
+     * @param {number} returnedObj.oldSessionID old sessionID
      * @param {string} returnedObj.actionID action directory
      * @param {string} returnedObj.actionName action name
      * @param {string|undefined} returnedObj.actionError action error or undefined
@@ -116,5 +143,6 @@ var alepizAuditNamespace = (function($) {
         init: init,
         openLogWindow: openLogWindow,
         printMessageThatActionFinished: printMessageThatActionFinished,
+        stopUpdateLog: stopUpdateLog,
     }
 })(jQuery);

@@ -1,44 +1,82 @@
 /*
- * Copyright (C) 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+ * Copyright Р’В© 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var log = require('../../lib/log')(module);
-var path = require('path');
-var cp = require('child_process');
+const _log = require('../../lib/log');
+const path = require('path');
+const cp = require('child_process');
+const iconv = require('iconv-lite');
 
-/*
- param = {
- executable: path to executable
- timeout: timeout, while waiting for end of execution
- cwd - working dir
- stdinData: if set, then write stdinData to the stdin of the executable
- dontLogStdout: if set, then did not log stdout
- dontLogStderr: if set then did not log stderr
- returnStdout: if set, then return stdout in callback
- returnStderr: if set, then return stdout in callback
- returnCode: if set, then return exit code in callback
- env: <object> Environment key-value pairs. Default process.env
-
- args:
- programArgs - array or stringified array of command line arguments
- cwd - working dir
- stdinData: if set, then write stdinData to the stdin of the executable
- }
+/**
+ *
+ * @param {Object} param launcher parameters from config.json launcherParam
+ * @param {number} param.sessionID sessionID for log to audit
+ * @param {string} [param.host='127.0.0.1'] the host on which to run the program
+ * @param {string} param.executable path to executable
+ * @param {string|Array} [param.programArgs] array or stringified array or string with the program arguments
+ * @param {number} param.timeout=0 timeout for waiting for end of execution
+ * @param {string} [param.cwd=''] - working directory. if not an absolute path, it is calculated depending on the
+ *  root directory of ALEPIZ
+ * @param {string} [param.stdinData] if set, then write stdinData to the stdin of the executable
+ * @param {Boolean} [param.dontLogStdout] if set, then did not log stdout
+ * @param {Boolean} [param.dontLogStderr] if set then did not log stderr
+ * @param {Boolean} [param.returnStdout] if set, then return stdout in callback
+ * @param {Boolean} [param.returnStderr] if set, then return stdout in callback
+ * @param {Boolean} [param.returnCode] if set, then return exit code in callback
+ * @param {Object} [param.env]: <object> Environment key-value pairs. Default process.env
+ * @param {string} [param.encodingFrom='cp866'] source command line code page
+ * @param {string} [param.encodingTo='utf8'] destination ALEPIZ code page
+ * @param {Boolean} [param.dontSplitOutput] Do not split the output into lines
+ * @param {Boolean} [param.windowsVerbatimArguments] No quoting or escaping of arguments is done on Windows.
+ *  Ignored on Unix. Default true
+ * @param {Object} args launcher arguments from HTML page
+ * @param {string|Array} args.programArgs array or stringified array or string with the program arguments
+ * @param {string} [args.cwd=''] - working directory. if not an absolute path, it is calculated depending on the
+ *  root directory of ALEPIZ
+ * @param {string|Array} [args.stdinData] if set, then write stdinData to the stdin of the executable
+ * @param {function(Error)|function(null, {stdout: string, stderr:string, exitCode:number})} callback
  */
 module.exports = function(param, args, callback) {
+
+    // trying to find the sessionID when the launcher was running not from runAction
+    if (!param.sessionID) {
+        for (var mod = module; mod; mod = mod.parent) {
+            if (mod.sessionID) {
+                param.sessionID = Number(mod.sessionID);
+                break;
+            }
+        }
+    }
+
+    var logParam = {
+        sessionID: param.sessionID,
+        filename: __filename,
+    }
+
+    const log = _log(logParam);
+
     var executable = param.executable;
     var workingDir = param.cwd || args.cwd || '';
     var timeout = param.timeout || 0;
+    var encodingFrom = param.encodingFrom || 'cp866';
+    var encodingTo = param.encodingTo || 'utf8';
     var stdinData = param.stdinData || args.stdinData;
+    var windowsVerbatimArguments = param.windowsVerbatimArguments !== false; // if not false then true
     var callbackAlreadyRunning = false,
         startTime = Date.now(),
         exitTimer;
     var initProgramArgs = param.programArgs || args.programArgs || [];
     var host = param.host ? param.host : "127.0.0.1";
 
-    if (!path.isAbsolute(workingDir)) workingDir = path.join(__dirname, '..', '..', workingDir);
+    if (!path.isAbsolute(workingDir)) {
+        try {
+            workingDir = path.join(__dirname, '..', '..', workingDir);
+        } catch (err) {
+            return callback(new Error('[exec]: set unexpected workingDir : ' + workingDir));
+        }
+    }
 
-    if (Number(timeout) !== parseInt(String(timeout), 10)) {
+    if (Number(timeout) !== parseInt(String(timeout), 10) || Number(timeout) < 0) {
         return callback(new Error('[exec]: set unexpected timeout : ' + timeout));
     } else timeout = Number(timeout);
 
@@ -47,16 +85,26 @@ module.exports = function(param, args, callback) {
             try {
                 var programArgs = JSON.parse(initProgramArgs);
             } catch (e) {
-                return callback(new Error('[exec]: can\'t parse arguments ' + initProgramArgs + ' as JSON: ' + e.message))
+                // initProgramArgs is a string with command line arguments. Try to make an array
+                var splitQuotes = initProgramArgs.split('"');
+                programArgs = [];
+                splitQuotes.forEach((strPart, idx) => {
+                    if (!strPart.length) return;
+                    // string in quotes
+                    if (idx && idx % 2 !== 0) programArgs.push(strPart);
+                    else Array.prototype.push.apply(programArgs, strPart.trim().split(' '))
+                });
             }
         } else programArgs = initProgramArgs;
 
         if (!Array.isArray(programArgs)) {
-            return callback(new Error('[exec]: Arguments ' + initProgramArgs + ' is not an array or stringified JSON array'))
+            return callback(new Error('[exec]: Arguments ' + initProgramArgs +
+                ' is not an array or stringified JSON array'))
         }
     } else programArgs = [];
 
-    log.info('[exec]: starting on ', host, ': ', executable, ' ', programArgs.join(' '));
+    log.debug('[exec]: starting on ', host, ': ', executable, ' ', programArgs.join(' '));
+
     if (host !== '127.0.0.1') {
         programArgs = [`Invoke-Command -ComputerName ${host} {${executable} ${programArgs.join(' ')}}`];
         executable = "powershell.exe";
@@ -67,6 +115,7 @@ module.exports = function(param, args, callback) {
     try {
         proc = cp.spawn(executable, programArgs, {
             cwd: workingDir || path.join(__dirname, '..', '..'),
+            windowsVerbatimArguments: windowsVerbatimArguments,
             windowsHide: true,
             timeout: timeout,
             env: param.env && typeof param.env === 'object' && Object.keys(param.env).length ? param.env : process.env,
@@ -81,7 +130,15 @@ module.exports = function(param, args, callback) {
         return callback(new Error('[exec] unexpected error occurred while running ' + executable));
     }
 
-    if (stdinData) proc.stdin.write(stdinData);
+    if (stdinData) {
+        if (Array.isArray(stdinData) && stdinData.length) {
+            stdinData.forEach(element => {
+                proc.stdin.write(element);
+            });
+        } else if (typeof(stdinData) === 'string') {
+            proc.stdin.write(stdinData);
+        }
+    }
 
     proc.on('error', function(err) {
         var errMsg = '[exec] error while running ' + executable + ': ' + err.message;
@@ -95,33 +152,42 @@ module.exports = function(param, args, callback) {
         fullStdout = '',
         fullStderr = '';
     proc.stdout.on('data', function(data) {
+        data = iconv.encode(iconv.decode(data, encodingFrom), encodingTo);
+
         var str = data.toString();
+
         fullStdout += str;
         //log.warn('!!', str.replace(/\n/gm, '\\n'));
         if (param.dontLogStdout) return;
-        if (str.indexOf('\n') !== -1) {
-            var arr = str.split('\n');
-            arr[0] = lastPartOfStdout + arr[0];
-            lastPartOfStdout = arr.pop();
-            arr.forEach(str => {
-                if (str.trim()) log.info('[exec] ', executable, ': ', str);
-            });
-        } else lastPartOfStdout += str;
+        if(param.dontSplitOutput) {
+            if(str.trim()) log.info('[exec] ', executable, ': ', str);
+        } else {
+            if (str.indexOf('\n') !== -1) {
+                var arr = str.split('\n');
+                arr[0] = lastPartOfStdout + arr[0];
+                lastPartOfStdout = arr.pop();
+                setTimeout(printLog, 1, log.info, arr);
+            } else lastPartOfStdout += str;
+        }
     });
 
     proc.stderr.on('data', function(data) {
+        data = iconv.encode(iconv.decode(data, encodingFrom), encodingTo);
+
         var str = data.toString();
         fullStderr += str;
         //log.warn('!!!', str.replace(/\n/gm, '\\n'));
         if (param.dontLogStderr) return;
-        if (str.indexOf('\n') !== -1) {
-            var arr = str.split('\n');
-            arr[0] = lastPartOfStderr + arr[0];
-            lastPartOfStderr = arr.pop();
-            arr.forEach(str => {
-                if (str.trim()) log.error('[exec] ', executable, ': ', str);
-            });
-        } else lastPartOfStderr += str;
+        if(param.dontSplitOutput) {
+            if(str.trim()) log.error('[exec] ', executable, ': ', str);
+        } else {
+            if (str.indexOf('\n') !== -1) {
+                var arr = str.split('\n');
+                arr[0] = lastPartOfStderr + arr[0];
+                lastPartOfStderr = arr.pop();
+                setTimeout(printLog, 1, log.info, arr);
+            } else lastPartOfStderr += str;
+        }
     });
 
     /*
@@ -145,27 +211,39 @@ module.exports = function(param, args, callback) {
     });
 
     function finishing(code) {
-        // print the last part of stdout and stderr, which does not contain '\n'
-        // and therefore was not printed before
-        if (!param.dontLogStdout && lastPartOfStdout.trim()) {
-            log.info('[exec] ', executable, ': ', lastPartOfStdout);
-            lastPartOfStdout = '';
-        }
-        if (!param.dontLogStderr && lastPartOfStderr.trim()) {
-            log.error('[exec] ', executable, ': ', lastPartOfStderr);
-            lastPartOfStderr = '';
-        }
+        // add pause before printing last log message for separate log messages
+        setTimeout(function () {
+            // print the last part of stdout and stderr, which does not contain '\n'
+            // and therefore was not printed before
+            if (!param.dontLogStdout && lastPartOfStdout.trim()) {
+                log.info('[exec] ', executable, ': ', lastPartOfStdout);
+                lastPartOfStdout = '';
+            }
+            if (!param.dontLogStderr && lastPartOfStderr.trim()) {
 
-        if (!callbackAlreadyRunning) {
-            callbackAlreadyRunning = true;
-            var result = {};
-            if (param.returnStdout) result.stdout = fullStdout;
-            if (param.returnCode) result.exitCode = code;
-            if (param.returnStderr) result.stderr = fullStderr;
+                log.error('[exec] ', executable, ': ', lastPartOfStderr);
+                lastPartOfStderr = '';
+            }
 
-            log.info('[exec] ', executable, ': exit with code: ', code, '; execution time: ',
-                Date.now() - startTime, 'ms; dir: ', workingDir, '; args: ', args);
-            callback(null, result);
-        }
+            if (!callbackAlreadyRunning) {
+                callbackAlreadyRunning = true;
+                var result = {};
+                if (param.returnStdout) result.stdout = fullStdout;
+                if (param.returnCode) result.exitCode = code;
+                if (param.returnStderr) result.stderr = fullStderr;
+
+                log.debug('[exec] ', executable, ': exit with code: ', code, '; execution time: ',
+                    Date.now() - startTime, 'ms; dir: ', workingDir, '; args: ', args);
+                callback(null, result);
+            }
+        }, 1);
+    }
+
+    // print data to log with delay in 1ms for separate log line when sorting
+    function printLog(logFunc, arr) {
+        var str = arr.shift();
+        if(str === undefined) return;
+        if (str.trim()) logFunc('[exec] ', executable, ': ', str);
+        setTimeout(printLog, 1, logFunc, arr);
     }
 };

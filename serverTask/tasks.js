@@ -1,6 +1,9 @@
 /*
  * Copyright © 2023. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
+/*
+ * Copyright © 2023. Alexander Belov. Contacts: <asbel@alepiz.com>
+ */
 
 const log = require('../lib/log')(module);
 const async = require('async');
@@ -21,6 +24,7 @@ const tasksDBSave = require('../models_db/modifiers/tasksDB');
 const conf = new Conf('config/common.json');
 const confTaskServer = new Conf('config/taskServer.json');
 
+var systemUser = conf.get('systemUser') || 'system';
 var tasks = {};
 module.exports = tasks;
 
@@ -113,7 +117,7 @@ function escapeHtml(string) {
 }
 
 /**
- * Load conditions, saved ti the taskConditions.json file after last stop
+ * Load conditions, saved to the taskConditions.json file after last stop
  * Get last value from the history for the all task condition OCIDs and
  * check for the task conditions are met every waitingConditionsTime ms using setInterval()
  * condition will be met when last value for the OCID after convert to the is Boolean() is true
@@ -246,21 +250,25 @@ tasks.checkCondition = function(OCIDs) {
     taskCondition.forEach((task, taskID) => {
         if(!task.conditionOCIDs instanceof Set) return;
 
-        var occurredConditionOCIDs = new Set(), conditionOCIDs = new Set();
+        var occurredConditionOCIDs = new Set(), waitingForConditionOCIDs = new Set();
         task.conditionOCIDs.forEach(function (conditionOCID) {
-            // save OCID in conditionOCIDs when OCID not found in conditionOCIDs
-            if(OCIDs.indexOf(conditionOCID) === -1) conditionOCIDs.add(conditionOCID);
+            // save OCID in waitingForConditionOCIDs when OCID not found in waitingForConditionOCIDs
+            if(OCIDs.indexOf(conditionOCID) === -1) waitingForConditionOCIDs.add(conditionOCID);
             else occurredConditionOCIDs.add(conditionOCID);
         });
 
-        log.info('Found new conditions: ', OCIDs,', for task ', taskID, ': ', occurredConditionOCIDs,
-            ' waiting for: ', conditionOCIDs, '; task: ', task);
+        log.info('Found new conditions, taskID: ', taskID,
+            '; is condition met: ', (waitingForConditionOCIDs.size === task.conditionOCIDs.size),
+            '\nOCIDs: ', OCIDs,
+            '\noccurredConditionOCIDs: ', occurredConditionOCIDs,
+            '\nwaitingForConditionOCIDs: ', waitingForConditionOCIDs,
+            '\ntask: ', task);
 
-        // conditions for this task are not met
-        if(conditionOCIDs.size === task.conditionOCIDs.size) return;
+        // no one conditions for this task are not met
+        if(waitingForConditionOCIDs.size === task.conditionOCIDs.size) return;
 
-        task.conditionOCIDs = conditionOCIDs;
-        var taskSession = unique.createID();
+        task.conditionOCIDs = waitingForConditionOCIDs;
+        var taskSession = unique.createHash(taskID.toString(36) + unique.createID());
 
         for(var taskActionID in task) {
             if(!Number(taskActionID)) continue;
@@ -286,21 +294,170 @@ tasks.checkCondition = function(OCIDs) {
 tasks.cancelTaskWithCondition = function(taskID) {
     if(taskCondition.has(taskID)) {
         taskCondition.delete(taskID);
+        savePartiallyCompletedTasksStateToFile();
     }
 };
+
+/**
+ * Process task workflows
+ * @param {string} username username
+ * @param {number} taskID taskID
+ * @param {Array<{
+ *      action: 'approve'|'change '|'execute'|'remove'|'cancel'|'check',
+ *      actionDescription: string,
+ *      changeGroup: string,
+ *      [oldGroupName: string],
+ *      message: Object}>} workflows workflow
+ * @param {string} action string
+ * @param {Error} error error when moving the task
+ * @param {Object} taskResult the result of the task like {<taskActionID1>: <result1>, <taskActionID2>: <result2>, ….}
+ * @param {function()} callback callback()
+ */
+tasks.processWorkflows = function (username, taskID, workflows, action, error,
+                                   taskResult, callback) {
+
+    if(!workflows.length) return callback();
+
+    tasks.getTaskParameters(username, taskID, function (err, taskParams) {
+        if (err) {
+            log.error('Error getting task param for process workflow for user ', username,
+                ', task ', taskID, ' action ', action, ': ', err.message);
+            return callback();
+        }
+
+        tasksDB.getTasksGroupsList(function (err, rows) {
+            var taskGroups = {};
+            if (err) log.error('Error getting tasks group list: ', err.message);
+            else rows.forEach(row => taskGroups[row.name.toLowerCase()] = row.id);
+
+            var taskGroupName = taskParams.parameters.groupName, newTaskGroupName = null;
+
+            /*
+            When saving changes to the task, the task group changes before the tasks.processWorkflows() is executed.
+            Therefore, we save the old group name in the workFlows[0].oldGroupName
+            */
+            if(workflows[0].oldGroupName) {
+                taskGroupName = workflows[0].oldGroupName;
+                newTaskGroupName = taskParams.parameters.groupName;
+                delete workflows[0].oldGroupName;
+            }
+
+            var workflowActionCompleted = false;
+
+            async.eachSeries(workflows, function (workflow, callback) {
+                if (workflowActionCompleted ||
+                    typeof (workflow.action) !== 'string' ||
+                    workflow.action.toLowerCase() !== action.toLowerCase()
+                ) {
+                    return callback();
+                }
+
+                var newTaskGroupID = 0;
+                var changeGroupRole = workflow.changeGroup;
+
+                if (typeof changeGroupRole === 'string' && changeGroupRole.indexOf(',') > 1) {
+
+                    // groupNamesPair[0] current group; groupNamesPair[1] target group
+                    var groupNamesPair = changeGroupRole.toLowerCase().split(/ *, */);
+
+                    // skip these workflow settings because the changeGroup parameter does not match to the group
+                    // in which the task is located
+
+                    if((!taskGroupName || groupNamesPair[0] !== taskGroupName.toLowerCase()) ||
+                        (newTaskGroupName && groupNamesPair[1] !== newTaskGroupName.toLowerCase())) {
+                        return callback();
+                    }
+                    /*
+                    Do not change the group if the task has been deleted or if changes have been made to the task.
+                    In the latter case, the group will be changed when saving changes to the task.
+                     */
+                    if(action !== 'remove' && action !== 'change') {
+                        if (!groupNamesPair[0].trim() || !groupNamesPair[1].trim() ||
+                            taskGroups[groupNamesPair[0]] === undefined || taskGroups[groupNamesPair[1]] === undefined) {
+                            log.warn('User: ', username,
+                                ': incorrect or a non-existent group is specified in the workflow rule: "',
+                                changeGroupRole, '" for workflow ', workflow);
+                        } else {
+                            newTaskGroupID = taskGroups[groupNamesPair[1]]
+
+                            log.info('User: ', username, ': move task ', taskID, ' from ', groupNamesPair[0],
+                                ' to ', groupNamesPair[1], ' (groupID: ', newTaskGroupID,
+                                '); used the rule of moving by groups: "', changeGroupRole, '"');
+                        }
+                    }
+                }
+
+                tasksDBSave.moveTaskToGroup(taskID, newTaskGroupID, function (err) {
+                    if (err) {
+                        log.error('User: ', username, ': error when changing the task group for taskID ', taskID,
+                            ': ', err.message, ': ', workflow);
+                    }
+
+                    var actionDescription = workflow.actionDescription || action;
+                    actionDescription = error ? actionDescription + ': ' + error.message : actionDescription;
+                    if(actionDescription.length > 2000) actionDescription = actionDescription.substring(0, 1000) + '...';
+
+                    var messageParam = workflow.message;
+                    // if the action starts with "execute...", the results of the action are checked to check whether
+                    // it is necessary to send a message
+                    if (action.toLowerCase() === 'execute') {
+                        if (!taskResult || typeof taskResult !== 'object' || !Object.keys(taskResult).length) {
+                            messageParam = null;
+                        } else {
+
+                            var taskContainCompletedActions = false;
+                            for (var taskActionID in taskResult) {
+                                if (taskResult[taskActionID] !== null) {
+                                    taskContainCompletedActions = true;
+                                    break;
+                                }
+                            }
+                            // do not send the message if there are no objects in this instance of ALEPIZ for which task
+                            // actions were performed
+                            if (!taskContainCompletedActions) {
+                                messageParam = null;
+                            }
+                        }
+                    }
+
+                    workflowActionCompleted = true;
+                    if (messageParam && typeof messageParam === 'object') {
+                        log.info('User ', username, ' send message for task ', taskID, ' action: ', action,
+                            ' (', actionDescription, ')',
+                            (taskResult ? ' taskResult: ' + JSON.stringify(taskResult, null, 4) : ''));
+                        sendMessage(username, taskID, messageParam, taskParams, actionDescription, function (err) {
+                            if (err) log.error('User: ', username, ': ', err.message);
+                            callback();
+                        });
+                    } else {
+                        log.info('User: ', username, '. Do not send the message for task ', taskID,
+                            ': incorrect messageParam or finished task does not have a taskResult because ' +
+                            'there are no objects in this instance of ALEPIZ for which ' +
+                            'task actions were performed. Action: ', action,
+                            '(', actionDescription, '), taskResult: ', taskResult, '; messageParam: ', messageParam);
+                        callback();
+                    }
+                });
+            }, callback);
+        });
+    });
+}
 
 /**
  * Sending message when something in the task is changed
  * @param {string} username username
  * @param {number} taskID taskID
- * @param {Object} param object with the message parameters ans variables
- * @param {string} action action with the task or error message
+ * @param {Object} param object with the message parameters and variables
+ * @param {Object} taskParam task parameters from tasks.getTaskParameters()
+ * @param {string} actionDescription action with the task or error message
  * @param {function(Error)|function()} callback callback(err)
  */
-tasks.sendMessage = function(username, taskID, param, action, callback) {
-    /*
-    TASK_ID, TASK_NAME, TASK_CREATOR, EXECUTE_CONDITION, ACTIONS_DESCRIPTION, ACTIONS_DESCRIPTION_HTML
-    */
+function sendMessage (username, taskID, param, taskParam, actionDescription, callback) {
+    if(!param || typeof param !== 'object') {
+        log.debug('Incorrect or empty message parameters for taskID: ', taskID, '; action: ', actionDescription,
+            '; user: ', username, '; parameters: ', param);
+        return callback();
+    }
 
     taskID = Number(taskID);
     if(!taskID || taskID !== parseInt(String(taskID), 10)) {
@@ -308,100 +465,120 @@ tasks.sendMessage = function(username, taskID, param, action, callback) {
             JSON.stringify(param, null, 4)));
     }
 
+    log.debug('User: ', username, ': send message task param: ', taskParam);
 
-    tasks.getTaskParameters(username, taskID, function (err, taskParam) {
-        if(err) {
-            return callback(new Error('Error send message taskID ' + taskID + ': '+ err.message + ', param: ' +
-                JSON.stringify(param, null, 4)));
+    if(!taskParam.parameters.name) return callback();
+
+    if(taskParam.parameters.runType > 100) {
+        var condition = 'run at ' + new Date(taskParam.parameters.runType).toLocaleString();
+    } else if(taskParam.parameters.runType === 2 || taskParam.parameters.runType === 12) {
+        condition = 'run now';
+    } else if(taskParam.counters && taskParam.objects) {
+        if(taskParam.parameters.runType === 0) condition = 'run every time';
+        else condition = 'run once' // taskParam.parameters.runType === 11
+
+        var objectsCounters = [];
+        for(var OCID in taskParam.counters) {
+            objectsCounters.push(taskParam.counters[OCID] + ' (' + taskParam.objects[OCID] + ')');
         }
-
-        log.debug('Send message task param: ', taskParam);
-
-        if(!taskParam.parameters.name) return callback();
-
-        if(taskParam.parameters.runType > 100) {
-            var condition = 'run at ' + new Date(taskParam.parameters.runType).toLocaleString();
-        } else if(taskParam.parameters.runType === 2 || taskParam.parameters.runType === 12) {
-            condition = 'run now';
-        } else if(taskParam.counters && taskParam.objects) {
-            if(taskParam.parameters.runType === 0) condition = 'run every time';
-            else condition = 'run once' // taskParam.parameters.runType === 11
-
-            var objectsCounters = [];
-            for(var OCID in taskParam.counters) {
-                objectsCounters.push(taskParam.counters[OCID] + ' (' + taskParam.objects[OCID] + ')');
-            }
-            condition += ' when condition met: ' + objectsCounters.join('; ');
-        } else if(taskParam.parameters.runType === null) {
-            condition = 'do not run';
+        condition += ' when condition met: ' +
+            (objectsCounters.length < 3 ? objectsCounters.join(', ') : objectsCounters.join('<br/>')) ;
+    } else if(taskParam.parameters.runType === null) {
+        condition = 'do not run';
+    } else {
+        if(!taskParam.objects) {
+            actionDescription += ': there are no required objects to meet the task condition';
+        } else if(!taskParam.counters) {
+            actionDescription += ': there are no required counters to meet the task condition';
         } else {
-            return callback(new Error('Error send message  taskID ' + taskID +
-                ': Unexpected runType: ' + taskParam.parameters.runType +
-                ', param: ' + JSON.stringify(param, null, 4) +
-                '; taskParam: ' + JSON.stringify(taskParam, null, 4)));
+            actionDescription += ': invalid type for the task condition';
         }
+        condition = 'condition cannot be met';
+        log.info('User: ', username, ' send message for task: ', taskID, ': ', actionDescription, '. runType: ',
+            taskParam.parameters.runType);
+    }
 
-        var actionsDescription = [], actionsDescriptionHTML = [], num = 1;
-        for(var taskActionID in taskParam.actions) {
+    var actionsDescription = [],
+        actionsDescriptionHTML = [],
+        num = 1,
+        objectsSet = new Set();
+    for(var taskActionID in taskParam.actions) {
 
-            actionsDescription.push(String(num++) + '. ' + taskParam.actions[taskActionID].name +
-                ':\n' + taskParam.actions[taskActionID].description);
+        actionsDescription.push(String(num++) + '. ' + escapeHtml(taskParam.actions[taskActionID].name) +
+            ':\n' + escapeHtml(taskParam.actions[taskActionID].description));
 
-            actionsDescriptionHTML.push('<li><span class="task-action"><span class="task-action-name">' +
-                taskParam.actions[taskActionID].name + '</span><span class="task-action-startup" data-startup-option="' +
-                taskParam.actions[taskActionID].startupOptions + '">&nbsp;</span><span class="task-action-description">' +
-                taskParam.actions[taskActionID].description + '</span></span></li>');
+        actionsDescriptionHTML.push('<li><span class="task-action"><span class="task-action-name">' +
+            escapeHtml(taskParam.actions[taskActionID].name) +
+            '</span><span class="task-action-startup" data-startup-option="' +
+            taskParam.actions[taskActionID].startupOptions + '">&nbsp;</span><span class="task-action-description">' +
+            taskParam.actions[taskActionID].description + '</span></span></li>');
+
+        // create object list
+        if(Array.isArray(taskParam.actions[taskActionID].parameters)) {
+            taskParam.actions[taskActionID].parameters.every(param => {
+                if (param.name !== 'o') return true; // continue
+
+                try {
+                    var obj = JSON.parse(param.value);
+                } catch (err) {
+                    log.warn('User: ', username, ': task: ', taskID, ': can\'t parse objects for action ',
+                        taskParam.actions[taskActionID].name, ' - ', param.value, ': ', err.message);
+                    return false; // break
+                }
+                if (!Array.isArray(obj)) {
+                    log.warn('User: ', username, ': task: ', taskID, ': objects for action ',
+                        taskParam.actions[taskActionID].name, ' are not an array: ', param.value);
+                    return false; // break
+
+                }
+                obj.forEach(o => {
+                    if (o.name) objectsSet.add(o.name);
+                });
+            });
         }
+    }
 
-        param.sender = username;
+    // copy param to the messageParam
+    var messageParam = JSON.parse(JSON.stringify(param));
+    messageParam.sender = username;
 
-        // remove stack from error message
-        action = action.replace(/at .+?:\d+:\d+.+$/ims, '');
+    // remove stack from error message
+    actionDescription = actionDescription.replace(/at .+?:\d+:\d+.+$/ims, '');
+    var objects = !objectsSet.size ? 'not selected' :
+        (objectsSet.size < 3 ? Array.from(objectsSet).join(', ') : Array.from(objectsSet).join('<br/>'));
 
-        param.variables = {
-            TASK_ID: taskID,
-            TASK_NAME: taskParam.parameters.name,
-            TASK_CREATOR: taskParam.parameters.ownerName,
-            TASK_CREATOR_FULL_NAME: taskParam.parameters.ownerFullName,
-            EXECUTE_CONDITION: condition,
-            ACTION: action[0].toUpperCase() + action.substring(1),
-            ACTIONS_DESCRIPTION: actionsDescription.join('\n\n'),
-            ACTIONS_DESCRIPTION_HTML: '<ol class="task-actions-description">' + actionsDescriptionHTML.join('') + '</ol>',
-        };
+    if(typeof messageParam.variables !== 'object') messageParam.variables = {};
+    messageParam.variables.TASK_ID = taskID;
+    messageParam.variables.TASK_NAME = taskParam.parameters.name;
+    messageParam.variables.TASK_CREATOR = taskParam.parameters.ownerName;
+    messageParam.variables.TASK_CREATOR_FULL_NAME = taskParam.parameters.ownerFullName;
+    messageParam.variables.TASK_OBJECTS = objects;
+    messageParam.variables.EXECUTE_CONDITION = condition;
+    messageParam.variables.ACTION = actionDescription.split('\n').filter(str => str.trim()).join('<br/>');
+    messageParam.variables.ACTIONS_DESCRIPTION = actionsDescription.join('\n\n');
+    messageParam.variables.ACTIONS_DESCRIPTION_HTML =
+        '<ol class="task-actions-description">' + actionsDescriptionHTML.join('') + '</ol>';
 
-        media.send(param, function (err) {
-            if(err) return callback(new Error('Error send message for taskID ' + taskID + ': ' + err.message));
-            callback();
-        });
+    log.debug('User ', username, ' send message for task ', taskID, ' action: ', actionDescription,
+        ' messageParam: ', messageParam);
+    media.send(messageParam, function (err) {
+        if(err) return callback(new Error('Error sending message for taskID ' + taskID + ': ' + err.message));
+        callback();
     });
 }
 
-/*
-    run task
-
-    userName: user name
-    taskID: task ID
-    taskActionID: [taskActionID, taskActionID] - list of actions to run in the specified task. null - run all actions
-    variables: {var1: val1, var2: val2, ....}
-
-    callback(err, result)
-    result: {
-        taskActionID1: actionData1,
-        taskActionID2: actionData2,
-        ...
-    }
-*/
 /**
  * run the task
  * @param {Object} param task parameters
  * @param {number} param.taskID taskID
- * @param {string} param.userName username
+ * @param {string} [param.userName] username. if not set username is a task creator
  * @param {Object} [param.variables] variables like {<name>: <value>, ...}
  * @param {Array<number>} [param.filterTaskActionIDs] filtered IDs from the tasksActions table
  * @param {Array<number>} [param.conditionOCIDs] array of the conditions OCIDs
  * @param {number} [param.runType] runType for the task
- * @param {function(Error)|function(null, Object)} callback callback(err, returnedTaskActionsResults) where
- *  returnedTaskActionsResults is {<taskActionID1>: <result1>, <taskActionID2>: <result2>, ....}
+ * @param {function(Error)|function(null, Object, string)} callback callback(err, returnedTaskActionsResults, username)
+ *  where returnedTaskActionsResults is {<taskActionID1>: <result1>, <taskActionID2>: <result2>, ....},
+ *  username - param.userName or task creator
  */
 tasks.runTask = function(param, callback) {
     var username = param.userName,
@@ -416,8 +593,6 @@ tasks.runTask = function(param, callback) {
             conditionOCIDs: new Set(param.conditionOCIDs), // copy array of OCIDs
         });
     }
-
-    if(!username) return callback(new Error('Can\'t run task ' + taskID + ' from undefined user "' + username + '"'));
 
     if(typeof variables !== 'object' || variables === null) variables = {};
     // username used only for a new undefined task (without taskID)
@@ -434,6 +609,7 @@ tasks.runTask = function(param, callback) {
             if(Array.isArray(filterTaskActionIDs) && filterTaskActionIDs.indexOf(taskParameter.taskActionID) === -1) {
                 return callback();
             }
+            if(!username) username = taskParameter.username;
 
             if(!actions[taskParameter.taskActionID]) {
                 actions[taskParameter.taskActionID] = {
@@ -475,7 +651,7 @@ tasks.runTask = function(param, callback) {
                     '", executing time: ', Date.now() - startTaskTime, 'ms');
                 log.debug('Task actions: ', actions, '; returned: ', returnedTaskActionsResults, ', err: ', err);
 
-                if(!taskCondition.has(taskID)) return callback(err, returnedTaskActionsResults);
+                if(!taskCondition.has(taskID)) return callback(err, returnedTaskActionsResults, username);
 
                 taskCondition.delete(taskID);
 
@@ -484,14 +660,14 @@ tasks.runTask = function(param, callback) {
                     taskCondition.set(taskID, {
                         conditionOCIDs: new Set(param.conditionOCIDs),
                     });
-                    return callback(err, returnedTaskActionsResults);
+                    return callback(err, returnedTaskActionsResults, username);
                 }
 
                 // for run once when condition met, running from taskServer
                 tasksDBSave.updateRunCondition(Number(taskID), 11, function(_err) {
                     if(_err) log.error('Error marking run once task ', taskID, ' as completed: ', _err.message);
                     else log.info('Marking run once task ', taskID, ' as completed');
-                    callback(err, returnedTaskActionsResults);
+                    callback(err, returnedTaskActionsResults, username);
                 });
             });
         });
@@ -512,14 +688,16 @@ tasks.runTask = function(param, callback) {
  */
 function runTaskFunction(username, taskID, actions, actionsOrder, callback) {
 
-    var result = {},
-        taskSession = unique.createID(),
+    var taskResult = {},
+        // taskSession is the taskID. But when a task is executed multiple times, we can't use taskID for audit
+        taskSession = unique.createHash(username + taskID + JSON.stringify(actions) +
+            JSON.stringify(actionsOrder) + unique.createID()),
         nextStartupOption = 3,
         // array with parallel executed actions
         actionFunctionsRunInParallel = [],
         // push callback as a last function in a array for success or error
-        actionFunctionOnError = [function (err) { callback(err, result)}],
-        actionFunctionOnSuccess = [function (err) { callback(err, result)}];
+        actionFunctionOnError = [function (err) { callback(err, taskResult)}],
+        actionFunctionOnSuccess = [function (err) { callback(err, taskResult)}];
 
 
     actions[actionsOrder[0]].startupOption = 3;
@@ -530,7 +708,7 @@ function runTaskFunction(username, taskID, actions, actionsOrder, callback) {
     * 1 - execute current actions if someone of previous actions completed with errors
     * 2 - execute current action in parallel with a previous action
     * 3 - runAnyway
-    * */
+    */
     log.debug('Actions in task ', taskID, ': ', actionsOrder);
 
     // processing actions in reverse order
@@ -599,6 +777,7 @@ function runTaskFunction(username, taskID, actions, actionsOrder, callback) {
                             actionID: actions[_taskActionID].ID,
                             executionMode: 'server',
                             user: username,
+                            launcherUser: systemUser,
                             args: _args,
                             taskActionID: _taskActionID,
                             taskID: taskID,
@@ -608,7 +787,7 @@ function runTaskFunction(username, taskID, actions, actionsOrder, callback) {
                                 return _actionFunctionOnError(err);
                             }
 
-                            result[actions[_taskActionID].ID + ':' + _taskActionID] = data;
+                            taskResult[actions[_taskActionID].ID + ':' + _taskActionID] = data;
                             _actionFunctionOnSuccess(err, data);
                         });
                     });
@@ -636,13 +815,14 @@ function runTaskFunction(username, taskID, actions, actionsOrder, callback) {
                         actionID: actions[_taskActionID].ID,
                         executionMode: 'server',
                         user: username,
+                        launcherUser: systemUser,
                         args: actions[_taskActionID].args,
                         taskActionID: _taskActionID,
                         taskID: taskID,
                         taskSession: taskSession,
                     }, function (err, data) {
                         if (err) return _actionFunctionOnError(err);
-                        result[actions[_taskActionID].ID + ':' + _taskActionID] = data;
+                        taskResult[actions[_taskActionID].ID + ':' + _taskActionID] = data;
                         _actionFunctionOnSuccess(null, data);
                     });
                 });
@@ -681,13 +861,14 @@ function runTaskFunction(username, taskID, actions, actionsOrder, callback) {
                                 actionID: actions[_taskActionID].ID,
                                 executionMode: 'server',
                                 user: username,
+                                launcherUser: systemUser,
                                 args: _args,
                                 taskActionID: _taskActionID,
                                 taskID: taskID,
                                 taskSession: taskSession,
                             }, function (err, data) {
                                 if (err) return callback(err);
-                                result[actions[_taskActionID].ID + ':' + _taskActionID] = data;
+                                taskResult[actions[_taskActionID].ID + ':' + _taskActionID] = data;
                                 callback(null, data);
                             });
                         });
@@ -853,6 +1034,7 @@ function runActionByCondition(taskID, taskActionID, taskSession) {
     if(!param.args) param.args = {};
     param.taskID = taskID;
     param.taskSession = taskSession;
+    param.launcherUser = systemUser;
 
     // run the action if all conditions are met
     if(!task.conditionOCIDs.size) {
@@ -863,18 +1045,20 @@ function runActionByCondition(taskID, taskActionID, taskSession) {
             if(err) {
                 log.error('Error in action ', taskActionID, ', task: ', taskID,
                     ', running for all remaining conditions: ', err.message);
-                return actionCallback(err);
             }
 
             // if the task is canceled during the execution of the action
             // or action was started once and this result unique
             if(!task || !task[taskActionID] || !task[taskActionID].result.length) {
-                return actionCallback(null, result);
+                savePartiallyCompletedTasksStateToFile();
+                return actionCallback(err, result);
             }
 
-            if(result !== undefined) addToResult(taskID, taskActionID, result);
+            addToResult(taskID, taskActionID, result, err);
 
-            actionCallback(null, task[taskActionID].result);
+            err = Array.isArray(task[taskActionID].errors) && task[taskActionID].errors.length ?
+                new Error(task[taskActionID].errors.join('; ')) : null;
+            actionCallback(err, task[taskActionID].result);
         });
         return;
     }
@@ -954,29 +1138,34 @@ function runActionByCondition(taskID, taskActionID, taskSession) {
         }
 
         paramCopy.args.o = JSON.stringify(objectsForAction);
+        paramCopy.launcherUser = systemUser;
 
         log.info('Starting action ', taskActionID, ', task ', taskID,
-            ' for occurred condition: ', occurredConditionOCIDs, '; o=', paramCopy.args.o, '; remain o=', param.args.o,
-            '; param: ', paramCopy);
+            ' for occurred condition: ', occurredConditionOCIDs,
+            '\no=', paramCopy.args.o,
+            '\nremain o=', param.args.o,
+            '\nparam: ', paramCopy);
 
         // run action for objects from condition
         actionClient.runAction(paramCopy, function(err, result) {
             if(err) {
                 log.error('Error in action ', taskActionID, ', task: ', taskID, ', running for conditions: ',
                     occurredConditionOCIDs, ': ', err.message);
-                return actionCallback(err);
             }
 
             // if the task is canceled during the execution of the action
             if(!task || !task[taskActionID]) {
-                return actionCallback(null, result);
+                savePartiallyCompletedTasksStateToFile();
+                return actionCallback(err, result);
             }
 
-            if(result !== undefined) addToResult(taskID, taskActionID, result);
+            addToResult(taskID, taskActionID, result, err);
 
             // run action callback if param.args.o has not an objects i.e. action was executed for all action object
             if(!args_o.length) {
-                actionCallback(null, task[taskActionID].result);
+                err = Array.isArray(task[taskActionID].errors) && task[taskActionID].errors.length ?
+                    new Error(task[taskActionID].errors.join('; ')) : null;
+                actionCallback(err, task[taskActionID].result);
             }
         });
     })
@@ -992,7 +1181,7 @@ function runActionByCondition(taskID, taskActionID, taskSession) {
  * @param {'server'} param.executionMode="server" one of execution modes
  * @param {string} param.user username
  * @param {object} param.args - object with action arguments like {<name>: <value>, ...}
- * @param {function(Error)|function(null, string)} callback callback(err, <string with replaced variables>)
+ * @param {function(Error)|function(null, *)} callback callback(err, <action result>)
  */
 function runAction(param, callback) {
     var taskID = param.taskID;
@@ -1008,6 +1197,7 @@ function runAction(param, callback) {
     if(!task[taskActionID]) {
         task[taskActionID] = {
             result: [],
+            errors: [],
         }
     }
     task[taskActionID].param = param;
@@ -1023,10 +1213,12 @@ function runAction(param, callback) {
  * @param {number} taskID task ID
  * @param {number } taskActionID id from the tasksActions table
  * @param {*} result action execution result for add
+ * @param {Error} [error] action execution error for add
  */
-function addToResult(taskID, taskActionID, result) {
-    taskCondition.get(taskID)[taskActionID].result.push(result);
-    savePartiallyCompletedTasksStateToFile();
+function addToResult(taskID, taskActionID, result, error) {
+    if(result !== undefined) taskCondition.get(taskID)[taskActionID].result.push(result);
+    if(error) taskCondition.get(taskID)[taskActionID].errors.push(error.message);
+    if(result !== undefined || error) savePartiallyCompletedTasksStateToFile();
 }
 
 /**
@@ -1069,6 +1261,7 @@ function savePartiallyCompletedTasksStateToFile() {
 
                 partiallyCompletedTasksWithRunConditionsForSaveToFile[taskID][taskActionID] = {
                     result: taskObj[taskActionID].result,
+                    errors: taskObj[taskActionID].errors,
                     param: taskObj[taskActionID].param,
                     occurredConditionOCIDs: Array.from(taskObj[taskActionID].occurredConditionOCIDs)
                 }
@@ -1096,42 +1289,61 @@ function savePartiallyCompletedTasksStateToFile() {
 }
 
 /**
- * Get workflow and allowed taskGroupIDs for specific user
+ * Get workflow for specific username
  * @param {string} username username
- * @param {function(Error)|function(null, Array, Array)} callback callback(err, workflow, allowedTaskGroupIDs) where
+ * @param {function(Error)|function(null,
+ *      Array<{
+ *          action: 'approve'|'change '|'execute'|'remove'|'cancel'|'check',
+ *          actionDescription: string,
+ *          changeGroup: string,
+ *          message: Object}>)} callback callback(err, workflow) where
  * workflow is an array from the config.json for the task_maker action with workflow of the specific username
- * allowedTasksGroupsIDs is an array with allowed taskGroupIDs
  */
 tasks.getWorkflow = function (username, callback) {
-    actionsConf.getConfiguration('task_maker', function(err, actionCfg) {
-        if (err) return callback(err);
+    userDB.getUsersInformation(username, function (err, rows) {
+        if (err) return callback(new Error('Can\'t get user roles for ' + username + ': ' + err.message));
 
-        userDB.getUsersInformation(username, function (err, rows) {
-            if (err) return callback(new Error('Can\'t get user roles for ' + username + ': ' + err.message));
+        var workflows = confTaskServer.get('workflow');
+        var rolesPriority = confTaskServer.get('rolesPriority') || [];
+        var workflow = [];
+        rows.forEach(function (row) {
+            if(workflows &&
+                Array.isArray(rolesPriority) &&
+                !workflow.length &&
+                rolesPriority.indexOf(row.roleName) !== -1 &&
+                Array.isArray(workflows[row.roleName])
+            ) {
+                workflow = workflows[row.roleName];
+            }
+        });
 
-            var workflow = [], userRoles = {};
+        callback(null, workflow);
+    });
+}
+
+/**
+ * Get allowed taskGroupIDs for specific username
+ * @param {string} username username
+ * @param {function(Error)|function(null, Array<number>)} callback callback(err, allowedTaskGroupIDs) where
+ * allowedTasksGroupsIDs is an array with allowed taskGroupIDs
+ */
+
+tasks.getAllowedTaskGroupIDs = function (username, callback) {
+    userDB.getUsersInformation(username, function (err, rows) {
+        if (err) return callback(new Error('Can\'t get user roles for ' + username + ': ' + err.message));
+
+        var userRoles = {};
+        rows.forEach(row=> userRoles[row.roleID] = true);
+
+        tasksDB.getRoles(function (err, rows) {
+            if (err) return callback(new Error('Can\'t get task groups roles: ' + err.message));
+
+            var allowedTaskGroupIDs = [];
             rows.forEach(function (row) {
-                if(actionCfg.workflow &&
-                    Array.isArray(actionCfg.rolesPriority) &&
-                    !workflow.length &&
-                    actionCfg.rolesPriority.indexOf(row.roleName) !== -1 &&
-                    Array.isArray(actionCfg.workflow[row.roleName])
-                ) {
-                    workflow = actionCfg.workflow[row.roleName];
-                }
-                userRoles[row.roleID] = true;
+                if (userRoles[row.roleID]) allowedTaskGroupIDs.push(row.taskGroupID);
             });
 
-            tasksDB.getRoles(function (err, rows) {
-                if (err) return callback(new Error('Can\'t get task groups roles: ' + err.message));
-
-                var allowedTaskGroupIDs = [];
-                rows.forEach(function (row) {
-                    if (userRoles[row.roleID]) allowedTaskGroupIDs.push(row.taskGroupID);
-                });
-
-                callback(null, workflow, allowedTaskGroupIDs);
-            });
+            callback(null, allowedTaskGroupIDs);
         });
     });
 }
@@ -1141,15 +1353,15 @@ tasks.getWorkflow = function (username, callback) {
  *
  * @param {string} username username
  * @param {number} taskID task ID
- * @param {function(Error)|function(null, Object)} callback callback(err, taskParameters)
+ * @param {function(Error)|function(null, Object)} callback callback(err, taskParams)
  * @example
- * taskParameters: {
+ * taskParams: {
  *      actionsConfiguration: see bellow,
  *      parameters: taskData[0] from rightsWrapperTaskDB.getTaskParameters(): {
  *          id: <taskID>,
  *          name: <taskName>,
  *          timestamp: <taskCreatedTime>,
- *          group: <taskGroupName>,
+ *          groupName: <taskGroupName>,
  *          ownerName: <task creator login>,
  *          ownerFullName: <task creator full name>,
  *          runType: <task condition runType>,

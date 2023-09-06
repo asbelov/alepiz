@@ -413,292 +413,92 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         В полях для фильтрации можно использовать символы "_" для обозначения какого-то одного символа
                          или "%" для обозначения ноль или больше каких-то символов.
 
-                    h5 Searching by subject
+                    h5 Task name or ID
                     p.
-                        Фильтр задач по теме. Начните вводить символы и если они присутствуют в теме задач, эти задачи
-                        будут показаны в списке.
+                        Фильтр задач по названию задачи или по ее идентификатору.
+                        Начните вводить символы и если они присутствуют в названии задач, эти задачи
+                        будут показаны в списке. Если вводятся цифры, поиск будет осуществляться по
+                        идентификатору задачи.
 
-                    h5 Searching by owner
+                    h5 Owner
                     p.
                         Поиск задач по владельцу. Начните ввод ника владельца задачи для фильтрации задачи
                         по нему
 
-                    h5 Select task group
+                    h5 Group
                     p.
-                        Для фильтрации задач по группе нужно выбрать соответствующую группу в этом элементе
+                        Для отображения задач из соответствующей группы необходимо выбрать группу
 
-                    h5 Select first date и Select last date
+                    h5 Start date и End date
                     p.
                         Фильтр задач по дате изменения. Если выбрать начальную и конечную дату, в списке
                         отобразятся только те задачи, которые были изменены в выбранный промежуток времени.
 
-                    h3 Настройка рабочего процесса (workflow)
+                    h3 Автоматическое создание названия новой задачи
                     p.
-                        Настройка рабочего процесса выполняется через файл конфигурации действия Task maker config.json,
-                        который находится в каталоге с действием и позволяет
-                        настроить отправку оповещений при изменении статуса задачи и перемещение задачи
-                        между группами. Изменить конфигурацию действия Task maker можно через
+                        Настройка автоматического создания названия новой задачи выполняется через файл конфигурации
+                        Task maker - config.json, который находится в каталоге с действием.
+                        Изменить конфигурацию действия Task maker можно через
                         #[a(href="/actions/action_editor/help/") Action editor].
+                        Автоматическое название новой задачи выполняется на основе анализа и преобразования
+                        названий объектов, которые входят в задачу.
                     p.
-                        Использование workflow позволяет организовать оповещение участников рабочего процесса о смене
-                        состояния задачи. Это может потребоваться, например, для своевременного подтверждения
-                        задачи администраторами, без чего задача не будет выполнена.
-                        Кроме того, с помощью workflow можно организовать
-                        процесс перемещения задачи между группами для организации рабочего процесса.
-                    p.
-                        Например,
-                        подразделение, отвечающее за изменение конфигурации сервисов по запросам от
-                        клиентов, формирует новую задачу и сохраняет ее. В соответствии с настройками workflow,
-                        задача попадает в группу для проверки и сотрудники получают оповещение о том, что задача ожидает
-                        их действий.
-                        После проверки, в соответствии с настройками workflow, задача попадает в группу для подтверждения
-                        администраторами. Администратор проверяет корректность задачи со своей стороны и подтверждает
-                        возможность ее выполнения. Оповещение об этом получают сотрудники, создавшие задачу. После
-                        выполнения, подразделения получают оповещение о том, что задача выполнена.
-                    p.
-                        Если настроен переход между задачами с помощью функций workflow, Task selector
-                        при инициализации Task maker, в соответствии с настройками,
-                        будет последовательно искать группу, в которой присутствуют задачи.
-                        Например, если в настройках workflow есть этапы рабочего процесса, в которых описан переход
-                        между группами Default group =&gt; Task for validation и Task for validation =&gt; Business task,
-                        то при запуске Task maker сначала будет искать задачи в Default group. Если их там не окажется,
-                        он перейдет в группу Task for validation. И если там тоже не окажется задач, перейдет в группу
-                        Business task и отобразит ее содержимое.
-                    p.
-                        Для настройки рабочего процесса в файле конфигурации Task maker - config.json создается
-                        объект workflow, который включает себя объекты - соответствующие названиям групп пользователей.
-                        Для каждой группы пользователей можно настроить свой рабочий процесс. Если пользователь входит
-                        в несколько групп, в файле конфигурации можно создать массив rolesPriority, в котором перечислить
-                        группы пользователей по приоритету. Тогда для определения рабочего процесса пользователя будет
-                        выбрана группа, у которой приоритет выше.
-                    ul.collapsible
-                        li
-                            div.collapsible-header #[i.material-icons settings] Пример настройки рабочего процесса для группы Administrators (нажмите для того, чтобы развернуть)
-                            div.collapsible-body
-                                pre.
-                                    "rolesPriority": ["Administrators", "Businesses", "Watchers", "Guests"],
-                                    "workflow": {
-                                        "Administrators": [{
-                                            "action": "Default group, Business tasks",
-                                            "message": {
-                                                "priority": 20,
-                                                "rcpt": "Administrators",
-                                                "configID": "createTask"
-                                            }
-                                        }, {
-                                            "action":"approve",
-                                            "message": {
-                                                "priority": 20,
-                                                "rcpt": "Administrators, Businesses",
-                                                "configID": "approveTask"
-                                            }
-                                        }]
-                                    }
-
-                    p.
-                        Для каждой группы пользователей формируется массив, элементы которого описывают этапы
-                        рабочего процесса. Каждый элемент рабочего процесса должен содержать объекты типа
-                        "action" и "message"
-
-                    h5 Объект Action
-                    p.
-                        Предназначен для определения, для какого действия создается элемент рабочего процесса. В качестве
-                        действий могут быть:
-                    ol
-                        li approve - происходит, когда администратор одобрил выполнение задачи
-                        li.
-                            change - происходит, когда в задачу вносятся изменения, такие как изменения в
-                            действиях или в условии выполнения задачи.
-                        li execute - происходит когда задача выполнена
-                        li remove - происходит, когда задача удалена
-                        li cancel - происходит, когда разрешенная к выполнению задача отменяется администратором.
-                        li.
-                            &lt;group1&gt;, &lt;group2&gt; - происходит когда задача перемещается из группы
-                            &lt;group1&gt; в группу &lt;group2&gt;.
-                            Если одновременно с перемещением задачи происходит ее изменение, действие change не
-                            выполняется. Это действие так же влияет на установку значения элемента "Group for task".
-                            Если текущей группой для задачи является &lt;group1&gt;, то в качестве следующей группы
-                            для задачи в элементе "Group for task" будет установлена &lt;group2&gt;.
-
-                    h5 Объект message
-                    p.
-                        Служит для настройки отправки сообщения при выполнении какого-то действия. Формат
-                        объекта message полностью соответствует объекту param (не message), описанному в функции
-                        #[a(href="/actions/communication_editor/help/#bookmark12") communication.send(param, callback)].
-                        В шаблоне сообщения можно использовать переменные, которые принимают значения в зависимости от
-                        настроек задачи:
+                        За настройку отвечает объект "taskNameRules". Если объекта "taskNameRules" не существует,
+                        Автоматическое создание названия новой задачи не будет выполняться.
+                        Объект включает в себя параметры:
                     ul.browser-default
-                        li TASK_ID - идентификатор задачи
-                        li TASK_NAME - название задачи
-                        li TASK_CREATOR - Создатель задачи - логическое имя
-                        li TASK_CREATOR_FULL_NAME - Создатель задачи - полное имя
-                        li EXECUTE_CONDITION - условие выполнения задачи
-                        li ACTION - выполняемое действие над задачей или текст ошибки, которая произошла во время выполнения задачи
-                        li ACTIONS_DESCRIPTION - текстовое описание действий, используемых в задаче
-                        li ACTIONS_DESCRIPTION_HTML - описание действий, используемых в задаче в формате HTML
+                        li.
+                            maxObjectsStrLen - все названия объектов объединяются в строку с разделителем ",". Если
+                            длина строки меньше чем значение этого параметра, то автоматическое название задачи
+                            будет сформировано из этой строки с объектами.
+                            В конце полученной строки добавляется строка из параметра taskNameSuffix.
+                            По умолчанию 50.
+                        li.
+                            taskNameSuffix - В конец полученной строки будет добавлен данный суффикс. По умолчанию ": ".
+                        li.
+                            regExpRules - массив с правилами преобразования названий объектов, входящих в задачу.
+                            Каждое правило последовательно применяется к каждому объекты.
+                            Если все объекты, входящих в задачу, соответствуют регулярному выражению правила
+                            (параметр testExpr), выполняется замена (параметр replExpr) c помощью функции JavaScript
+                            replace(new RegExp(&lt;testExpr&gt;, &apos;gi&apos;), &lt;replExpr&gt;).
+                            Далее все полученные строки соединяются
+                            в одну строку с разделителем ",". Если длина полученной строки меньше, чем значение
+                            параметра maxObjectsStrLen, то автоматическое название задачи будет сформировано из этой
+                            строки с объектами. В противном случае будет выполнен переход к следующему правилу.
+                        ul.browser-default
+                            li.
+                                testExpr - регулярное выражение для проверки названий объектов на соответствие правилу
+                            li.
+                                replExpr - выражение, которое используется для замены в названии объекта.
+                                Замена выполняется c помощью функции JavaScript
+                                replace(new RegExp(&lt;testExpr&gt;, &apos;gi&apos;), &lt;replExpr&gt;).
+                            li.
+                                maxObjectsStrLen все полученные названия объектов объединяются в строку с разделителем
+                                ",". Если длина строки меньше чем значение этого параметра, то автоматическое название
+                                задачи будет сформировано из этой строки с объектами. По умолчанию 50.
+                                В конце полученной строки добавляется строка из параметра taskNameSuffix.
 
                     ul.collapsible
                         li
-                            div.collapsible-header #[i.material-icons settings] ACTIONS_DESCRIPTION формируется как: (нажмите для того, чтобы развернуть)
+                            div.collapsible-header #[i.material-icons settings] Настройка автоматического создания названия новой задачи (нажмите для того, чтобы развернуть)
                             div.collapsible-body
                                 pre.
-                                    1. <Название действия 1>:
-                                    <Описание действия 1>
-
-                                    2. <Название действия 2>:
-                                    <Описание действия 2>
-
-                                    ....
-
-                    ul.collapsible
-                        li
-                            div.collapsible-header #[i.material-icons settings] ACTIONS_DESCRIPTION_HTML формируется как: (нажмите для того, чтобы развернуть)
-                            div.collapsible-body
-                                pre.
-                                    &lt;ol class=&quot;task-actions-description&quot;&gt;
-                                        &lt;li&gt;
-                                            &lt;span class=&quot;task-action&quot;&gt;
-                                                &lt;span class=&quot;task-action-name&quot;&gt;
-                                                    <b>Название действия 1</b>
-                                                &lt;/span&gt;
-                                                &lt;span class=&quot;task-action-startup&quot; data-startup-option=&quot;<b>&lt;условие выполнения задачи&gt;</b>&quot;&gt;
-                                                    &amp;nbsp;
-                                                &lt;/span&gt;
-                                                &lt;span class=&quot;task-action-description&quot;&gt;
-                                                    <b>Описание действия 1</b>
-                                                &lt;/span&gt;
-                                            &lt;/span&gt;
-                                        &lt;/li&gt;
-                                        ....
-                                    &lt;/ol&gt;
-                    p.
-                        где <b>"условие выполнения задачи"</b> может быть 0 или 1 или 2::
-                    ul
-                        li 0 - Run if previous action completed without errors;
-                        li 1 - Run if someone of previous actions executed with an errors;
-                        li 2 - Run and don't wait until the previous action will be completed
-                        li 3 - Run anyway
-
-                    h4 Пример настройки шаблона сообщения workflow для email:
-                    p.
-                        Ниже представлен шаблон approveTask, который будет использоваться в соответствии с настройкой
-                        workflow, объектом message, в котором установлен параметр "configID": "approveTask".
-                        Настройка шаблона производится в communication/email/config.json с помощью
-                        #[a(href="/actions/communication_editor/help/") Media editor].:
-
-                    ul.collapsible
-                        li
-                            div.collapsible-header #[i.material-icons settings] шаблон approveTask (нажмите для того, чтобы развернуть)
-                            div.collapsible-body
-                                pre.
-                                    "approveTask": {
-                                            "transport": "default",
-                                            "message": {
-                                                "subject": "Re: #%:TASK_ID:%: %:TASK_NAME:%",
-                                                "messageId": "<%:TASK_ID:%.approveTask@alepiz.com>",
-                                                "inReplyTo": "<%:TASK_ID:%.checkTask@alepiz.com>",
-                                                "references": "<%:TASK_ID:%.createTask@alepiz.com> <%:TASK_ID:%.checkTask@alepiz.com>",
-                                                "replyTo": "root@domain.com",
-                                                "text": {
-                                                    "path": "templates/newTask.txt"
-                                                },
-                                                "html": {
-                                                    "path": "templates/replayTask.html"
+                                    "taskNameRules": {
+                                            "maxObjectsStrLen": 100,
+                                            "taskNameSuffix": ": ",
+                                            "regExpRules": [
+                                                {
+                                                    "testExpr": "^([^ ]+).*$",
+                                                    "replExpr": "$1: ",
+                                                    "maxObjectsStrLen": 100
                                                 }
-                                            }
-                                        }
-                    ul.collapsible
-                        li
-                            div.collapsible-header #[i.material-icons settings] Шаблон текстового сообщения templates/newTask.txt (нажмите для того, чтобы развернуть)
-                            div.collapsible-body
-                                pre.
-                                    Task status: %:ACTION:%
-                                    Created by: %:TASK_CREATOR_FULL_NAME:%
-                                    Condition: %:EXECUTE_CONDITION:%
+                                            ]
+                                        },
 
-                                    %:ACTIONS_DESCRIPTION:%
-
-                    ul.collapsible
-                        li
-                            div.collapsible-header #[i.material-icons settings] Шаблон сообщения templates/replayTask.html в формате HTML (нажмите для того, чтобы развернуть)
-                            div.collapsible-body
-                                pre.
-                                    &lt;html lang=&quot;ru&quot;&gt;
-                                    &lt;head&gt;
-                                        &lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=utf-8&quot;&gt;
-                                        &lt;title&gt;Create a new task&lt;/title&gt;
-                                        &lt;style&gt;
-                                            html {
-                                                line-height: 1.5;
-                                                font-family: Roboto, Oxygen-Sans, Ubuntu, Cantarell, &quot;Helvetica Neue&quot;, sans-serif;
-                                                font-weight: normal;
-                                                color: rgba(0, 0, 0, 0.87);
-                                                font-size: 15px;
-                                            }
-                                            p {
-                                                line-height: 1.5em;
-                                                margin: 0;
-                                                padding: 0;
-                                            }
-                                            .bold {
-                                                font-weight: bold;
-                                            }
-                                            .task-action-name {
-                                                font-weight: bold;
-                                                display:block;
-                                                float:left;
-                                            }
-                                            .task-action-name {
-                                                font-weight: bold;
-                                                display:inline-block;
-                                            }
-                                            .task-action-startup {
-                                                font-style:italic;
-                                                display:inline-block;
-                                            }
-                                            .task-action-startup[data-startup-option=&quot;0&quot;]::after {
-                                                content: &quot;(Run if previous action completed without errors):&quot;;
-                                            }
-                                            .task-action-startup[data-startup-option=&quot;1&quot;]::after {
-                                                content: &quot;(Run if someone of previous actions executed with an errors):&quot;;
-                                            }
-                                            .task-action-startup[data-startup-option=&quot;2&quot;]::after {
-                                                content: &quot;(Run and don&apos;t wait until the previous action will be completed):&quot;;
-                                            }
-                                            .task-action-description {
-                                                display:block;
-                                                margin: 20px 0;
-                                                padding-left: 1.5rem;
-                                                border-left: 2px solid #ee6e73;
-                                            }
-                                            .quoted {
-                                                display:block;
-                                                margin: 20px 0;
-                                                padding: 0.5rem 0 1rem 1rem;
-                                                border-left: 2px solid blue;
-                                            }
-                                        &lt;/style&gt;
-                                    &lt;/head&gt;
-                                    &lt;body&gt;
-                                    &lt;p&gt;&lt;span class=&quot;bold&quot;&gt;Action&lt;/span&gt;: %:ACTION:%&lt;/p&gt;
-
-                                    &lt;div class=&quot;quoted&quot;&gt;
-                                    &lt;h3&gt;%:TASK_NAME:%&lt;/h3&gt;
-                                    %:ACTIONS_DESCRIPTION_HTML:%
-
-                                    &lt;hr/&gt;
-                                    &lt;p&gt;&lt;span class=&quot;bold&quot;&gt;Created by:&lt;/span&gt; %:TASK_CREATOR_FULL_NAME:%&lt;/p&gt;
-                                    &lt;p&gt;&lt;span class=&quot;bold&quot;&gt;Condition:&lt;/span&gt; %:EXECUTE_CONDITION:%&lt;/p&gt;
-                                    &lt;/div&gt;
-                                    &lt;/body&gt;
-                                    &lt;/html&gt;
+                    h5 Настройка рабочего процесса
                     p.
-                        В результате сотрудники, участвующие в рабочем процессе, получат примерно такое сообщение:
-
-
-                    img(src="./images/help.taskMessage.png" width="1024").materialboxed.card-panel.hoverable
-
-
+                        Настройка рабочего процесса обслуживания задач описана в разделе справки
+                        #[a(href="help/settingsTaskServer.ru.pug#bookmark2") Описание настроек сервера выполнения задач taskServer.json].
 
 
 

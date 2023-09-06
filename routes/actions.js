@@ -68,7 +68,7 @@ router.post('/'+confActions.get('dir')+'/:action',
             return;
         }
 
-        var sessionID = unique.createID();
+        var sessionID = unique.createHash(JSON.stringify(req.params) + unique.createID());
         module.sessionID = sessionID;
         log.debug('Creating a new session for user: ', username, ',  action: ', actionCfg.name,
             ', sessionID: ', sessionID);
@@ -113,9 +113,6 @@ router.post('/'+confActions.get('dir')+'/:action',
                 result.action.link += '_' + String(sessionID);
                 result.action.sessionID = sessionID;
 
-                log.info('Init a new action' + (req.body.actionUpdate === '1' ? ' with full reload' : '' ) +
-                    '. Parameters: ', result);
-
                 var actionHomePage = path.join(__dirname, '..', actionLink, result.action.homePage);
 
                 if(req.body.actionUpdate === '1') {
@@ -123,8 +120,10 @@ router.post('/'+confActions.get('dir')+'/:action',
                         ajax: true,
                         server: true
                     });
-                    log.debug('Require for update action: ', actionsForUpdate);
                 }
+
+                log.info('Display a new action ', result.action.name,
+                    (req.body.actionUpdate === '1' ? ' with reload' : '' ), ' for objects: ', result.objects);
 
                 res.render(actionHomePage, result, function(err, html) {
                     if(err) {
@@ -249,7 +248,6 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode',
             runAjaxOnRemoteServers: actionCfg.runAjaxOnRemoteServers,
             slowAjaxTime: actionCfg.slowAjaxTime,
             slowServerTime: actionCfg.slowServerTime,
-            debug: actionCfg.debug,
             sessionID: sessionID,
             updateAction: actionsForUpdate.has(actionID) ? actionsForUpdate.get(actionID)[executionMode] : false
         }, function(err, data) {
@@ -280,7 +278,7 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode',
 
             // when action is finished, clear old and create new session ID
             var oldSessionID = sessionID;
-            sessionID = unique.createID();
+            sessionID = unique.createHash(JSON.stringify(req.params) + unique.createID());
             module.sessionID = sessionID;
 
             browserLog.deleteSession(oldSessionID);
@@ -299,7 +297,7 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode',
                 log.info('Complete executing action ', actionID, ' with result: ', returnedObj,
                     '; username: ', username, '; sessions: ', oldSessionID, '=>', sessionID);
             } else if(executionMode === 'makeTask') {
-                log.info('Completed saving action ', actionID,
+                log.info('Complete adding action ', actionID, ' to the task ',
                     '; username: ', username, '; sessions: ', oldSessionID, '=>', sessionID);
             }
         });

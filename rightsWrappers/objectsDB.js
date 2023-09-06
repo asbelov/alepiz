@@ -67,14 +67,13 @@ rightsWrapper.renameObjects = function(user, objects, callback){
  * @param {number} newOrder object sort order in the object list
  * @param {0|1} disabled is object disabled
  * @param {string|null} color object color
- * @param {number} sessionID sessionID for create unique objectID
  * @param {number} createdTimestamp timestamp when object was created
  * @param {function(Error)|function(null, newObjectsIDs:Array, newObjectName:Object)} callback
  *  callback(err, newObjectsIDs, newObjectName), where newObjectsIDs - array with
  *  new object IDs, newObjectName - object like {<objectName1>: <objectID1>, ...}
  */
 rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOrder, disabled,
-                                    color, sessionID, createdTimestamp, callback) {
+                                    color, createdTimestamp, callback) {
     if(!newObjectsNames || !newObjectsNames.length) return callback(null, []);
 
     //user = prepareUser(user);
@@ -94,7 +93,7 @@ rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOr
         color = getColor(color);
 
         // add a new objects, its description and order
-        objectsDBSave.addObjects(newObjectsNames, newDescription, newOrder, (disabled ? 1 : 0), color, sessionID,
+        objectsDBSave.addObjects(newObjectsNames, newDescription, newOrder, (disabled ? 1 : 0), color,
             createdTimestamp, callback);
     });
 };

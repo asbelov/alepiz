@@ -5,6 +5,8 @@
     "separate": "",
     "runCollectorSeparately": "on",
     "runCollectorAsThread": "on",
+    "sleepTimeAfterValueProcessed": 15000,
+    "returnedValuesProcessedLimit": 1,
     "parameters": {
         "ranges": {
             "description": "IP addresses ranges, separated by comma",

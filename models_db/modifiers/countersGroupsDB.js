@@ -12,8 +12,13 @@ const unique = require('../../lib/utils/unique');
 var groupsDB = {};
 module.exports = groupsDB;
 
-groupsDB.new = function(groupName, sessionID, callback) {
-    const id = unique.createHash(groupName + sessionID);
+/**
+ * Add counter group
+ * @param {string} groupName new group name
+ * @param {function(Error)|function()} callback callback(err)
+ */
+groupsDB.addCounterGroup = function(groupName, callback) {
+    const id = unique.createHash(groupName);
 
     db.run('INSERT INTO countersGroups (id, name) VALUES (?, ?)', [id, groupName], function(err){
         if(err) {
@@ -24,7 +29,13 @@ groupsDB.new = function(groupName, sessionID, callback) {
     })
 };
 
-groupsDB.edit = function(groupID, newGroupName, callback) {
+/**
+ * Rename counter group
+ * @param {number} groupID counter group ID
+ * @param {string} newGroupName new group name
+ * @param {function(Error)|function()} callback callback(err)
+ */
+groupsDB.renameCounterGroup = function(groupID, newGroupName, callback) {
     if(!groupID) {
         var err = new Error('Error editing counters group: initial group name is not set');
         return callback(err);
@@ -40,7 +51,8 @@ groupsDB.edit = function(groupID, newGroupName, callback) {
             $id: groupID
         }, function(err) {
             if (err) {
-                log.error('Error changing name for counter group from ' + groupID + ' to '+newGroupName+' into database: ', err.message);
+                log.error('Error changing name for counter group from ', groupID, ' to ', newGroupName,
+                    ' into database: ', err.message);
                 return callback(err);
             }
             callback();
@@ -48,7 +60,13 @@ groupsDB.edit = function(groupID, newGroupName, callback) {
     );
 };
 
-groupsDB.setInitial = function(groupID, groupProperty, callback) {
+/**
+ * Set or unset the initial counter group (when new counter will be created, this group will be selected)
+ * @param {number} groupID group ID
+ * @param {0|1} groupProperty 0 - not initial group, 1 - initial group
+ * @param {function(Error)|function()} callback callback(err)
+ */
+groupsDB.setInitialCounterGroup = function(groupID, groupProperty, callback) {
     if(!groupID) return callback(new Error('Error editing counters group: initial group name is not set'));
     if(!groupProperty) return callback(new Error('Error editing counters group: property of initial group is not set'));
 
@@ -68,10 +86,15 @@ groupsDB.setInitial = function(groupID, groupProperty, callback) {
     });
 };
 
-groupsDB.remove = function(groupID, callback) {
-    if(!groupID || groupID === '0') {
-        var err = new Error('Error removing counters group from database: group name is not set or it is a "Conditions for Tasks"');
-        return callback(err);
+/**
+ * Remove counter group
+ * @param {number} groupID group ID
+ * @param {function(Error)|function()} callback callback(err)
+ */
+groupsDB.removeCounterGroup = function(groupID, callback) {
+    if(!groupID) {
+        return callback(new Error('Error removing counters group from database: group ID is not set or there is a ' +
+            '"Conditions for Tasks": ') + groupID);
     }
     db.run('DELETE FROM countersGroups WHERE id=?', groupID, function(err){
         if(err) {

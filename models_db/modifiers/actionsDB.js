@@ -18,20 +18,33 @@ module.exports = actionsDB;
  *         actionName TEXT NOT NULL,
  *         config TEXT,
  *         UNIQUE(userID, actionName) ON CONFLICT REPLACE)
- * @param {string} user username
+ * @param {string} username username
  * @param {string} actionID - action directory
  * @param {string} config - stringified action configuration (usually JSON.stringify())
- * @param {number} sessionID - sessionID for create unique ID for inserted row
- * @param {function(Error)} callback - callback(err)
+ * @param {function(Error)|function()} callback - callback(err)
  */
-actionsDB.setActionConfig = function (user, actionID, config, sessionID, callback) {
-    const id = unique.createHash(user + actionID + config + sessionID);
+actionsDB.setActionConfig = function (username, actionID, config, callback) {
+    // ID unique only for specific user and action
+    const id = unique.createHash(username + actionID);
 
     db.run('INSERT INTO actionsConfig (id, userID, actionName, config) ' +
-        'VALUES ($id, (SELECT id FROM users WHERE isDeleted=0 AND name = $userName), $actionName, $config)', {
+        'VALUES ($id, (SELECT id FROM users WHERE isDeleted=0 AND name=$userName), $actionName, $config)', {
         $id: id,
-        $userName: user,
+        $userName: username,
         $actionName: actionID,
         $config: config,
-    }, callback);
+    }, function(errInsert) {
+        if(!errInsert) return callback();
+
+        db.run('UPDATE actionsConfig SET config=$config ' +
+            'WHERE userID=(SELECT id FROM users WHERE isDeleted=0 AND name=$userName) AND actionName=$actionName',{
+            $userName: username,
+            $actionName: actionID,
+            $config: config,
+        }, function(errUpdate) {
+            if(!errUpdate) return callback();
+
+            callback(new Error('INSERT: ' + errInsert.message + '; UPDATE: ' + errUpdate.message));
+        });
+    });
 }

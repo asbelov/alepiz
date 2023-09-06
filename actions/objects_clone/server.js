@@ -34,7 +34,7 @@ module.exports = function(args, callback) {
 
                 if(param.newObjectsNames.length) log.info('Add a new objects: ', param.newObjectsNames);
                 addNewObjects(user, param.newObjectsNames, param.description, param.order, param.disabled, param.color,
-                    args.sessionID, args.timestamp,function(err, newObjectsIDs) {
+                    args.timestamp, function(err, newObjectsIDs) {
                     if(err) return transactionDB.rollback(err, callback);
 
                     if(newObjectsIDs) Array.prototype.push.apply(param.objectsIDs, newObjectsIDs);

@@ -6,19 +6,34 @@ function onChangeObjects(objects){
     JQueryNamespace.onChangeObjects(objects);
 }
 
+function callbackBeforeExec(callback) {
+    JQueryNamespace.beforeExec(callback)
+}
+
+
+// The functions will be passed from the parent frame
+// describe the function here to prevent the error message
+if(!getActionParametersFromBrowserURL) getActionParametersFromBrowserURL = function (callback) {callback([]);}
+
 var JQueryNamespace = (function ($) {
     $(function () {
         init(); // Will run after finishing drawing the page
     });
 
-    var serverURL = parameters.action.link+'/ajax'; // path to ajax
+    var serverURL = parameters.action.link + '/ajax'; // path to ajax
     var objects = parameters.objects; // initialize the variable "objects" for the selected objects on startup
     var firstSessionID = {};
     var actions = {};
+    var selectedSessionID, selectedTaskID;
+
+    var correctlyText = parameters.action.correctly || 'correct';
+    var incorrectlyText = parameters.action.incorrectly || 'incorrect: ';
+
     var datePickerFromInstance,
         datePickerToInstance,
         selectUsersInstance,
         selectActionsInstance;
+
     var bodyElm,
         auditBodyElm,
         actionListElm,
@@ -30,17 +45,64 @@ var JQueryNamespace = (function ($) {
         selectActionsElm,
         descriptionFilterElm,
         simpleFilterCBElm,
+        onlyTasksCBElm,
         sessionTableFirstRowTDElms,
         taskIDFilterElm,
         messageFilterElm,
-        sessionTableTHElms;
+        sessionTableTHElms,
+        commentDescriptionElm,
+        modalCommentElm,
+        taskIDElm,
+        taskSessionIDElm,
+        sessionIDElm;
+
+    var monthNames = ["January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+
 
     return {
         onChangeObjects: _onChangeObjects,
+        beforeExec: _beforeExec,
     };
 
     function _onChangeObjects (_objects) {
         objects = _objects; // set variable "objects" for selected objects
+        drawAction();
+    }
+
+    function _beforeExec(callback) {
+        if(!selectedTaskID && !selectedSessionID) {
+            return callback(new Error('Task or action not selected. ' +
+                'Please select the task or action you want to comment on'))
+        }
+
+        var addCommentElm = $('#modalComment');
+        var modalCommentBtn = null;
+        var sendMessageBtnElm = $('#modalSendMessage');
+        var cancelBtnElm = $('#modalCancel');
+
+        addCommentElm.characterCounter();
+        sendMessageBtnElm.unbind('click').click(function() { modalCommentBtn = this; });
+        cancelBtnElm.unbind('click').click(function() { modalCommentBtn = this; });
+
+        var modal = M.Modal.init(document.getElementById('addCommentModal'), {
+            inDuration: 0,
+            outDuration: 0,
+            dismissible: false,
+            onCloseStart: function() { addCommentElm.blur(); },
+            onCloseEnd: function() {
+                if(!modalCommentBtn || $(modalCommentBtn).attr('id') === 'modalSendMessage') callback()
+                else callback(new Error('Adding a comment has been canceled'));
+            }
+        });
+
+        setTimeout(function() {
+            modal.open();
+            setTimeout(function() {
+                addCommentElm.focus();
+            }, 200);
+        }, 500);
     }
 
     function init() {
@@ -56,14 +118,72 @@ var JQueryNamespace = (function ($) {
         taskIDFilterElm = $('#taskIDFilter');
         messageFilterElm = $('#messageFilter');
         simpleFilterCBElm = $('#simpleFilterCB');
+        onlyTasksCBElm = $('#onlyTasksCB');
+        commentDescriptionElm = $('#commentDescription');
+        modalCommentElm = $('#modalComment');
+        taskIDElm = $('#taskID');
+        taskSessionIDElm = $('#taskSessionID');
+        sessionIDElm = $('#sessionID');
 
         alepizActionLogViewerNamespace.init($('#actionLog'));
 
         initMaterialElm();
-        getSessions(firstSessionID);
         initResizer();
         initEvents();
+        drawAction();
     }
+
+    function drawAction() {
+        getActionParametersFromBrowserURL(function(actionParametersFromURL) {
+            var selectedUsers = [], selectedActions = [];
+            actionParametersFromURL.forEach(function (param) {
+                if (param.key === 't') taskIDFilterElm.val(Number(param.val)); // taskID
+                else if (param.key === 'td') descriptionFilterElm.val(param.val); // description or error
+                else if (param.key === 'tm') messageFilterElm.val(param.val); // log message
+                else if (param.key === 'tsf' && param.val === '0') simpleFilterCBElm.prop('checked', false); // simple filter checkbox
+                else if (param.key === 'tsd') startDateElm.val(getDateString(new Date(Number(param.val)))); // start date
+                else if (param.key === 'ted') endDateElm.val(getDateString(new Date(Number(param.val)))); // end date
+                else if (param.key === 'tu') selectedUsers = param.val.split(',').map(id => parseInt(id, 10)); // userIDs
+                else if (param.key === 'ta') selectedActions = param.val.split(',').map(actionID => actionID.trim()); // actionIDs
+                else if (param.key === 'tst' && param.val === '0') onlyTasksCBElm.prop('checked', false) // show only tasks
+            });
+
+            getUsersAndActions(selectedUsers, selectedActions, function () {
+                getSessions(firstSessionID);
+            })
+        });
+    }
+
+    /*
+        returned date string in format DD MonthName, YYYY
+        date: date object (new Date())
+     */
+    function getDateString(date) {
+        if(!date) date = new Date();
+
+        return (date.getDate() < 10 ? '0' + date.getDate() : date.getDate()) + ' ' + monthNames[date.getMonth()] +
+            ', ' + date.getFullYear();
+    }
+
+    /**
+     * Converting date and time string in format DD MonthName, YYYY to timestamp in ms
+     * @param {string} dateStr date string in format DD MonthName, YYYY
+     * @param {string} [timeStr] time in format hh:mm or undefined
+     * @return {number|undefined} JS timestamp in ms or undefined if dateStr is null
+     */
+    function getTimestampFromStr(dateStr, timeStr) {
+        var dateParts = dateStr.match(/^(\d\d?)\s([^,]+),\s(\d\d\d\d)$/);
+        if(dateParts === null) return;
+        var monthNum = monthNames.indexOf(dateParts[2]);
+
+        var timeParts = [0,0];
+        if(timeStr) {
+            timeParts = timeStr.match(/^(\d+):(\d+)$/);
+            if(timeParts === null) timeParts = [0,0];
+        }
+        return new Date(Number(dateParts[3]), monthNum, Number(dateParts[1]), timeParts[0], timeParts[1], 0, 0).getTime();
+    }
+
 
     function initEvents() {
 
@@ -78,11 +198,21 @@ var JQueryNamespace = (function ($) {
             simpleFilterCBElm.prop('checked', true);
             taskIDFilterElm.val('');
             messageFilterElm.val('');
-            M.FormSelect.init(document.querySelectorAll('select'), {});
+            selectUsersInstance = M.FormSelect.init(selectUsersElm[0], {});
+            selectActionsInstance = M.FormSelect.init(selectActionsElm[0], {});
+            setBrowserParam();
         });
 
         $('#modalFilterApply').click(function () {
             getSessions();
+            setBrowserParam();
+        });
+
+        var filterElms = $('[data-filter-prm]');
+
+        filterElms.keyup(function (e) {
+            if (e.which === 27) $(this).val(''); // Esc
+            else if (e.which === 13) $('#modalFilterApply').trigger('click'); // Enter
         });
     }
 
@@ -93,6 +223,8 @@ var JQueryNamespace = (function ($) {
 
         M.Collapsible.init(document.querySelectorAll('.collapsible'), {
             onOpenStart: getUsersAndActions,
+            onOpenEnd: initResizer,
+            onCloseEnd: initResizer,
         });
 
         datePickerFromInstance = M.Datepicker.init(startDateElm[0], {
@@ -107,40 +239,125 @@ var JQueryNamespace = (function ($) {
             setDefaultDate: true,
             container: bodyElm[0],
         });
+
+        selectUsersInstance = M.FormSelect.init(selectUsersElm[0], {});
+        selectActionsInstance = M.FormSelect.init(selectActionsElm[0], {});
     }
 
-    function getUsersAndActions() {
+    /**
+     * Add filter parameters to the browser URL
+     */
+    function setBrowserParam() {
+        var param = [];
+
+        if (taskIDFilterElm.val()) {
+            param.push({
+                key: 't',
+                val: taskIDFilterElm.val(),
+            });
+        }
+        if (descriptionFilterElm.val()) {
+            param.push({
+                key: 'td',
+                val: descriptionFilterElm.val(),
+            });
+        }
+        if (messageFilterElm.val()) {
+            param.push({
+                key: 'tm',
+                val: messageFilterElm.val(),
+            });
+        }
+        if (!simpleFilterCBElm.is(':checked')) {
+            param.push({
+                key: 'tsf',
+                val: 0,
+            });
+        }
+        if (!onlyTasksCBElm.is(':checked')) {
+            param.push({
+                key: 'tst',
+                val: 0,
+            });
+        }
+
+        if (startDateElm.val()) {
+            var startDate = getTimestampFromStr(startDateElm.val());
+            startDate += (new Date(startDate) - new Date(startDate).setHours(0, 0, 0, 0));
+            param.push({
+                key: 'tsd',
+                val: startDate,
+            })
+        }
+        if (endDateElm.val()) {
+            var endDate = getTimestampFromStr(endDateElm.val());
+            endDate += (new Date(endDate) - new Date(endDate).setHours(0,0,0,0));
+            param.push({
+                key: 'ted',
+                val: endDate,
+            });
+        }
+
+        if (selectUsersInstance.getSelectedValues().length) {
+            param.push({
+                key: 'tu',
+                val: selectUsersInstance.getSelectedValues().join(','),
+            });
+        }
+
+        if (selectActionsInstance.getSelectedValues().length) {
+            param.push({
+                key: 'ta',
+                val: selectActionsInstance.getSelectedValues().join(','),
+            });
+        }
+
+        setActionParametersToBrowserURL(param);
+    }
+
+    function getUsersAndActions(selectedUsers, selectedActions, callback) {
         bodyElm.css("cursor", "wait");
         $.post(serverURL, {
             func: 'getUsersAndActions',
         }, function(data) {
             bodyElm.css("cursor", "pointer");
             if(!data || !data.users || !data.actions) {
+                typeof callback === 'function' && callback();
                 return console.error('Received unreachable users ans actions: ', data);
             }
+
+            if(!Array.isArray(selectedUsers)) selectedUsers = [];
+            if(!Array.isArray(selectedActions)) selectedActions = [];
 
             var usersHTML = data.users.sort(function (a, b) {
                 if(a.user > b.user) return 1;
                 return -1;
-            }).map(userObj => '<option value = "' + userObj.id + '">' + userObj.user + '</option>').join('');
+            }).map(userObj => {
+                var isSelected = selectedUsers.indexOf(userObj.id) !== -1 ? ' selected' : '';
+                return '<option value = "' + userObj.id + '"' + isSelected + '>' + userObj.user + '</option>'
+            }).join('');
 
             var actionsHTML = data.actions.sort(function (a, b) {
                 if(a.name > b.name) return 1;
                 return -1;
-            }).map(actionObj => '<option value = "' + actionObj.id + '">' + actionObj.name + '</option>').join('');
+            }).map(actionObj => {
+                var isSelected = selectedActions.indexOf(actionObj.id) !== -1 ? ' selected' : '';
+                return '<option value = "' + actionObj.id + '"' + isSelected + '>' + actionObj.name + '</option>'
+            }).join('');
 
             selectUsersElm.html(usersHTML);
             selectActionsElm.html(actionsHTML);
 
-            M.FormSelect.init(document.querySelectorAll('select'), {});
+            selectUsersInstance = M.FormSelect.init(selectUsersElm[0], {});
+            selectActionsInstance = M.FormSelect.init(selectActionsElm[0], {});
+
+            typeof callback === 'function' && callback();
         });
     }
 
     function getSessions(firstID) {
         bodyElm.css("cursor", "wait");
         // i known, that select initialized in the initEvents, but dont remove this from here
-        selectUsersInstance = M.FormSelect.init(selectUsersElm[0], {});
-        selectActionsInstance = M.FormSelect.init(selectActionsElm[0], {});
 
         var from = new Date(datePickerFromInstance.toString()).getTime() || '';
         var to = new Date(datePickerToInstance.toString()).getTime() || '';
@@ -209,7 +426,7 @@ var JQueryNamespace = (function ($) {
         var tableHTML = '<table class="bordered highlight" style="table-layout:fixed;" id="sessionTable">' +
             '<tbody id="sessionTableBody">';
 
-        var tasksRef = {}, actionNum = 0;
+        var tasksRef = {}, actionErrors = {}, actionNum = 0;
         var filteredObjectIDs = {};
         objects.forEach(obj => filteredObjectIDs[obj.id] = obj.name);
 
@@ -219,6 +436,7 @@ var JQueryNamespace = (function ($) {
         var actionIDFilter = {};
         selectActionsInstance.getSelectedValues().forEach(actionID => actionIDFilter[actionID] = true);
 
+        var actionForObjects = parameters.action.actionForObjects;
         sessions.sort((a,b) => b.startTimestamp - a.startTimestamp).forEach(function (row) {
             if(row.taskID) {
                 var hideClass = ' class="hide"';
@@ -233,16 +451,20 @@ var JQueryNamespace = (function ($) {
             }
 
             var description = row.description ?
-                row.description
+                escapeHtml(row.description)
                     .replace(/{{highlightOpen}}/g, '<span class="highLight">')
                     .replace(/{{highlightClose}}/g, '</span>') :
                 '';
 
             var error = row.error ?
-                escapeHtml(row.error)
+                escapeHtml(row.actionName)  + ': ' + escapeHtml(row.error)
                     .replace(/{{highlightOpen}}/g, '<span class="highLight">')
-                    .replace(/{{highlightClose}}/g, '</span>') :
+                    .replace(/{{highlightClose}}/g, '</span>').split('\n').filter(str => str.trim()).join('<br/>') :
                 '';
+
+            if(error.length > 1000) error = error.substring(0, 1000) + '...';
+
+            if(row.error) actionErrors[row.sessionID] = row.error;
 
             var taskName = row.taskName ?
                 escapeHtml(row.taskName)
@@ -250,11 +472,24 @@ var JQueryNamespace = (function ($) {
                     .replace(/{{highlightClose}}/g, '</span>') :
                 '';
 
-            var objectList = row.objects.map(obj => {
-                if(objects.length && filteredObjectIDs[obj.id]) {
-                    return '<span class="highLight">' + escapeHtml(obj.name) + '</span>';
-                } else return escapeHtml(obj.name)
-            }).join(',<br/>');
+            if(row.objects.length) {
+                var urlParameters = {
+                    'c': encodeURIComponent(row.objects.map(obj => obj.name).join(',')),
+                };
+
+                var actionPath = parameters.action.link.replace(/\/[^\/]+$/, '') + '/' + row.actionID;
+                urlParameters.a = encodeURIComponent(actionPath); // /action/information
+
+                var url = '/?' + Object.keys(urlParameters).map(function(key) {
+                    return key + '=' + urlParameters[key];
+                }).join('&');
+
+                var objectList = '<a href="' + url + '" target="_blank">' + row.objects.map(obj => {
+                    if(objects.length && filteredObjectIDs[obj.id]) {
+                        return '<span class="highLight">' + escapeHtml(obj.name) + '</span>';
+                    } else return escapeHtml(obj.name)
+                }).join(',<br/>') + '</a>';
+            } else objectList = '';
 
             var actionName = actionIDFilter[row.actionID] ?
                 '<span class="highLight">' + escapeHtml(row.actionName) + '</span>' :
@@ -264,8 +499,9 @@ var JQueryNamespace = (function ($) {
                 '<span class="highLight">' + escapeHtml(row.userName) + '</span>' :
                 escapeHtml(row.userName);
 
-            var actionHTML = '<tr style="cursor:pointer" data-session-id="' + row.sessionID + '""' +
-                hideClass + taskIDAttr + '">' +
+            var actionHTML = '<tr style="cursor:pointer" data-session-id="' + row.sessionID + '"' +
+                hideClass + taskIDAttr + ' data-action-name="' + escapeHtml(row.actionName) +
+                '" data-error="' + (error ? 1 : 0) + '">' +
                 '<td style="width: 5%">' + taskLabel  +
                 '</td><td style="width: 5%">' +
                 (row.startTimestamp ?
@@ -280,13 +516,13 @@ var JQueryNamespace = (function ($) {
                 '</td><td style="width: 10%">' + userName +
                 '</td><td style="width: 10%">' + actionName +
                 '</td><td style="width: 35%">' + description +
-                '</td><td class="red-text" style="width: 20%">' + error +
-                '</td><td style="width: 10%">' + objectList || ''+
+                '</td><td class="red-text" style="width: 20%; font-weight: normal; overflow-wrap: break-word;">' + error +
+                '</td><td style="width: 10%; overflow-wrap: break-word;">' + objectList +
                 '</td><td class="hide">' + row.userID +
                 '</td></tr>';
             actions[row.actionID] = row.actionName;
 
-            if(!tasksRef[taskSession]) {
+            if (!tasksRef[taskSession]) {
                 var taskObjects = {};
                 row.objects.forEach(function (obj) {
                     taskObjects[obj.name] = obj.id;
@@ -299,7 +535,8 @@ var JQueryNamespace = (function ($) {
                     userID: row.userID,
                     actionName: [actionName],
                     description: taskName,
-                    error: error ? [error] : '',
+                    error: error ? [error] : [],
+                    rawError: error ? [row.actionName + ': ' + row.error] : [],
                     objects: taskObjects,
                     actions: [actionHTML],
                 }
@@ -316,7 +553,10 @@ var JQueryNamespace = (function ($) {
 
                 tasksRef[taskSession].actionName.unshift(actionName);
 
-                if (error) tasksRef[taskSession].error.unshift(error);
+                if (error) {
+                    tasksRef[taskSession].error.unshift(error);
+                    tasksRef[taskSession].rawError.unshift(row.actionName + ': ' + row.error);
+                }
 
                 row.objects.forEach(function (obj) {
                     tasksRef[taskSession].objects[escapeHtml(obj.name)] = obj.id;
@@ -326,23 +566,39 @@ var JQueryNamespace = (function ($) {
             }
         });
 
+        var showOnlyTasks = onlyTasksCBElm.is(':checked');
         for(var taskSession in tasksRef) {
             var task = tasksRef[taskSession];
             if(task.taskID) {
-                var humanTaskID = String(task.taskID).replace(/^(.*)(.{5})$/, '$1 $2');
-                //var humanTaskID = String(task.taskID).replace(/^(.*)(.{5})$/, '$2');
+                var highlightedTaskID = taskIDFilterElm.val() ?
+                    '<span class="highLight">' + '#' + task.taskID + '</span>' : '#' + String(task.taskID);
 
-                if(taskIDFilterElm.val()) {
-                    humanTaskID = '<span class="highLight">' +'<span class="highLight">' + humanTaskID + '</span>';
-                }
+                if(Object.keys(task.objects).length) {
 
-                var objectList = Object.keys(task.objects).map(name => {
-                    if(objects.length && filteredObjectIDs[task.objects[name]]) {
-                        return '<span class="highLight">' + escapeHtml(name) + '</span>';
-                    } else return escapeHtml(name)
-                }).join(',<br/>');
+                    var urlParameters = {
+                        'c': encodeURIComponent(Object.keys(task.objects).join(',')), // selected objects
+                    };
 
-                tableHTML += '<tr style="cursor:pointer; font-weight: bold" data-task-id="' + taskSession + '">' +
+                    if(actionForObjects) {
+                        var actionPath = parameters.action.link.replace(/\/[^\/]+$/, '') + '/' + actionForObjects;
+                        urlParameters.a = encodeURIComponent(actionPath); // /action/information
+                    }
+
+                    var url = '/?' + Object.keys(urlParameters).map(function(key) {
+                        return key + '=' + urlParameters[key];
+                    }).join('&');
+
+                    var objectList = '<a href="' + url + '" target="_blank">' + Object.keys(task.objects).map(name => {
+                        if(objects.length && filteredObjectIDs[task.objects[name]]) {
+                            return '<span class="highLight">' + escapeHtml(name) + '</span>';
+                        } else return escapeHtml(name)
+                    }).join(',<br/>') + '</a>';
+                } else objectList = '';
+
+                tableHTML += '<tr style="cursor:pointer; font-weight: bold" data-task-session-id="' + taskSession +
+                    '"  data-task-id="' + task.taskID +
+                    '" data-task-description="' + '#' + task.taskID + ' ' + escapeHtml(task.description) +
+                    '" data-error="' + (task.error.length ? 1 : 0) + '">' +
                     '<td><i class="material-icons" data-task-icon="' + taskSession + '">expand_more</i></td><td>' +
                     (task.startTimestamp ?
                         (from ? '<span class="highLight">' : '') + (new Date(task.startTimestamp)).toLocaleString()
@@ -353,20 +609,20 @@ var JQueryNamespace = (function ($) {
                         (to ? '<span class="highLight">' : '') + (new Date(task.stopTimestamp)).toLocaleString()
                             .replace(/\D\d\d\d\d/, '').replace(/:\d\d$/, '') + (to ? '</span>' : '') :
                         '-') +
-                    '</td><td>' + task.userName +
+                    '</td><td>' + escapeHtml(task.userName) +
                     '</td><td>' + task.actionName.join(',<br/>') +
-                    '</td><td>' + '#' + humanTaskID + ': ' + task.description +
-                    '</td><td class="red-text">' +
+                    '</td><td>' + highlightedTaskID + ': ' + escapeHtml(task.description) +
+                    '</td><td class="red-text" style="font-weight: normal; overflow-wrap: break-word;">' +
                         (task.error.length ?
                             '* ' + task.error.join('</br>* ') : '') +
-                    '</td><td>' + objectList || '' +
+                    '</td><td style="overflow-wrap: break-word;">' + objectList +
                     '</td><td class="hide">' + task.userID +
                     '</td></tr>';
 
                 task.actions.forEach(function (actionHTML) {
                     tableHTML += actionHTML;
                 });
-            } else tableHTML += task.actions[0];
+            } else if(!showOnlyTasks) tableHTML += task.actions[0];
         }
 
         actionListElm.html(tableHTML +  '</tbody></table>');
@@ -381,32 +637,71 @@ var JQueryNamespace = (function ($) {
         });
 
         var sessionTRElms = $('[data-session-id]');
-        var tasksTRElms = $('[data-task-id]');
+        var tasksTRElms = $('[data-task-session-id]');
 
         sessionTRElms.click(function () {
-            var sessionID = Number($(this).attr('data-session-id'));
-            sessionTRElms.css({backgroundColor: ''})
+            selectedTaskID = null;
+            taskIDElm.val('');
+            taskSessionIDElm.val('');
+            selectedSessionID = Number($(this).attr('data-session-id'));
+            sessionIDElm.val(selectedSessionID);
+            commentDescriptionElm.text(' action "' + $(this).attr('data-action-name') + '"');
+            var error = $(this).attr('data-error');
+            modalCommentElm.val(error === '0' ? correctlyText : incorrectlyText + actionErrors[selectedSessionID] || '');
+            M.textareaAutoResize(modalCommentElm);
+            sessionTRElms.css({backgroundColor: ''});
             $(this).css({backgroundColor: '#DDDDDD'});
             sessionTRElms.css({cursor: 'wait'});
-            var message = simpleFilterCBElm.is(':checked') ?
+            var messageFilter = simpleFilterCBElm.is(':checked') ?
                 '"' + messageFilterElm.val() + '"' : messageFilterElm.val();
-            alepizActionLogViewerNamespace.getLastLogRecords([sessionID], {},
+            alepizActionLogViewerNamespace.getLastLogRecords([selectedSessionID], {},
                 function (actionID) {
                     sessionTRElms.css({cursor: 'pointer'});
-                    return actions[actionID];
-                }, false, message);
+                    return actions[actionID]; // this getActionName function should return the name of the action
+                }, false, messageFilter, true);
         });
 
         tasksTRElms.click(function () {
-            var taskID = $(this).attr('data-task-id');
-            $('[data-task-action-id=' + taskID + ']').toggleClass('hide');
+            selectedSessionID = null;
+            var selectedTaskSessionID = $(this).attr('data-task-session-id');
+            selectedTaskID = $(this).attr('data-task-id');
+            taskIDElm.val(selectedTaskID);
+            taskSessionIDElm.val(selectedTaskSessionID);
+            sessionIDElm.val('');
+            commentDescriptionElm.text(' task "' + $(this).attr('data-task-description') + '"');
+            var error = $(this).attr('data-error');
+            modalCommentElm.val(error === '0' ?
+                correctlyText : incorrectlyText + tasksRef[selectedTaskSessionID].rawError.join('\n'));
+
+            M.textareaAutoResize(modalCommentElm);
+            $('[data-task-action-id=' + selectedTaskSessionID + ']').toggleClass('hide');
             $(this).toggleClass('task-open');
             tasksTRElms.css({backgroundColor: ''})
             if($(this).hasClass('task-open')) {
                 $(this).css({backgroundColor: '#CCCCCC'});
-                $('[data-task-icon="' + taskID + '"]').text('expand_less');
-            } else $('[data-task-icon="' + taskID + '"]').text('expand_more')
+                $('[data-task-icon="' + selectedTaskSessionID + '"]').text('expand_less');
+
+                // show actions log
+                var actionsTRElms = $('tr[data-task-action-id=' + selectedTaskSessionID + '][data-session-id]');
+                var sessionIDs = $.map(actionsTRElms, function(actionElm) {
+                    return Number($(actionElm).attr('data-session-id'));
+                });
+
+                tasksTRElms.css({cursor: 'wait'});
+                var messageFilter = simpleFilterCBElm.is(':checked') ?
+                    '"' + messageFilterElm.val() + '"' : messageFilterElm.val();
+                alepizActionLogViewerNamespace.getLastLogRecords(sessionIDs, {},
+                    function (actionID) {
+                        tasksTRElms.css({cursor: 'pointer'});
+                        return actions[actionID]; // this getActionName function should return the name of the action
+                    }, false, messageFilter, true);
+            } else {
+                commentDescriptionElm.text(' unselected task');
+                modalCommentElm.val('');
+                $('[data-task-icon="' + selectedTaskID + '"]').text('expand_more');
+                selectedTaskID = null;
+                taskIDElm.val('');
+            }
         });
     }
-
 })(jQuery); // end of jQuery name space

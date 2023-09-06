@@ -85,12 +85,11 @@ countersDB.updateCounter = function(counter, callback) {
  * @param {0|1} counter.disabled - is counter disabled
  * @param {0|1} counter.debug - need to debug counter
  * @param {number} counter.taskCondition - counter taskCondition
- * @param {number} sessionID - unique sessionID
  * @param {function(Error) | function(null, counterID:number)} callback - callback(err, counterID) where counterID is a new
  * counter ID
  */
-countersDB.insertCounter = function(counter, sessionID, callback) {
-    const id = unique.createHash(JSON.stringify(counter) + sessionID);
+countersDB.insertCounter = function(counter, callback) {
+    const id = unique.createHash(JSON.stringify(counter));
     log.info('Inserting new counter ', id, ' into the database: ', counter);
 
     db.run(

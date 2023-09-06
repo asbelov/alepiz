@@ -73,10 +73,20 @@ function getTableList(callback) {
  *  where dbN is the dbClient.js object
  */
 function replication(remoteDBs) {
+    /**
+     * @description Replication configuration parameters
+     * @type {{
+     *  restartReplicationTime: number,
+     *  pauseBetweenReplication: number,
+     *  disable: boolean,
+     *  pauseBetweenTableProcessing: number,
+     *  maxTableSizeForReplication: number
+     * }}
+     */
     var cfg = confRepl.get();
     var indexOfOwnNode = confMyNode.get('indexOfOwnNode');
 
-    if(cfg.debug) log.info('Starting new replication cycle');
+    log.debug('Starting new replication cycle');
 
     var restartReplicationTime = cfg.restartReplicationTime ===
         parseInt(String(cfg.restartReplicationTime), 10) && cfg.restartReplicationTime > 10000 ?
@@ -117,7 +127,7 @@ function replication(remoteDBs) {
 
         var tableNum = 1;
         async.eachSeries(tables, function (table, callback) {
-            if (cfg.debug) log.info('Processing table ', table, ': ', tableNum++, '/', tables.length);
+            log.debug('Processing table ', table, ': ', tableNum++, '/', tables.length);
 
             db.get('SELECT COUNT(*) AS cnt FROM ' + table, function (err, localTableRows) {
                 if (err) {
@@ -152,8 +162,10 @@ function replication(remoteDBs) {
 
                     async.eachOf(remoteDBs, function (remoteDB, hostPort, callback) {
                         if (!remoteDB.clientIPC.isConnected()) {
-                            if (!remoteDB.clientIPC.printNotConnectedBefore || cfg.debug) {
+                            if (!remoteDB.clientIPC.printNotConnectedBefore) {
                                 log.warn('Not connected to ', hostPort, ' waiting...');
+                            } else {
+                                log.debug('Not connected to ', hostPort, ' waiting...');
                             }
                             remoteDB.clientIPC.printNotConnectedBefore = true;
                             return callback();
@@ -174,26 +186,22 @@ function replication(remoteDBs) {
                             var diff = getDifferenceFromArraysSortedByID(myRows, remoteRows, id, table);
                             if (diff.length) differences.push(diff);
 
-                            if (cfg.debug) {
-                                log.info('Table ', table, ' has ', diff.length, ' differences. Rows local: ',
+                            log.debug('Table ', table, ' has ', diff.length, ' differences. Rows local: ',
                                     localTableRows.cnt, ', remote: ', remoteRows.length, ':', hostPort);
-                            }
 
                             callback();
                         });
                     }, function () {
                         // no differences found
                         if (differences.length === 0) {
-                            if (cfg.debug) log.info('No differences found for table ', table);
+                            log.debug('No differences found for table ', table);
                             let t = setTimeout(callback, pauseBetweenTableProcessing);
                             t.unref();
                             return;
                         }
 
-                        if (cfg.debug) {
-                            log.info('Found not optimized differences for table ', table, ': ',
-                                (differences[0].length > 10 ? differences[0].length : differences));
-                        }
+                        log.debug('Found not optimized differences for table ', table, ': ',
+                            (differences[0].length > 10 ? differences[0].length : differences));
                         var diffRows = differences.shift();
                         if (differences.length > 1) {
                             differences.forEach(diffRows1 => {
@@ -201,10 +209,8 @@ function replication(remoteDBs) {
                             })
                         }
 
-                        if (cfg.debug) {
-                            log.info('Found optimized differences for table ', table, ': ',
-                                (diffRows.length > 10 ? diffRows.length : diffRows));
-                        }
+                        log.debug('Found optimized differences for table ', table, ': ',
+                            (diffRows.length > 10 ? diffRows.length : diffRows));
 
                         if (diffRows.length === 0) {
                             log.info('Found ', differences.length + 1,

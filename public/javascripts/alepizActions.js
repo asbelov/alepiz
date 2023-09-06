@@ -9,7 +9,6 @@ var alepizActionsNamespace = (function($) {
         actionsListElm,
         searchActionsElm,
         searchObjectsElm,
-        searchFiltersElm,
         searchIconElm,
         objectsTabElm,
         searchActionsAutocompleteInstance,
@@ -29,13 +28,12 @@ var alepizActionsNamespace = (function($) {
         actionsListElm = $('#actionsList');
         searchActionsElm = $('#searchActions');
         searchObjectsElm = $('#searchObjects');
-        searchFiltersElm = $('#searchFilters');
         searchIconElm = $('#searchIcon');
         objectsTabElm = $('#objectsTab');
     }
 
     function initMaterializeElements() {
-        searchActionsAutocompleteInstance = M.Autocomplete.init(searchActionsElm[0], {
+        var options = {
             data: {},
             limit: 20, // The max amount of results that can be shown at once. Default: Infinity.
             minLength: 2, // The minimum length of the input for the autocomplete to start. Default: 1.
@@ -56,8 +54,9 @@ var alepizActionsNamespace = (function($) {
                     });
                 }
             }
-        });
+        };
 
+        searchActionsAutocompleteInstance = M.Autocomplete.init(searchActionsElm[0], options);
         M.Collapsible.init(document.querySelectorAll('.collapsible'), {});
     }
 
@@ -190,6 +189,21 @@ var alepizActionsNamespace = (function($) {
     return {
         init: init,
         createActionsList: createActionsList,
+        /**
+         * Return active action parameters
+         * @return {{
+         *     callbackBeforeExec: function(callback),
+         *     callbackAfterExec: function(*, callback),
+         *     execMethod: 'POST'|'GET',
+         *     link: string,
+         *     timeout: number,
+         *     name: string,
+         *     cleanInputIDs: string,
+         *     launcher: string,
+         *     rights: {run: Boolean, makeTask: Boolean},
+         *     swapActionControlBtn: Boolean
+         * }}
+         */
         getActiveActionConf: function () {
             return actionsConf[activeActionLink];
         },

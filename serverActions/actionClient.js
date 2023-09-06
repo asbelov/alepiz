@@ -82,7 +82,7 @@ actionClient.disconnect = function (callback) {
  * @param {object} param.args - object with action arguments like {<name>: <value>, ...}
  * @param {Boolean} [param.updateAction] reload ajax.js and server.js
  * @param {function(Error)|function(null, actionResult:Object)} callback callback(err, actionResult)
- * @param callback.actionResult: object like {"<serverAddress>:<serverPort>":<actionResult>, ....} if
+ * callback.actionResult: object like {"<serverAddress>:<serverPort>":<actionResult>, ....} if
  *      (executionMode = 'server' and runActionOnRemoteServers = true) or
  *      (executionMode = 'ajax' and  runAjaxOnRemoteServers = true).
  *      Otherwise this parameter is <actionResult>
@@ -99,8 +99,13 @@ actionClient.runAction = function (param, callback) {
         return;
     }
 
-    if(!param.sessionID) param.sessionID = unique.createID();
     param.timestamp = Date.now();
+    if(!param.sessionID) {
+        param.sessionID = unique.createHash(JSON.stringify(param) + unique.createID());
+    }
+    if(!param.taskID) {
+        param.newTaskID = unique.createHash(JSON.stringify(param));
+    }
 
     log.debug('Sending parameters to action server for run action: ', param, {
         func: (vars) => vars.EXPECTED_ACTION_ID === vars.EXPECTED_ACTION_ID,
@@ -109,9 +114,6 @@ actionClient.runAction = function (param, callback) {
         }
     });
 
-    if(!param.taskID) {
-        param.newTaskID = unique.createHash(JSON.stringify(param) + unique.createID());
-    }
     var dataToSend = {
         msg: 'runAction',
         param: param,
@@ -205,11 +207,9 @@ actionClient.runAction = function (param, callback) {
                         }
                     });
             }
-
             // actionResult: return ajax data or action execution result
             callback(err, actionResult);
         });
-
     }
 };
 
@@ -249,6 +249,5 @@ actionClient.actionConfig = function (username, func, actionID, config, callback
         user: prepareUser(username),
         actionID: actionID,
         config: config,
-        sessionID: unique.createID(),
     }, callback); // getActionConfig => callback(err, {config:...}; ); setActionConfig => callback(err)
 };

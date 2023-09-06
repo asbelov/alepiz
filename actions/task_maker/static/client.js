@@ -28,6 +28,7 @@ var JQueryNamespace = (function ($) {
         taskExecuteTimeSettingsAreaElm = $('#taskExecuteTimeSettingsArea');
         runTaskOnceElm = $('#runTaskOnce');
         newTaskGroupElm = $('#newTaskGroup');
+        newTaskGroupNameElm = $('#newTaskGroupName');
         taskExecutionConditionElm = $('#taskExecutionCondition');
         taskExecutionConditionDivElm = taskExecutionConditionElm.parent();
         runTaskAtDateElm = $('#runTaskAtDate');
@@ -202,11 +203,11 @@ var JQueryNamespace = (function ($) {
         objects = parameters.objects,
         taskParametersAreaElm,
         removedTasks = {},
-        workflow = {},
         unnamedTaskName = 'New unnamed task',
         mergeTasksData = {},
         taskListParameters = {
             onClick: onClickOnTask,
+            onChangeTaskList: showTaskChangeConfirmDialog,
             onAdd: onAddTask,
             onRemove: onRemoveTask,
             onComplete: onCompleteDrawingTaskList,
@@ -218,6 +219,7 @@ var JQueryNamespace = (function ($) {
         taskNameDivElm,
         taskExecuteTimeSettingsAreaElm,
         newTaskGroupElm,
+        newTaskGroupNameElm,
         runTaskOnceElm,
         taskExecutionConditionElm,
         taskExecutionConditionDivElm,
@@ -255,6 +257,8 @@ var JQueryNamespace = (function ($) {
      * @param {function(Error)|function()} callback callback(err) if an error has occurred, then the action will not be started
      */
     function beforeExec(callback) {
+        newTaskGroupNameElm.val(newTaskGroupElm.find('option:selected').text());
+
         if($('#taskExecutionCondition').val() === 'runAtTime') {
             var timeParts = $('#runTaskAtTime').val().match(/^(\d\d?):(\d\d?)$/);
             var startTime = timeParts ? Number(timeParts[1]) * 3600000 + Number(timeParts[2]) * 60000 : 0;
@@ -287,13 +291,24 @@ var JQueryNamespace = (function ($) {
     function afterExec(result, callback) {
         clearRemovedTasks();
         delete taskListParameters.aprovedTasks;
-        // task list will be refreshed automatically
-        //drawTasksList(taskListParameters, callback);
-        callback();
+        $('#taskUpdated').val('');
+        drawTasksList(taskListParameters, callback);
     }
 
     function onClickOnTask(taskID, taskName, callback) {
+        showTaskChangeConfirmDialog(function (err) {
+            if(err) return callback(err);
 
+            drawTaskParameters(taskID, taskName, !mergeTasksData.taskID, function (err) {
+                if (!taskID || err) $('#taskSettings').addClass('hide');
+                else $('#taskSettings').removeClass('hide');
+                mergeTasksData = {};
+                callback(err);
+            });
+        });
+    }
+
+    function showTaskChangeConfirmDialog(callback) {
         if($('#taskUpdated').val()) {
             modalChangeTaskConfirmElm.modal({dismissible: false});
             modalChangeTaskConfirmElm.modal('open');
@@ -302,19 +317,11 @@ var JQueryNamespace = (function ($) {
                 callback(new Error('Change task operation canceled'));
             });
             modalChangeTaskConfirmYesElm.unbind().click(function () {
-                drawTask(callback);
-            });
-
-        } else drawTask(callback);
-
-        function drawTask(callback) {
-            drawTaskParameters(taskID, taskName, !mergeTasksData.taskID, function (err) {
-                if (!taskID || err) $('#taskSettings').addClass('hide');
-                else $('#taskSettings').removeClass('hide');
-                mergeTasksData = {};
+                $('#taskUpdated').val('');
                 callback();
             });
-        }
+
+        } else callback();
     }
 
     /**
@@ -384,11 +391,20 @@ var JQueryNamespace = (function ($) {
             // set variable after draw element
             taskGroupForSearchElm = $('#taskGroupForSearch');
             // copy task groups to the newTaskGroup selector
-            newTaskGroupElm.html(taskGroupForSearchElm.html());
+
+            var taskGroups = getTaskGroups();
+            var workflowGroups = getWorkflowGroups();
+            var selectedGroupID = taskGroupForSearchElm.val();
+            selectedGroupID = workflowGroups[selectedGroupID] !== undefined ?
+                workflowGroups[selectedGroupID] : selectedGroupID
+
+            var htmlForNewTaskGroupsElm = taskGroups.map(function (group) {
+                var selected = group.id === selectedGroupID ? ' selected' : '';
+                return '<option value="' + group.id + '"' + selected + '>' + group.name + '</option>';
+            }).join('');
+
+            newTaskGroupElm.html(htmlForNewTaskGroupsElm);
             M.FormSelect.init(newTaskGroupElm[0], {});
-            try {
-                workflow = JSON.parse($('#workflow').val());
-            } catch (e) {}
         });
 
         $('#removedTask').click(clearRemovedTasks).mouseover(function () { // show hint
@@ -397,9 +413,7 @@ var JQueryNamespace = (function ($) {
             M.toast({
                 html: 'Click on the trash to restore the tasks:<br/>' +
                     Object.keys(removedTasks).map(function (taskID) {
-                        //var humanTaskID = String(taskID).replace(/^(.*)(.{5})$/, '$1 $2');
-                        var humanTaskID = String(taskID).replace(/^(.*)(.{5})$/, '$2');
-                        return '#' + humanTaskID + ': ' + removedTasks[taskID];
+                        return '#' + taskID + ': ' + removedTasks[taskID];
                     }).join('<br/>'),
                 completeCallback: function () { removeTasksToastNowShowing = false; }
             });
@@ -578,6 +592,91 @@ var JQueryNamespace = (function ($) {
     }
 
     /**
+     * Create task name for unnamed task
+     * @param {Object} actions actions objects for get o parameter with objects
+     * @return {string} task name
+     */
+    function createTaskName(actions) {
+        var taskNameRules = parameters.action.taskNameRules;
+        if(typeof taskNameRules !== 'object') return '';
+
+        var objectsSet = new Set();
+        /*
+        actions: {
+            <actionID>: {
+                ID: <action_id>,
+                parameters: [
+                    {name: o, value: "[{\"id\":<objectID>,\"name\":\"<objName>\"},...]}",
+                    ...
+                ]
+            }
+        }
+         */
+        for(var id in actions) {
+            var params = actions[id].parameters;
+            if(!Array.isArray(params)) continue;
+
+            params.every(param => {
+                if(param.name !== 'o') return true; // continue
+
+                try {
+                    var obj = JSON.parse(param.value);
+                } catch (err) {
+                    console.log('Can\'t parse objects for', actions[id].ID, '-', param.value, ':', err.message);
+                    return false; // break
+                }
+                if(!Array.isArray(obj)) {
+                    console.log('Objects for', actions[id].ID, ' not an array:', param.value);
+                    return false; // break
+
+                }
+                obj.forEach(o => {
+                    if(o.name) objectsSet.add(o.name);
+                });
+            });
+        }
+
+        var objects = Array.from(objectsSet);
+
+        var maxObjectsStrLen = taskNameRules.maxObjectsStrLen || 50;
+        var taskNameSuffix = taskNameRules.taskNameSuffix || ': ';
+
+        var objectStr = objects.join(',');
+        if(objectStr.length < maxObjectsStrLen) {
+            //console.log('!!!', maxObjectsStrLen)
+            return objectStr.trim() ? objectStr + taskNameSuffix : '';
+        }
+
+        taskNameRules.regExpRules.every(regExp => {
+            try {
+                var re = new RegExp(regExp.testExpr, 'ig');
+            } catch (err) {
+                //console.log('Error creating regExp from ', regExp.testExpr, ': ', err.message);
+                return true; //continue
+            }
+            //console.log(regExp)
+            var objectsArr = [];
+
+            if(!objects.every(obj => {
+                if(!re.test(obj)) {
+                    //console.log(obj, '!=', regExp.testExpr)
+                    return false; // break;
+                }
+                objectsArr.push(obj.replace(re, regExp.replExpr));
+                return true;
+            })) return true; // continue
+            //console.log(objectsArr)
+            objectStr = objectsArr.join(',');
+            maxObjectsStrLen = regExp.maxObjectsStrLen || 50;
+            if(objectStr.length < maxObjectsStrLen) return false; // break
+            //console.log(objectStr, maxObjectsStrLen)
+            objectStr = '';
+        });
+
+        return objectStr.trim() ? objectStr + taskNameSuffix : '';
+    }
+
+    /**
      * Draw task actions and parameters (in the bottom window)
      * @param {number} taskID task ID
      * @param {string} taskName task name
@@ -604,92 +703,88 @@ var JQueryNamespace = (function ($) {
             var OCIDs = data.OCIDs || [];
             var objectsForOCIDs = data.objects || {};
             var countersForOCIDs = data.counters;
+            var taskObjects = [];
 
-            var actionsRemain = Object.keys(actions).length;
             $('#taskExecutionConditionsDescription').text('');
 
             for(var taskActionID in actions) {
-                var hasOParam = false;
                 actions[taskActionID].parameters.forEach(function (actionParam) {
                     if(actionParam.name !== 'o' || !actionParam.value) return;
-                    hasOParam = true;
 
                     try {
-                        var _objects = JSON.parse(String(actionParam.value));
+                        Array.prototype.push.apply(taskObjects, JSON.parse(String(actionParam.value)));
                     }  catch(err) {
-                        _objects = [];
                         //console.log('Error parsing o parameter: ', err.message);
                     }
-
-                    setSharedCounters(_objects, 'From task actions',
-                        'data-value="OCIDsFromTaskActions"',function() {
-
-                        // run setSharedCounters(objects); after draw all 'From task actions' options
-                        M.FormSelect.init(taskExecutionConditionElm[0], {});
-                        if(--actionsRemain) return;
-                        setSharedCounters(objects, null,null, function () {
-                            M.FormSelect.init(taskExecutionConditionElm[0], {});
-                            if (!OCIDs.length) return;
-
-                            // convert array to string
-                            taskExecutionConditionElmPrevValue = OCIDs.map(function (OCID) {
-                                return String(OCID);
-                            });
-                            var optionsHtml =
-                                '<optgroup label="From task saved data" data-value="savedTaskExecutionCondition">';
-                            var selected = task.runType === 11 ? '' : ' selected';
-                            if(OCIDs.length > 20) { // on many conditions for task
-
-                                var counters = {};
-                                OCIDs.forEach(function (OCID) {
-                                    var counterName = countersForOCIDs[OCID];
-                                    if(!counters[counterName]) counters[counterName] = [objectsForOCIDs[OCID]];
-                                    else counters[counterName].push(objectsForOCIDs[OCID]);
-                                });
-
-                                var conditionStrings = [];
-                                for(var counterName in counters) {
-                                    conditionStrings.push(counterName + ' for ' + counters[counterName].join(','));
-                                }
-
-                                $('#taskExecutionConditionsDescription').text('Condition description: ' +
-                                    conditionStrings.join('; '));
-
-                                optionsHtml += '<option value="' + OCIDs.join(',') +
-                                    '"' + selected + ' data-value="savedTaskExecutionCondition">' +
-                                    'Ask to run for ' + OCIDs.length + ' saved task conditions</option>';
-                            } else {
-                                OCIDs.forEach(function (OCID) {
-                                    // remove option with equal OCID
-                                    taskExecutionConditionElm.find('option[value="' + OCID + '"]').remove();
-                                    optionsHtml += '<option value="' + OCID +
-                                        '"' + selected +
-                                        ' data-value="savedTaskExecutionCondition">Ask to run when ' +
-                                        countersForOCIDs[OCID] + ' for ' + objectsForOCIDs[OCID] + '</option>';
-                                });
-                            }
-                            optionsHtml += '</optgroup>';
-                            if(task.runType !== 11) taskExecutionConditionElm.val('');
-                            taskExecutionConditionElm.append(optionsHtml);
-
-                            setActiveTaskConditionOption(task.runType, function () {
-                                // disable option for running task immediately after saving
-                                $('option[value=runByActions]').prop('disabled', !data.canExecuteTask);
-
-                                M.FormSelect.init(taskExecutionConditionElm[0], {});
-                            });
-                        });
-                    });
                 });
-                if(!hasOParam) --actionsRemain;
             }
 
-            var groupID = taskGroupForSearchElm.val();
-            var nextGroupIdx = workflow[groupID];
-            if(typeof nextGroupIdx === 'number') groupID = nextGroupIdx;
+            setSharedCounters(taskObjects, 'From task actions',
+                'data-value="OCIDsFromTaskActions"',function() {
 
-            if(groupID) newTaskGroupElm.val(groupID);
-            else newTaskGroupElm.val(taskGroupForSearchElm.val());
+                // run setSharedCounters(objects); after draw all 'From task actions' options
+                setSharedCounters(objects, null,null, function () {
+                    M.FormSelect.init(taskExecutionConditionElm[0], {});
+
+                    // convert array to string
+                    taskExecutionConditionElmPrevValue = OCIDs.map(function (OCID) {
+                        return String(OCID);
+                    });
+                    var optionsHtml =
+                        '<optgroup label="From task saved data" data-value="savedTaskExecutionCondition">';
+                    // 11 is a run once completed
+                    var selected = task.runType === 11 ? '' : ' selected';
+                    if(OCIDs.length > 20) { // on many conditions for task
+
+                        var counters = {};
+                        OCIDs.forEach(function (OCID) {
+                            var counterName = countersForOCIDs[OCID];
+                            if(!counters[counterName]) counters[counterName] = [objectsForOCIDs[OCID]];
+                            else counters[counterName].push(objectsForOCIDs[OCID]);
+                        });
+
+                        var conditionStrings = [];
+                        for(var counterName in counters) {
+                            conditionStrings.push(counterName + ' for ' + counters[counterName].join(','));
+                        }
+
+                        $('#taskExecutionConditionsDescription').text('Condition description: ' +
+                            conditionStrings.join('; '));
+
+                        optionsHtml += '<option value="' + OCIDs.join(',') +
+                            '"' + selected + ' data-value="savedTaskExecutionCondition">' +
+                            'Ask to run for ' + OCIDs.length + ' saved task conditions</option>';
+                    } else {
+                        OCIDs.forEach(function (OCID) {
+                            // remove option with equal OCID
+                            taskExecutionConditionElm.find('option[value="' + OCID + '"]').remove();
+                            optionsHtml += '<option value="' + OCID +
+                                '"' + selected +
+                                ' data-value="savedTaskExecutionCondition">Ask to run when ' +
+                                countersForOCIDs[OCID] + ' for ' + objectsForOCIDs[OCID] + '</option>';
+                        });
+                    }
+                    optionsHtml += '</optgroup>';
+                    // 11 is a run once completed
+                    if(task.runType !== 11) taskExecutionConditionElm.val('');
+                    taskExecutionConditionElm.append(optionsHtml);
+
+                    setActiveTaskConditionOption(task.runType, function () {
+                        // disable option for running task immediately after saving
+                        $('option[value=runByActions]').prop('disabled', !data.canExecuteTask);
+
+                        M.FormSelect.init(taskExecutionConditionElm[0], {});
+                    });
+                });
+            });
+
+
+            var workflowGroups = getWorkflowGroups();
+            var selectedGroupID = taskGroupForSearchElm.val();
+            selectedGroupID = workflowGroups[selectedGroupID] !== undefined ?
+                workflowGroups[selectedGroupID] : selectedGroupID;
+
+            newTaskGroupElm.val(selectedGroupID);
 
             $('#taskID').val(taskID || '');
 
@@ -713,7 +808,8 @@ var JQueryNamespace = (function ($) {
             var html = '';
             // sort actions without actionsOrder for a new task
             if (taskName === unnamedTaskName || !taskName) {
-                $('#taskName').val('');
+
+                $('#taskName').val(createTaskName(data.actions));
 
                 var actionsWithOrder = [], actionsWithoutOrder = [];
                 taskActionIDs.forEach(function (taskActionID) {
@@ -1000,10 +1096,14 @@ var JQueryNamespace = (function ($) {
             case 11: // run once completed
             case 0: // run permanently
             case 1: // run once
-                if(runType === 11) {
+                taskExecutionConditionElmPrevValue =
+                    [taskExecutionConditionElm.find('option[data-value="OCIDsFromTaskActions"]').attr('value')];
+                taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
+                var taskExecutionConditionVal = taskExecutionConditionElm.val();
+                if((!taskExecutionConditionVal || !taskExecutionConditionVal.length) && runType === 11) {
                     $('option[data-requiredOption="last"]').
                     after('<option data-value="completed" value="runCompleted">' +
-                        'Task execution completed (Run the task when the condition is met)</option>');
+                        'The task was completed. The task execution condition does not exist</option>');
                     taskExecutionConditionElmPrevValue = ['runCompleted'];
                     taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
                 }

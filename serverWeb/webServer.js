@@ -24,6 +24,7 @@ const actionsHelp = require('../routes/help');
 const browserLog = require('../routes/browserLog');
 const webSecrets = require("./webSecrets");
 const thread = require("../lib/threads");
+const exitHandler = require('../lib/exitHandler');
 
 const Conf = require('../lib/conf');
 const confWebServer = new Conf('config/webServer.json');

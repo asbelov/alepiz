@@ -12,10 +12,19 @@ const unique = require('../../lib/utils/unique');
 var unitsDB = {};
 module.exports = unitsDB;
 
-unitsDB.new = function(unit, abbreviation, prefixes, multiplies, onlyPrefixes, sessionID, callback) {
-    log.debug('New unit parameters: ', unit, abbreviation, prefixes, multiplies, onlyPrefixes);
+/**
+ * Add a new counter unit
+ * @param {string} unitName new unit name
+ * @param {string } abbreviation unit abbreviation
+ * @param {string} prefixes unit prefixes
+ * @param {string} multiplies unit multiplies
+ * @param {0|1} onlyPrefixes
+ * @param {function(Error)|function()} callback callback(err)
+ */
+unitsDB.addCounterUnit = function(unitName, abbreviation, prefixes, multiplies, onlyPrefixes, callback) {
+    log.debug('New unit parameters: ', unitName, abbreviation, prefixes, multiplies, onlyPrefixes);
 
-    if(!unit) {
+    if(!unitName) {
         var err = new Error('Error inserting counters unit into database: unit name is not set');
         return callback(err);
     }
@@ -36,21 +45,22 @@ unitsDB.new = function(unit, abbreviation, prefixes, multiplies, onlyPrefixes, s
     }
 
     if(prefixes && multiplies &&
-        prefixes.replace(/\s*[;,]\s*/, ',').split(',').length !== multiplies.replace(/\s*[;,]\s*/, ',').split(',').length) {
-        err = new Error('Error inserting counters unit into database: count of prefixes is not equal to count of multiplies');
+        prefixes.replace(/\s*[;,]\s*/, ',').split(',').length !==
+            multiplies.replace(/\s*[;,]\s*/, ',').split(',').length) {
+        err = new Error('Error inserting counters unit into database: number of prefixes is not equal to number of multiplies');
         return callback(err);
     }
 
     if(Number(onlyPrefixes) !== 0) onlyPrefixes = 1;
     else onlyPrefixes = 0;
 
-    const id = unique.createHash(unit + abbreviation + prefixes + multiplies + onlyPrefixes + sessionID);
+    const id = unique.createHash(unitName + abbreviation + prefixes + multiplies + onlyPrefixes);
 
     db.run(
         'INSERT INTO countersUnits (id, name, abbreviation, prefixes, multiplies, onlyPrefixes) VALUES ' +
         '($id, $name, $abbreviation, $prefixes, $multiplies, $onlyPrefixes)', {
             $id: id,
-            $name: unit,
+            $name: unitName,
             $abbreviation: abbreviation,
             $prefixes: prefixes,
             $multiplies: multiplies,
@@ -58,7 +68,7 @@ unitsDB.new = function(unit, abbreviation, prefixes, multiplies, onlyPrefixes, s
         },
         function(err) {
             if (err) {
-                log.error('Error inserting counter unit ' + unit + ' into database: ', err.message);
+                log.error('Error inserting counter unit ' + unitName + ' into database: ', err.message);
                 return callback(err);
             }
             callback();
@@ -66,14 +76,24 @@ unitsDB.new = function(unit, abbreviation, prefixes, multiplies, onlyPrefixes, s
     )
 };
 
-unitsDB.edit = function(unitID, newUnit, abbreviation, prefixes, multiplies, onlyPrefixes, callback) {
-    log.debug('Edit unit parameters: ', unitID, newUnit, abbreviation, prefixes, multiplies, onlyPrefixes);
+/**
+ * Edit counter unit
+ * @param {number} unitID unit ID
+ * @param {string} newUnitName new unit name
+ * @param {string } abbreviation unit abbreviation
+ * @param {string} prefixes unit prefixes
+ * @param {string} multiplies unit multiplies
+ * @param {0|1} onlyPrefixes
+ * @param {function(Error)|function()} callback callback(err)
+ */
+unitsDB.editCounterUnit = function(unitID, newUnitName, abbreviation, prefixes, multiplies, onlyPrefixes, callback) {
+    log.debug('Edit unit parameters: ', unitID, newUnitName, abbreviation, prefixes, multiplies, onlyPrefixes);
     if(!unitID) {
         var err = new Error('Error editing counters unit: initial unit name is not set');
         return callback(err);
     }
 
-    if(!newUnit) {
+    if(!newUnitName) {
         err = new Error('Error editing counters unit: new unit name is not set');
         return callback(err);
     }
@@ -103,9 +123,9 @@ unitsDB.edit = function(unitID, newUnit, abbreviation, prefixes, multiplies, onl
     else onlyPrefixes = 0;
 
     db.run(
-        'UPDATE countersUnits SET name=$newUnit, abbreviation=$abbreviation, prefixes=$prefixes, ' +
+        'UPDATE countersUnits SET name=$newUnitName, abbreviation=$abbreviation, prefixes=$prefixes, ' +
         'multiplies=$multiplies, onlyPrefixes=$onlyPrefixes WHERE id=$oldUnitID', {
-            $newUnit: newUnit,
+            $newUnitName: newUnitName,
             $oldUnitID: unitID,
             $abbreviation: abbreviation,
             $prefixes: prefixes,
@@ -113,7 +133,8 @@ unitsDB.edit = function(unitID, newUnit, abbreviation, prefixes, multiplies, onl
             $onlyPrefixes: onlyPrefixes
         }, function(err) {
             if (err) {
-                log.error('Error changing name for counter unit from ' + unitID + ' to '+newUnit+' into database: ', err.message);
+                log.error('Error changing name for counter unit from ', unitID, ' to ',
+                    newUnitName, ' into database: ', err.message);
                 return callback(err);
             }
             callback();
@@ -121,7 +142,12 @@ unitsDB.edit = function(unitID, newUnit, abbreviation, prefixes, multiplies, onl
     );
 };
 
-unitsDB.remove = function(unitID, callback) {
+/**
+ * Remove counter unit
+ * @param {number} unitID unit ID
+ * @param {function(Error)|function()} callback callback(err)
+ */
+unitsDB.removeCounterUnit = function(unitID, callback) {
     log.debug('Remove unit parameters: ', unitID);
 
     if(!unitID) return callback(new Error('Error removing counters unit from database: unit name is not set'));

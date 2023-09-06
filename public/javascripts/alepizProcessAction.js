@@ -13,7 +13,8 @@ var alepizProcessActionNamespace = (function($) {
         makeTaskFloatingBtnElm,
         runActionIconElm,
         makeTaskIconElm,
-        iframeDOMElm;
+        iframeDOMElm,
+        sessionIDs = {};
 
     function init() {
         bodyElm = $("body");
@@ -48,6 +49,8 @@ var alepizProcessActionNamespace = (function($) {
         makeTaskBtnElm.addClass('hide');
         runActionSmallBtnElm.addClass('hide');
         makeTaskFloatingBtnElm.addClass('hide');
+
+        if(!activeAction) return;
         //console.log(activeAction.rights)
         // show "run action" button
         if(activeAction.launcher && activeAction.rights.run && !activeAction.swapActionControlBtn) {
@@ -60,7 +63,9 @@ var alepizProcessActionNamespace = (function($) {
                 makeTaskBtnElm.removeClass('hide');
             } else {
                 makeTaskFloatingBtnElm.removeClass('hide');
-                if(activeAction.swapActionControlBtn) runActionSmallBtnElm.removeClass('hide');
+                if(activeAction.launcher && activeAction.rights.run && activeAction.swapActionControlBtn) {
+                    runActionSmallBtnElm.removeClass('hide');
+                }
             }
         }
     }
@@ -74,7 +79,10 @@ var alepizProcessActionNamespace = (function($) {
     * running callback after action execution if specified
     * show result of action execution
     */
-    function processIframeInputsData(dontOpenLogWindows){
+    function processIframeInputsData(e){
+        // prevent to start the function from the parent button
+        if(e) e.stopPropagation();
+
         var activeAction = alepizActionsNamespace.getActiveActionConf();
 
         // if button id attr is makeTask*Btn, then run action for makeTask, else execute action
@@ -103,7 +111,7 @@ var alepizProcessActionNamespace = (function($) {
                 callbackBeforeExecFunc(
                     function (err) {
                         if (err) return log.error(err.message);
-                        return getInputDataAndExecServer(executionMode, dontOpenLogWindows);
+                        return getInputDataAndExecServer(executionMode);
                     }
                 );
             } catch (err) {
@@ -112,11 +120,11 @@ var alepizProcessActionNamespace = (function($) {
                     'Callback: ' + callbackBeforeExecFunc + '(callback): ', err.stack);
             }
             // without callback function for action executing action directly
-        } else getInputDataAndExecServer(executionMode, dontOpenLogWindows);
+        } else getInputDataAndExecServer(executionMode);
 
 
         // executionMode = 'server'|'makeTask'
-        function getInputDataAndExecServer(executionMode, dontOpenLogWindows) {
+        function getInputDataAndExecServer(executionMode) {
             var objects = alepizObjectsNamespace.getSelectedObjects();
 
             var actionParam = [{name: 'o', value: JSON.stringify(objects)}];
@@ -132,7 +140,14 @@ var alepizProcessActionNamespace = (function($) {
             var execMethod = activeAction.execMethod ? activeAction.execMethod.toUpperCase() : 'POST';
             if(execMethod !== 'GET' || execMethod !== 'POST') execMethod = 'POST';
 
-            var ajaxUrl = activeAction.link + '_' + alepizMainNamespace.getSessionID() + '/' + executionMode;
+            var sessionID = alepizMainNamespace.getSessionID();
+            if(sessionIDs[sessionID]) {
+                sessionID = createUniqueID('ALEPIZ' + String(Date.now()));
+                alepizMainNamespace.setSessionID(sessionID);
+                console.log('Creating new sessionID ', sessionID);
+            }
+
+            var ajaxUrl = activeAction.link + '_' + sessionID + '/' + executionMode;
             var timeout = Number(activeAction.timeout) * 1000;
             $("body").css("cursor", "progress");
 
@@ -142,7 +157,8 @@ var alepizProcessActionNamespace = (function($) {
                     displayLength: 6000
                 });
             } else {
-                if(dontOpenLogWindows === true) {
+                // when the function processIframeInputsData(e) was not started as argument to the onclick event handler
+                if(e === undefined) {
                     M.toast({
                         html: 'Executing action "' + activeAction.name + '"... Open log window for details',
                         displayLength: 6000
@@ -150,6 +166,7 @@ var alepizProcessActionNamespace = (function($) {
                 } else alepizAuditNamespace.openLogWindow();
             }
 
+            if(executionMode === 'server') sessionIDs[sessionID] = true;
             $.ajax(ajaxUrl, {
                 type: execMethod,
                 data: $.param(actionParam),
@@ -211,7 +228,7 @@ var alepizProcessActionNamespace = (function($) {
         }
 
 
-        // Function processing result, returned by action
+        // processing result, returned by action
         //
         // returnObj = {
         //      data: <any data, for sending to the callbackAfterExec function at client side>
@@ -277,6 +294,22 @@ Reload object list at objects tab after action executed.
             });
         });
     }
+
+    function createUniqueID (str, seed = 0) {
+        var h1 = 0xdeadbeef ^ seed,
+            h2 = 0x41c6ce57 ^ seed;
+        for (var i = 0, ch; i < str.length; i++) {
+            ch = str.charCodeAt(i);
+            h1 = Math.imul(h1 ^ ch, 2654435761);
+            h2 = Math.imul(h2 ^ ch, 1597334677);
+        }
+
+        h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+
+        return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+    }
+
 
 
     return {

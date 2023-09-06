@@ -10,7 +10,7 @@ var configurations = new Map();
 /**
  * Create a log configuration for specific log label from log.json file
  * @param {string} label log label (path to the js file, where was called the log function)
- * @return {Object} log configuration
+ * @return {{printObjectWithDepth: number, auditLogLevel: "D"|"I"|"W"|"E"|"EXIT"|"THROW"}} log configuration
  */
 module.exports = function(label) {
     var confObj = configurations.get(label);

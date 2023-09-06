@@ -20,26 +20,32 @@ var historyGet = {
 module.exports = historyGet;
 
 
-/*
-    get requested records by position or by time, depend on format of the 'shift' parameter
-
-    id: object ID
-
-    if format of 'num' parameter is a #<num> and\or 'shift' is #<shift>, then get records by position.
-    shift: it's a last record position from the end of the storage. 0 - last element
-    num: count of the requirement records from the last position. 0 - only one element with a 'last' position
-
-    or
-
-    if format of 'num' parameter is a <num>, then get records by time
-     'shift' and 'num' parameters:
-     1. if 'shift' is a timestamp (from 1970 in ms) - it interpretable as "time from". 'num' must be a timestamp too, and it is interpretable as "time to"
-     2. if 'shift' is ms from last record. 'num' - time interval in ms from 'shift'
-     you can add suffix 's', 'm', 'h' or 'd' to the end of time parameters 'shift' or 'num'.
-     It means seconds for 's', minutes for 'm', hours for 'h' and days for 'd'
-
-    callback(err, records), where records: [{data:.., timestamp:..}, ....]
-
+/**
+ * Return requested records by position or by time, depend of the <num> or <shift> parameters
+ *
+ * @param {number} id OCID
+ * @param {string|number} shift records or initial timestamp or time shift from the last record
+ * @param {string|number} num records number or final timestamp or time period from the <shift>
+ * @param {0|1|2} recordsType 0 - any, 1 - number, 2 - string
+ * @param {function(Error)|function(null, Array<[data: *, timestamp: number]>)} callback
+ *  callback(err, records), where records: [{data:.., timestamp:..}, ....]
+ * @example
+ *
+ * if the parameter <num> or <shift> is passed with the prefix "#" (#<num>, #<shift>),, then records will be returned
+ * according to their location in the database.
+ *      <num>: the number of records to be returned, starting from the <shift> position.
+ *      <shift>: this is the shift relative to the last record from the end of the storage.
+ *          0 - there is no shift and the last element is used
+ *     or
+ *
+ * if the parameter <num> or <shift> is passed without the prefix "#" (<num>, <shift>), then these parameters are
+ * interpreted as time.
+ *      if <shift> is a timestamp (since 1970 in ms), then <shift> is interpreted as the initial timestamp,
+ *      and <num> is the final timestamp. And data will be received starting from the time <shift>, ending with the time <num>.
+ *
+ *      if <shift> is the number of milliseconds from the last record, then <num> is the time period for
+ *      which data is required. To specify the time, you can add the suffixes 's' (seconds), 'm' (minutes),
+ *      'h' (hours) or 'd' (days) after <shift> or <num>.
  */
 function getFromHistory(id, shift, num, recordsType, callback) {
 
@@ -88,10 +94,10 @@ function getFromHistory(id, shift, num, recordsType, callback) {
             return callback(err, null, rawRecords);
         }
 
-        // can be on disconnect
+        // may occur when disconnecting
         if(!Array.isArray(rawRecords)) return callback();
 
-        // convert numeric to Number
+        // convert stringified Number to the Number for recordType 0(any) or 1(number)
         if(recordsType < 2) {
             var records = rawRecords.map(function (record) {
                 if (!isNaN(parseFloat(record.data)) && isFinite(record.data)) {
@@ -110,25 +116,26 @@ function getFromHistory(id, shift, num, recordsType, callback) {
 
         // used in a history functions, if not got all required records, return nothing
         if(!isGotAllRecords) {
-            rawRecords.push('No data from the database');
+            rawRecords.push('Not all required data were received from the DB: ' + records.length + '/' + num);
             return callback(null, null, rawRecords);
         }
 
         if(!isTime) {
-            // return less the 90% of requirement records
+            // Less than 90% of the required records were returned
             if(!clearNum || records.length / clearNum < 0.9) {
-                rawRecords.push('records: ' + records.length + '; num: ', clearNum);
+                rawRecords.push('Less than 90% of the required records were returned: ' + records.length + '/' + num);
                 return callback(null, null, rawRecords);
             }
             return callback(null, records, records);
         } else {
             if(records.length < 2) {
-                rawRecords.push('Returned ' + records.length + ' records');
+                rawRecords.push('Less then 2 records were returned: ' + records.length +  '/' + num);
                 return callback(null, null, rawRecords);
             }
 
             // calculating an avg time interval between the record timestamps
-            for(var i = 2, avgTimeInterval = records[1].timestamp - records[0].timestamp; i < records.length; i++) {
+            for(var i = 2, avgTimeInterval = records[1].timestamp - records[0].timestamp;
+                i < records.length; i++) {
                 avgTimeInterval = (avgTimeInterval + records[i].timestamp - records[i-1].timestamp) / 2;
             }
 
@@ -136,10 +143,11 @@ function getFromHistory(id, shift, num, recordsType, callback) {
             // timeInterval
             var timeFrom = clearShift > 1477236595310 ? clearShift : Date.now() - clearShift - clearNum;
 
-            // checking for the last record timestamp is near the timeFrom timestamp
+            // checking for the first record timestamp is near the timeFrom timestamp
             // r.timestamp = 14:05:00, avgInterval = 30, timeFrom = 14:04:25
             if(records[0].timestamp - avgTimeInterval * 1.2 > timeFrom) {
-                rawRecords.push('avgInterval + 20%: ' + Math.round(avgTimeInterval * 1.2 / 1000) +
+                rawRecords.push('Timestamp of the first record differs by more than 20% from the timeFrom: ' +
+                    'avgInterval + 20%: ' + Math.round(avgTimeInterval * 1.2 / 1000) +
                     '; timestamp - timeFrom: ' + Math.round((records[0].timestamp - timeFrom) / 1000));
                 return callback(null, null, rawRecords);
             }

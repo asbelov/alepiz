@@ -66,25 +66,25 @@ module.exports = function(args, callback) {
         return rightsWrappersCountersDB.getCountersForObjects(args.username, args.ids, groupID, callback);
     }
 
-    if(func === 'addCounterGroup') return groupsDBSave.new(args.group, args.sessionID, callback);
+    if(func === 'addCounterGroup') return groupsDBSave.addCounterGroup(args.group, callback);
 
-    if(func === 'editCounterGroup') return groupsDBSave.edit(args.oldGroup, args.group, callback);
+    if(func === 'editCounterGroup') return groupsDBSave.renameCounterGroup(args.oldGroup, args.group, callback);
 
-    if(func === 'setDefaultCounterGroup') return groupsDBSave.setInitial(args.group, args.groupProp, callback);
+    if(func === 'setDefaultCounterGroup') return groupsDBSave.setInitialCounterGroup(args.group, args.groupProp, callback);
 
-    if(func === 'removeCounterGroup') return groupsDBSave.remove(args.group, callback);
+    if(func === 'removeCounterGroup') return groupsDBSave.removeCounterGroup(Number(args.group), callback);
 
     if(func === 'addCounterUnit') {
-        return unitsDBSave.new(args.unit, args.abbreviation, args.prefixes, args.multiplies, args.onlyPrefixes,
-            args.sessionID, callback);
-    }
-
-    if(func === 'editCounterUnit') {
-        return unitsDBSave.edit(args.oldUnitID, args.unit, args.abbreviation, args.prefixes, args.multiplies,
+        return unitsDBSave.addCounterUnit(args.unit, args.abbreviation, args.prefixes, args.multiplies,
             args.onlyPrefixes, callback);
     }
 
-    if(func === 'removeCounterUnit') return unitsDBSave.remove(args.unit, callback);
+    if(func === 'editCounterUnit') {
+        return unitsDBSave.editCounterUnit(args.oldUnitID, args.unit, args.abbreviation, args.prefixes, args.multiplies,
+            args.onlyPrefixes, callback);
+    }
+
+    if(func === 'removeCounterUnit') return unitsDBSave.removeCounterUnit(args.unit, callback);
 
     if(func === 'getFunctionsDescription') return callback(null, getFunctionsDescription());
 

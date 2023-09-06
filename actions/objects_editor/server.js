@@ -1,10 +1,7 @@
 /*
- * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
+ * Copyright (C) 16.05.2015. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-/**
- * Created by Alexander Belov on 16.05.2015.
- */
 const log = require('../../lib/log')(module);
 const objectsDB = require('../../rightsWrappers/objectsDB');
 const countersDB = require('../../rightsWrappers/countersDB');
@@ -15,7 +12,21 @@ const server = require('../../server/counterProcessor');
 const Conf = require("../../lib/conf");
 const confMyNode = new Conf('config/node.json');
 
-
+/**
+ * Change object
+ * @param {Object} args
+ * @param {string} args.actionName action name
+ * @param {string} args.username username
+ * @param {string} args.rulesForRenameObjects stringified rules like [{"id": "XX", "name": "newObjectName1"}, {..}, ...]
+ * @param {string} args.objectsDescription objects description
+ * @param {string} args.objectsOrder stringified number - object order
+ * @param {string|undefined} args.objectsColor object color
+ * @param {string|undefined} args.objectsShade object shade
+ * @param {string} args.linkedCountersIDs comma separated linked counterIDs
+ * @param {string} args.linkedCounterIDsAdd comma separated new linked counterIDs
+ * @param {string} args.linkedCounterIDsDel comma separated linked counterIDs for delete
+ * @param {function(Error)|function(null, string)} callback callback(err, "<objectID1>,<objectID2>,...");
+ */
 module.exports = function(args, callback) {
     log.debug('Starting action server ', args.actionName, ' with parameters', args);
 
@@ -69,8 +80,9 @@ function editObjects(user, args, callback) {
         return callback(new Error('Error while parse JSON string with a new objects names "' +
             args.rulesForRenameObjects + '": result is not an array: ' + String(newObjects)));
 
-    var description = objectIDs.length > 1 && args.objectsDescription === '' ? undefined : args.objectsDescription;
-    var disabled = args.disabled !== '' ? args.disabled : undefined;
+    var description = objectIDs.length > 1 && args.objectsDescription === '' ?
+        undefined : args.objectsDescription;
+    var disabled = args.disabled !== '' ? (Number(args.disabled) ? 1 : 0) : undefined;
 
     if(args.objectsOrder) {
         var order = Number(args.objectsOrder);
@@ -120,8 +132,8 @@ function editObjects(user, args, callback) {
                                     objectID: Number(objectID),
                                     counterID: Number(counterID),
                                 });
-                                OCIDsToInsertHuman.add(objectID2Name[objectID] + ' #' + String(objectID).slice(-5) +
-                                    ' => ' + counterID2Name[counterID] + ' #' + String(counterID).slice(-5));
+                                OCIDsToInsertHuman.add(objectID2Name[objectID] + ' #' + objectID +
+                                    ' => ' + counterID2Name[counterID] + ' #' + counterID);
                             }
                         });
                     });
@@ -136,8 +148,8 @@ function editObjects(user, args, callback) {
                                     objectID: Number(objectID),
                                     counterID: Number(counterID),
                                 });
-                                OCIDsForDeleteHuman.add(objectID2Name[objectID] + ' #' + String(objectID).slice(-5) +
-                                    ' => ' + counterID2Name[counterID] + ' #' + String(counterID).slice(-5));
+                                OCIDsForDeleteHuman.add(objectID2Name[objectID] + ' #' + objectID +
+                                    ' => ' + counterID2Name[counterID] + ' #' + counterID);
                             }
                         });
                     });
@@ -223,17 +235,20 @@ function editObjects(user, args, callback) {
                                         transactionDB.end(function (err) {
                                         if (err) return callback(err);
 
-
+                                        /**
+                                         * @description Configuration of the current Alepiz node
+                                         * @type {{indexOfOwnNode: number, serviceNobodyObjects: Boolean}}
+                                         */
                                         var cfg = confMyNode.get();
                                         var indexOfOwnNode = cfg.indexOfOwnNode;
                                         var ownerOfUnspecifiedAlepizIDs = cfg.serviceNobodyObjects;
 
-                                        log.debug('args.disabled: ', args.disabled,
+                                        log.debug('disabled: ', disabled,
                                             '\nalepizIDs: ', alepizIDs,
                                             '\nownerOfUnspecifiedAlepizIDs: ', ownerOfUnspecifiedAlepizIDs,
                                             '\nindexOfOwnNode:', indexOfOwnNode);
 
-                                        var objectsAreEnabled = !args.disabled &&
+                                        var objectsAreEnabled = disabled === 0  &&
                                             ((!alepizIDs.length && ownerOfUnspecifiedAlepizIDs) ||
                                                 alepizIDs.indexOf(indexOfOwnNode) !== -1);
 
@@ -254,6 +269,8 @@ function editObjects(user, args, callback) {
                                                 Object.values(objectID2Name).join('; '),
                                                 '\nobjectsAreEnabled: ', objectsAreEnabled);
                                         }
+
+                                        if(!disabled) return callback(null, objectIDs.join(','));
 
                                         // object disabled. remove counters
                                         objectsDB.getObjectsCountersIDs(user, objectIDs, function (err, rows) {

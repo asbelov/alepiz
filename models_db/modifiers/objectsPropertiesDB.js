@@ -14,8 +14,8 @@ module.exports = objectsPropertiesDB;
 objectsPropertiesDB.updateProperties = function(objectID, properties, callback) {
     log.debug('Updating properties for objectsIDs: ', objectID, ' properties: ', properties);
 
-    var stmt = db.prepare('UPDATE objectsProperties SET name=$name, value=$value, mode=$mode, description=$description ' +
-        'WHERE objectID=$objectID and name=$name', function(err) {
+    var stmt = db.prepare('UPDATE objectsProperties SET name=$name, value=$value, mode=$mode, ' +
+        'description=$description WHERE objectID=$objectID and name=$name', function(err) {
         if (err) return callback(err);
 
         var notUpdatedProperties = [];

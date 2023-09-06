@@ -34,28 +34,34 @@ tasksDB.addTask = function(taskID, userID, timestamp, name, groupID, callback) {
 
 /**
  * Update existing task
- * @param {number} userID user ID
  * @param {number} taskID taskID for update
- * @param {string|null} name task name
+ * @param {string|null} taskName task name
  * @param {number} groupID task group ID
- * @param {function(Error)|function()} callback callback(err)
+ * @param {function(Error)} callback callback(err)
  */
-tasksDB.updateTask = function(userID, taskID, name, groupID, callback) {
-    if(!name) name = null;
+tasksDB.updateTask = function(taskID, taskName, groupID, callback) {
+    if(!taskName) taskName = null;
 
     db.run('UPDATE tasks SET name=$name, groupID=$groupID WHERE id=$taskID', {
         $taskID: taskID,
-        $name: name,
+        $name: taskName,
         $groupID: groupID,
-    }, function(err) {
-        {
-            if(err) {
-                return callback(new Error('User ' + userID + ' can\'t  update taskID ' + taskID + '; name ' + name +
-                    '; groupID: ' + groupID + ': ' + err.message));
-            }
-            callback();
-        }
-    });
+    }, callback);
+};
+
+/**
+ * Move task to task group
+ * @param {number} taskID taskID for update
+ * @param {number} groupID task group ID
+ * @param {function(Error)|function()} callback callback(err)
+ */
+tasksDB.moveTaskToGroup = function(taskID, groupID, callback) {
+    if(!groupID) return callback();
+
+    db.run('UPDATE tasks SET groupID=$groupID WHERE id=$taskID', {
+        $taskID: taskID,
+        $groupID: groupID,
+    }, callback);
 };
 
 /**

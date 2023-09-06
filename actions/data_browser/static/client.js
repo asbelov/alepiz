@@ -955,8 +955,7 @@ var dataBrowserNamespace = (function ($) {
                                 tableHeaderHTML +=
                                     '<th class="right-align blue-text tooltipped" style="cursor: pointer" data-th-ocid="' +
                                     ocid +
-                                    '" data-position="top" data-tooltip="Switch raw\\human (#' +
-                                    String(ocid).slice(-5) + ')">' +
+                                    '" data-position="top" data-tooltip="Switch raw\\human (#' + ocid + ')">' +
                                     escapeHtml(counter.objectName + ':' + counter.name) + '</th>';
                                 return;
                             }

@@ -75,7 +75,7 @@
 
     function createPriorities(priorities) {
         return priorities.map(function (priority) {
-            return '<option value="' + priority.id + '">#' + String(priority.id).slice(-5) + ' ' +
+            return '<option value="' + priority.id + '">#' + priority.id + ' ' +
                 priority.description + '</option>';
         });
     }

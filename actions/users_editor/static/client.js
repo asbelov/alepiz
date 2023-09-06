@@ -114,7 +114,7 @@ var JQueryNamespace = (function ($) {
             var priorityDescriptions = {}, priorityHTML = '';
             rows.forEach(function (row) {
                 priorityDescriptions[row.id] = row.description;
-                priorityHTML += '<option value="' + row.id + '">' + escapeHtml('#' + String(row.id).slice(-5) +
+                priorityHTML += '<option value="' + row.id + '">' + escapeHtml('#' + row.id +
                     ': ' + row.description) + '</option>';
             });
 
@@ -146,17 +146,18 @@ var JQueryNamespace = (function ($) {
 
             var users = {};
             rows.forEach(function (row) {
+                var roleID = row.roleID;
                 if(!users[row.name]) {
                     users[row.name] = {
                         name: row.name,
                         id: row.id,
                         fullName: row.fullName,
-                        roles: [row.roleID],
+                        roles: [roleID],
                         medias: {},
                     };
                 } else {
-                    if(users[row.name].roles.indexOf(row.roleID) === -1) {
-                        users[row.name].roles.push(row.roleID);
+                    if(users[row.name].roles.indexOf(roleID) === -1) {
+                        users[row.name].roles.push(roleID);
                     }
                 }
                 if(row.address && row.mediaID) {
@@ -176,10 +177,9 @@ var JQueryNamespace = (function ($) {
     }
 
     function createUserList(users, roles) {
-        var htmlNewUser = '<a href="#!" userID="" class="collection-item avatar active">' +
+        var htmlNewUser = '<a href="#!" userID="" class="collection-item avatar active" style="min-height: 44px">' +
             '<i class="material-icons circle">person_add</i>' +
-            '<span class="title">NEW USER</span>' +
-            '<p>Description: none</p>' +
+            '<span class="title">NEW USER: Used for create a new user</span>' +
             '<p>Roles: none</p>';
 
         var html = Object.keys(users).sort().map(function (name) {
@@ -189,22 +189,21 @@ var JQueryNamespace = (function ($) {
                 return roles[id].name + ' (' + roles[id].description + ')'
             }).join(', ');
 
-            return '<a href="#!" userID="' + user.id + '" userName="' + name + '" class="collection-item avatar">' +
+            return '<a href="#!" userID="' + user.id + '" data-username="' + name + '" class="collection-item avatar" style="min-height: 44px">' +
                 '<i class="material-icons circle">person</i>' +
-                '<span class="title">' + escapeHtml(name).toUpperCase() + '</span>' +
-                '<p>Description: ' + escapeHtml(user.fullName) + '</p>' +
+                '<span class="title">' + escapeHtml(name).toUpperCase() + ': ' + escapeHtml(user.fullName) + '</span>' +
                 '<p>Roles: ' + escapeHtml(rolesStr) + '</p>' +
-                (user.id ? '<span class="secondary-content"><i class="material-icons" removeUser>close</i></span>' : '') +
+                (user.id ? '<span class="secondary-content"><i class="material-icons" data-removeUser>close</i></span>' : '') +
                 '</a>'
         }).join('');
 
         $('#userList').empty().append(htmlNewUser + html);
 
-        $('i[removeUser]').click(function () {
+        $('i[data-removeUser]').click(function () {
             var userID = $(this).parent().parent().attr('userID');
             $(this).parent().parent().remove();
             removedUsersIDs.push(userID);
-            removedUsersNames.push($(this).parent().parent().attr('userName'));
+            removedUsersNames.push($(this).parent().parent().attr('data-username'));
             $('#removedUsers').val(removedUsersIDs.join(','));
 
             if(userID === userIDElm.val()) setUserProperties();
@@ -214,7 +213,7 @@ var JQueryNamespace = (function ($) {
             $('a[userID].active').removeClass('active');
             $(this).addClass('active');
 
-            var name = $(this).attr('userName');
+            var name = $(this).attr('data-username');
 
             setUserProperties(users[name]);
         })

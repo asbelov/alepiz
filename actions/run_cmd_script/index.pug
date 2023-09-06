@@ -1,0 +1,28 @@
+//
+    Copyright © 2023. Alexander Belov. Contacts: <asbel@alepiz.com>
+    Created on 07.07.2023, 17:47:25
+doctype
+html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
+    head
+        title= action.name
+        link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
+        link(rel='stylesheet', href='/material-design-icons/material-icons.css')
+        meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+        script(src='/materialize-css/dist/js/materialize.js')
+    body
+        main
+            div.row
+                div.col.s12
+                    div.card
+                        div.card-content
+                            span.card-title Run cmd command or script
+                            div.row
+                                div.col.s12.input-field
+                                    input(type="text" value="/c \"print data.cmd\" -cnt 70 -sleep 1")#programArgs
+                                    label(for="programArgs") Arguments for cmd.exe
+                                div.col.s12.input-field
+                                    input(type="text" value=".\\actions\\run_cmd_script\\")#cwd
+                                    label(for="cwd") Working dir
+                                div.col.s12.input-field
+                                    textarea.materialize-textarea#stdinData
+                                    label(for="stdinData") STDIN data

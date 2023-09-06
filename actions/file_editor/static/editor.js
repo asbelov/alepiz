@@ -335,7 +335,7 @@ function Editor(initCfg) {
         CodeMirror.autoLoadMode(editor, mode);
 
         if(!c.fileName) text2Editor();
-        else loadFilePart(null, function(_textareaSav) {
+        else loadFilePart(codePage.value, function(_textareaSav) {
             setTimeout(function() {
                 editor.on('change', function() {
                     isTextChanged = true;

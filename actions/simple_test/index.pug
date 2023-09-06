@@ -21,7 +21,10 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                 input(type="text")#returnValue
                 label(for="returnValue") Return value
             div.col.s12.input-field
-                input(type="text" value="0")#executionTime
-                label(for="executionTime") Execution time
+                input(type="text" value="20000")#executionTime
+                label(for="executionTime") Execution time (ms)
+            div.col.s12.input-field
+                input(type="text" value="1000")#printDataToLogInterval
+                label(for="executionTime") Frequency of printing data to the log (ms)
     footer
         input(type="hidden" name="actionName" value= action.name)

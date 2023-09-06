@@ -27,7 +27,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         main
             div#auditBody
                 div(style="padding: 0 10px 0 10px")
-                    ul.collapsible
+                    ul.collapsible.z-depth-0
                         li
                             div.collapsible-header.no-padding
                                 table.bordered(style="table-layout:fixed;")
@@ -45,37 +45,57 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                             div.collapsible-body
                                 div.row.no-margin
                                     div.input-field.col.s12.m4.l3
-                                        input(type='text')#taskIDFilter
+                                        input(type='text' data-filter-prm="t")#taskIDFilter
                                         label(for='taskIDFilter') Task IDs
                                     div.col.s6.m4.l2.input-field
                                         // value set to raise label
-                                        input(type='text' style="cursor:pointer").datepicker#startDate
+                                        input(type='text' style="cursor:pointer" data-filter-prm="tsd").datepicker#startDate
                                         label(for='startDate') From
                                     div.col.s6.m4.l2.input-field
                                         // value set to raise label
-                                        input(type='text' style="cursor:pointer").datepicker#endDate
+                                        input(type='text' style="cursor:pointer" data-filter-prm="ted").datepicker#endDate
                                         label(for='endDate') To
                                     div.input-field.col.s12.m6.l5
-                                        select#selectUsers(multiple)
+                                        select(data-filter-prm="tu")#selectUsers(multiple)
                                         label Users
                                     div.input-field.col.s12.m6
-                                        select#selectActions(multiple)
+                                        select(data-filter-prm="ta")#selectActions(multiple)
                                         label Actions
                                     div.input-field.col.s12.m6
-                                        input(type='text')#descriptionFilter
+                                        input(type='text' data-filter-prm="td")#descriptionFilter
                                         label(for='descriptionFilter') Description or error
-                                    div.input-field.col.s12.m6.l8
-                                        input(type='text')#messageFilter
+                                    div.input-field.col.s12.m4.l6
+                                        input(type='text' data-filter-prm="tm")#messageFilter
                                         label(for='messageFilter') Log message
                                     div.input-field.col.s6.m4.l2
                                         label
                                             input(type='checkbox' checked)#simpleFilterCB
                                             span Simple filter
-                                    div.col.s3.m4.l1.input-field.col
+                                    div.input-field.col.s6.m4.l2
+                                        label
+                                            input(type='checkbox' checked)#onlyTasksCB
+                                            span Show only tasks
+                                    div.col.s6.m4.l1.input-field.col
                                         a(href='#!')#modalFilterApply.waves-effect.waves-green.btn Apply
-                                    div.col.s3.m4.l1.input-field.col
+                                    div.col.s6.m4.l1.input-field.col
                                         a(href='#!')#modalFilterClear.waves-effect.waves-green.btn Clear
                 div(style="overflow: auto;padding: 0 10px 0 10px")#actionList
                 div(data-direction="vertical" style="width:100%; height:24px; padding-top:11px").resizer#resizer
                     div(style="width:100%; height:2px; background-color: #cbd5e0;")
                 div(style="overflow: auto;padding: 0 10px 0 10px")#actionLog
+
+        div#addCommentModal.modal
+            div.modal-content
+                h5 Comment
+                p Please add a comment to the result of the
+                    span#commentDescription
+                div.input-field
+                    textarea(data-length="5000").materialize-textarea#modalComment
+                    label(for="modalComment") Comment
+                    input(type="hidden")#taskID
+                    input(type="hidden")#taskSessionID
+                    input(type="hidden")#sessionID
+            div.modal-footer
+                a(href="#")#modalSendMessage.modal-close.waves-effect.waves-green.btn-flat Send message
+                a(href="#")#modalCancel.modal-close.waves-effect.waves-green.btn-flat Cancel
+

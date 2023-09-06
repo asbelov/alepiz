@@ -1,0 +1,34 @@
+{
+    "name": "Run cmd script",
+    "description": "Run cmd script",
+    "homePage": "index",
+    "execMethod": "post",
+    "launcher": "exec",
+    "launcherPrms": {
+        "executable": "C:\\Windows\\SysWOW64\\cmd.exe",
+        "returnStdout": true,
+        "returnCode": true,
+        "returnStderr": true,
+        "dontSplitOutput": true
+    },
+    "staticDir": "static",
+    "timeout": 60,
+    "showWhenNoObjectsSelected": true,
+    "descriptionTemplate": "Run C:\\Windows\\SysWOW64\\cmd.exe %:programArgsStr:%. Working dir: %:cwd:%. STDIN: %:stdinData:%",
+    "icon": "run",
+    "canAddParametersToAction": false,
+    "runActionOnRemoteServers": false,
+    "returnActionResult": true,
+    "applyToOwnObjects": true,
+    "parameters": {
+        "programArgsStr": {
+            "description": "Command line arguments for cmd.exe"
+        },
+        "cwd": {
+            "description": "Working dir"
+        },
+        "stdinData": {
+            "description": "Data will be send to script stdin"
+        }
+    }
+}

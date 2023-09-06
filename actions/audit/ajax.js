@@ -49,7 +49,10 @@ function getSessions(args, callback) {
             async.eachSeries(rows, function (row, callback) {
 
                 getActionCfg(row.actionID, function (err, actionCfg) {
-                    if (err) return callback(err);
+                    if(err) {
+                        log.info(err.message);
+                        actionCfg = {name: row.actionID};
+                    }
 
                     var session = sessions[row.sessionID]
                     if(!session) {
@@ -141,6 +144,10 @@ function getUsersAndAction(callback) {
 
             async.eachSeries(Array.from(actionIDs), function (actionID, callback) {
                 getActionCfg(actionID, function (err, actionCfg) {
+                    if(err) {
+                        log.info(err.message);
+                        actionCfg = {name: actionID};
+                    }
                     if(typeof actionCfg === 'object' && actionCfg.name) {
                         actions.push({
                             id: actionID,
@@ -148,7 +155,7 @@ function getUsersAndAction(callback) {
                         });
 
                     }
-                    callback(err);
+                    callback();
                 });
             }, function (err) {
                 if(err) return callback(err);

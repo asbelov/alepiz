@@ -72,7 +72,6 @@ module.exports = function(args, callback) {
                         disabled: param.disabled,
                         sortPosition: param.sortPosition,
                         color: param.color,
-                        sessionID: args.sessionID,
                         timestamp: args.timestamp,
                     }, function (err, objectID) {
                         if (err) {
@@ -131,7 +130,7 @@ function addOrUpdateObjects(user, param, callback) {
     var disabled = param.disabled ? 1 : 0;
 
     if(!param.id) {
-        objectsDB.addObjects(user, param.id, description, order, disabled, param.color, param.sessionID, param.timestamp,
+        objectsDB.addObjects(user, param.id, description, order, disabled, param.color, param.timestamp,
             function (err, newObjectIDs) {
                 if (err) return callback(new Error('Can\'t insert object: ' + err.message));
 

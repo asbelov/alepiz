@@ -39,9 +39,9 @@ module.exports = collector;
 
 collector.get = function(param, callback) {
 
-    for(var key in param) {
-        if(!param.hasOwnProperty(key)) continue;
-        if(typeof param[key] === 'string' && param[key].indexOf(';') !== -1 && key !== 'query') {
+    for (var key in param) {
+        if (!param.hasOwnProperty(key)) continue;
+        if (typeof param[key] === 'string' && param[key].indexOf(';') !== -1 && key !== 'query') {
             return callback(new Error('Parameter ' + key + ' contain incorrect symbol ";"' + JSON.stringify(param)));
         }
     }
@@ -57,53 +57,53 @@ collector.get = function(param, callback) {
     Driver={ODBC Driver 13for SQL Server}
     Driver={SQL Server}
      */
-    if(param.driver) config.push('Driver={' + param.driver.replace(/^{(.+?)}$/, '$1') + '}');
+    if (param.driver) config.push('Driver={' + param.driver.replace(/^{(.+?)}$/, '$1') + '}');
     else config.push('Driver={SQL Server}');
 
     param.port = Number(param.port);
-    if(param.port && (param.port !== parseInt(String(param.port), 10) || param.port < 1 || param.port > 65535)) {
+    if (param.port && (param.port !== parseInt(String(param.port), 10) || param.port < 1 || param.port > 65535)) {
         log.error('Incorrect TCP port: ', param.port, ': ', param);
         return callback();
     }
 
-    if(!param.server) {
+    if (!param.server) {
         log.error('MSSQL server not specified: ', param.server, ': ', param);
         return callback();
     } else config.push('Server=' + param.server + (param.port ? ',' + String(param.port) : ''));
 
-    if(param.userName) {
+    if (param.userName) {
         config.push('Uid=' + param.userName);
-        if(password) config.push('Pwd=' + password);
+        if (password) config.push('Pwd=' + password);
     }
 
-    if(param.database) config.push('Database={' + param.database.replace(/^{(.+?)}$/, '$1') + '}');
-    if(param.trusted) config.push('Trusted_Connection=' + (param.trusted ? 'yes' : 'no'));
+    if (param.database) config.push('Database={' + param.database.replace(/^{(.+?)}$/, '$1') + '}');
+    if (param.trusted) config.push('Trusted_Connection=' + (param.trusted ? 'yes' : 'no'));
 
     var connectionTimeout = param.connectionTimeoutSec || 2;
     var queryTimeout = param.queryTimeoutSec || 2;
 
-    if(connectionTimeout !== parseInt(String(connectionTimeout), 10) || connectionTimeout < 1) connectionTimeout = 2;
-    if(queryTimeout !== parseInt(String(queryTimeout), 10) || queryTimeout < 1) queryTimeout = 2;
+    if (connectionTimeout !== parseInt(String(connectionTimeout), 10) || connectionTimeout < 1) connectionTimeout = 2;
+    if (queryTimeout !== parseInt(String(queryTimeout), 10) || queryTimeout < 1) queryTimeout = 2;
 
     var connectionString = config.join('; ');
     mssql.open({
         conn_str: connectionString,
         conn_timeout: connectionTimeout, // specified in seconds.
-    }, function (err, con) {
+    }, function(err, con) {
 
-        if(err) {
-            var ret = param.query ? JSON.stringify({unableToConnect: err.message}) : 0;
-            con && typeof con.close  === 'function' ? con.close(() => callback(null, ret)) : callback(null, ret);
+        if (err) {
+            var ret = param.query ? JSON.stringify({ unableToConnect: err.message }) : 0;
+            con && typeof con.close === 'function' ? con.close(() => callback(null, ret)) : callback(null, ret);
             return;
         }
         //log.debug('Connected to ', param.server, 'using ', param);
-        if(!param.query) return con.close(() => callback(null, 1));
+        if (!param.query) return con.close(() => callback(null, 1));
 
         var q = con.query({
             query_str: param.query,
             query_timeout: queryTimeout, // specified in seconds.
-        }, function (err, rows) {
-            if(err) return con.close(() => callback(new Error('Error in query "' + param.query + '": ' + err.message)));
+        }, function(err, rows) {
+            if (err) return con.close(() => callback(new Error('Error in query "' + param.query + '": ' + err.message)));
 
             con.close(() => callback(null, rows));
         });

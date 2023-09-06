@@ -277,7 +277,7 @@ rightsWrapper.addOrUpdateTask = function(username, task, actions, callback) {
     if (!username) return callback(new Error('Incorrect user name "' + username + '" for add new task'));
 
     if (!task.actionsOrder || !Array.isArray(task.actionsOrder) || !task.actionsOrder.length) {
-        return callback(new Error('Incorrect actionsOrder "'+ task.actionsOrder + '" for add new task'));
+        return callback(new Error('Incorrect actionsOrder "' + task.actionsOrder + '" for add new task'));
     }
 
     if (!task.name || typeof task.name !== 'string') task.name = null;
@@ -287,7 +287,7 @@ rightsWrapper.addOrUpdateTask = function(username, task, actions, callback) {
     }
     var groupID = Number(task.groupID);
     if (groupID === undefined || groupID !== parseInt(String(groupID), 10)) {
-        return callback(new Error('Incorrect group ID "'+task.groupID+'" for add new task'));
+        return callback(new Error('Incorrect group ID "' + task.groupID + '" for add new task'));
     }
 
 
@@ -318,8 +318,8 @@ rightsWrapper.addOrUpdateTask = function(username, task, actions, callback) {
                 When updating, we update the task data in order to save data with the task conditions.
                 But for simplicity, we delete actions and parameters and save them again
                  */
-                addOrUpdateTaskAndRemoveActions(task.taskID, task.newTaskID, userID, timestamp, task.name, groupID, task.taskActionID,
-                    function(err, taskID) {
+                addOrUpdateTaskAndRemoveActions(task.taskID, task.newTaskID, userID, timestamp, task.name,
+                    groupID, task.taskActionID, function(err, taskID) {
                     if (err) return callback(err);
 
                     var actionsOrder = {};
@@ -347,16 +347,16 @@ rightsWrapper.addOrUpdateTask = function(username, task, actions, callback) {
                         }
 
                         log.info('Adding a new action for task ID ', taskID, ', taskActionID: ', taskActionID,
-                            ', startupOptions: ', startupOptions, ', action order: ', actionsOrder[taskActionID],
-                            ', action parameters: ', actions[taskActionID]);
+                            ', startupOptions: ', startupOptions, ', action order: ', actionsOrder[taskActionID]);
+                        log.debug('Action parameters: ', actions[taskActionID]);
 
                         // when updating the task all task actions will be removed and will be added again
                         tasksDBSave.addAction(taskID, taskActionID2actionID[taskActionID], startupOptions,
                             actionsOrder[taskActionID],function(err, newTaskActionID) {
                             if (err) return callback(err);
 
-                            log.info('Add parameters for task ID: ', taskID, ', new taskActionID: ', newTaskActionID,
-                                ', params: ', actions[taskActionID].args);
+                            log.info('Add parameters for task ID: ', taskID, ', new taskActionID: ', newTaskActionID);
+                            log.debug('Task parameters: ', actions[taskActionID].args);
 
                             tasksDBSave.addParameters(newTaskActionID, actions[taskActionID].args, callback);
                         });
@@ -393,10 +393,10 @@ function addOrUpdateTaskAndRemoveActions(taskID, newTaskID, userID, timestamp, t
         return;
     }
 
-    tasksDBSave.updateTask(userID, taskID, taskName, groupID, function (err) {
+    tasksDBSave.updateTask(taskID, taskName, groupID, function (err) {
         if(err) {
-            return callback(new Error('Can\'t update task #' + taskID + '"' + taskName +
-                '", groupID: "' + groupID + '": ' + err.message));
+            return callback(new Error('Can\'t update task ' + taskID + ' name: "' + taskName +
+                '", groupID: "' + groupID + '", userID ' + userID + ': ' + err.message));
         }
         tasksDBSave.removeTaskActionsAndParameters(taskID, function (err) {
             if(err) {
@@ -422,7 +422,8 @@ function addOrUpdateTaskAndRemoveActions(taskID, newTaskID, userID, timestamp, t
 rightsWrapper.saveAction = function (username, taskID, newTaskID, actionID, args, callback) {
     username = prepareUser(username);
 
-    log.info('Starting to save the action for the user: ', username, ', action: ', actionID, ', args: ', args);
+    log.info('Starting to save the action for the user: ', username, ', action: ', actionID);
+    log.debug('args: ', args);
     usersDB.getID(username, function(err, userID) {
         if (err) return callback(new Error('Can\'t get userID for user "' + username + '": '+err.message));
         if (userID === undefined) {
@@ -480,6 +481,7 @@ rightsWrapper.saveAction = function (username, taskID, newTaskID, actionID, args
 
                             tasksDBSave.addParameters(taskActionID, args, function (err) {
                                 if (err) return transactionDB.rollback(err, callback);
+
                                 log.info('Action ', actionID, ', taskActionID: ', taskActionID,
                                     ' successfully saved to the existing task ', taskID);
                                 transactionDB.end(callback);
@@ -495,8 +497,8 @@ rightsWrapper.saveAction = function (username, taskID, newTaskID, actionID, args
 /**
  * Add run condition for the task
  * @param {number} taskID task ID
- * @param {0|1|11|2|12} runType 0 - run permanently, 1 - run once, 2 - run now, 11 - run once task has already started,
- * 12 - run now already started, <timestamp> - run by time
+ * @param {0|1|11|2|12} runType 0 - run permanently, 1 - run once, 2 - run now
+ * 11 - run once task has already started, 12 - run now already started, <timestamp> - run by time
  * @param {Array<number>|string|number} OCIDs array of condition OCIDs or comma separated string or one OCID
  * @param {function(Error)|function()} callback callback(err)
  */
@@ -509,12 +511,14 @@ rightsWrapper.addRunCondition = function (taskID, runType, OCIDs, callback) {
 
         /*
         0 - run permanently, 1 - run once, 2 - run now
+        9 -
         11 - run once task has already started, 12 - run now already started, <timestamp> - run by time
-        // 1477236595310 = 01.01.2000
+        1477236595310 = 01.01.2000
         */
         if(([0,1,2,11,12].indexOf(runType) === -1 && runType < 1477236595310) ||
             runType !== parseInt(String(runType), 10)) {
-            return callback('Invalid runType (' + runType + ') while add or update condition for task ' + taskID);
+            if(runType === 9) return callback() // set scheduled task to run again
+            return callback(new Error('Invalid runType (' + runType + ') while add or update condition for task ' + taskID));
         }
 
         addOrUpdateTaskCondition(checkedTaskID[0], runType, function(err) {
@@ -550,12 +554,12 @@ rightsWrapper.addRunCondition = function (taskID, runType, OCIDs, callback) {
 /**
  * Add or update task condition
  * @param {number} taskID taskID
- * @param {0|1|11|2|12} runType 0 - run permanently, 1 - run once, 2 - run now, 11 - run once task has already started,
- * 12 - run now already started, <timestamp> - run by time
+ * @param {0|1|11|2|12} runType 0 - run permanently, 1 - run once, 2 - run now
+ * 11 - run once task has already started, 12 - run now already started, <timestamp> - run by time
  * @param {function(Error)|function()} callback callback(err)
  */
 function addOrUpdateTaskCondition(taskID, runType, callback) {
-    log.info('For task ID ', taskID, ' set runType: ', runType);
+    log.info('For task ID ', taskID, ' save runType: ', runType, ' into the database');
 
     tasksDBSave.addRunCondition(taskID, runType, function(err) {
         if(!err) return callback();

@@ -68,11 +68,10 @@ alepizFiltersNamespace = (function($) {
                 // if not empty, make it empty
                 searchFiltersElm.val('');
                 searchIconElm.removeClass('hide');
-                filterFilterList();
             } else {
                 searchIconElm.addClass('hide');
-                filterFilterList(searchStr);
             }
+            alepizObjectsNamespace.filterList(searchStr, objectsFilterElm, 'data-object-filter');
         });
 
         // find it at alepizObjects.js
@@ -151,13 +150,6 @@ alepizFiltersNamespace = (function($) {
         });
     }
 
-    function filterFilterList(initSearchStr) {
-        if (!initSearchStr) initSearchStr = searchFiltersElm.val();
-        else searchFiltersElm.val(initSearchStr);
-
-        return alepizObjectsNamespace.filterList(initSearchStr, objectsFilterElm, 'data-object-filter');
-    }
-
     function getCheckedFilterNames() {
         return $('input[data-object-filter]:checked').map(function() {
             return $(this).attr('data-object-filter');
@@ -197,10 +189,8 @@ alepizFiltersNamespace = (function($) {
             else $(this).text('AND');
             var config = alepizMainNamespace.getConfig();
             var filter = getFilterExpression(true);
-            if(config.objectFilter !== filter) {
-                config.objectFilter = filter;
-                alepizMainNamespace.saveConfig();
-            }
+            config.objectFilter = filter;
+            alepizMainNamespace.saveConfig();
         });
     }
 
@@ -212,10 +202,8 @@ alepizFiltersNamespace = (function($) {
         createObjectFilterExpressionForEditor(filter);
         var config = alepizMainNamespace.getConfig();
         // when initializing filters config is not initialized
-        if('objectFilter' in config && config.objectFilter !== filter) {
-            config.objectFilter = filter;
-            alepizMainNamespace.saveConfig();
-        }
+        config.objectFilter = filter;
+        alepizMainNamespace.saveConfig();
         if(!checkedFilterNames || !checkedFilterNames.length) {
             filterCounterContainerElm.addClass('hide');
             filterTabSwitchElm.text('FILTERS');

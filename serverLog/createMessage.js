@@ -56,8 +56,6 @@ var consoleColors = {
     attrHidden:     '\u001b[8m'
 };
 
-var prevMessage = '', equalPrevMessagesNum = 0;
-
 /** Set color for a string
  * @param {string} str part of the log message for se color
  * @param {string} colorLabel message color label
@@ -94,11 +92,10 @@ createMessage.createHeader = function (level, label, sessionID, date, TID_PID) {
  * @param {Array} args array of the message parts. Parts can be any types
  * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} level message debug level
  * @param {number} objectDepth object depth for log object
- * @returns {{message: string, equalPrevMessagesNum: number}|null} message: message body,
- *      equalPrevMessagesNum number of the equal previous messages.
+ * @returns {string} message body
  */
 createMessage.createBody = function (args, level, objectDepth) {
-    var message = args.map(arg => {
+    return args.map(arg => {
         if (typeof arg === 'number'/* || !isNaN(arg)*/) return setColor(String(arg), 'number');
         if (typeof arg === 'string') return setColor(arg.replace(/[\r\n]+$/, ''), level);
         if (typeof arg === 'boolean') return setColor(String(arg), 'boolean');
@@ -115,18 +112,4 @@ createMessage.createBody = function (args, level, objectDepth) {
             return '(ERROR CONVERTING OBJECT TO STRING: ' + err.message+')'
         }
     }).join('');
-
-
-    var returnedResult = {
-        message: message,
-        equalPrevMessagesNum: equalPrevMessagesNum,
-    }
-    if(message === prevMessage) {
-        ++equalPrevMessagesNum;
-        return null;
-    } else {
-        prevMessage = message;
-        equalPrevMessagesNum = 0;
-    }
-    return returnedResult
 }

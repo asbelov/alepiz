@@ -47,7 +47,7 @@ browserLog.log = function (level, argsStr, sessionID, callback){
         return callback(new Error('Can\'t parse log arguments (' + argsStr + ') received from browser: ' + err.message));
     }
 
-    log.raw(level, args, module);
+    log.raw(level, args);
     callback();
 };
 

@@ -3,12 +3,22 @@
     "description": "Audit of actions",
     "homePage": "index",
     "ajaxServer": "ajax.js",
-    "execMethod": "post",
     "staticDir": "static",
     "timeout": 60,
     "showWhenNoObjectsSelected": true,
     "onChangeObjectMenuEvent": "callback:onChangeObjects",
+    "callbackBeforeExec": "callbackBeforeExec",
     "outputFormat": "text",
     "icon": "policy",
-    "applyToOwnObjects": true
+    "applyToOwnObjects": true,
+    "runActionOnRemoteServers": true,
+    "execMethod": "post",
+    "launcher": "nodeModule",
+    "launcherPrms": {
+        "javaScript": "server.js",
+        "startAsThread": true
+    },
+    "correctly": "Correctly",
+    "incorrectly": "Incorrectly: \n",
+    "actionForObjects": "information"
 }

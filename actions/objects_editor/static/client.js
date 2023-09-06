@@ -73,13 +73,11 @@ var JQueryNamespace = (function ($) {
         colorPicker.init($('#colorPickerParent'), $('#shadePickerParent'), colorSampleElm);
         alepizIDPicker.init($('#alepizIDPickerParent'));
         disabledCBElm.click(function () {
-            if(disabledCBElm.val() !== initDisabledStatus) disabledElm.val(initDisabledStatus ? 1 : 0);
-            else disabledElm.val('');
+            disabledElm.val(disabledCBElm.is(':checked') ? 1 : 0);
         });
     });
 
     var serverURL = parameters.action.link+'/ajax',
-        initDisabledStatus,
         disabledElm,
         disabledCBElm,
         objectsDescriptionElm,
@@ -109,34 +107,39 @@ var JQueryNamespace = (function ($) {
             // sortPosition: <objectOrder>, color:.., disabled:..., created:...}, {...},...]
 
             var objectsParameters = data.objectsParameters;
-            if(!objectsParameters.length) return;
+            if (!objectsParameters.length) return;
 
             var disabled = objectsParameters[0].disabled,
                 sortPosition = objectsParameters[0].sortPosition,
                 description = objectsParameters[0].description,
                 colorShade = objectsParameters[0].color;
 
-            $('#objectsNames').html(objectsParameters.map(function(obj) {
+            $('#objectsNames').html(objectsParameters.map(function (obj) {
                 return '<b>' + obj.name + '</b>' +
                     (obj.created ? ': created ' + new Date(Number(obj.created)).toLocaleString() : '');
             }).join('<br/>'));
 
-            colorSampleElm.text(objectsParameters.map(function(obj) { return obj.name; }).join(', ') || 'OBJECT NAME');
+            colorSampleElm.text(objectsParameters.map(function (obj) {
+                return obj.name;
+            }).join(', ') || 'OBJECT NAME');
 
-            for(var i = 1; i < objectsParameters.length; i++) {
+            for (var i = 1; i < objectsParameters.length; i++) {
                 var obj = objectsParameters[i];
-                if(disabled !== obj.disabled) disabled = undefined;
-                if(sortPosition !== obj.sortPosition) sortPosition = undefined;
-                if(description !== obj.description) description = undefined;
-                if(colorShade !== obj.color) colorShade = undefined; // save unchanged
-                if(description === undefined && sortPosition === undefined &&
+                if (disabled !== obj.disabled) disabled = undefined;
+                if (sortPosition !== obj.sortPosition) sortPosition = undefined;
+                if (description !== obj.description) description = undefined;
+                if (colorShade !== obj.color) colorShade = undefined; // save unchanged
+                if (description === undefined && sortPosition === undefined &&
                     disabled === undefined && colorShade === undefined) break;
             }
 
 
-            if(disabled === 1) initDisabledStatus = "1";
-            else initDisabledStatus = "";
-            disabledCBElm.prop('checked', initDisabledStatus);
+            if (disabled === undefined) {
+                disabledCBElm.prop('indeterminate', true);
+            } else {
+                disabledCBElm.prop('indeterminate', false);
+                disabledCBElm.prop('checked', !!disabled);
+            }
 
             if(sortPosition) objectsOrderElm.val(sortPosition);
             else objectsOrderElm.val(0);
@@ -218,6 +221,6 @@ var JQueryNamespace = (function ($) {
     }
 
     function createChipName(name, id) {
-         return  name + ' (#' + String(id).slice(-5) + ')';
+        return  name + ' (#' + id + ')';
     }
 })(jQuery); // end of jQuery name space

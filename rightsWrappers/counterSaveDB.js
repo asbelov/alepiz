@@ -166,7 +166,6 @@ rightsWrapper.saveObjectsCountersIDs = function(username, initObjectIDs, initCou
  * @param {Object} counterData.counterParameters counter parameters
  * @param {Array<Object>} counterData.updateEvents counter update events parameters
  * @param {Object} counterData.variables counter variables data
- * @param {number} counterData.sessionID unique counter sessionID for create unique new counterID
  * @param {function(Error)|function(null, number)} callback callback(err, counterID)
  */
 rightsWrapper.saveCounter = function(username, counterData, callback) {
@@ -176,7 +175,6 @@ rightsWrapper.saveCounter = function(username, counterData, callback) {
     var counterParameters = counterData.counterParameters;
     var updateEvents = counterData.updateEvents;
     var variables = counterData.variables;
-    var sessionID = counterData.sessionID;
 
     checkIDs(initObjectsIDs, function(err, checkedIDs) {
         if (err && (!Array.isArray(checkedIDs) || !checkedIDs.length)) {
@@ -248,7 +246,7 @@ rightsWrapper.saveCounter = function(username, counterData, callback) {
                 if(err) return callback(err);
 
                 // callback(err, counterID)
-                saveCounter(objectsIDs, counter, counterParameters, updateEvents, variables, sessionID, callback);
+                saveCounter(objectsIDs, counter, counterParameters, updateEvents, variables, callback);
             });
         });
     });
@@ -261,10 +259,9 @@ rightsWrapper.saveCounter = function(username, counterData, callback) {
  * @param {Object} counterParameters counter parameters
  * @param {Array<Object>} updateEvents counter update events parameters
  * @param {Object} variables counter variables data
- * @param {number} sessionID unique counter sessionID for create unique new counterID
  * @param {function(Error)|function(null, number)} callback callback(err, counterID)
  */
-function saveCounter(objectsIDs, counter, counterParameters, updateEvents, variables, sessionID, callback) {
+function saveCounter(objectsIDs, counter, counterParameters, updateEvents, variables, callback) {
 
     collectors.checkParameters(counter.collectorID, counterParameters, variables,
         function(err, preparedCounterParameters){
@@ -308,7 +305,7 @@ function saveCounter(objectsIDs, counter, counterParameters, updateEvents, varia
                                     counter.name, '(', counter.counterID, '); OCIDs: ', OCIDs);
                                 if(rows.length) server.sendMsg({
                                     removeCounters: OCIDs,
-                                    description: 'Counter ' + counter.name + ' was updated in database'
+                                    description: 'Counter ' + counter.name + ' was updated in database and disabled'
                                 });
                                 callback(err, counter.counterID);
                             })
@@ -316,7 +313,7 @@ function saveCounter(objectsIDs, counter, counterParameters, updateEvents, varia
                     });
                 });
             } else {
-                insertCounter(objectsIDs, counter, counterParameters, updateEvents, variables, sessionID,
+                insertCounter(objectsIDs, counter, counterParameters, updateEvents, variables,
                     function(err, counterID) {
                     if(err) return transaction.rollback(err, callback);
 
@@ -325,7 +322,7 @@ function saveCounter(objectsIDs, counter, counterParameters, updateEvents, varia
 
                         // on create a new not disabled counter
                         log.info('Sending message to the server and history for add new counter ',
-                            counter.name, '(', counter.counterID, ')');
+                            counter.name, '(', counterID, ')');
                         if(!counter.disabled) server.sendMsg({
                             update: {
                                 topObjects: true,
@@ -401,11 +398,10 @@ function updateCounter(objectsIDs, counter, counterParameters, updateEvents, var
  * @param {Object} counterParameters counter parameters
  * @param {Array<Object>} updateEvents counter update events parameters
  * @param {Object} variables counter variables data
- * @param {number} sessionID unique counter sessionID for create unique new counterID
  * @param {function(Error)|function(null, number)} callback callback(err, counterID)
  */
-function insertCounter(objectsIDs, counter, counterParameters, updateEvents, variables, sessionID, callback) {
-    counterSaveDB.insertCounter(counter, sessionID, function(err, counterID) {
+function insertCounter(objectsIDs, counter, counterParameters, updateEvents, variables, callback) {
+    counterSaveDB.insertCounter(counter, function(err, counterID) {
         if(err) return callback(new Error('Error inserting counter into counters table: ' + err.message +
         ': ' + JSON.stringify(counter, null, 4)));
 
@@ -583,7 +579,7 @@ function updateObjectsCountersRelations(counterID, objectIDs, counterName, callb
             if(err || !row) {
                 return callback(new Error('Can\'t get objectCounterID for objectID: ' +
                     existingObjectsIDs[0] + ' and counter: ' + counterName + ': ' +
-                    (err ? err.mesage : 'relation is not found in database') ));
+                    (err ? err.message : 'relation is not found in database') ));
             }
 
             // also remove duplicates
@@ -602,7 +598,7 @@ function updateObjectsCountersRelations(counterID, objectIDs, counterName, callb
                 countersDB.getObjectCounterID(objectCounterPairForDeleting.objectID, counterID, function (err, row) {
                     if (err || !row) return callback(new Error('Can\'t get objectCounterID for objectID: ' +
                         objectCounterPairForDeleting.objectID + ' and counter: ' + counterName + ': ' +
-                        (err ? err.mesage : 'relation is not found in database')));
+                        (err ? err.message : 'relation is not found in database')));
 
                     objectsCountersIDsForDeleting.push(row.id);
                     callback();

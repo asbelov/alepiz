@@ -180,7 +180,13 @@ runInThread(path.join(__dirname, 'counterProcessorServer'), {moduleName: collect
                                             });
 
                                         if(message.data.$variables) {
-                                            var preparedResult = history.add(message.data.$id, result)
+                                            var preparedResult = history.prepareNewData(message.data.$id, result)
+                                            if(preparedResult) {
+                                                history.add(message.data.$id, {
+                                                    timestamp: preparedResult.timestamp,
+                                                    data: preparedResult.data,
+                                                });
+                                            }
                                             counterProcessorServer.processCounterResult({
                                                 err: err,
                                                 result: preparedResult,

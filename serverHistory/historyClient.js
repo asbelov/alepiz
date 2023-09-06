@@ -145,33 +145,57 @@ for(var funcName in functions) {
  */
 history.getFunctionList = function() { return functionsArray; };
 
-/** Add new data to history storage and return value like {timestamp:…, value:…}
- *
- * @param {number} initID - object counter ID (OCID) will be set as a history ID
- * @param {object|?number|string|boolean|undefined} data - data to add to history.
+/** Add new record to history storage and return value like {timestamp:…, value:…}
+ * @param {number} id object counter ID (OCID) will be set as a history ID
+ * @param {{timestamp: timestamp, data: (number|string|boolean)}} record record to add to history.
+ * Can be an object like {timestamp:…, data:…}
+ * @param {number} record.timestamp timestamp of the value
+ * @param {number|string|boolean} record.data record data
+ */
+history.add = function(id, record) {
+    id = Number(id);
+
+    if(!usedToSaveDataToHistory) {
+        usedToSaveDataToHistory = true;
+        getHouseKeeperData();
+    }
+
+    // send record to history only if counter.keepHistory != 0
+    if(!dontKeepHistoryOCIDs.has(id)) {
+        clientIPC.send({
+            msg: 'add',
+            id: id,
+            record: record,
+        });
+    }
+};
+
+/** Prepare data for insert to the history
+ * @param {number} initID object counter ID (OCID) will be set as a history ID
+ * @param {object|?number|string|boolean|undefined} data data to add to history.
  * Must be an object like {timestamp:…, value:…} or a simple value.
  * If no timestamp is set, a timestamp is created using Date.now().
  * If the timestamp is incorrect, then no data is added to the history and return undefined.
  * If the value is an object, JSON.stringify(value) runs before adding the value into history.
  * If the value is undefined or null then no value is added to history and return undefined.
- * @param {number} data.timestamp - timestamp of the value
- * @param {object|number|string|boolean} data.value - value. the JSON.stringify(value) will be applied if the value
+ * @param {number} data.timestamp timestamp of the value
+ * @param {object|number|string|boolean} data.value value. the JSON.stringify(value) will be applied if the value
  * type is object
- * @returns {{value: null|number|string|boolean|undefined, timestamp: number}|undefined} - will return the stored value
- * {timestamp:…, value:…} or undefined on error
+ * @returns {{value: null|number|string|boolean|undefined, timestamp: number, data: number|string|boolean}|undefined}
+ * will return the stored value {timestamp:…, value:…, data:...} or undefined on error
  */
-history.add = function(initID, data) {
-    log.debug('history.add(initID: ', initID, ', data: ', data, ')', {
-            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
-            vars: {
-                "EXPECTED_OCID": initID
-            }
-        });
-    // don't add empty value
+history.prepareNewData = function (initID, data) {
+    var id = Number(initID);
+    log.debug('history.prepareNewData(id: ', initID, ', record: ', data, ')', {
+        func: (vars) => vars.EXPECTED_OCID === vars.OCID,
+        vars: {
+            "EXPECTED_OCID": id
+        }
+    });
+
     if(data === undefined || data === null) return;
 
     // checking for correct OCID
-    var id = Number(initID);
     if(id !== parseInt(String(id), 10) || id < 1) {
         log.error('Try to add data to history for not unsigned integer objectCounterID: ', initID, ', data: ', data);
         return;
@@ -193,7 +217,8 @@ history.add = function(initID, data) {
                 //timestamp < 1477236595310 || timestamp > now + 60000) { // 1477236595310 = 01/01/2000
                 timestamp < now - parameters.timestampMaxTimeDiff || timestamp > now + 60000) { // 1477236595310 = 01/01/2000
                 log.debug('Try to add data to history with invalid timestamp or very old timestamp or timestamp ' +
-                    'from a future for id: ', id, '; data: ', data, '; now: ', now, '; now - timestamp = ', now - timestamp);
+                    'from a future for id: ', id, '; data: ', data, '; now: ', now, '; now - timestamp = ',
+                    now - timestamp);
                 timestamp = now;
             }
 
@@ -219,25 +244,12 @@ history.add = function(initID, data) {
         return;
     }
 
-    if(!usedToSaveDataToHistory) {
-        usedToSaveDataToHistory = true;
-        getHouseKeeperData();
-    }
-
-    // send data to history only if counter.keepHistory != 0
-    if(!dontKeepHistoryOCIDs.has(id)) {
-        clientIPC.send({
-            msg: 'add',
-            id: id,
-            record: record
-        });
-    }
-
     return {
         // !!! return value, not record.data, because record.data can be a string object and cannot be
         // !!! processed on the server when multiple values are accepted at one time as an array of values
         value: value, //  !!! not a record.data !!!
         timestamp: record.timestamp,
+        data: record.data,
     };
 };
 

@@ -649,7 +649,7 @@ var JQueryNamespace = (function ($) {
             var color = importanceList[event.importance].color;
             return '<a href="#!" class="collection-item black-text truncate tooltipped" style="background-color: ' +
                 color + ';" id="' + event.counterID + '" data-events-list="' + color +
-                '" data-tooltip="#' + String(event.counterID).slice(-5) + ' ' + escapeHtml(event.description) + '">' +
+                '" data-tooltip="#' + event.counterID + ' ' + escapeHtml(event.description) + '">' +
                 escapeHtml(event.name.replace(/^[A-Z]: /, '')) + '</a>';
         }).join('');
 
@@ -837,7 +837,7 @@ var JQueryNamespace = (function ($) {
             rows.forEach(function (row) {
                 if(row.debug) {
                     countersWithDebug.push('<a style="color:yellow" href="/?a=%2Factions%2Fcounter_settings&cid=' +
-                        row.id + '" target="_blank">' + (num++) + '. #' + String(row.id).slice(-5) + ' ' +
+                        row.id + '" target="_blank">' + (num++) + '. #' + row.id + ' ' +
                         escapeHtml(row.name) + '</a><br>');
                 }
             });

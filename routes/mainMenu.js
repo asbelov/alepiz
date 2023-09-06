@@ -132,8 +132,8 @@ function searchObjects(initSearchStr, user, filterNames,
 
     // !!!! don't touch it or save it before touching !!!!
     var searchStr = '%'+initSearchStr.
-        // replace spaces around and '|', '\r', '\n' characters to '*|*'
-        replace(/\s*[|\r\n]+\s*/g, '*|*').
+        // replace spaces around and ',', '|', '\r', '\n' characters to '*|*'
+        replace(/\s*[,|\r\n]+\s*/g, '*|*').
         // replace spaces around and '&' characters to '*&*'
         replace(/\s*&+\s*/g, '*&*').
         // replace '|&' or '&|' to '&', don't ask why
@@ -144,12 +144,12 @@ function searchObjects(initSearchStr, user, filterNames,
         replace(/\*+/g, '%').
         // remove forward and backward spaces characters
         replace(/^\s+/, '').replace(/\s+$/, '').
-        // remove patterns smaller than 6 characters between logical operators
-        replace(/[&|].{0,5}([&|])/g, '$1').
-        // remove search patterns smaller than 5 characters at the forward
-        replace(/^.{0,4}[&|]/, '').
-        // remove patterns smaller than 5 characters at the backward
-        replace(/[&|].{0,4}$/, '')+'%';
+        // remove patterns smaller than 3 characters between logical operators (%<symbol>%)
+        replace(/[&|].{0,3}([&|])/g, '$1').
+        // remove search patterns smaller than 2 characters at the forward (<symbol>%)
+        replace(/^.{0,2}[&|]/, '').
+        // remove patterns smaller than 2 characters at the backward (%<symbol>)
+        replace(/[&|].{0,2}$/, '')+'%';
 
     log.debug('Run search: "', initSearchStr, '" -> "', searchStr, '": length: ', searchStr.length);
 

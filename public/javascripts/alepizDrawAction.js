@@ -254,8 +254,7 @@ callback(html), where html is a string with HTML page for active action
             if (e.keyCode === 13 && e.ctrlKey) {
                 e.preventDefault();
                 e.stopPropagation();
-                // true - don't open a log window
-                alepizProcessActionNamespace.processIframeInputsData(true);
+                alepizProcessActionNamespace.processIframeInputsData();
                 return false;
             }
         }

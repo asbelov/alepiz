@@ -507,7 +507,7 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
             recordsArray.slice( -(offset + cnt), offset ? -offset : cacheObj.records.size);
         recordsFromCacheCnt += recordsFromCache.length;
 
-        if(recordsFromCache.length === cnt) {
+        if(recordsFromCache.length >= cnt) {
             calculateCacheSize(cacheObj, 0, recordsFromCache);
             log.debug('from cache: getByIdx(id: ', id, ', offset: ', offset,', cnt: ', cnt,
                 ', maxRecordsCnt: ',maxRecordsCnt, ', recordsType: ', recordsType,

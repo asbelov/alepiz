@@ -8,14 +8,20 @@ const Database = require('better-sqlite3');
 const Conf = require('../lib/conf');
 
 const confLog = new Conf('config/log.json');
+
+/**
+ *
+ * @type {{
+ *     auditDB: Array<string>|string,
+ *     dbLockTimeout: number,
+ * }}
+ */
 const cfg = confLog.get();
 
 const highlightOpen = '{{highlightOpen}}';
 const highlightClose = '{{highlightClose}}';
 
-var auditDB = {
-    //getRecords: function (lastRecordID, userID, sessionsIDs, callback) {callback(null, []); },
-};
+var auditDB = {};
 module.exports = auditDB;
 
 /**
@@ -80,9 +86,13 @@ auditDB.dbOpen = function (dbPath, isReadOnly, callback) {
      * @param {string} messageObj.message message
      */
     auditDB.insertRecord = db.transaction((messageObj) => {
-        var messagesTable = db.prepare('INSERT INTO messages (label, message) VALUES($label, $message)').run({
-            label: messageObj.label,
-            message: messageObj.messageBody,
+        /**
+         * @type {{lastInsertRowid: number}}
+         */
+        var messagesTable =
+            db.prepare('INSERT INTO messages (label, message) VALUES($label, $message)').run({
+                label: messageObj.label,
+                message: messageObj.messageBody,
         });
         var id = messagesTable.lastInsertRowid;
         db.prepare('INSERT INTO log (id, sessionID, timestamp, level) VALUES($id, $sessionID, $timestamp, $level)')
@@ -112,8 +122,12 @@ auditDB.dbOpen = function (dbPath, isReadOnly, callback) {
         // add null description for generate new rowid for sessions table
         if(!sessionObj.description) sessionObj.description = null
         try {
-            var descriptionsTable = db.prepare('INSERT INTO descriptions (description) VALUES ($description)')
-                .run(sessionObj);
+            /**
+             * @type {{lastInsertRowid: number}}
+             */
+            var descriptionsTable =
+                db.prepare('INSERT INTO descriptions (description) VALUES ($description)').run(sessionObj);
+
             sessionObj.id = descriptionsTable.lastInsertRowid;
         } catch (err) {
             throw new Error('Can\'t add description ' + sessionObj.description + ' to auditDB: ' + err.message);
@@ -124,6 +138,9 @@ auditDB.dbOpen = function (dbPath, isReadOnly, callback) {
         } else if (sessionObj.taskName) {
 
             var addTaskName = db.transaction((sessionObj) => {
+                /**
+                 * @type {{lastInsertRowid: number}}
+                 */
                 var taskNamesTable = db.prepare('INSERT INTO taskNames (name) VALUES (?)')
                     .run(sessionObj.taskName);
                 var taskNameRowID = taskNamesTable.lastInsertRowid;
@@ -204,7 +221,7 @@ VALUES ($id, $userID, $sessionID, $actionID, $taskID, $taskSession, $startTimest
      */
     auditDB.getRecords = function(lastRecordID=0, sessionIDs, message) {
         var maxRecordsCnt = Number(confLog.get('maxRecordsReturnedFromDatabase'));
-        if(maxRecordsCnt !== parseInt(String(maxRecordsCnt), 10) || maxRecordsCnt <= 10 ) maxRecordsCnt = 100;
+        if(maxRecordsCnt !== parseInt(String(maxRecordsCnt), 10) || maxRecordsCnt <= 10 ) maxRecordsCnt = 1000;
 
         if(!message) message = '';
         var queryFilter = message.replace(/"/g, '') ? ' AND messages.message MATCH $message ' : '';
@@ -294,9 +311,19 @@ ORDER by log.id ASC LIMIT $maxRecordsReturnedFromDatabase');
      * @param {string} req.taskIDs comma separated taskIDs filter
      * @param {string} req.message message filter
      * @param {string} req.objectIDs comma separated objectIDs filter
-     * @return Array{{id: number, sessionID: number, userID number, taskID: number, taskSession: number,
-     *  actionID: string, startTimestamp:number, stopTimestamp: number, [message: string], [description: string],
-     *  objects: Array<{id: number, name: string}>}} sessionRows
+     * @return {Array<{
+     *      id: number,
+     *      sessionID: number,
+     *      userID: number,
+     *      taskID: number,
+     *      taskSession: number,
+     *      actionID: string,
+     *      startTimestamp: number,
+     *      stopTimestamp: number,
+     *      [message: string],
+     *      [description: string],
+     *      objects: Array<{id: number, name: string}>
+     * }>} sessionRows
      * @example
      * returned sessionRows array:
      *  [{
@@ -465,9 +492,15 @@ ORDER by log.id ASC LIMIT $maxRecordsReturnedFromDatabase');
 SELECT sessions.id AS id, sessions.sessionID AS sessionID, sessions.userID AS userID, sessions.taskID AS taskID, \
 sessions.taskSession AS taskSession, sessions.actionID AS actionID, \
 sessions.startTimestamp AS startTimestamp, sessions.stopTimestamp AS stopTimestamp, \
-descriptions.description AS description, descriptions.error AS error, taskNames.name AS taskName \
+descriptions.description AS description, descriptions.error AS error, taskNames.name AS taskName, \
+actionComments.comment AS actionComment, actionCommentsReferences.timestamp AS actionCommentTimestamp, \
+taskComments.comment AS taskComment, taskCommentsReferences.timestamp AS taskCommentTimestamp \
 FROM sessions \
 JOIN descriptions ON sessions.id=descriptions.rowid \
+LEFT JOIN taskCommentsReferences ON taskCommentsReferences.taskSession=sessions.taskSession \
+LEFT JOIN taskComments ON taskCommentsReferences.taskCommentRowID=taskComments.rowid \
+LEFT JOIN actionCommentsReferences ON actionCommentsReferences.sessionID=sessions.sessionID \
+LEFT JOIN actionComments ON actionCommentsReferences.actionCommentRowID=actionComments.rowid \
 LEFT JOIN taskReferences ON sessions.taskSession=taskReferences.taskSession \
 LEFT JOIN taskNames ON taskReferences.taskNameRowID=taskNames.rowid' + queryFilter + ' \
 ORDER BY sessions.id DESC' + rowsLimit).all({
@@ -544,7 +577,7 @@ ORDER BY sessions.id DESC' + rowsLimit).all({
 
     /**
      * Get all user IDs and action IDs for filter in audit action
-     * @return {userIDs: Array<number>, actionIDs: Array<number>} userIDs - array with user IDs,
+     * @return {{userIDs: Array<number>, actionIDs: Array<number>}} userIDs - array with user IDs,
      *  actionIDs - array with action IDs
      */
     auditDB.getAllUsersAndActions = function () {
@@ -556,6 +589,51 @@ ORDER BY sessions.id DESC' + rowsLimit).all({
             actionIDs: actionIDs,
         };
     }
+
+    /**
+     * Add comment to the task
+     * @param {number} taskSessionID taskSessionID
+     * @param {string} comment new comment for the task
+     */
+    auditDB.addTaskComment = db.transaction((taskSessionID, comment) => {
+
+        /**
+         * @type {{lastInsertRowid: number}}
+         */
+        var taskCommentsTable = db.prepare('INSERT INTO taskComments (comment) VALUES(?)')
+            .run(comment);
+        var taskCommentRowID = taskCommentsTable.lastInsertRowid;
+
+        db.prepare('\
+INSERT INTO taskCommentsReferences (taskCommentRowID, taskSession, timestamp) \
+VALUES ($taskCommentRowID, $taskSession, $timestamp)').run({
+            taskCommentRowID: taskCommentRowID,
+            taskSession: taskSessionID,
+            timestamp: Date.now(),
+        });
+    });
+
+    /**
+     * Add comment to the action
+     * @param {number} sessionID sessionID
+     * @param {string} comment new comment for the action
+     */
+    auditDB.addActionComment = db.transaction((sessionID, comment) => {
+        /**
+         * @type {{lastInsertRowid: number}}
+         */
+        var actionCommentsTable =
+            db.prepare('INSERT INTO actionComments (comment) VALUES(?)').run(comment);
+
+        var actionCommentRowID = actionCommentsTable.lastInsertRowid;
+        db.prepare('\
+INSERT INTO actionCommentsReferences (actionCommentRowID, sessionID, timestamp) \
+VALUES($actionCommentRowID, $sessionID, $timestamp)').run({
+            actionCommentRowID: actionCommentRowID,
+            sessionID: sessionID,
+            timestamp: Date.now(),
+        });
+    });
 
     callback(null, db);
 }

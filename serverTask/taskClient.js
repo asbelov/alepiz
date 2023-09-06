@@ -83,16 +83,22 @@ taskServer.cancelTask = function(taskID) {
 /**
  * Add a new task from Task maker action
  * @param {number} taskID task ID
+ * @param {string} username username used only for log
  * @param {number} runType 0 - run permanently, 1 run once, timestamp - run by schedule
  * @param {Object} workflow workflow
  * @param {Array} [conditionOCIDs] array of objects counters IDs
  */
-taskServer.addTask = function(taskID, runType, workflow, conditionOCIDs) {
-    if(runType > 100) log.info('Add task ', taskID, '; run at: ', new Date(runType).toLocaleString());
-    else log.info('Add task ', taskID, '; runType: ', runType, '; conditionOCIDs: ', conditionOCIDs)
+taskServer.addTask = function(taskID, username, runType, workflow, conditionOCIDs) {
+    if(runType > 100) {
+        log.info('Add task ', taskID, ' username: ', username, '; run at: ', new Date(runType).toLocaleString());
+    } else {
+        log.info('Add task ', taskID, ' username: ', username, '; runType: ', runType, '; conditionOCIDs: ',
+            conditionOCIDs)
+    }
 
     clientIPC.send({
         taskID: taskID,
+        username: username,
         runType: runType, // 0 - run permanently, 1 run once, timestamp - run by schedule
         workflow: workflow,
         conditionOCIDs: conditionOCIDs, // array of objects counters IDs
@@ -110,9 +116,10 @@ taskServer.addTask = function(taskID, runType, workflow, conditionOCIDs) {
  * @param {Array} [param.filterSessionIDs] run only filtered actions from the task (array of the sessionIDs)
  * @param {number} [param.mySessionID] sessionID for the task (for group task action in audit)
  * @param {string} param.runTaskFrom function description from which run the task (for log)
+ * @param {Boolean} param.runOnLocalNode run task only on the local Alepiz node
  * @param {function(Error)|function(null, Object)} callback callback(err, taskResults) where taskResults is the
  *  object like {"<host1>:<Port1>": <taskResultFromAlepizInstance1>, "<host2>:<Port2>": <taskResultFromAlepizInstance2>, ...}
- *  and <taskResultFromAlepizInstance> is an object like {"<actionID1>:<tasksActionsID>": <actionResult1>, ....}
+ *  and <taskResultFromAlepizInstance> is an object like {"<actionID1>:<taskActionID>": <actionResult1>, ....}
  */
 taskServer.runTask = function (param, callback) {
     if(!clientIPC) {
@@ -124,6 +131,15 @@ taskServer.runTask = function (param, callback) {
     }
 
     var taskResults = {};
+    var cfg = confTaskServer.get();
+    if(param.runOnLocalNode) {
+        clientIPC.sendAndReceive(param, function(err, taskResult) {
+            taskResults[cfg.serverAddress + ':' + cfg.serverPort] = taskResult;
+            callback(err, taskResults);
+        });
+        return;
+    }
+
     async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
         if (typeof clientIPC.sendAndReceive !== 'function') return callback();
         clientIPC.sendAndReceive(param, function(err, taskResult) {

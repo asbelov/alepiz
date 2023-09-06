@@ -28,7 +28,7 @@ tasksDB.getUnnamedTask = function(userID, callback){
 
 /**
  * Getting task parameters. Username used only for a new undefined task (without taskID)
- * @param {string} username username for get parameters from a new task if taskID not defined
+ * @param {string|null} username username for get parameters from a new task if taskID not defined
  * @param {number} taskID task ID
  * @param {function(Error)|function(null, Array)} callback callback(err, taskParametersRows)
  * where taskParametersRows is an array with objects described in example section
@@ -40,7 +40,8 @@ tasksDB.getUnnamedTask = function(userID, callback){
  *     value: <action parameter value>,
  *     actionID: <action ID (action dir)>,
  *     startupOptions: <startup options for action>,
- *     actionsOrder: <action order in the task>
+ *     actionsOrder: <action order in the task>,
+ *     username: <task creator username>,
  * }
  */
 tasksDB.getTaskParameters = function(username, taskID, callback) {
@@ -48,7 +49,7 @@ tasksDB.getTaskParameters = function(username, taskID, callback) {
     db.all('\
 SELECT tasksActions.id AS taskActionID, tasksParameters.name AS name, tasksParameters.value AS value, \
 tasksActions.actionID AS actionID, tasksActions.startupOptions AS startupOptions, \
-tasksActions.actionsOrder AS actionsOrder \
+tasksActions.actionsOrder AS actionsOrder, users.name AS username \
 FROM tasksParameters \
 JOIN tasksActions ON tasksParameters.taskActionID = tasksActions.id \
 JOIN tasks ON tasksActions.taskID = tasks.id \
@@ -76,7 +77,9 @@ WHERE ' + (taskID ? 'tasks.id = ?' : 'users.name = ? AND tasks.name IS NULL') +
  *  id: <taskID>,
  *  name: <taskName>,
  *  timestamp: <taskCreatedTime>,
- *  group: <taskGroupName>,
+ *  groupID: <taskGroupID>,
+ *  groupName: <taskGroupName>,
+ *  userDI: <taskCreatorUserID>
  *  ownerName: <task creator login>,
  *  ownerFullName: <task creator full name>,
  *  runType: <task condition runType>,
@@ -93,10 +96,11 @@ tasksDB.getTaskData = function (username, taskID, callback) {
     db.all('\
 SELECT tasks.id AS id, tasks.name AS name, tasks.timestamp AS timestamp, tasks.groupID AS groupID, tasks.userID AS userID, \
 users.name AS ownerName, users.fullName AS ownerFullName, tasksRunConditions.runType AS runType, \
-tasksRunConditions.timestamp AS conditionTimestamp \
+tasksRunConditions.timestamp AS conditionTimestamp, tasksGroups.name AS groupName \
 FROM tasks \
 LEFT JOIN tasksRunConditions ON tasks.id = tasksRunConditions.taskID \
 JOIN users ON tasks.userID = users.id \
+JOIN tasksGroups ON tasks.groupID = tasksGroups.id \
 WHERE ' + (taskID ? 'tasks.id = ?' : 'users.name = ? AND tasks.name IS NULL'),
         taskID ? [taskID] : [username], function(err, taskData) {
         if(err) {
@@ -116,8 +120,9 @@ WHERE ' + (taskID ? 'tasks.id = ?' : 'users.name = ? AND tasks.name IS NULL'),
  * @param {Object} param query parameters
  * @param {string} param.ownerName task owner username
  * @param {string} param.taskName task name
+ * @param {number} param.taskID task id
  * @param {number} param.groupID task group ID
- * @param {function(Error)|function(null, rows)} callback callback(err, rows) where row is an array
+ * @param {function(Error)|function(null, Array)} callback callback(err, rows) where row is an array
  * @example
  * example of the returned array (rows)
  *  [
@@ -148,15 +153,17 @@ LEFT JOIN tasksRunConditions ON tasks.id = tasksRunConditions.taskID \
 LEFT JOIN users userApproved ON tasksRunConditions.userApproved = userApproved.id \
 LEFT JOIN users userCanceled ON tasksRunConditions.userCanceled = userCanceled.id \
 WHERE tasks.timestamp >= $timestampFrom AND tasks.timestamp <= $timestampTo AND \
-(users.name = $userName OR tasks.name NOTNULL)' +
+        (users.name = $userName OR tasks.name NOTNULL)' +
         (param.ownerName ? ' AND users.name like $ownerName' : '') +
         (param.taskName ? ' AND tasks.name like $taskName' : '') +
+        (param.taskID ? ' AND tasks.id=$taskID' : '') +
         ' AND tasks.groupID = $groupID ORDER by tasks.timestamp DESC LIMIT 500', {
 
             $timestampFrom: timestampFrom,
             $timestampTo: timestampTo,
             $ownerName: param.ownerName ? param.ownerName : undefined,
             $taskName: param.taskName ? param.taskName : undefined,
+            $taskID: param.taskID ? param.taskID : undefined,
             $groupID: param.groupID,
             $userName: username,
         }, function(err, taskData) {
@@ -177,14 +184,16 @@ LEFT JOIN tasksRunConditions ON tasks.id = tasksRunConditions.taskID \
 LEFT JOIN users userApproved ON tasksRunConditions.userApproved = userApproved.id \
 LEFT JOIN users userCanceled ON tasksRunConditions.userCanceled = userCanceled.id \
 WHERE tasks.timestamp <= $timestampTo AND \
-(users.name = $userName OR tasks.name NOTNULL)' +
+        (users.name = $userName OR tasks.name NOTNULL)' +
         (param.ownerName ? ' AND users.name like $ownerName' : '') +
         (param.taskName ? ' AND tasks.name like $taskName' : '') +
+        (param.taskID ? ' AND tasks.id=$taskID' : '') +
         ' AND tasks.groupID = $groupID ORDER by tasks.timestamp DESC LIMIT 500', {
 
                     $timestampTo: timestampTo,
                     $ownerName: param.ownerName ? param.ownerName : undefined,
                     $taskName: param.taskName ? param.taskName : undefined,
+                    $taskID: param.taskID ? param.taskID : undefined,
                     $groupID: param.groupID,
                     $userName: username,
                 },
@@ -216,15 +225,6 @@ tasksDB.getTaskActions = function(taskID, callback) {
 };
 
 /**
- * Get all data from the tasks table (SELECT * FROM tasks)
- * @param {function(Error|undefined, Array)} callback callback(err, rows) where row is an array like
- * [{id:, groupID:, userID:, name:, timestamp: }, ...]
- */
-tasksDB.getAllTasks = function( callback) {
-    db.all('SELECT * FROM tasks', callback);
-};
-
-/**
  * Get actionIDs (action dir) by taskActionIDs (id in tasksActions table)
  * @param {Array} taskActionIDs array with taskActionIDs
  * @param {function(Error)|function(null, Object)} callback(err, taskActionID2actionID), where
@@ -241,7 +241,7 @@ tasksDB.getActionsIDs = function (taskActionIDs, callback) {
         async.eachSeries(taskActionIDs, function (taskActionID, callback) {
             stmt.get(taskActionID, function (err, row) {
                 if(err) return callback(err);
-                taskActionID2actionID[taskActionID] = row.actionID;
+                if(row) taskActionID2actionID[taskActionID] = row.actionID;
                 callback();
             });
         }, function (err) {

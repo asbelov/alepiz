@@ -186,12 +186,11 @@ module.exports = function(args, callback) {
             debug: (args.debug ? 1 : 0),
             taskCondition: (args.taskCondition ? 1 : 0),
             updateVariablesRef: args.updateVariablesRef, //= oldCounterName: update variables references when counter name is changed
-            timestamp: args.timestamp,
+            timestamp: Date.now(),
         },
         counterParameters: collectorParameters,
         updateEvents: updateEvents,
         variables: variables,
-        sessionID: args.sessionID,
     };
 
     if(args.exportCounter && args.counterID) {

@@ -36,8 +36,6 @@ alepizMainNamespace = (function($) {
         searchActionsElm,
         searchFiltersElm,
         searchIconElm,
-        runActionBtnElm,
-        makeTaskBtnElm,
         objectsTabElm,
         objectsTabSwitchElm,
         actionsTabSwitchElm,
@@ -81,6 +79,7 @@ alepizMainNamespace = (function($) {
         currentMenuWidth = minMenuWidth;
 
     function init() {
+        alepizProcessActionNamespace.initActionBtn();
         $.post('/mainMenu', {f: 'getDefaultInterfaceConfiguration'}, function(_defaultInterfaceConfiguration) {
             defaultConfig = _defaultInterfaceConfiguration || {};
 
@@ -123,7 +122,8 @@ alepizMainNamespace = (function($) {
                     else if (tabItem === 'ACTIONS') tabInstance.select('actionsList');
                     else if (tabItem === 'FILTERS') tabInstance.select('objectsFilterTab');
 
-                    alepizFiltersNamespace.createObjectsFiltersTab(customConfig.objectFilter || [], function () {
+                    alepizFiltersNamespace.createObjectsFiltersTab(
+                        config.objectFilter || customConfig.objectFilter || [], function () {
 
                         var parametersFromURL = getParametersFromURL();
                         alepizObjectsNamespace.createObjectsList(parametersFromURL.uncheckedObjectsNames,
@@ -171,8 +171,6 @@ alepizMainNamespace = (function($) {
         lastFocusedSearchStringElm = searchObjectsElm;
         searchIconElm = $('#searchIcon');
 
-        runActionBtnElm = $('#runActionBtn');
-        makeTaskBtnElm = $('#makeTaskBtn');
 
         objectsTabElm = $('#objectsTab');
         objectsTabSwitchElm = $('#objectsTabSwitch');
@@ -292,7 +290,7 @@ alepizMainNamespace = (function($) {
         slideOutElm.css('width', currentMenuWidth);
         var backgroundHeight = $('#backgroundImg').height() - 35;
         searchObjectsElm.css('max-height', backgroundHeight + 'px');
-        sideNavResizeIconElm.click(function (e) {
+        sideNavResizeIconElm.click(function () {
             tabInstance.destroy();
             if(slideOutElm.width() <= Number(minMenuWidth.replace(/\D/g, '')) ) {
                 currentMenuWidth = maxMenuWidth;
@@ -445,7 +443,7 @@ alepizMainNamespace = (function($) {
             }
         });
 
-        actionsTabSwitchElm.click(function(e) {
+        actionsTabSwitchElm.click(function() {
             var checkedObjectsNum = alepizObjectsNamespace.getSelectedObjectNames().length;
             objectsTabSwitchElm.text('OBJECTS' + (checkedObjectsNum ? ' [' + checkedObjectsNum + ']' : ''));
             var checkedFiltersNum = alepizFiltersNamespace.getCheckedFilterNames().length;
@@ -641,6 +639,19 @@ alepizMainNamespace = (function($) {
         });
     }
 
+    /**
+     * Create the navigation bar
+     * @param {Array<{
+     *      name: string,
+     *      URL: string,
+     *      openInNewWindow: Boolean,
+     *      searchStr: string,
+     *      parentObjects: Array,
+     *      checkedObjectNames: Array,
+     *      uncheckedObjectNames: Array,
+     *      filters: Array,
+     *      }>} navBarLinksArray array with nav link bar configuration
+     */
     function createNavBarLinks(navBarLinksArray) {
         if(!Array.isArray(navBarLinksArray)) return;
         var navbarLinks = {};

@@ -18,23 +18,55 @@ const confLog = new Conf('config/log.json');
 var cfg = confLog.get();
 var clientIPC, allClientIPC, callbacksWhileConnecting = [];
 
+/**
+ * Initialize log
+ * @param {{filename: string, [sessionID]: number}|NodeModule} parentModule
+ * @return {{
+ *  debug: Function,
+ *  info: Function,
+ *  warn: Function,
+ *  error: Function,
+ *  exit: Function,
+ *  throw: Function,
+ *  raw: Function,
+ *  options: Function,
+ *  addNewSession: Function,
+ *  addSessionResult: Function,
+ *  getAuditData: Function,
+ *  disconnect: Function,
+ *  addTaskComment: Function,
+ *  addActionComment: Function,
+ * }}
+ */
 module.exports = function (parentModule) {
 
     exitHandler.init(null, parentModule, {});
-    cfg.id = 'log:' + createLabel(parentModule);
+    var label = createLabel(parentModule);
+    cfg.id = 'log:' + label;
+    cfg.connectOnDemand = true;
+    cfg.socketTimeout = 90000000; // disconnect after idle more then 25 hours
 
     clientIPC = new IPC.client(cfg, function (err, msg, _clientIPC) {
         if (err) log.warn('IPC client error: ', err.message);
     });
 
-    var logObj = createLogObject(parentModule, sendToLogServer);
+    for (var mod = parentModule; mod; mod = mod.parent) {
+        if (mod.sessionID) {
+            var sessionID = Number(mod.sessionID);
+            break;
+        }
+    }
 
-    logObj.raw = sendToLogServer;
+    var logObj = createLogObject(parentModule, sessionID, label, sendToLogServer);
+
+    logObj.raw = function(level, args) {
+        return sendToLogServer(level, args, parentModule, sessionID, label);
+    }
 
     logObj.options = function () {
         var args = Array.prototype.slice.call(arguments);
         var options = args.pop();
-        sendToLogServer('I', args, parentModule, options);
+        return sendToLogServer('I', args, parentModule, sessionID, label, options);
     };
 
     /**
@@ -50,9 +82,10 @@ module.exports = function (parentModule) {
      * @param {Array} sessionObj.objects objects for action
      * @param {string} [sessionObj.descriptionTemplate] action template description for create action description
      * @param {Object} [sessionObj.args] action parameters {<name>:<value>,...} for create action description
+     * @param {function} callback callback()
      */
-    logObj.addNewSession = function (sessionObj) {
-        clientIPC.send(sessionObj);
+    logObj.addNewSession = function (sessionObj, callback) {
+        clientIPC.sendAndReceive(sessionObj, callback);
     }
 
     /**
@@ -64,6 +97,46 @@ module.exports = function (parentModule) {
      */
     logObj.addSessionResult = function (sessionObj) {
         clientIPC.send(sessionObj);
+    }
+
+    /**
+     * Add a new comment to the task in audit
+     * @param {number} taskSessionID task session ID for identify the task
+     * @param {string} comment a new comment for the task
+     */
+    logObj.addTaskComment = function (taskSessionID, comment) {
+        connectToRemoteLogNodes(function () {
+            async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
+                if (typeof clientIPC.send !== 'function') return callback();
+                clientIPC.send({
+                    taskSessionID: taskSessionID,
+                    taskComment: comment,
+                }, function (err) {
+                    if(err) log.error('Error add a new comment to the task: ', err.message, ': ', hostPort);
+                    callback();
+                });
+            }, function () {});
+        });
+    }
+
+    /**
+     * Add a new comment to the action
+     * @param {number} sessionID action session ID
+     * @param {string} comment a new comment to the action
+     */
+    logObj.addActionComment = function (sessionID, comment) {
+        connectToRemoteLogNodes(function () {
+            async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
+                if (typeof clientIPC.send !== 'function') return callback();
+                clientIPC.send({
+                    sessionID: sessionID,
+                    actionComment: comment,
+                }, function (err) {
+                    if(err) log.error('Error add a new comment to the action: ', err.message, ': ', hostPort);
+                    callback();
+                });
+            }, function () {});
+        });
     }
 
     logObj.getAuditData = getAuditData;
@@ -78,29 +151,38 @@ module.exports = function (parentModule) {
  * Send log message to the log server
  * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} level log level
  * @param {Array} args array of log arguments
- * @param {NodeModule} parentModule parent node module
+ * @param {{filename: string, sessionID: number}|NodeModule} parentModule parent node module for create log label and log file name
+ * @param {number} sessionID sessionID
+ * @param {string} label label
  * @param {Object|undefined} [options] log options
  * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} options.level log level when used log.options() function
  * @param {Array<string>} options.filenames log file names when used log.options() function
+ * @return {Boolean} true if data was send to the log server and print to the log file. false in other case
  */
-function sendToLogServer(level, args, parentModule, options) {
-    var dataToSend = prepareLogMessage(level, args, options, parentModule);
-    if(!dataToSend) return;
+function sendToLogServer(level, args, parentModule, sessionID, label, options) {
+    var dataToSend = prepareLogMessage(level, args, options, label);
+    if(!dataToSend) return false;
 
-    for (var mod = module; mod; mod = mod.parent) {
-        if (mod.sessionID) {
-            dataToSend.sessionID = Number(mod.sessionID);
-            break;
+    if(sessionID) dataToSend.sessionID = sessionID;
+    else {
+        for (var mod = parentModule; mod; mod = mod.parent) {
+            if (mod.sessionID) {
+                dataToSend.sessionID = Number(mod.sessionID);
+                break;
+            }
         }
     }
 
     if(dataToSend.level !== 'EXIT' && dataToSend.level !== 'TROW') {
-        clientIPC.send(dataToSend, function (err) {
-            if(err) {
-                dataToSend.additionalLabel = '#';
-                writeLog(dataToSend);
-            }
-        });
+        writeLog(dataToSend);
+        if(dataToSend.sessionID && dataToSend.logToAudit) {
+            clientIPC.send(dataToSend, function (err) {
+                if (err) {
+                    dataToSend.additionalLabel = '#';
+                    writeLog(dataToSend);
+                }
+            });
+        }
     } else {
         dataToSend.additionalLabel = '#';
         writeLog(dataToSend);
@@ -113,6 +195,8 @@ function sendToLogServer(level, args, parentModule, options) {
             } else process.exit(2);
         }
     }
+
+    return true;
 }
 
 /**

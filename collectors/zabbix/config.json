@@ -5,6 +5,8 @@
     "separate": "",
     "runCollectorSeparately": "",
     "runCollectorAsThread": "on",
+    "returnedValuesProcessedLimit": 1,
+    "sleepTimeAfterValueProcessed": 300,
     "parameters": {
         "host": {
             "description": "Zabbix agent IP address",

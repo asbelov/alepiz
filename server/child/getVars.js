@@ -27,32 +27,31 @@ const updateEventsMode = {
 
 /**
  * Get variable values
- * @param param {{
- *      parentCounterName: ({string}|*),
- *      updateEventMode,
- *      cache: {
- *          variablesExpressions: unknown,
- *          variablesHistory: unknown,
- *          objectsProperties: unknown,
- *          alepizInstance: {id: Number, name: string}
- *      },
- *      parentVariables: (*|{"<var1>": "<value1>"}),
- *      updateEventExpression,
- *      variablesDebugInfo: {},
- *      counterID: number,
- *      collector: ({string}|*),
- *      counterName: ({string}|*),
- *      parentObjectName: ({string}|*),
- *      parentObjectValue: ({string}|{number}|*),
- *      prevUpdateEventState: *,
- *      objectName,
- *      OCID,
- *      objectID: number,
- *      parentOCID: ({number}|*),
- *      countersObjects: {}
- *  }}
+ * @param param {Object}
+ * @param {Object} param.childThread
+ * @param {number} param.removeCounter
+ * @param {Object} param.parentVariables
+ * @param {0|1} param.prevUpdateEventState
+ * @param {string|number|null} param.parentObjectValue
+ * @param {Object} param.variablesDebugInfo
+ * @param {string} param.updateEventExpression
+ * @param {0|1|2|3} param.updateEventMode
+ * @param {number} param.OCID
+ * @param {number} param.parentOCID
+ * @param {string|undefined} param.parentObjectName
+ * @param {string|undefined} param.parentCounterName
+ * @param {string} param.objectName
+ * @param {string} param.counterName
+ * @param {number} param.objectID
+ * @param {number} param.counterID
+ * @param {string} param.collector
+ * @param {Object} param.countersObjects
+ * @param {Object} param.cache
+ * @param {any|Map<any, any>} param.cache.variablesHistory
+ * @param {any|Map<any, any>} param.cache.variablesExpressions
+ * @param {any|Map<any, any>} param.cache.objectsProperties
+ * @param {id: number, name: string} param.cache.alepizInstance
  * @param callback {function}
- * @private
  */
 
 function getVars(param, callback) {
@@ -349,6 +348,7 @@ function getVar(initVariableName, variables, param, callback) {
             objectID: param.objectID,
             counterName: param.counterName,
             counterID: param.counterID,
+            childThread: param.childThread,
         }, function(err, result, variablesDebugInfo) {
 
             //if(param.counterID === 243) console.log('!!getVariableValue: ', variableName, '=', result, variable, '; debug:', variablesDebugInfo, ';Cache props: ' + [...param.cache.objectsProperties.keys()] + '; vars: ' + [...param.cache.variablesExpressions.keys()] + [...param.cache.variablesHistory.keys()]);

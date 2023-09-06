@@ -9,18 +9,11 @@ const variablesReplace = require('../../lib/utils/variablesReplace');
 const initCache = require('./initCache');
 //const profiling = require('../lib/profiling');
 const history = require('../../serverHistory/historyClient');
-const debugCounters = require('../../serverDebug/debugCounters');
-const taskServer = require('../../serverTask/taskClient');
 const thread = require('../../lib/threads');
 const getVars = require('./getVars');
 const connectingCollectors = require('./connectingCollectors');
-const Conf = require("../../lib/conf");
-
-const confServer = new Conf('config/server.json');
 
 const serverName = thread.workerData[0];
-const childID = thread.workerData[1];
-var childThread;
 var cacheAndCollectorsInitialized = false;
 var messageCache = new Set();
 var collectorsObj = {};
@@ -32,20 +25,12 @@ var cache = {
     variablesHistory: new Map(),
 };
 
-// init history and debugCounters communication
-history.connect(childID, function () {
-    debugCounters.connect(function () {
-        taskServer.connect(childID, function(err) {
-            if(err) log.error('Can\'t connect to the task server: ', err.message);
-            childThread = new thread.child({
-                module: 'getCountersValue-' + serverName,
-                onMessage: processMessage,
-                onStop: destroyCollectors,
-                onDestroy: destroyCollectors,
-            });
-        });
-    });
-}, confServer.get('dontConnectToRemoteHistoryInstances'));
+var childThread = new thread.child({
+    module: 'getCountersValue-' + serverName,
+    onMessage: processMessage,
+    onStop: destroyCollectors,
+    onDestroy: destroyCollectors,
+});
 
 //profiling.init(60);
 
@@ -71,7 +56,7 @@ function processMessage(message, callback) {
 
         if(cacheAndCollectorsInitialized) return;
 
-        connectingCollectors(function (err, _collectors) {
+        connectingCollectors(childThread, function (err, _collectors) {
             if (err) {
                 destroyCollectors(function() {
                     log.error('Can\'t init collectors: ' + err.message);
@@ -182,9 +167,11 @@ function destroyCollectors(callback) {
  * @param {Object} param object with parentOCID and OCID
  * @param {number} param.parentOCID parent OCID
  * @param {number} param.OCID OCID
+ * @param {number} param.timestamp timestamp
  */
 function sendCompleteExecutionResult(param) {
     childThread.send({
+        timestamp: param.timestamp,
         parentOCID: param.parentOCID,
         OCID: param.OCID,
     });
@@ -261,13 +248,13 @@ function getVariablesAndCheckUpdateEvents(message) {
     }
 
     var param = {
+        timestamp: Date.now(),
+        childThread: childThread,
         removeCounter: message.removeCounter,
         parentVariables: message.parentVariables,
         prevUpdateEventState: updateEventState,
         parentObjectValue: message.parentObjectValue,
         variablesDebugInfo: {},
-        //updateEventExpression: counter.updateEventExpression,
-        //updateEventMode: counter.updateEventMode,
         updateEventExpression: message.updateEventExpression,
         updateEventMode: message.updateEventMode,
         OCID: message.OCID,
@@ -279,7 +266,6 @@ function getVariablesAndCheckUpdateEvents(message) {
         objectID: objectID,
         counterID: counterID,
         collector: counter.collector,
-        debug: counter.debug,
         countersObjects: {}, // will set letter after print debug info
         cache: {
             variablesHistory: cache.variablesHistory.get(counterID) || new Map(),
@@ -299,13 +285,15 @@ function getVariablesAndCheckUpdateEvents(message) {
     });
 
     param.countersObjects = countersObjects;
-    getVars(param,function (err, noNeedToCalculateCounter, variables, variablesDebugInfo, preparedCollectorParameters) {
+    getVars(param,
+        function (err, noNeedToCalculateCounter, variables, variablesDebugInfo, preparedCollectorParameters) {
 
-        if (param.debug) {
-            debugCounters.add('v', param.OCID, variablesDebugInfo,
-                variablesDebugInfo.UPDATE_EVENT_STATE && variablesDebugInfo.UPDATE_EVENT_STATE.important);
-        }
-
+        var messageToSend = counter.debug ? {
+            timestamp: param.timestamp,
+            OCID: param.OCID,
+            variablesDebugInfo: variablesDebugInfo,
+            importance: variablesDebugInfo.UPDATE_EVENT_STATE && variablesDebugInfo.UPDATE_EVENT_STATE.important,
+        } : {};
         //profiling.stop('1. get variables values', message);
         //profiling.start('2. prepare to get counter value', message);
 
@@ -315,11 +303,10 @@ function getVariablesAndCheckUpdateEvents(message) {
         if (param.parentOCID && param.updateEventExpression &&
             updateEventState !== variables.UPDATE_EVENT_STATE &&
             variables.UPDATE_EVENT_STATE !== undefined) {
-            childThread.send({
-                parentOCID: param.parentOCID,
-                OCID: param.OCID,
-                updateEventState: variables.UPDATE_EVENT_STATE,
-            });
+
+            messageToSend.OCID = param.OCID;
+            messageToSend.parentOCID = param.parentOCID;
+            messageToSend.updateEventState = variables.UPDATE_EVENT_STATE;
 
             log.debug('getVariablesAndCheckUpdateEvents for OCID ', param.OCID,
                 '\n send: updateEventState: ', updateEventState ,'=>', variables.UPDATE_EVENT_STATE,
@@ -335,6 +322,8 @@ function getVariablesAndCheckUpdateEvents(message) {
                     }
                 });
         }
+        
+        if(messageToSend.OCID) childThread.send(messageToSend);
 
         if (err) {
             log.options(err.message, {
@@ -476,10 +465,30 @@ function processCollectorResult(err, result, param, collectorName) {
     var taskCondition = cache.countersObjects.counters.get(param.counterID) &&
         cache.countersObjects.counters.get(param.counterID).taskCondition;
 
+    var returnedMessage = {
+        timestamp: param.timestamp,
+        parentOCID: param.parentOCID ? param.parentOCID : undefined,
+        OCID: param.OCID,
+        collector: collectorName,
+    };
+    var preparedResult = result;
+    var sendValueToParent = true;
+
     // result was saved to the history in activeCollector.js for active and separate collectors
     // for decrees number of transfers of result value
-    var preparedResult = collectorsObj[param.collector].active || collectorsObj[param.collector].separate ?
-        result : history.add(param.OCID, result);
+    if(!collectorsObj[param.collector].active && !collectorsObj[param.collector].separate) {
+        preparedResult = history.prepareNewData(param.OCID, result);
+        if(preparedResult) {
+            returnedMessage.historyRecord = {
+                timestamp: preparedResult.timestamp,
+                data: preparedResult.data,
+            };
+            if(taskCondition) {
+                returnedMessage.objectName = param.objectName;
+                returnedMessage.counterName = param.counterName;
+            }
+        }
+    }
 
     log.debug('processCollectorResult for OCID ', param.OCID, ' return ', result, '(', preparedResult, '); param: ', param,
         '; taskCondition: ', taskCondition, '; err: ', err, {
@@ -488,10 +497,6 @@ function processCollectorResult(err, result, param, collectorName) {
                 "EXPECTED_OCID": param.OCID
             }
         });
-
-    if (taskCondition && preparedResult) {
-        taskServer.checkCondition(param.OCID, param.objectName, param.counterName);
-    }
 
     if (!preparedResult || preparedResult.value === undefined || preparedResult.value === null) {
         if (err) {
@@ -504,56 +509,56 @@ function processCollectorResult(err, result, param, collectorName) {
                     level: 'E'
                 });
         } // else return nothing, skip it
-        return sendCompleteExecutionResult(param);
-    } else if (err) {
-        log.options('Collector ', param.collector, ' return error for OCID: ', param.OCID, ': ',
-            param.objectName,
-            '(', param.counterName,
-            '); result: ', result, '; Error: ', err.message,
-            '; Parameters: ', param.collectorParameters, {
-                filenames: ['counters/' + param.counterID, 'counters'],
-                level: 'W'
+        sendValueToParent = false;
+    } else {
+        if (err) {
+            log.options('Collector ', param.collector, ' return error for OCID: ', param.OCID, ': ',
+                param.objectName,
+                '(', param.counterName,
+                '); result: ', result, '; Error: ', err.message,
+                '; Parameters: ', param.collectorParameters, {
+                    filenames: ['counters/' + param.counterID, 'counters'],
+                    level: 'W'
+                });
+        }
+
+        //profiling.stop('2. get counter value', param);
+        //profiling.start('3. get depended counters', param);
+        // dependedCounters: [{parentObjectName:.., parentCollector:.., OCID: <objectsCountersID>, collector:<collectorID>,
+        //     counterID:.., objectID:..,
+        //     objectName:.., expression:..., mode: <0|1|2>}, {...}...]
+        //     mode 0 - update each time, when expression set to true, 1 - update once when expression change to true,
+        //     2 - update once when expression set to true, then once, when expression set to false
+        var dependedCounters = getCountersForDependedCounters(param.counterID, param.objectID, param.OCID,
+            param.collectorParameters.$variables);
+
+        if (!dependedCounters || !dependedCounters.size) {
+            // send process ID to server
+
+            log.debug('processCollectorResult for OCID ', param.OCID, ' no dependent counters found', {
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
+                vars: {
+                    "EXPECTED_OCID": param.OCID
+                }
+            });
+
+            sendValueToParent = false;
+        }
+    }
+
+    if(sendValueToParent) {
+        returnedMessage.variables = param.collectorParameters.$variables;
+        returnedMessage.value = preparedResult.value;
+        returnedMessage.dependedCounters = dependedCounters
+
+        log.debug('processCollectorResult for OCID ', param.OCID, ' dependent counters found, return to parent: ',
+            returnedMessage, {
+                func: (vars) => vars.EXPECTED_OCID === vars.OCID,
+                vars: {
+                    "EXPECTED_OCID": param.OCID
+                }
             });
     }
-
-    //profiling.stop('2. get counter value', param);
-    //profiling.start('3. get depended counters', param);
-    // dependedCounters: [{parentObjectName:.., parentCollector:.., OCID: <objectsCountersID>, collector:<collectorID>,
-    //     counterID:.., objectID:..,
-    //     objectName:.., expression:..., mode: <0|1|2>}, {...}...]
-    //     mode 0 - update each time, when expression set to true, 1 - update once when expression change to true,
-    //     2 - update once when expression set to true, then once, when expression set to false
-    var dependedCounters = getCountersForDependedCounters(param.counterID, param.objectID, param.OCID,
-        param.collectorParameters.$variables);
-
-    if (!dependedCounters || !dependedCounters.size) {
-        // send process ID to server
-
-        log.debug('processCollectorResult for OCID ', param.OCID, ' no dependent counters found', {
-            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
-            vars: {
-                "EXPECTED_OCID": param.OCID
-            }
-        });
-
-        return sendCompleteExecutionResult(param);
-    }
-
-    var returnedMessage = {
-        parentOCID: param.parentOCID ? param.parentOCID : undefined,
-        OCID: param.OCID,
-        variables: param.collectorParameters.$variables,
-        value: preparedResult.value,
-        dependedCounters: dependedCounters,
-    };
-
-    log.debug('processCollectorResult for OCID ', param.OCID, ' dependent counters found, return to parent: ',
-        returnedMessage, {
-            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
-            vars: {
-                "EXPECTED_OCID": param.OCID
-            }
-        });
 
     //profiling.stop('3. get depended counters', param);
     //profiling.start('4. send data to server', param);

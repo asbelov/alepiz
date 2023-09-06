@@ -9,7 +9,7 @@ const topDirName = path.join(__dirname, '..');
 
 /**
  * Create log label
- * @param {NodeModule} parentModule parent node module
+ * @param {{filename: string, sessionID: number}|NodeModule} parentModule parent node module
  * @returns {string} log label
  */
 module.exports = function (parentModule) {

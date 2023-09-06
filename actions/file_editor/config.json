@@ -1,24 +1,27 @@
 {
-    "name": "File editor",
+    "name": "Редактор",
     "description": "Edit configuration files",
     "homePage": "index",
     "ajaxServer": "../log_viewer/ajax.js",
+    "startAjaxAsThread": true,
     "execMethod": "post",
     "launcher": "nodeModule",
-    "startAjaxAsThread": true,
     "launcherPrms": {
         "javaScript": "server.js",
         "startAsThread": true
     },
     "staticDir": "static",
     "callbackBeforeExec": "callbackBeforeExec",
+    "swapActionControlBtn":true,
     "onChangeObjectMenuEvent": "fullreload",
     "timeout": 60,
     "outputFormat": "text",
-    "icon": "edit",
+    "icon": "description",
     "showOnlyForObjectsWithProperties": "SERVICE_PATH",
+    "dontShowForObjects": "Новый брокер",
     "applyToOwnObjects": true,
-    "swapActionControlBtn": true,
+    "descriptionTemplate": "%:editorChanges:%",
+    "descriptionTemplateHTML": "%:editorChanges:%",
     "options": {
         "IDForm": "EditorForm",
         "IDResult": "editorResult",
@@ -27,9 +30,10 @@
         "replaceElm": true,
         "reloadOnNewFile": true,
         "filterFiles": "(\\.ini$)|(\\.xml$)|(\\.dsc$)|(\\.cmd$)|(\\.bat$)|(\\.cfg$)|(\\.data$)|(\\.tmpl$)|(\\.json$)|(\\.txt$)",
-        "order": "common.json,config,main",
+        "order": "mfd.gw,q_, -asts.gw,aststw.ini,multihub.ini,p2router.ini,repltw,web2quik.ini,quik.ini",
         "skipDirs": "old_version,sav,certs,!scripts",
         "filePath": "CONFIG_FILES_PATH",
-        "bcpFilePath": "./old_version/%:YYYY:%%:MM:%%:dd:%%:HH:%%:mm:%%:ss:%_edt"
+        "bcpFilePath": "./old_version/%:YYYY:%%:MM:%%:dd:%%:HH:%%:mm:%%:ss:%_edt",
+        "codePage":"win1251"
     }
 }

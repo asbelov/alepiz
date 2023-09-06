@@ -6,11 +6,11 @@
  * Created by Alexander Belov on 11.07.2017.
  */
 
-var log = require('../lib/log')(module);
-var IPC = require('../lib/IPC');
-var proc = require('../lib/proc');
+const log = require('../lib/log')(module);
+const IPC = require('../lib/IPC');
+const proc = require('../lib/proc');
 const setShift = require('../lib/utils/setShift')
-var Conf = require('../lib/conf');
+const Conf = require('../lib/conf');
 const conf = new Conf('config/common.json');
 const confActions = new Conf('config/actions.json');
 
@@ -39,6 +39,10 @@ var actionsQueueSystem = new Set(),
     maxMemSize = confActions.get('maxMemSize') || conf.get('maxMemSize') || 4096,
     maxQueueLength = confActions.get('maxQueueLength') || 1000;
 
+/**
+ * @description Action server configuration
+ * @type {{serverNumber: number, userServerNumber: number, id: string}}
+ */
 var cfg = confActions.get();
 
 attachRunAction(cfg.serverNumber || 5, function (err, _runActionBySystemUser) {
@@ -58,7 +62,7 @@ attachRunAction(cfg.serverNumber || 5, function (err, _runActionBySystemUser) {
                 return actionsDB.getActionConfig(msg.user, msg.actionID, callback);
             }
             if (msg && msg.msg === 'setActionConfig') {
-                return actionsDBSave.setActionConfig(msg.user, msg.actionID, msg.config, msg.sessionID, callback);
+                return actionsDBSave.setActionConfig(msg.user, msg.actionID, msg.config, callback);
             }
 
             if (socket === -1) {
@@ -104,7 +108,11 @@ attachRunAction(cfg.serverNumber || 5, function (err, _runActionBySystemUser) {
     });
 });
 
-
+/**
+ * Start runAction threads
+ * @param {number} serverNumber number of runAction threads
+ * @param {function(Error)|function(null, function)} callback callback(Error, runActionProcess.sendAndReceive)
+ */
 function attachRunAction(serverNumber, callback) {
     if(!cfg.serverNumber || cfg.serverNumber < 1) {
         log.info('Include runAction in action server');
@@ -130,7 +138,13 @@ function attachRunAction(serverNumber, callback) {
     });
 }
 
-
+/**
+ * Add action (server.js) to the actions queue or run action (ajax.js or server.js) immediately
+ * The action will be running immediately if there is a ajax.js or action configuration has a option notInQueue: true
+ * In other cases нру action will be running from user or system queue.
+ * @param {Object} param action parameters
+ * @param {function(Error)|function(Error, Object)} callback callback(err, actionResult)
+ */
 function addActionToQueue(param, callback) {
     actionConf.getConfiguration(param.actionID, function (err, actionConf) {
         if(err) return callback(err);
@@ -174,6 +188,11 @@ function addActionToQueue(param, callback) {
 /*
 All actions can be running in order
  */
+
+/**
+ * Run one action from QUEUE. If user queue is not empty, run action from user queue.
+ * If system queue is not empty, then run action from system queue
+ */
 function runActionFromQueue() {
 
     if(lastProcessedAction.startTime) {
@@ -196,6 +215,10 @@ function runActionFromQueue() {
     if(actionsQueueSystem.size) return runQueue(actionsQueueSystem);
 }
 
+/**
+ * Run action (in thread or inline)
+ * @param {Set<{param: Object, callback: function, actionConf: Object}>} actionQueue action QUEUE
+ */
 function runQueue(actionQueue) {
     var action = setShift(actionQueue);
 

@@ -78,7 +78,7 @@ actionParameters: [{key: <key1>, val:<val1>}, {..}, ...]
  */
 
 function setActionParametersToBrowserURL(actionParameters) {
-    if(!Array.isArray(actionParameters) || !actionParameters.length) return;
+    if(!Array.isArray(actionParameters)) return;
 
     actionParameters = actionParameters
         .filter(function(param) {

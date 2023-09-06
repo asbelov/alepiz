@@ -6,13 +6,13 @@
  * Created by Alexander Belov on 12.02.2017.
  */
 
-var log = require('../../lib/log')(module);
-var fs = require('fs');
-var path = require('path');
-var async = require('async');
-var objectsPropertiesDB = require('../../rightsWrappers/objectsPropertiesDB');
-var actionConf = require('../../lib/actionsConf');
-var recode = require('../../lib/recode');
+const log = require('../../lib/log')(module);
+const fs = require('fs');
+const path = require('path');
+const async = require('async');
+const objectsPropertiesDB = require('../../rightsWrappers/objectsPropertiesDB');
+const actionConf = require('../../lib/actionsConf');
+const recode = require('../../lib/recode');
 
 module.exports = function(args, callback) {
     var func = args.function;
@@ -27,9 +27,9 @@ module.exports = function(args, callback) {
 
 
 function getFilesList(args, callback) {
-    log.info('Starting ajax for getting file list: ', args);
+    log.debug('Starting ajax for getting file list: ', args);
 
-    if(!args.IDs) return callback('Objects IDs are not set');
+    if(!args.IDs) return callback(new Error('Objects IDs are not set'));
 
     actionConf.getConfiguration(args.actionID, function(err, config) {
         if(err) return callback(err);
@@ -45,7 +45,8 @@ function getFilesList(args, callback) {
             try {
                 var filterFilesRE = new RegExp(options.filterFiles, 'ig');
             } catch (e) {
-                return callback(new Error('Can\'t make regExp from filterFiles option: ' + filterFiles + ': ' + e.message));
+                return callback(new Error('Can\'t make regExp from filterFiles option: ' + options.filterFiles +
+                    ': ' + e.message));
             }
         } else filterFilesRE = null;
 
@@ -58,7 +59,10 @@ function getFilesList(args, callback) {
             properties.forEach(function (property) {
                 var objectID = property.objectID;
                 if(objectID) {
-                    if (Number(property.mode) === 0 && (property.name === 'HOST' || property.name ==='SERVICE_PATH' || property.name === filePath || property.name ==='RECURSION_FOR_FILES')) {
+                    if (Number(property.mode) === 0 &&
+                        (property.name === 'HOST' || property.name ==='SERVICE_PATH' || property.name === filePath ||
+                            property.name ==='RECURSION_FOR_FILES')
+                    ) {
                         if(!services[objectID]) services[objectID] = {files: []};
                         services[objectID][property.name] = property.value;
                     }
@@ -85,7 +89,7 @@ function getFilesList(args, callback) {
                     callback();
                 });
             }, function (err) {
-                if(err) return callback(err.message);
+                if(err) return callback(err);
 
                 var result = '';
                 for(var objectID in services) {
@@ -148,7 +152,9 @@ function getPath(_path) {
 function getFiles(dir, skipDirs, filterFilesRE, recursion, subDir, callback) {
     if(recursion < 0) return callback();
 
-    fs.readdir(path.join(dir, subDir), {withFileTypes: true}, function (err, filesObjArray) {
+    fs.readdir(path.join(dir, subDir), {withFileTypes: true},
+        function (err, filesObjArray) {
+
         if(err) return callback(new Error('Can\'t read dir ' + dir + ': ' + err.message));
         var files = [];
         async.each(filesObjArray, function(file, callback) {
@@ -168,7 +174,7 @@ function getFiles(dir, skipDirs, filterFilesRE, recursion, subDir, callback) {
             callback();
 
         }, function(err) {
-            if(err) return callback(err.message);
+            if(err) return callback(err);
 
             callback(null, files);
         });

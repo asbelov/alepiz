@@ -78,8 +78,13 @@ function onMessage (messageObj, callback) {
         getAuditData.getUsersAndActions(callback);
     } else if (messageObj.username !== undefined && !sessions.has(messageObj.sessionID)) {
         sessions.set(messageObj.sessionID, messageObj);
+        callback();
     } else if (messageObj.stopTimestamp) {
         addSessionResult(messageObj);
+    } else if (messageObj.taskComment) {
+        addTaskComment(messageObj);
+    } else if (messageObj.actionComment) {
+        addActionComment(messageObj);
     } else {
         return callback(new Error('Unreachable message ' + JSON.stringify(messageObj, null, 4)));
     }
@@ -101,7 +106,7 @@ function onMessage (messageObj, callback) {
 function addNewRecord(messageObj) {
     var sessionObj = sessions.get(messageObj.sessionID);
     if(!sessionObj) {
-        log.debug('No session found for ', messageObj.messageBody)
+        log.debug('The session ', messageObj.sessionID ,' not found for ', messageObj.messageBody)
         return;
     }
 
@@ -175,10 +180,16 @@ function addNewSession(sessionObj, callback) {
                 try {
                     auditDB.addNewSession(sessionObj);
                     sessions.get(sessionObj.sessionID).saved = true;
-                    log.debug('Added a new session: ', sessionObj.sessionID);
                 } catch (err) {
                     return callback(err);
                 }
+
+                log.info('Added a new session ', sessionObj.sessionID,
+                    ', action: ', sessionObj.actionID, ', objects: ', sessionObj.objects,
+                    ', task: ', sessionObj.taskName, ' #', sessionObj.taskID,
+                    ', taskSession: ', sessionObj.taskSession,
+                    ', username: ', sessionObj.username, ', task userID: ',  sessionObj.userID);
+
                 return callback()
             });
         });
@@ -225,4 +236,36 @@ function createActionDescription(args, descriptionTemplate, callback) {
         }
     }
     actionsConf.makeActionDescription(descriptionTemplate, variables, callback);
+}
+
+/**
+ * Add a new comment for the task
+ * @param {Object} messageObj
+ * @param {number} messageObj.taskSessionID task session ID
+ * @param {string} messageObj.taskComment a new comment for the task
+ */
+function addTaskComment(messageObj) {
+    if(typeof messageObj.taskSessionID !== 'number') return;
+    try {
+        auditDB.addTaskComment(messageObj.taskSessionID, messageObj.taskComment);
+    } catch (err) {
+        log.error('Error add comment for the task: ', err.message, '; taskSession: ', messageObj.taskSessionID,
+            '; comment: "', messageObj.taskComment, '"');
+    }
+}
+
+/**
+ * Add a new comment for the action
+ * @param {Object} messageObj
+ * @param {number} messageObj.sessionID action session ID
+ * @param {string} messageObj.actionComment a new comment for the action
+ */
+function addActionComment(messageObj) {
+    if(typeof messageObj.sessionID !== 'number') return;
+    try {
+        auditDB.addTaskComment(messageObj.sessionID, messageObj.actionComment);
+    } catch (err) {
+        log.error('Error add comment for the action: ', err.message, '; sessionID: ', messageObj.sessionID,
+            '; comment: "', messageObj.actionComment, '"');
+    }
 }

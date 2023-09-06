@@ -86,7 +86,7 @@ function addNewObjects(user, args, callback){
         // add a new objects, its description and order
         //  Top objects has order < 10 objectsFilterDB.js
 
-        rightsWrapper.addObjects(user, newObjectsNames, description, order, disabled, color, args.sessionID,
+        rightsWrapper.addObjects(user, newObjectsNames, description, order, disabled, color,
             args.timestamp, function (err, newObjectsIDs) {
             if (err) {
                 log.error('Error adding new object[s] ', newObjectsNames, ' with description: ', description,
@@ -107,7 +107,7 @@ function addNewObjects(user, args, callback){
                         if (err) return callback(err);
 
                         log.info('Added new object[s] ', newObjectsNames, ' with description: ', description,
-                            ' and sort order ', order);
+                            ' and sort order ', order, '; new objectIDs: ', newObjectsIDs.join(', '));
                         // because in case with newObjectsIDs.join(',') and one object it return id as string, i.e. "12"
                         if (newObjectsIDs.length === 1) callback(null, newObjectsIDs[0]);
                         else callback(null, newObjectsIDs.join(','));
@@ -129,7 +129,8 @@ function addNewObjects(user, args, callback){
                     transactionDB.end(function (err) {
                         if (err) return callback(err);
                         log.info('Added new object[s] ', newObjectsNames, ' with description: ', description,
-                            ' and sort order ', order, '; up level objects: ', upLevelObjects);
+                            ' and sort order ', order, '; new objectIDs: ', newObjectsIDs.join(', '),
+                            '; up level objects: ', upLevelObjects);
                         // because in case with newObjectsIDs.join(',') and one object it return id as string, i.e. "12"
                         if (newObjectsIDs.length === 1) callback(null, newObjectsIDs[0]);
                         else callback(null, newObjectsIDs.join(','));

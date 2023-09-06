@@ -8,6 +8,7 @@
 
 const createLogObject = require('./createLogObject');
 const prepareLogMessage = require('./prepareLogMessage');
+const createLabel = require('./createLabel');
 const {threadId} = require('worker_threads');
 const writeLog = require('./writeLog');
 
@@ -22,25 +23,32 @@ const TID_PID = (threadId ? ':' + threadId + ':' : ':') + process.pid;
  * @returns {{warn: Function, exit: Function, debug: Function, throw: Function, error: Function, info: Function}}
  */
 module.exports = function (parentModule) {
-    var logObj = createLogObject(parentModule, writeToLog);
+    for (var mod = parentModule; mod; mod = mod.parent) {
+        if (mod.sessionID) {
+            var sessionID = Number(mod.sessionID);
+            break;
+        }
+    }
+    var label = createLabel(parentModule);
+    var logObj = createLogObject(parentModule, sessionID, label, writeToLog);
     logObj.disconnect = function(callback) { if (typeof callback === 'function') callback() };
 
     return logObj;
-}
 
-/**
- * Write data to the log file
- * @param {'D'|'I'|'W'|'E'|'EXIT'|'THROW'} level log level
- * @param {Array} args array of the log message data
- * @param {NodeModule} parentModule parent node module
- */
-function writeToLog(level, args, parentModule) {
-    var dataToSend = prepareLogMessage(level, args, undefined, parentModule);
-    if(dataToSend) {
-        dataToSend.TID_PID = TID_PID;
-        dataToSend.additionalLabel = '*';
-        writeLog(dataToSend);
+    /**
+     * Write data to the log file
+     * @param {'D'|'I'|'W'|'E'|'EXIT'|'THROW'} level log level
+     * @param {Array} args array of the log message data
+     */
+    function writeToLog(level, args) {
+        var dataToSend = prepareLogMessage(level, args, undefined, label);
+        if(dataToSend) {
+            dataToSend.TID_PID = TID_PID;
+            dataToSend.additionalLabel = '*';
+            writeLog(dataToSend);
+        }
+
+        if(level === 'THROW') process.exit(2);
     }
-
-    if(level === 'THROW') process.exit(2);
 }
+

@@ -3,6 +3,7 @@
  */
 
 const log = require('../lib/log')(module);
+const async = require('async');
 const path = require('path');
 const Conf = require('../lib/conf');
 const confSqlite = new Conf('config/sqlite.json');
@@ -39,6 +40,7 @@ THREADSAFE=1
  */
 
 var bestDB = dbInit();
+var slowQueryExecutionTime = 20000;
 
 var db = {
     maxVariableNumber: confSqlite.get('maxVariableNumber') || 99,
@@ -80,6 +82,7 @@ function dbInit() {
             bestDB.pragma('foreign_keys = "ON"');
             bestDB.pragma('encoding = "UTF-8"');
             bestDB.pragma('journal_mode = "WAL"');
+            bestDB.pragma('busy_timeout = 30000'); // DB Lock timeout (not working)
         } catch (err) {
             log.warn('Can\'t set some required pragma modes to ', dbPath, ': ', err.message);
         }
@@ -97,6 +100,7 @@ function dbInit() {
 function prepareCommonArgs (args) {
     var sql = args.shift();
     if(args.length > 0 && typeof args[args.length - 1] === 'function') var callback = args.pop();
+
 
     try {
         var bestStmt = bestDB.prepare(sql.replace(/"/g, '\''));
@@ -144,43 +148,97 @@ db.run = function (sql, args) {
     args = Array.prototype.slice.call(arguments);
     sql = args.shift();
     if(args.length > 0 && typeof args[args.length - 1] === 'function') var callback = args.pop();
+
+    var operationSuccessfullyComplete = false,
+        retryAttemptsAfterDBLock = Number(confSqlite.get('retryAttemptsAfterDBLock'))  || 60,
+        retryAttemptsPause = Number(confSqlite.get('retryAttemptsPause'))  || 500;
+
     if(!args.length) {
-        try {
-            //console.log('exec ', sql);
-            bestDB.exec(sql.replace(/"/g, '\''));
-        } catch (err) {
-            //console.log('err exec ', sql, '; ', typeof callback === 'function', err);
-            if (typeof callback === 'function') {
-                return callback(new Error('exec(): ' + err.message + '; SQL: ' + sql));
+        async.eachSeries([...Array(retryAttemptsAfterDBLock).keys()], function(idx, callback) {
+            if(operationSuccessfullyComplete) return callback();
+            var startQueryTime = Date.now();
+            try {
+                //console.log('exec ', sql);
+                bestDB.exec(sql.replace(/"/g, '\''));
+            } catch (err) {
+                // if DB is locked, try to retry operation
+                if(err.message.indexOf('database is locked') !== -1) {
+                    if(idx + 1 < retryAttemptsAfterDBLock) {
+                        log.warn('Try to retry ', idx + 1, '/',  retryAttemptsAfterDBLock, ': ', err.message);
+                        return setTimeout(callback, retryAttemptsPause);
+                    }
+                    err = new Error(err.message + '; retryAttemptsAfterDBLock: ' + retryAttemptsAfterDBLock +
+                        '; retryAttemptsPause: ' + retryAttemptsPause);
+                }
+                return callback(err);
             }
-            else throw err;
-        }
-        //console.log('done exec ', sql, '; ', typeof callback === 'function');
-        if (typeof callback === 'function') return callback();
+            if(Date.now - startQueryTime >
+                (confSqlite.get('slowQueryExecutionTime') || slowQueryExecutionTime)) {
+                log.warn('The SQL query was executed slowly (', Math.round((Date.now - startQueryTime) / 1000),
+                    'sec); SQL: ', sql, '; args: ', args);
+            }
+
+            operationSuccessfullyComplete = true;
+            callback();
+        }, function (err) {
+                if(err) {
+                    //console.log('err exec ', sql, '; ', typeof callback === 'function', err);
+                    if (typeof callback === 'function') {
+                        return callback(new Error('exec(): ' + err.message + '; SQL: ' + sql));
+                    } else throw err;
+                }
+
+                if (typeof callback === 'function') return callback();
+                //console.log('done exec ', sql, '; ', typeof callback === 'function');
+        });
         return;
     }
 
-    try {
-        var bestStmt = bestDB.prepare(sql.replace(/"/g, '\''));
-    } catch (err) {
-        if (typeof callback === 'function') {
-            return callback(new Error('prepare(): ' + err.message + '; SQL: ' + sql));
-        }
-        else throw err;
-    }
+    var info;
+    async.eachSeries([...Array(retryAttemptsAfterDBLock).keys()], function(idx, callback) {
+        if(operationSuccessfullyComplete) return callback();
 
-    try {
-        var info = bestStmt.run.apply(bestStmt, convertNamedParam(args));
-    } catch (err) {
-        if (typeof callback === 'function') {
-            return callback(new Error('run(): ' + err.message + '; SQL: ' + sql + '; ARGS: ' +
-                JSON.stringify(args, null, 4)));
+        try {
+            var bestStmt = bestDB.prepare(sql.replace(/"/g, '\''));
+        } catch (err) {
+            if (typeof callback === 'function') {
+                return callback(new Error('prepare(): ' + err.message + '; SQL: ' + sql));
+            }
+            else throw err;
         }
-        else throw err;
-    }
 
-    if (typeof callback === 'function') callback(null, info);
-    else return info;
+        var startQueryTime = Date.now();
+        try {
+            info = bestStmt.run.apply(bestStmt, convertNamedParam(args));
+        } catch (err) {
+            // if DB is locked, try to retry operation
+            if(err.message.indexOf('database is locked') !== -1) {
+                if(idx + 1 < retryAttemptsAfterDBLock) {
+                    log.warn('Try to retry ', idx + 1, '/',  retryAttemptsAfterDBLock, ': ', err.message);
+                    return setTimeout(callback, retryAttemptsPause);
+                }
+                err = new Error(err.message + '; retryAttemptsAfterDBLock: ' + retryAttemptsAfterDBLock +
+                    '; retryAttemptsPause: ' + retryAttemptsPause);
+            }
+            return callback(err);
+        }
+        if(Date.now - startQueryTime >
+            (confSqlite.get('slowQueryExecutionTime') || slowQueryExecutionTime)) {
+            log.warn('The SQL query was executed slowly (', Math.round((Date.now - startQueryTime) / 1000),
+                'sec); SQL: ', sql, '; args: ', args);
+        }
+        operationSuccessfullyComplete = true;
+        callback();
+    }, function (err) {
+        if(err) {
+            //console.log('err exec ', sql, '; ', typeof callback === 'function', err);
+            if (typeof callback === 'function') {
+                return callback(new Error('exec(): ' + err.message + '; SQL: ' + sql));
+            } else throw err;
+        }
+
+        if (typeof callback === 'function') callback(null, info);
+    });
 }
 
 /**
@@ -195,6 +253,7 @@ db.get = function (sql, args) {
     var [bestStmt, callback] = prepareCommonArgs(args);
     if(!bestStmt) return;
 
+    var startQueryTime = Date.now();
     try {
         var row = bestStmt.get.apply(bestStmt, convertNamedParam(args));
     } catch (err) {
@@ -203,6 +262,11 @@ db.get = function (sql, args) {
                 JSON.stringify(args, null, 4)));
         }
         else throw err;
+    }
+    if(Date.now - startQueryTime >
+        (confSqlite.get('slowQueryExecutionTime') || slowQueryExecutionTime)) {
+        log.warn('The SQL query was executed slowly (', Math.round((Date.now - startQueryTime) / 1000),
+            'sec); SQL: ', sql, '; args: ', args);
     }
 
     if (typeof callback === 'function') return callback(null, row);
@@ -222,6 +286,7 @@ db.all = function (sql, args) {
     if(!bestStmt) return;
 
     //console.log('all: ', sql, args, typeof callback === 'function')
+    var startQueryTime = Date.now();
     try {
         var rows = bestStmt.all.apply(bestStmt, convertNamedParam(args));
     } catch (err) {
@@ -230,6 +295,11 @@ db.all = function (sql, args) {
                 JSON.stringify(args, null, 4)));
         }
         else throw err;
+    }
+    if(Date.now - startQueryTime >
+        (confSqlite.get('slowQueryExecutionTime') || slowQueryExecutionTime)) {
+        log.warn('The SQL query was executed slowly (', Math.round((Date.now - startQueryTime) / 1000),
+            'sec); SQL: ', sql, '; args: ', args);
     }
 
     if (typeof callback === 'function') return callback(null, rows);
@@ -256,11 +326,17 @@ db.exec = function (sql, callback) {
         return;
     }
 
+    var startQueryTime = Date.now();
     try {
         bestDB.exec(sql.replace(/"/g, '\''));
     } catch (err) {
         if (typeof callback === 'function') return callback(new Error('exec(): ' + err.message + '; SQL: ' + sql));
         else throw err;
+    }
+    if(Date.now - startQueryTime >
+        (confSqlite.get('slowQueryExecutionTime') || slowQueryExecutionTime)) {
+        log.warn('The SQL query was executed slowly (', Math.round((Date.now - startQueryTime) / 1000),
+            'sec); SQL: ', sql);
     }
     if (typeof callback === 'function') return callback();
 }
@@ -340,17 +416,47 @@ function STMT(sql, prepareArgs) {
         var [bestStmt, callback] = prepareArgsSTMT(args);
         if(!bestStmt) return;
 
-        try {
-            var info = bestStmt.run.apply(bestStmt, convertNamedParam(args));
-        } catch (err) {
-            if (typeof callback === 'function') {
-                return callback(new Error('stmt run(): ' + err.message + '; SQL: ' + sql + '; ARGS: ' +
-                    JSON.stringify(args, null, 4)));
-            } else throw err;
-        }
+        var operationSuccessfullyComplete = false,
+            retryAttemptsAfterDBLock = Number(confSqlite.get('retryAttemptsAfterDBLock'))  || 5,
+            retryAttemptsPause = Number(confSqlite.get('retryAttemptsPause'))  || 300,
+            info;
 
-        if (typeof callback === 'function') callback(null, info);
-        else return info;
+        async.eachSeries([...Array(retryAttemptsAfterDBLock).keys()], function(idx, callback) {
+            if(operationSuccessfullyComplete) return callback();
+
+            var startQueryTime = Date.now();
+            try {
+                info = bestStmt.run.apply(bestStmt, convertNamedParam(args));
+            } catch (err) {
+                // if DB is locked, try to retry operation
+                if(err.message.indexOf('database is locked') !== -1) {
+                    if(idx + 1 < retryAttemptsAfterDBLock) {
+                        log.warn('Try to retry ', idx + 1, '/',  retryAttemptsAfterDBLock, ': ', err.message);
+                        return setTimeout(callback, retryAttemptsPause);
+                    }
+                    err = new Error(err.message + '; retryAttemptsAfterDBLock: ' + retryAttemptsAfterDBLock +
+                        '; retryAttemptsPause: ' + retryAttemptsPause);
+                }
+                return callback(err);
+            }
+            if(Date.now - startQueryTime >
+                (confSqlite.get('slowQueryExecutionTime') || slowQueryExecutionTime)) {
+                log.warn('The SQL query was executed slowly (', Math.round((Date.now - startQueryTime) / 1000),
+                    'sec); SQL: ', sql, '; args: ', args);
+            }
+            operationSuccessfullyComplete = true;
+            callback();
+        }, function (err) {
+            if(err) {
+                //console.log('err exec ', sql, '; ', typeof callback === 'function', err);
+                if (typeof callback === 'function') {
+                    return callback(new Error('exec(): ' + err.message + '; SQL: ' + sql));
+                } else throw err;
+            }
+
+            if (typeof callback === 'function') return callback(null, info);
+            //console.log('done exec ', sql, '; ', typeof callback === 'function');
+        });
     }
 
     /**
@@ -364,6 +470,7 @@ function STMT(sql, prepareArgs) {
         var [bestStmt, callback] = prepareArgsSTMT(args);
         if(!bestStmt) return;
 
+        var startQueryTime = Date.now();
         try {
             var res = bestStmt.get.apply(bestStmt, convertNamedParam(args));
         } catch (err) {
@@ -371,6 +478,11 @@ function STMT(sql, prepareArgs) {
                 return callback(new Error('stmt get(): ' + err.message + '; SQL: ' + sql + '; ARGS: ' +
                     JSON.stringify(args, null, 4)));
             } else throw err;
+        }
+        if(Date.now - startQueryTime >
+            (confSqlite.get('slowQueryExecutionTime') || slowQueryExecutionTime)) {
+            log.warn('The SQL query was executed slowly (', Math.round((Date.now - startQueryTime) / 1000),
+                'sec); SQL: ', sql, '; args: ', args);
         }
         if (typeof callback === 'function') return callback(null, res);
         else return res;
@@ -387,6 +499,7 @@ function STMT(sql, prepareArgs) {
         var [bestStmt, callback] = prepareArgsSTMT(args);
         if(!bestStmt) return;
 
+        var startQueryTime = Date.now();
         try {
             var res = bestStmt.all.apply(bestStmt, convertNamedParam(args));
         } catch (err) {
@@ -394,6 +507,11 @@ function STMT(sql, prepareArgs) {
                 return callback(new Error('stmt all(): ' + err.message + '; SQL: ' + sql + '; ARGS: ' +
                     JSON.stringify(args, null, 4)));
             } else throw err;
+        }
+        if(Date.now - startQueryTime >
+            (confSqlite.get('slowQueryExecutionTime') || slowQueryExecutionTime)) {
+            log.warn('The SQL query was executed slowly (', Math.round((Date.now - startQueryTime) / 1000),
+                'sec); SQL: ', sql, '; args: ', args);
         }
         if (typeof callback === 'function') return callback(null, res);
         else return res;

@@ -200,22 +200,29 @@ rightsWrapper.saveObjectsProperties = function (user, objectsIDs, propertiesForS
         async.eachSeries(objectsIDs, function (objectID, callback) {
             if(!properties.update[objectID] && !properties.updateDescription[objectID] &&
                 !properties.insert[objectID] && (!deleteNotListedProperties ||
-                (deleteNotListedProperties && (!properties.deleteShared || !properties.deleteShared.length)))) return callback();
+                (deleteNotListedProperties && (!properties.deleteShared || !properties.deleteShared.length)))) {
+                return callback();
+            }
 
             async.series([
                 function (callback) {
                     if(!properties.update[objectID]) return callback();
                     updatedObjectsIDs[objectID] = objectID;
-                    objectsPropertiesDBSave.updateProperties(objectID, Object.values(properties.update[objectID]), callback);
+                    objectsPropertiesDBSave.updateProperties(objectID,
+                        Object.values(properties.update[objectID]), callback);
                 }, function (callback) {
                     if(!properties.updateDescription[objectID]) return callback();
-                    objectsPropertiesDBSave.updateProperties(objectID, Object.values(properties.updateDescription[objectID]), callback);
+                    objectsPropertiesDBSave.updateProperties(objectID,
+                        Object.values(properties.updateDescription[objectID]), callback);
                 }, function (callback) {
                     if(!properties.insert[objectID]) return callback();
                     updatedObjectsIDs[objectID] = objectID;
-                    objectsPropertiesDBSave.insertProperties(objectID, Object.values(properties.insert[objectID]), callback)
+                    objectsPropertiesDBSave.insertProperties(objectID,
+                        Object.values(properties.insert[objectID]), callback)
                 }, function (callback) {
-                    if(!deleteNotListedProperties || !properties.deleteShared || !properties.deleteShared.length) return callback();
+                    if(!deleteNotListedProperties || !properties.deleteShared || !properties.deleteShared.length) {
+                        return callback();
+                    }
                     updatedObjectsIDs[objectID] = objectID;
                     objectsPropertiesDBSave.deleteProperties(objectID, properties.deleteShared, callback);
                 }
@@ -223,7 +230,8 @@ rightsWrapper.saveObjectsProperties = function (user, objectsIDs, propertiesForS
         }, function (err) {
             delete(properties.shared);
             // for reload properties to the cache
-            callback(err, Object.values(updatedObjectsIDs), properties); // use Object.values for save type of objectID as Number
+            // use Object.values for save type of objectID as Number
+            callback(err, Object.values(updatedObjectsIDs), properties);
         });
     });
 };
@@ -233,7 +241,8 @@ rightsWrapper.saveObjectsProperties = function (user, objectsIDs, propertiesForS
  * @param {string} user - username for check right for objects
  * @param {Array|string|number} objectsIDs - array or comma separated string with objects IDs
  * @param {Object} initProperties - properties for sorting [{name:..., mode:..., value:..., description:...}, ...]
- * @param {boolean} [deleteNotListedProperties] - if true, then delete properties, which not listed in "properties" array for use in automatic tasks
+ * @param {boolean} [deleteNotListedProperties] - if true, then delete properties, which not listed in "properties"
+ *  array for use in automatic tasks
  * @param {function(Error)|function(null, Array, Object)} callback - return error or callback(null, objetIDs, properties)
  * where objectIDs is an Array of modified object IDs, properties is an object with information about properties
  * modification
@@ -271,19 +280,22 @@ function sortProperties(user, objectsIDs, initProperties, deleteNotListedPropert
                 var sharedProperty = sharedProperties[property.name];
                 // true or false are saved in DB as 1 or 0 and next condition always will be true with those values
                 if(typeof sharedProperty.value === 'boolean') sharedProperty.value = Number(sharedProperty.value);
-                if (Number(sharedProperty.mode) !== Number(property.mode) || String(sharedProperty.value) !== String(property.value)) {
+                if (Number(sharedProperty.mode) !== Number(property.mode) ||
+                    String(sharedProperty.value) !== String(property.value)) {
                     // for debug
                     sharedProperty.oldMode = property.mode;
                     sharedProperty.oldValue = property.value;
                     if(!propertiesForUpdate[objectID]) propertiesForUpdate[objectID] = [sharedProperty];
                     else propertiesForUpdate[objectID].push(sharedProperty);
                 } else if(sharedProperty.description !== property.description) {
-                    if(!propertiesWithDifferentDescriptions[objectID]) propertiesWithDifferentDescriptions[objectID] = [sharedProperty];
-                    else propertiesWithDifferentDescriptions[objectID].push(sharedProperty);
+                    if(!propertiesWithDifferentDescriptions[objectID]) {
+                        propertiesWithDifferentDescriptions[objectID] = [sharedProperty];
+                    } else propertiesWithDifferentDescriptions[objectID].push(sharedProperty);
                 }
             } else if(deleteNotListedProperties) {
-                if(!sharedPropertiesNamesForDelete[property.name]) sharedPropertiesNamesForDelete[property.name] = [property];
-                else sharedPropertiesNamesForDelete[property.name].push(property);
+                if(!sharedPropertiesNamesForDelete[property.name]) {
+                    sharedPropertiesNamesForDelete[property.name] = [property];
+                } else sharedPropertiesNamesForDelete[property.name].push(property);
             }
         });
 

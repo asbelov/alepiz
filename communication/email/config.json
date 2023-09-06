@@ -106,5 +106,38 @@
                 "path": "templates/replyTask.html"
             }
         }
-    }
+    },
+    "checkExecutedTask": {
+        "transport": "default",
+        "message": {
+            "subject": "Re: #%:TASK_ID:%: %:TASK_NAME:%",
+            "messageId": "<%:TASK_ID:%.checkExecuteTask@alepiz.com>",
+            "inReplyTo": "<%:TASK_ID:%.executeTask@alepiz.com>",
+            "references": "<%:TASK_ID:%.createTask@alepiz.com> <%:TASK_ID:%.checkTask@alepiz.com> <%:TASK_ID:%.approveTask@alepiz.com> <%:TASK_ID:%.executeTask@alepiz.com>",
+            "replyTo": "root@domain.com",
+            "text": {
+                "path": "templates/newTask.txt"
+            },
+            "html": {
+                "path": "templates/checkExecutedTask.html"
+            }
+        }
+    },
+    "removeTask": {
+        "transport": "default",
+        "message": {
+            "subject": "Re: #%:TASK_ID:%: %:TASK_NAME:%",
+            "messageId": "<%:TASK_ID:%.removeTask@alepiz.com>",
+            "inReplyTo": "<%:TASK_ID:%.approveTask@alepiz.com>",
+            "references": "<%:TASK_ID:%.createTask@alepiz.com> <%:TASK_ID:%.checkTask@alepiz.com> <%:TASK_ID:%.approveTask@alepiz.com>",
+            "replyTo": "root@domain.com",
+            "text": {
+                "path": "templates/newTask.txt"
+            },
+            "html": {
+                "path": "templates/replyTask.html"
+            }
+        }
+    },
+
 }

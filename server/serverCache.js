@@ -15,8 +15,23 @@ var recordsFromDBCnt = 0;
 
 module.exports = createCache;
 
-
-function createCache(updateMode, callback) {
+/**
+ * Create the cache
+ * @param {Object|null} updateMode
+ * @param {Boolean} updateMode.updateObjectsCounters true - full update cache
+ * @param {Array<number>} updateMode.getHistoryVariables  countersIDs
+ * @param {Array<number>} updateMode.getVariablesExpressions countersIDs
+ * @param {Array<number>} updateMode.geObjectsProperties objectID
+ * @param {string} serverName server name for log
+ * @param {function()|function(Error, Object, Object, Object, Object)} callback(err, counterObjectNames, {
+ *      OCIDs: Map(<OCID>, <Map(<objectID>, <counterID>)>
+ *      objects: Map(<objectID, objectName>)
+ *      objectName2OCID: Map(<objectNameInUpperCase>, <Map(<counterID>, <OCID>)>)
+ *      counters: Map(<counterID>, <{objectsIDs, dependedUpdateEvents, collector, counterName,
+ *          debug, taskCondition, groupID, counterParams}>)
+ *  }, objectAlepizRelation, alepizInstance)
+ */
+function createCache(updateMode, serverName, callback) {
     if(updateMode && (!updateMode.updateObjectsCounters && !updateMode.getHistoryVariables.length &&
         !updateMode.getVariablesExpressions.length && !updateMode.geObjectsProperties.length)) return callback();
 
@@ -41,17 +56,19 @@ function createCache(updateMode, callback) {
                 objectAlepizRelation = _objectAlepizRelation;
                 cache.alepizInstance = alepizInstance;
 
-                    log.debug('Update cache: ' +
-                        '\ncounterObjectNames: ', counterObjectNames.size,
-                        '\nobjectAlepizRelation: ', objectAlepizRelation.size,
-                        '\nalepizInstance: ', alepizInstance,
-                        '\ncountersObjects.OCIDs: ', countersObjects.OCIDs.size,
-                        '\ncountersObjects.objects: ', countersObjects.objects.size,
-                        '\ncountersObjects.objectName2OCID: ', countersObjects.objectName2OCID.size,
-                        '\ncountersObjects.counters: ', countersObjects.counters.size
-                    );
+                if(err) return callback(err);
 
-                    callback(err);
+                log.debug('Update cache ', serverName, ': ',
+                    '\ncounterObjectNames: ', counterObjectNames.size,
+                    '\nobjectAlepizRelation: ', objectAlepizRelation.size,
+                    '\nalepizInstance: ', alepizInstance,
+                    '\ncountersObjects.OCIDs: ', countersObjects.OCIDs.size,
+                    '\ncountersObjects.objects: ', countersObjects.objects.size,
+                    '\ncountersObjects.objectName2OCID: ', countersObjects.objectName2OCID.size,
+                    '\ncountersObjects.counters: ', countersObjects.counters.size
+                );
+
+                callback();
             });
         },
         // variablesHistory
@@ -240,7 +257,7 @@ function getVariables(initIDs, func, key, variables, debugStr, callback) {
                 if(!variables.has(id)) variables.set(id, new Map());
                 variables.get(id).set(row.name, row);
             });
-            log.debug('Update cache ', debugStr, ': ', variables.size > 5 ? variables.size : variables);
+            log.debug('Update cache ', debugStr, ': ', variables.size);
             callback();
         });
     })

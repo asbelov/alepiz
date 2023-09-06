@@ -414,7 +414,13 @@ function reqAgentData(result, socket){
                 });
                 return;
             }
-            log.info('Callback not defined for ', zabbixHost, '; key ',  zabbixKey);
+            if(!countersParameters.has(zabbixHost)) {
+                log.info('Receiver object for ', zabbixHost, ' not defined ');
+            } else if(!countersParameters.get(zabbixHost).has(zabbixKey)) {
+                log.info('Receiver object for ', zabbixHost, ' and key ',  zabbixKey, ' not defined ');
+            } else {
+                log.info('Callback not defined for ', zabbixHost, '; key ',  zabbixKey);
+            }
             errCnt++;
             return;
         }

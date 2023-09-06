@@ -29,39 +29,83 @@ module.exports = function(args, callback) {
 /**
  * Get task groups object
  * @param {string} username username
- * @param {function(Error)|function(null, Object)} callback callback(err, taskGroupObj) where taskGroupObj is
+ * @param {function(Error)|function(null, {
+ *      allowedTaskGroups: Array,
+ *      taskGroups: Array,
+ *      workflowGroups: Object,
+ *      fullWorkflowGroups: Object,
+ *      allowedTasksGroupsIDs: Array<number>,
+ *      groupIDs: Object,
+ * })} callback callback(err, taskGroupObj) where taskGroupObj is
  * {
- *  groups: allowedRows,
+ *  allowedTaskGroups: allowedRows,
  *  workflow: workflowGroups,
  *  allowedTasksGroupsIDs: allowedTasksGroupsIDs,
+ *  groupIDs: groupIDs[row.id] = row.name,
  * }
  */
 function getTaskGroups(username, callback) {
-    tasks.getWorkflow(username, function (err, workflow, allowedTasksGroupsIDs) {
+    tasks.getWorkflow(username, function (err, workflows) {
         if(err) return callback(err);
 
-        tasksDB.getTasksGroupsList(function (err, rows) {
-            if(err) return callback(new Error('Can\'t get task groups: ' + err.message));
+        tasks.getAllowedTaskGroupIDs(username, function (err, allowedTasksGroupsIDs) {
+            if(err) return callback(err);
 
-            var groupsNames = {};
-            var allowedRows = rows.filter(function (row) {
-                groupsNames[row.name] = row.id;
-                return allowedTasksGroupsIDs.indexOf(row.id) !== -1;
-            });
+            tasksDB.getTasksGroupsList(function (err, rows) {
+                if(err) return callback(new Error('Can\'t get task groups: ' + err.message));
 
-            var workflowGroups = {};
-            workflow.forEach(function (obj) {
-                if(!obj.action || obj.action.indexOf(',') === -1) return;
-                var groupPair = obj.action.split(/ *, */);
-                var groupID = groupsNames[groupPair[0]], nextGroupID = groupsNames[groupPair[1]];
-                if(typeof groupID !== 'number' || typeof nextGroupID !== 'number') return;
-                workflowGroups[groupID] = nextGroupID;
-            });
+                var groupNames = {}, groupIDs = {};
+                var allowedRows = rows.filter(function (row) {
+                    groupNames[row.name] = row.id;
+                    groupIDs[row.id] = row.name;
+                    return allowedTasksGroupsIDs.indexOf(row.id) !== -1;
+                });
 
-            callback(null, {
-                groups: allowedRows,
-                workflow: workflowGroups,
-                allowedTasksGroupsIDs: allowedTasksGroupsIDs,
+                var workflowGroups = {}, fullWorkflowGroups = {}, unfinishedGroupChains = {};
+                workflows.forEach(function (workflow) {
+                    if(!workflow.changeGroup || workflow.changeGroup.indexOf(',') === -1) return;
+                    var groupPair = workflow.changeGroup.split(/ *, */);
+                    var groupID = groupNames[groupPair[0]], nextGroupID = groupNames[groupPair[1]];
+
+                    if(typeof groupID === 'number' && typeof nextGroupID === 'number') {
+                        if(workflow.action === 'change') fullWorkflowGroups[groupID] = nextGroupID;
+
+                        var isAllowedCurrentGroup = allowedTasksGroupsIDs.indexOf(groupID) !== -1;
+                        var isAllowedNextGroup = allowedTasksGroupsIDs.indexOf(nextGroupID) !== -1;
+
+                        if (isAllowedCurrentGroup && isAllowedNextGroup) workflowGroups[groupID] = nextGroupID;
+                        else if (isAllowedCurrentGroup && !isAllowedNextGroup) unfinishedGroupChains[nextGroupID] = groupID;
+                        else if (!isAllowedCurrentGroup && isAllowedNextGroup) {
+                            if (unfinishedGroupChains[groupID] !== undefined) {
+                                workflowGroups[unfinishedGroupChains[groupID]] = nextGroupID;
+                            }
+                        } else if (!isAllowedCurrentGroup && !isAllowedNextGroup) {
+                            if (unfinishedGroupChains[groupID] !== undefined) {
+                                unfinishedGroupChains[nextGroupID] = unfinishedGroupChains[groupID];
+                            }
+                        }
+
+                        log.debug('workflowGroups: groupID: ', groupID, '(allow: ', isAllowedCurrentGroup,
+                            ') nextGroupID: ', nextGroupID, '(allow: ', isAllowedNextGroup,
+                            ') unfinishedGroupChains: ', unfinishedGroupChains, ', workflowGroups: ', workflowGroups);
+                    }
+                });
+                // return only allowed tasks groups and tasks groups from workFlow
+                var taskGroups = rows.filter(row => {
+                    for(var groupID in fullWorkflowGroups) {
+                        if(fullWorkflowGroups[groupID] === row.id) return true;
+                    }
+                    return allowedTasksGroupsIDs.indexOf(row.id) !== -1;
+                });
+
+                callback(null, {
+                    allowedTaskGroups: allowedRows,
+                    taskGroups: taskGroups,
+                    fullWorkflowGroups: fullWorkflowGroups,
+                    workflowGroups: workflowGroups,
+                    allowedTasksGroupsIDs: allowedTasksGroupsIDs,
+                    groupIDs: groupIDs,
+                });
             });
         });
     });
@@ -99,11 +143,12 @@ function getCounters(username, objectsIDsStr, callback){
  * Get the task list
  * @param {Object} filterParam parameters for filter tasks
  * @param {string} filterParam.username username
- * @param {number} filterParam.timestampFrom
- * @param {number} filterParam.timestampTo
- * @param {number} filterParam.groupID
- * @param {string} filterParam.taskName
- * @param {string} filterParam.ownerName
+ *
+ * @param {number} filterParam.timestampFrom date from
+ * @param {number} filterParam.timestampTo date to
+ * @param {number} filterParam.groupID group ID
+ * @param {string} filterParam.taskName task name
+ * @param {string} filterParam.userName owner name
  * @param {boolean} filterParam.searchFirstNotEmptyGroup !!groupID
  * @param {function(Error)|function(null, Array<Object>)} callback callback(err, taskListObject)
  * where rows - task List rows, groupID - groupID with task for finding task List
@@ -111,100 +156,131 @@ function getCounters(username, objectsIDsStr, callback){
  * taskListObject
  * {
  *      taskData: Object.values(tasks),
- *      workflow: groupObj.workflow,
- *      groups: groupObj.groups,
+ *      workflow: groupObj.workflowGroups,
+ *      fullWorkflowGroups: groupObj.fullWorkflowGroups,,
+ *      allowedTaskGroups: groupObj.allowedTaskGroups,
+ *      taskGroups: groupObj.taskGroups,
  *      groupID: groupID,
  *}
  */
 function getTaskList(filterParam, callback) {
-    if(!filterParam.timestampFrom) return callback(new Error('Undefined first timestamp while getting task list'));
+    if(!filterParam.timestampFrom) {
+        return callback(new Error('Undefined first timestamp while getting task list'));
+    }
+
     var timestampFrom = Number(filterParam.timestampFrom);
-    if(!timestampFrom || timestampFrom !== parseInt(String(timestampFrom), 10) || timestampFrom < 946659600000 )
-        return callback(new Error('Incorrect first timestamp ("' + filterParam.timestampFrom + '") while getting task list'));
+    if(!timestampFrom || timestampFrom !== parseInt(String(timestampFrom), 10) || timestampFrom < 946659600000 ) {
+        return callback(new Error('Incorrect first timestamp ("' + filterParam.timestampFrom +
+            '") while getting task list'));
+    }
 
     if(!filterParam.timestampTo) return callback(new Error('Undefined last timestamp while getting task list'));
     var timestampTo = Number(filterParam.timestampTo);
-    if(!timestampTo || timestampTo !== parseInt(String(timestampTo), 10) || timestampTo < 946659600000 )
-        return callback(new Error('Incorrect last timestamp ("' + filterParam.timestampTo + '") while getting task list'));
+    if(!timestampTo || timestampTo !== parseInt(String(timestampTo), 10) || timestampTo < 946659600000 ) {
+        return callback(new Error('Incorrect last timestamp ("' + filterParam.timestampTo +
+            '") while getting task list'));
+    }
 
-    if(timestampFrom >= timestampTo)
-        return callback(new Error('First timestamp ("' + filterParam.timestampFrom + '") more then last timestamp ("' + filterParam.timestampTo + '") for getting task list'));
+    if(timestampFrom >= timestampTo) {
+        return callback(new Error('First timestamp ("' + filterParam.timestampFrom +
+            '") more then last timestamp ("' + filterParam.timestampTo + '") for getting task list'));
+    }
 
     var groupID = Number(filterParam.groupID);
     if(!groupID) groupID = 0;
-    else if(groupID !== parseInt(String(groupID), 10)) return callback(new Error('Incorrect group ID ("' + filterParam.groupID + '") while getting task list'));
+    else if(groupID !== parseInt(String(groupID), 10)) {
+        return callback(new Error('Incorrect group ID ("' + filterParam.groupID + '") while getting task list'));
+    }
 
     getTaskGroups(filterParam.username, function (err, groupObj) {
         if(err) return callback(err);
 
         var allowedTasksGroupsIDs = groupObj.allowedTasksGroupsIDs;
+        var groupIDs = groupObj.groupIDs;
 
         if(allowedTasksGroupsIDs.indexOf(groupID) === -1) {
-            return callback(new Error('Group ID ' + groupID + ' is not allowed for user ' + filterParam.username));
+            return callback(new Error('Group ' + groupIDs[groupID] + ' is not allowed for user ' + filterParam.username));
         }
 
         if(filterParam.userName) var ownerName = '%' + filterParam.userName + '%';
-        if(filterParam.taskName) var taskName = '%' + filterParam.taskName + '%';
+
+        // if taskName is an integer, then try to search taskID
+        if(filterParam.taskName) {
+            if(Number(filterParam.taskName) === parseInt(filterParam.taskName, 10) &&
+                Number(filterParam.taskName) > 0
+            ) {
+                var taskID = parseInt(filterParam.taskName, 10);
+            } else {
+                var taskName = '%' + filterParam.taskName + '%';
+            }
+        }
 
         getRawTaskList({
             username: filterParam.username,
             timestampFrom: timestampFrom,
             timestampTo: timestampTo,
             groupID: groupID,
+            taskID: taskID,
             taskName: taskName,
             ownerName: ownerName,
             searchFirstNotEmptyGroup: !!filterParam.groupID,
-        }, groupObj.workflow, function(err, rows, groupID) {
-        /*
-        tasksDB.getTaskList(args.username, timestampFrom, timestampTo, {
-            groupID: groupID,
-            taskName: taskName,
-            ownerName: ownerName
-        }, function(err, rows) {
-
-         */
+        }, groupObj.workflowGroups, groupIDs, function(err, rows, groupID) {
             if(err) return callback(err);
-
-            groupObj.groupID = groupID;
 
             if(!rows.length) {
                 log.debug('No tasks found for user ', filterParam.username, ' from ',
                     new Date(timestampFrom).toLocaleString(), ' to ', new Date(timestampTo).toLocaleString(),
-                    ', groupID: ', groupID, '; taskName: ', taskName, '; ownerName: ', ownerName);
-                return callback(null, groupObj);
+                    ', group: ', groupIDs[groupID], '; taskName: ', taskName, '; ownerName: ', ownerName);
+                return callback(null, {
+                    taskData: [],
+                    workflowGroups: groupObj.workflowGroups,
+                    fullWorkflowGroups: groupObj.fullWorkflowGroups,
+                    allowedTaskGroups: groupObj.allowedTaskGroups,
+                    taskGroups: groupObj.taskGroups,
+                    groupID: groupID,
+                });
             }
 
             var tasks = {}, actions = {};
             rows.forEach(function (row) {
-                if(!tasks[row.id]) tasks[row.id] = row;
+                if(!tasks[row.id]) {
+                    tasks[row.id] = row;
+                    tasks[row.id].actionIDs = [row.actionID];
+                } else tasks[row.id].actionIDs.push(row.actionID);
                 if(!actions[row.actionID]) actions[row.actionID] = true;
             });
-            rightsWrapper.checkActionsRights(filterParam.username, Object.keys(actions), null, function (err, actionsRights) {
+            rightsWrapper.checkActionsRights(filterParam.username, Object.keys(actions), null,
+                function (err, actionsRights) {
                 if(err) {
-                    return callback(new Error('Error checking rights for task "' + taskName +
-                        '", actions in task: "' + Object.keys(actions).join(', ') + '": ' + err.message));
+                    return callback(new Error('Error checking rights for the actions in task: ' + err.message +
+                        '; tasks: ' + JSON.stringify(tasks, null, 4) ));
                 }
 
                 for(var taskID in tasks) {
-                    tasks[taskID].canExecuteTask = true;
-                    tasks[taskID].canViewTask = true;
 
-                    for(var actionID in actionsRights) {
-                        if(!actionsRights[actionID] || !actionsRights[actionID].run) {
-                            tasks[taskID].canExecuteTask = false;
-                        }
+                    for(var i = 0; i < tasks[taskID].actionIDs.length; i++) {
+                        var actionID = tasks[taskID].actionIDs[i];
+
                         if(!actionsRights[actionID] || !actionsRights[actionID].view) {
-                            tasks[taskID].canViewTask = false;
+                            log.debug('User: ', filterParam.username, ': has no rights for action ', actionID,
+                                ' in task ', taskID, ' group ', groupIDs[groupID] ,'. Remove task from list');
+                            delete tasks[taskID];
+                            break;
                         }
+
+                        tasks[taskID].canExecuteTask = !(!actionsRights[actionID] || !actionsRights[actionID].run);
                     }
                 }
 
-                log.debug('Receiving task list: ', tasks)
+                log.debug('User: ', filterParam.username, ': receiving task list in group ', groupIDs[groupID],
+                    ': ', tasks, '; rows: ', rows);
 
                 callback(null, {
                     taskData: Object.values(tasks),
-                    workflow: groupObj.workflow,
-                    groups: groupObj.groups,
+                    workflowGroups: groupObj.workflowGroups,
+                    fullWorkflowGroups: groupObj.fullWorkflowGroups,
+                    allowedTaskGroups: groupObj.allowedTaskGroups,
+                    taskGroups: groupObj.taskGroups,
                     groupID: groupID,
                 });
             });
@@ -222,11 +298,13 @@ function getTaskList(filterParam, callback) {
  * @param {number} filterParam.timestampTo
  * @param {number} filterParam.groupID
  * @param {string} filterParam.taskName
+ * @param {number} filterParam.taskID
  * @param {string} filterParam.ownerName
  * @param {boolean} filterParam.searchFirstNotEmptyGroup groupID === ''
  * @param {Object} workflowGroups group chain in workflow workflowGroup[groupID] = nextGroupID
  * @param {function(Error)|function(null, Array<Object>, number)} callback callback(err, rows, groupID)
  * where rows - task List rows, groupID - groupID with task for finding task List
+ * @param {Object} groupIDs groupIDs[groupID] = groupName
  * @example
  * example of the returned array (rows)
  * [{
@@ -242,19 +320,27 @@ function getTaskList(filterParam, callback) {
  *      changeStatusTimestamp: time when condition saw changed
  * }, ...]
  */
-function getRawTaskList(filterParam, workflowGroups, callback) {
-    var groupID = filterParam.groupID, prevGroupID = groupID, rows = [];
+function getRawTaskList(filterParam, workflowGroups, groupIDs, callback) {
+    var groupID = filterParam.groupID || 0, prevGroupID = groupID, rows = [];
+
+    if(filterParam.searchFirstNotEmptyGroup) {
+        log.debug('User: ', filterParam.username, ': move groups rules: ', workflowGroups,
+            '; target group: ', groupIDs[groupID], '; groups: ', groupIDs);
+    }
+
     async.whilst(function () {
         return groupID !== undefined && !rows.length;
     }, function (callback) {
         tasksDB.getTaskList(filterParam.username, filterParam.timestampFrom, filterParam.timestampTo, {
             groupID: groupID,
             taskName: filterParam.taskName,
+            taskID: filterParam.taskID,
             ownerName: filterParam.ownerName
         }, function(err, _rows) {
             if (!err && _rows && _rows.length) rows = _rows;
             else if(filterParam.searchFirstNotEmptyGroup) {
-                log.debug('Can\'t find tasks in task groups ', groupID, '; try to search in group ', workflowGroups[groupID]);
+                log.debug('User: ', filterParam.username, ': can\'t find tasks in task groups ', groupIDs[groupID],
+                    '; try to search next group ', groupIDs[workflowGroups[groupID]]);
             }
             prevGroupID = groupID;
             groupID = filterParam.searchFirstNotEmptyGroup ? workflowGroups[groupID] : undefined;
