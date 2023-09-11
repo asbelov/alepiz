@@ -20,8 +20,10 @@ const iconv = require('iconv-lite');
  * @param {string} args.codePage text code page
  * @param {string} args.selectService service name where the file was changed
  * @param {string} args.selectFile file name for saving changes
- * @param {string} args.editorResult changes in diff format
- * @param {string} args.bcpFilePath Backup file path
+ * @param {string} args.editorResult contents of the newly edited file
+ * @param {string} args.actionCfg.options.bcpFilePath Backup file path
+ * @param {Boolean} args.actionCfg.options.DOSStyleLineBreaks true - use DOS style line breaks (\r\n).
+ *      false - unix style (\n). Default - unix style.
  * @param {function(Error)|function(null, string)} callback callback(err, fileNameForSave)
  */
 
@@ -71,7 +73,6 @@ module.exports = function(args, callback) {
 
             bcpFile(args, filePath, fileName, function (err) {
                 if (err) return callback(err);
-                log.info('Saving file to ', newFilePath);
                 saveFile(newFilePath, args.editorResult, args.codePage, callback);
             });
         }, function (err) {
@@ -87,8 +88,24 @@ module.exports = function(args, callback) {
     function saveFile(filePath, content, codePage, callback) {
         if(content === undefined) return callback(new Error('Content for file ' + filePath + ' is undefined'));
 
-        var outData = iconv.encode(content, codePage);
-        fs.writeFile(filePath, outData, function (err) {
+        var outBuffer = iconv.encode(content, codePage);
+
+        /**
+         * iconv.encode returns UNIX-style line feeds. convert line feeds in the received buffer to the format
+         * specified by the option DOSStyleLineBreaks. 0x0d = \r; 0x0a = \n
+         */
+        var outArray = [], prevCh = 0;
+        for(var ch of outBuffer) {
+            if(args.actionCfg.options.DOSStyleLineBreaks) {
+                if(ch === 0x0a && prevCh !== 0x0d) outArray.push(0x0d, 0x0a);
+                else outArray.push(ch);
+            } else if(ch !== 0x0d) outArray.push(ch);
+            prevCh = ch;
+        }
+        log.info('Saving file to ', filePath, ' using ',
+            (args.actionCfg.options.DOSStyleLineBreaks ? 'DOS' : 'UNIX'), ' style line breaks');
+
+        fs.writeFile(filePath, Buffer.from(outArray), function (err) {
             if(err) return callback(new Error('Can\'t write file ' + filePath + ': ' + err.message));
 
             if(!content.length) {
@@ -97,9 +114,12 @@ module.exports = function(args, callback) {
             }
 
             fs.stat(filePath, function(err, stats) {
-                if (err) return callback(new Error('Can\'t get file size for the file ' + filePath + ': ' + err.message));
-                if(stats.size === 0) {
-                    log.warn('After saving file ' , filePath, ' has zero size but mast be a ', content.length,
+                if (err) {
+                    return callback(new Error('Can\'t get file size for the file ' + filePath + ': ' + err.message));
+                }
+
+                if(stats.size === 0 && outArray.length !== 0) {
+                    log.warn('After saving file ' , filePath, ' has zero size but mast be a ', outArray.length,
                         'bytes. Try to save again');
                     setTimeout(saveFile, 300, filePath, content, codePage, callback);
                     return;

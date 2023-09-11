@@ -34,6 +34,7 @@
         "skipDirs": "old_version,sav,certs,!scripts",
         "filePath": "CONFIG_FILES_PATH",
         "bcpFilePath": "./old_version/%:YYYY:%%:MM:%%:dd:%%:HH:%%:mm:%%:ss:%_edt",
-        "codePage":"win1251"
+        "codePage": "win1251",
+        "DOSStyleLineBreaks": true
     }
 }

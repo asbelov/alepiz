@@ -10,7 +10,7 @@ const tasks = require('../../serverTask/tasks');
  * @param {Object} args
  * @param {string} args.taskID taskID
  * @param {string} args.taskSessionID task session ID for add a new comment to the task
- * @param {string} args.sessionID action session ID for add a new comment to the action
+ * @param {string} args.selectedSessionID action session ID for add a new comment to the action
  * @param {string} args.actionName action name
  * @param {string} args.modalComment auditor comment
  * @param {Object} args.actionCfg action configuration
@@ -64,14 +64,15 @@ module.exports = function(args, callback) {
         });
     } else {
         log.info('User ', args.username, ' adding the comment: "', args.modalComment,
-            '" for the action with sessionID: ', args.sessionID);
+            '" for the action with sessionID: ', args.selectedSessionID);
 
-        if(Number(args.sessionID) !== parseInt(args.sessionID, 10) || Number(args.sessionID) < 1) {
+        if(Number(args.selectedSessionID) !== parseInt(args.selectedSessionID, 10) ||
+            Number(args.selectedSessionID) < 1) {
             return callback(new Error('Error add a new comment for the action to the auditDB: incorrect sessionID: ' +
-                args.sessionID + '; comment: ' + args.modalComment));
+                args.selectedSessionID + '; comment: ' + args.modalComment));
         }
 
-        log.addActionComment(Number(args.sessionID), args.modalComment, args.username);
+        log.addActionComment(Number(args.selectedSessionID), args.modalComment, args.username);
         callback(null, args.modalComment);
     }
 }

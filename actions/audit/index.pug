@@ -40,7 +40,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                             th(style="width: 10%") User
                                             th(style="width: 10%") Action
                                             th(style="width: 35%") Description
-                                            th(style="width: 20%") Error
+                                            th(style="width: 20%") Comments\Errors
                                             th(style="width: 10%") Objects
                             div.collapsible-body
                                 div.row.no-margin
@@ -63,7 +63,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                         label Actions
                                     div.input-field.col.s12.m6
                                         input(type='text' data-filter-prm="td")#descriptionFilter
-                                        label(for='descriptionFilter') Description or error
+                                        label(for='descriptionFilter') Description
                                     div.input-field.col.s12.m4.l6
                                         input(type='text' data-filter-prm="tm")#messageFilter
                                         label(for='messageFilter') Log message
@@ -94,7 +94,7 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                     label(for="modalComment") Comment
                     input(type="hidden")#taskID
                     input(type="hidden")#taskSessionID
-                    input(type="hidden")#sessionID
+                    input(type="hidden")#selectedSessionID
             div.modal-footer
                 a(href="#")#modalSendMessage.modal-close.waves-effect.waves-green.btn-flat Send message
                 a(href="#")#modalCancel.modal-close.waves-effect.waves-green.btn-flat Cancel

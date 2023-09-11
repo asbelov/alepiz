@@ -61,21 +61,48 @@ function getSessions(args, callback) {
                         getUserName(userID, function (err, username) {
                             if (err) return callback(err);
 
-                            sessions[row.sessionID] = {
-                                startTimestamp: row.startTimestamp,
-                                stopTimestamp: row.stopTimestamp,
-                                userID: userID,
-                                userName: username,
-                                actionID: row.actionID,
-                                actionName: actionCfg.name,
-                                description: row.description || '',
-                                error: row.error || '',
-                                objects: row.objects,
-                                sessionID: row.sessionID,
-                                taskID: row.taskID || null,
-                                taskSession: row.taskSession || null,
-                                taskName: row.taskName || null,
-                            };
+                            if(!sessions[row.sessionID]) {
+                                sessions[row.sessionID] = {
+                                    startTimestamp: row.startTimestamp,
+                                    stopTimestamp: row.stopTimestamp,
+                                    userID: userID,
+                                    userName: username,
+                                    actionID: row.actionID,
+                                    actionName: actionCfg.name,
+                                    description: row.description || '',
+                                    error: row.error || '',
+                                    objects: row.objects,
+                                    sessionID: row.sessionID,
+                                    taskID: row.taskID || null,
+                                    taskSession: row.taskSession || null,
+                                    taskName: row.taskName || null,
+                                    actionComment: row.actionComment ? [row.actionComment] : [],
+                                    actionCommentTimestamp: row.actionCommentTimestamp ? [row.actionCommentTimestamp] : [],
+                                    actionCommentUsername: row.actionCommentUsername ? [row.actionCommentUsername] : [],
+                                    taskComment: row.taskComment ? [row.taskComment] : [],
+                                    taskCommentTimestamp: row.taskCommentTimestamp ? [row.taskCommentTimestamp] : [],
+                                    taskCommentUsername: row.taskCommentUsername ? [row.taskCommentUsername] : [],
+                                };
+                            } else {
+                                if(row.actionComment) {
+                                    sessions[row.sessionID].actionComment.push(row.actionComment);
+                                }
+                                if(row.actionCommentTimestamp) {
+                                    sessions[row.sessionID].actionCommentTimestamp.push(row.actionCommentTimestamp);
+                                }
+                                if(row.actionCommentUsername) {
+                                    sessions[row.sessionID].actionCommentUsername.push(row.actionCommentUsername);
+                                }
+                                if(row.taskComment) {
+                                    sessions[row.sessionID].taskComment.push(row.taskComment);
+                                }
+                                if(row.taskCommentTimestamp) {
+                                    sessions[row.sessionID].taskCommentTimestamp.push(row.taskCommentTimestamp);
+                                }
+                                if(row.taskCommentUsername) {
+                                    sessions[row.sessionID].taskCommentUsername.push(row.taskCommentUsername);
+                                }
+                            }
                             callback();
                         });
                     } else {

@@ -302,7 +302,7 @@ ORDER by log.id ASC LIMIT $maxRecordsReturnedFromDatabase');
      * Get session information from the lastID. The lastID is not a sessionID.
      * This is the "id" field from the session table
      *
-     * @param {Object} req filter parameters
+     * @param {{user: (string|number), lastRecordID: number}} req filter parameters
      * @param {number} req.from from date
      * @param {number} req.to to date
      * @param {string} req.userIDs comma separated user IDs

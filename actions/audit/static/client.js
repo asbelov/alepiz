@@ -54,7 +54,7 @@ var JQueryNamespace = (function ($) {
         modalCommentElm,
         taskIDElm,
         taskSessionIDElm,
-        sessionIDElm;
+        selectedSessionIDElm;
 
     var monthNames = ["January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
@@ -123,7 +123,8 @@ var JQueryNamespace = (function ($) {
         modalCommentElm = $('#modalComment');
         taskIDElm = $('#taskID');
         taskSessionIDElm = $('#taskSessionID');
-        sessionIDElm = $('#sessionID');
+        // don't use "sessionID" as the element ID. It is reserved for the sessionID of the current action
+        selectedSessionIDElm = $('#selectedSessionID');
 
         alepizActionLogViewerNamespace.init($('#actionLog'));
 
@@ -465,6 +466,25 @@ var JQueryNamespace = (function ($) {
                     .replace(/{{highlightOpen}}/g, '<span class="highLight">')
                     .replace(/{{highlightClose}}/g, '</span>').split('\n').filter(str => str.trim()).join('<br/>') :
                 '';
+            var actionComment = row.actionComment.length ?
+                row.actionComment.map((actionComment, i) => {
+                    return '<b>' + escapeHtml(row.actionCommentUsername[i]) + ':&nbsp;' +
+                        new Date(row.actionCommentTimestamp[i]).toLocaleString() +
+                        ':</b><br/>' + escapeHtml(actionComment)
+                            .replace(/{{highlightOpen}}/g, '<span class="highLight">')
+                            .replace(/{{highlightClose}}/g, '</span>').split('\n')
+                            .filter(str => str.trim()).join('<br/>')
+                }).join('<br/>') : '';
+
+            var taskComment = row.taskComment.length ?
+                row.taskComment.map((taskComment, i) => {
+                    return '<b>' + escapeHtml(row.taskCommentUsername[i]) + ':&nbsp;' +
+                        new Date(row.taskCommentTimestamp[i]).toLocaleString() +
+                        ':</b><br/>' + escapeHtml(taskComment)
+                            .replace(/{{highlightOpen}}/g, '<span class="highLight">')
+                            .replace(/{{highlightClose}}/g, '</span>').split('\n')
+                            .filter(str => str.trim()).join('<br/>')
+                }).join('<br/>') : '';
 
             if(error.length > 1000) error = error.substring(0, 1000) + '...';
 
@@ -510,17 +530,20 @@ var JQueryNamespace = (function ($) {
                 '</td><td style="width: 5%">' +
                 (row.startTimestamp ?
                     (from ? '<span class="highLight">' : '') + (new Date(row.startTimestamp)).toLocaleString()
-                        .replace(/\D\d\d\d\d/, '').replace(/:\d\d$/, '') + (from ? '</span>' : '') :
+                        .replace(/\D\d\d\d\d/, '')
+                        .replace(/:\d\d$/, '') + (from ? '</span>' : '') :
                     '-') +
                 '</td><td style="width: 5%">' +
                 (row.stopTimestamp ?
                     (to ? '<span class="highLight">' : '') + (new Date(row.stopTimestamp)).toLocaleString()
-                        .replace(/\D\d\d\d\d/, '').replace(/:\d\d$/, '')  + (to ? '</span>' : ''):
+                        .replace(/\D\d\d\d\d/, '')
+                        .replace(/:\d\d$/, '')  + (to ? '</span>' : ''):
                     '-') +
                 '</td><td style="width: 10%">' + userName +
                 '</td><td style="width: 10%">' + actionName +
                 '</td><td style="width: 35%">' + description +
-                '</td><td class="red-text" style="width: 20%; font-weight: normal; overflow-wrap: break-word;">' + error +
+                '</td><td class="' + (actionComment ? 'green-text' : 'red-text' ) +
+                    '" style="width: 20%; font-weight: normal; overflow-wrap: break-word;">' + (actionComment || error) +
                 '</td><td style="width: 10%; overflow-wrap: break-word;">' + objectList +
                 '</td><td class="hide">' + row.userID +
                 '</td></tr>';
@@ -540,6 +563,7 @@ var JQueryNamespace = (function ($) {
                     actionName: [actionName],
                     description: taskName,
                     error: error ? [error] : [],
+                    taskComment: taskComment,
                     rawError: error ? [row.actionName + ': ' + row.error] : [],
                     objects: taskObjects,
                     actions: [actionHTML],
@@ -592,7 +616,8 @@ var JQueryNamespace = (function ($) {
                         return key + '=' + urlParameters[key];
                     }).join('&');
 
-                    var objectList = '<a href="' + url + '" target="_blank">' + Object.keys(task.objects).map(name => {
+                    var objectList = '<a href="' + url + '" target="_blank">' +
+                        Object.keys(task.objects).map(name => {
                         if(objects.length && filteredObjectIDs[task.objects[name]]) {
                             return '<span class="highLight">' + escapeHtml(name) + '</span>';
                         } else return escapeHtml(name)
@@ -606,19 +631,23 @@ var JQueryNamespace = (function ($) {
                     '<td><i class="material-icons" data-task-icon="' + taskSession + '">expand_more</i></td><td>' +
                     (task.startTimestamp ?
                         (from ? '<span class="highLight">' : '') + (new Date(task.startTimestamp)).toLocaleString()
-                            .replace(/\D\d\d\d\d/, '').replace(/:\d\d$/, '') + (from ? '</span>' : '') :
+                            .replace(/\D\d\d\d\d/, '')
+                            .replace(/:\d\d$/, '') + (from ? '</span>' : '') :
                         '-') +
                     '</td><td>' +
                     (task.stopTimestamp ?
                         (to ? '<span class="highLight">' : '') + (new Date(task.stopTimestamp)).toLocaleString()
-                            .replace(/\D\d\d\d\d/, '').replace(/:\d\d$/, '') + (to ? '</span>' : '') :
+                            .replace(/\D\d\d\d\d/, '')
+                            .replace(/:\d\d$/, '') + (to ? '</span>' : '') :
                         '-') +
                     '</td><td>' + escapeHtml(task.userName) +
                     '</td><td>' + task.actionName.join(',<br/>') +
                     '</td><td>' + highlightedTaskID + ': ' + escapeHtml(task.description) +
-                    '</td><td class="red-text" style="font-weight: normal; overflow-wrap: break-word;">' +
-                        (task.error.length ?
-                            '* ' + task.error.join('</br>* ') : '') +
+                    '</td><td class="' + (task.taskComment ? 'green-text' : 'red-text') +
+                        '" style="font-weight: normal; overflow-wrap: break-word;">' +
+                            (task.taskComment ||
+                            (task.error.length ?
+                                '* ' + task.error.join('</br>* ') : '')) +
                     '</td><td style="overflow-wrap: break-word;">' + objectList +
                     '</td><td class="hide">' + task.userID +
                     '</td></tr>';
@@ -648,7 +677,7 @@ var JQueryNamespace = (function ($) {
             taskIDElm.val('');
             taskSessionIDElm.val('');
             selectedSessionID = Number($(this).attr('data-session-id'));
-            sessionIDElm.val(selectedSessionID);
+            selectedSessionIDElm.val(selectedSessionID);
             commentDescriptionElm.text(' action "' + $(this).attr('data-action-name') + '"');
             var error = $(this).attr('data-error');
             modalCommentElm.val(error === '0' ? correctlyText : incorrectlyText + actionErrors[selectedSessionID] || '');
@@ -671,7 +700,7 @@ var JQueryNamespace = (function ($) {
             selectedTaskID = $(this).attr('data-task-id');
             taskIDElm.val(selectedTaskID);
             taskSessionIDElm.val(selectedTaskSessionID);
-            sessionIDElm.val('');
+            selectedSessionIDElm.val('');
             commentDescriptionElm.text(' task "' + $(this).attr('data-task-description') + '"');
             var error = $(this).attr('data-error');
             modalCommentElm.val(error === '0' ?
