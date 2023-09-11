@@ -70,6 +70,10 @@ function onMessage (messageObj, callback) {
 
     if (messageObj.messageBody) {
         addNewRecord(messageObj);
+    } else if (messageObj.taskComment) {
+        addTaskComment(messageObj);
+    } else if (messageObj.actionComment) {
+        addActionComment(messageObj);
     } else if (messageObj.auditData === 'logRecords') {
         getAuditData.getLogRecords(messageObj, callback);
     } else if (messageObj.auditData === 'sessions') {
@@ -81,10 +85,6 @@ function onMessage (messageObj, callback) {
         callback();
     } else if (messageObj.stopTimestamp) {
         addSessionResult(messageObj);
-    } else if (messageObj.taskComment) {
-        addTaskComment(messageObj);
-    } else if (messageObj.actionComment) {
-        addActionComment(messageObj);
     } else {
         return callback(new Error('Unreachable message ' + JSON.stringify(messageObj, null, 4)));
     }
@@ -243,14 +243,16 @@ function createActionDescription(args, descriptionTemplate, callback) {
  * @param {Object} messageObj
  * @param {number} messageObj.taskSessionID task session ID
  * @param {string} messageObj.taskComment a new comment for the task
+ * @param {string} messageObj.username username
  */
 function addTaskComment(messageObj) {
     if(typeof messageObj.taskSessionID !== 'number') return;
     try {
-        auditDB.addTaskComment(messageObj.taskSessionID, messageObj.taskComment);
+        auditDB.addTaskComment(messageObj.taskSessionID, messageObj.taskComment, messageObj.username);
+        log.info('Added a comment to the task to the DB: ', messageObj);
     } catch (err) {
         log.error('Error add comment for the task: ', err.message, '; taskSession: ', messageObj.taskSessionID,
-            '; comment: "', messageObj.taskComment, '"');
+            '; comment: "', messageObj.taskComment, '", username: ', messageObj.username);
     }
 }
 
@@ -259,13 +261,15 @@ function addTaskComment(messageObj) {
  * @param {Object} messageObj
  * @param {number} messageObj.sessionID action session ID
  * @param {string} messageObj.actionComment a new comment for the action
+ * @param {string} messageObj.username username
  */
 function addActionComment(messageObj) {
     if(typeof messageObj.sessionID !== 'number') return;
     try {
-        auditDB.addTaskComment(messageObj.sessionID, messageObj.actionComment);
+        auditDB.addActionComment(messageObj.sessionID, messageObj.actionComment, messageObj.username);
+        log.info('Added a comment to the action to the DB: ', messageObj);
     } catch (err) {
         log.error('Error add comment for the action: ', err.message, '; sessionID: ', messageObj.sessionID,
-            '; comment: "', messageObj.actionComment, '"');
+            '; comment: "', messageObj.actionComment, '", username: ', messageObj.username);
     }
 }

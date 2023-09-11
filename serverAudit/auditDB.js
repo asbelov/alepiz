@@ -322,21 +322,33 @@ ORDER by log.id ASC LIMIT $maxRecordsReturnedFromDatabase');
      *      stopTimestamp: number,
      *      [message: string],
      *      [description: string],
+     *      [actionComment: string],
+     *      [actionCommentTimestamp: number],
+     *      [actionCommentUsername: string],
+     *      [taskComment: string],
+     *      [taskCommentTimestamp: number],
+     *      [taskCommentUsername: string],
      *      objects: Array<{id: number, name: string}>
      * }>} sessionRows
      * @example
      * returned sessionRows array:
      *  [{
-     *     id: <id = descriptions.rowid>,
-     *     sessionID: <sessionID>,
-     *     actionID: <actionID (action dir)>,
-     *     startTimestamp: <time when action was started>,
-     *     stopTimestamp: <time when action was finished>,
-     *     description: <an action description created from a action descriptionTemplateHTML or descriptionTemplate>
-     *     objects: [{
-     *         id: <objectID>,
-     *         name: <objectName>
-     *     }, ....]
+     *      id: <id = descriptions.rowid>,
+     *      sessionID: <sessionID>,
+     *      actionID: <actionID (action dir)>,
+     *      startTimestamp: <time when action was started>,
+     *      stopTimestamp: <time when action was finished>,
+     *      description: <an action description created from a action descriptionTemplateHTML or descriptionTemplate>
+ *          actionComment: comment for the action,
+     *      actionCommentTimestamp: action comment timestamp,
+     *      actionCommentUsername: action comment username,
+     *      taskComment: comment for the task,
+     *      taskCommentTimestamp: task comment timestamp,
+     *      taskCommentUsername: task comment username,
+     *      objects: [{
+     *          id: <objectID>,
+     *          name: <objectName>
+     *      }, ....]
      *  }, ...]
      */
     auditDB.getSessions = function (req={}) {
@@ -494,7 +506,9 @@ sessions.taskSession AS taskSession, sessions.actionID AS actionID, \
 sessions.startTimestamp AS startTimestamp, sessions.stopTimestamp AS stopTimestamp, \
 descriptions.description AS description, descriptions.error AS error, taskNames.name AS taskName, \
 actionComments.comment AS actionComment, actionCommentsReferences.timestamp AS actionCommentTimestamp, \
-taskComments.comment AS taskComment, taskCommentsReferences.timestamp AS taskCommentTimestamp \
+actionCommentsReferences.username AS actionCommentUsername, \
+taskComments.comment AS taskComment, taskCommentsReferences.timestamp AS taskCommentTimestamp,\
+taskCommentsReferences.username AS taskCommentUsername \
 FROM sessions \
 JOIN descriptions ON sessions.id=descriptions.rowid \
 LEFT JOIN taskCommentsReferences ON taskCommentsReferences.taskSession=sessions.taskSession \
@@ -594,22 +608,24 @@ ORDER BY sessions.id DESC' + rowsLimit).all({
      * Add comment to the task
      * @param {number} taskSessionID taskSessionID
      * @param {string} comment new comment for the task
+     * @param {string} username username
      */
-    auditDB.addTaskComment = db.transaction((taskSessionID, comment) => {
+    auditDB.addTaskComment = db.transaction((taskSessionID, comment, username) => {
 
         /**
          * @type {{lastInsertRowid: number}}
          */
-        var taskCommentsTable = db.prepare('INSERT INTO taskComments (comment) VALUES(?)')
-            .run(comment);
-        var taskCommentRowID = taskCommentsTable.lastInsertRowid;
+        var taskCommentsTable =
+            db.prepare('INSERT INTO taskComments (comment) VALUES(?)').run(comment);
 
+        var taskCommentRowID = taskCommentsTable.lastInsertRowid;
         db.prepare('\
-INSERT INTO taskCommentsReferences (taskCommentRowID, taskSession, timestamp) \
-VALUES ($taskCommentRowID, $taskSession, $timestamp)').run({
+INSERT INTO taskCommentsReferences (taskCommentRowID, taskSession, timestamp, username) \
+VALUES ($taskCommentRowID, $taskSession, $timestamp, $username)').run({
             taskCommentRowID: taskCommentRowID,
             taskSession: taskSessionID,
             timestamp: Date.now(),
+            username: username,
         });
     });
 
@@ -617,8 +633,9 @@ VALUES ($taskCommentRowID, $taskSession, $timestamp)').run({
      * Add comment to the action
      * @param {number} sessionID sessionID
      * @param {string} comment new comment for the action
+     * @param {string} username username
      */
-    auditDB.addActionComment = db.transaction((sessionID, comment) => {
+    auditDB.addActionComment = db.transaction((sessionID, comment, username) => {
         /**
          * @type {{lastInsertRowid: number}}
          */
@@ -627,11 +644,12 @@ VALUES ($taskCommentRowID, $taskSession, $timestamp)').run({
 
         var actionCommentRowID = actionCommentsTable.lastInsertRowid;
         db.prepare('\
-INSERT INTO actionCommentsReferences (actionCommentRowID, sessionID, timestamp) \
-VALUES($actionCommentRowID, $sessionID, $timestamp)').run({
+INSERT INTO actionCommentsReferences (actionCommentRowID, sessionID, timestamp, username) \
+VALUES($actionCommentRowID, $sessionID, $timestamp, $username)').run({
             actionCommentRowID: actionCommentRowID,
             sessionID: sessionID,
             timestamp: Date.now(),
+            username: username,
         });
     });
 

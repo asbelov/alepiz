@@ -69,11 +69,13 @@ stopTimestamp INTEGER)\
     }
 
     try {
+        // username is used instead of userID because databases with users may not exist
         db.prepare('\
 CREATE TABLE IF NOT EXISTS actionCommentsReferences (\
 actionCommentRowID INTEGER PRIMARY KEY,\
 sessionID INTEGER NOT NULL,\
-timestamp INTEGER NOT NULL\
+timestamp INTEGER NOT NULL,\
+username TEXT NOT NULL\
 )\
 ').run();
     } catch (err) {
@@ -115,11 +117,13 @@ taskNameRowID INTEGER NOT NULL UNIQUE)\
     }
 
     try {
+        // username is used instead of userID because databases with users may not exist
         db.prepare('\
 CREATE TABLE IF NOT EXISTS taskCommentsReferences (\
 taskCommentRowID INTEGER PRIMARY KEY,\
 taskSession INTEGER NOT NULL,\
-timestamp INTEGER NOT NULL\
+timestamp INTEGER NOT NULL,\
+username TEXT NOT NULL \
 )\
 ').run();
     } catch (err) {

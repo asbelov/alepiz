@@ -16,6 +16,7 @@ const rightsWrapperTaskDB = require('../rightsWrappers/tasksDB');
 const actionsConf = require('../lib/actionsConf');
 const userDB = require('../models_db/usersDB');
 const variablesReplace = require('../lib/utils/variablesReplace');
+const getOwnObjectIDs = require('../lib/getOwnObjectIDs');
 const media = require('../lib/communication');
 const history = require('../serverHistory/historyClient');
 const unique = require('../lib/utils/unique');
@@ -310,11 +311,9 @@ tasks.cancelTaskWithCondition = function(taskID) {
  *      message: Object}>} workflows workflow
  * @param {string} action string
  * @param {Error} error error when moving the task
- * @param {Object} taskResult the result of the task like {<taskActionID1>: <result1>, <taskActionID2>: <result2>, ….}
  * @param {function()} callback callback()
  */
-tasks.processWorkflows = function (username, taskID, workflows, action, error,
-                                   taskResult, callback) {
+tasks.processWorkflows = function (username, taskID, workflows, action, error, callback) {
 
     if(!workflows.length) return callback();
 
@@ -355,6 +354,11 @@ tasks.processWorkflows = function (username, taskID, workflows, action, error,
                 var newTaskGroupID = 0;
                 var changeGroupRole = workflow.changeGroup;
 
+                var actionDescription = workflow.actionDescription || action;
+                actionDescription = error ? actionDescription + ': ' + error.message : actionDescription;
+                if(actionDescription.length > 2000) actionDescription = actionDescription.substring(0, 1000) + '...';
+
+
                 if (typeof changeGroupRole === 'string' && changeGroupRole.indexOf(',') > 1) {
 
                     // groupNamesPair[0] current group; groupNamesPair[1] target group
@@ -382,7 +386,8 @@ tasks.processWorkflows = function (username, taskID, workflows, action, error,
 
                             log.info('User: ', username, ': move task ', taskID, ' from ', groupNamesPair[0],
                                 ' to ', groupNamesPair[1], ' (groupID: ', newTaskGroupID,
-                                '); used the rule of moving by groups: "', changeGroupRole, '"');
+                                '); used the rule of moving by groups: "', changeGroupRole, '"', ' action: ', action,
+                                ' (', actionDescription, ')');
                         }
                     }
                 }
@@ -393,50 +398,14 @@ tasks.processWorkflows = function (username, taskID, workflows, action, error,
                             ': ', err.message, ': ', workflow);
                     }
 
-                    var actionDescription = workflow.actionDescription || action;
-                    actionDescription = error ? actionDescription + ': ' + error.message : actionDescription;
-                    if(actionDescription.length > 2000) actionDescription = actionDescription.substring(0, 1000) + '...';
-
                     var messageParam = workflow.message;
-                    // if the action starts with "execute...", the results of the action are checked to check whether
-                    // it is necessary to send a message
-                    if (action.toLowerCase() === 'execute') {
-                        if (!taskResult || typeof taskResult !== 'object' || !Object.keys(taskResult).length) {
-                            messageParam = null;
-                        } else {
-
-                            var taskContainCompletedActions = false;
-                            for (var taskActionID in taskResult) {
-                                if (taskResult[taskActionID] !== null) {
-                                    taskContainCompletedActions = true;
-                                    break;
-                                }
-                            }
-                            // do not send the message if there are no objects in this instance of ALEPIZ for which task
-                            // actions were performed
-                            if (!taskContainCompletedActions) {
-                                messageParam = null;
-                            }
-                        }
-                    }
 
                     workflowActionCompleted = true;
-                    if (messageParam && typeof messageParam === 'object') {
-                        log.info('User ', username, ' send message for task ', taskID, ' action: ', action,
-                            ' (', actionDescription, ')',
-                            (taskResult ? ' taskResult: ' + JSON.stringify(taskResult, null, 4) : ''));
-                        sendMessage(username, taskID, messageParam, taskParams, actionDescription, function (err) {
-                            if (err) log.error('User: ', username, ': ', err.message);
-                            callback();
-                        });
-                    } else {
-                        log.info('User: ', username, '. Do not send the message for task ', taskID,
-                            ': incorrect messageParam or finished task does not have a taskResult because ' +
-                            'there are no objects in this instance of ALEPIZ for which ' +
-                            'task actions were performed. Action: ', action,
-                            '(', actionDescription, '), taskResult: ', taskResult, '; messageParam: ', messageParam);
+
+                    sendMessage(username, taskID, messageParam, taskParams, actionDescription, function (err) {
+                        if (err) log.error('User: ', username, ': ', err.message);
                         callback();
-                    }
+                    });
                 });
             }, callback);
         });
@@ -454,8 +423,8 @@ tasks.processWorkflows = function (username, taskID, workflows, action, error,
  */
 function sendMessage (username, taskID, param, taskParam, actionDescription, callback) {
     if(!param || typeof param !== 'object') {
-        log.debug('Incorrect or empty message parameters for taskID: ', taskID, '; action: ', actionDescription,
-            '; user: ', username, '; parameters: ', param);
+        log.info('User: ', username, ' don\'t send the message for the task ', taskID, '. Action: ', actionDescription,
+            ': incorrect or empty message parameters:', param);
         return callback();
     }
 
@@ -511,9 +480,10 @@ function sendMessage (username, taskID, param, taskParam, actionDescription, cal
             escapeHtml(taskParam.actions[taskActionID].name) +
             '</span><span class="task-action-startup" data-startup-option="' +
             taskParam.actions[taskActionID].startupOptions + '">&nbsp;</span><span class="task-action-description">' +
-            taskParam.actions[taskActionID].description + '</span></span></li>');
+            taskParam.actions[taskActionID].descriptionHTML + '</span></span></li>');
 
         // create object list
+        var taskObjects = [];
         if(Array.isArray(taskParam.actions[taskActionID].parameters)) {
             taskParam.actions[taskActionID].parameters.every(param => {
                 if (param.name !== 'o') return true; // continue
@@ -529,41 +499,54 @@ function sendMessage (username, taskID, param, taskParam, actionDescription, cal
                     log.warn('User: ', username, ': task: ', taskID, ': objects for action ',
                         taskParam.actions[taskActionID].name, ' are not an array: ', param.value);
                     return false; // break
-
                 }
-                obj.forEach(o => {
-                    if (o.name) objectsSet.add(o.name);
-                });
+                Array.prototype.push.apply(taskObjects, obj);
             });
         }
     }
 
-    // copy param to the messageParam
-    var messageParam = JSON.parse(JSON.stringify(param));
-    messageParam.sender = username;
-
-    // remove stack from error message
     actionDescription = actionDescription.replace(/at .+?:\d+:\d+.+$/ims, '');
-    var objects = !objectsSet.size ? 'not selected' :
-        (objectsSet.size < 3 ? Array.from(objectsSet).join(', ') : Array.from(objectsSet).join('<br/>'));
+    getOwnObjectIDs(taskObjects, null, function (err, filteredObjects) {
+        if (!filteredObjects.length && taskObjects.length) {
+            log.info('User: ', username, ' don\'t send the message for the task ', taskID,
+                ': there are no objects in this instance of ALEPIZ for which ' +
+                'task actions were performed. Task objects: ', filteredObjects, '; all objects: ', taskObjects,
+                '. Actions: ', actionDescription, '; messageParam: ', param);
+            return callback();
+        }
 
-    if(typeof messageParam.variables !== 'object') messageParam.variables = {};
-    messageParam.variables.TASK_ID = taskID;
-    messageParam.variables.TASK_NAME = taskParam.parameters.name;
-    messageParam.variables.TASK_CREATOR = taskParam.parameters.ownerName;
-    messageParam.variables.TASK_CREATOR_FULL_NAME = taskParam.parameters.ownerFullName;
-    messageParam.variables.TASK_OBJECTS = objects;
-    messageParam.variables.EXECUTE_CONDITION = condition;
-    messageParam.variables.ACTION = actionDescription.split('\n').filter(str => str.trim()).join('<br/>');
-    messageParam.variables.ACTIONS_DESCRIPTION = actionsDescription.join('\n\n');
-    messageParam.variables.ACTIONS_DESCRIPTION_HTML =
-        '<ol class="task-actions-description">' + actionsDescriptionHTML.join('') + '</ol>';
+        filteredObjects.forEach(o => {
+            if (o.name) objectsSet.add(escapeHtml(o.name));
+        });
 
-    log.debug('User ', username, ' send message for task ', taskID, ' action: ', actionDescription,
-        ' messageParam: ', messageParam);
-    media.send(messageParam, function (err) {
-        if(err) return callback(new Error('Error sending message for taskID ' + taskID + ': ' + err.message));
-        callback();
+        // copy param to the messageParam
+        var messageParam = JSON.parse(JSON.stringify(param));
+        messageParam.sender = username;
+
+        // remove stack from error message
+        var objects = !objectsSet.size ? 'not selected' :
+            (objectsSet.size < 3 ? Array.from(objectsSet).join(', ') : Array.from(objectsSet).join('<br/>'));
+
+        if(typeof messageParam.variables !== 'object') messageParam.variables = {};
+        messageParam.variables.TASK_ID = taskID;
+        messageParam.variables.TASK_NAME = taskParam.parameters.name;
+        messageParam.variables.TASK_CREATOR = taskParam.parameters.ownerName;
+        messageParam.variables.TASK_CREATOR_FULL_NAME = taskParam.parameters.ownerFullName;
+        messageParam.variables.TASK_OBJECTS = objects;
+        messageParam.variables.EXECUTE_CONDITION = condition;
+        messageParam.variables.ACTION = actionDescription.split('\n').filter(str => str.trim()).join('<br/>');
+        messageParam.variables.ACTIONS_DESCRIPTION = actionsDescription.join('\n\n');
+        messageParam.variables.ACTIONS_DESCRIPTION_HTML =
+            '<ol class="task-actions-description">' + actionsDescriptionHTML.join('') + '</ol>';
+
+        log.debug('User ', username, ' send message for task ', taskID, ' action: ', actionDescription,
+            ' messageParam: ', messageParam);
+        media.send(messageParam, function (err) {
+            if(err) return callback(new Error('Error sending message for taskID ' + taskID + ': ' + err.message));
+
+            log.info('User: ', username, ' send the message for the task ', taskID, '. Action: ', actionDescription);
+            callback();
+        });
     });
 }
 
@@ -1356,7 +1339,7 @@ tasks.getAllowedTaskGroupIDs = function (username, callback) {
  * @param {function(Error)|function(null, Object)} callback callback(err, taskParams)
  * @example
  * taskParams: {
- *      actionsConfiguration: see bellow,
+ *      actions: see bellow,
  *      parameters: taskData[0] from rightsWrapperTaskDB.getTaskParameters(): {
  *          id: <taskID>,
  *          name: <taskName>,
@@ -1372,7 +1355,7 @@ tasks.getAllowedTaskGroupIDs = function (username, callback) {
  *      objects: objects from rightsWrapperTaskDB.getTaskParameters(): {<OCID>: <objectName>, ...}
  *      canExecuteTask: !err from rightsWrapperTaskDB.checkActionsRights()
  * }
- * actionsConfiguration - [
+ * actions - [
  *     <taskActionID1>: {
  *         ID: actionID
  *         name: actionName,

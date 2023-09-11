@@ -103,14 +103,16 @@ module.exports = function (parentModule) {
      * Add a new comment to the task in audit
      * @param {number} taskSessionID task session ID for identify the task
      * @param {string} comment a new comment for the task
+     * @param {string} username username
      */
-    logObj.addTaskComment = function (taskSessionID, comment) {
+    logObj.addTaskComment = function (taskSessionID, comment, username) {
         connectToRemoteLogNodes(function () {
             async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
                 if (typeof clientIPC.send !== 'function') return callback();
                 clientIPC.send({
                     taskSessionID: taskSessionID,
                     taskComment: comment,
+                    username: username,
                 }, function (err) {
                     if(err) log.error('Error add a new comment to the task: ', err.message, ': ', hostPort);
                     callback();
@@ -123,14 +125,16 @@ module.exports = function (parentModule) {
      * Add a new comment to the action
      * @param {number} sessionID action session ID
      * @param {string} comment a new comment to the action
+     * @param {string} username username
      */
-    logObj.addActionComment = function (sessionID, comment) {
+    logObj.addActionComment = function (sessionID, comment, username) {
         connectToRemoteLogNodes(function () {
             async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
                 if (typeof clientIPC.send !== 'function') return callback();
                 clientIPC.send({
                     sessionID: sessionID,
                     actionComment: comment,
+                    username: username,
                 }, function (err) {
                     if(err) log.error('Error add a new comment to the action: ', err.message, ': ', hostPort);
                     callback();

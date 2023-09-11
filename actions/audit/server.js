@@ -26,10 +26,18 @@ module.exports = function(args, callback) {
 
     log.debug('Starting action server "', args.actionName, '" with parameters', args);
 
-
     if(Number(args.taskID)) {
         log.info('User ', args.username, ' adding the comment: "', args.modalComment, '" for the taskID: ', args.taskID,
             '; taskSessionID: ', args.taskSessionID);
+
+
+        if(Number(args.taskSessionID) !== parseInt(args.taskSessionID, 10) ||
+            Number(args.taskSessionID) < 1) {
+            return callback(new Error('Error add a new comment for the task to the auditDB: ' +
+                'incorrect taskSessionID: ' +  args.taskSessionID + '; comment: ' + args.modalComment));
+        }
+
+        log.addTaskComment(Number(args.taskSessionID), args.modalComment, args.username);
 
         tasks.getWorkflow(args.username, function (err, workflows) {
             if(err) {
@@ -44,21 +52,13 @@ module.exports = function(args, callback) {
                     }
                 }
             });
-            tasks.processWorkflows(args.username, Number(args.taskID), workflows, 'check', null, null,
+            tasks.processWorkflows(args.username, Number(args.taskID), workflows, 'check', null,
                 function (err) {
                     if(err) {
                         return callback(new Error('Error process workflow for task ' + args.taskID +
-                                ' user ' + args.username + ': ' + err.message + '; workflows: ' +
-                                JSON.stringify(workflows, null, 4)), args.modalComment);
+                            ' user ' + args.username + ': ' + err.message + '; workflows: ' +
+                            JSON.stringify(workflows, null, 4)), args.modalComment);
                     }
-
-                    if(Number(args.taskSessionID) !== parseInt(args.taskSessionID, 10) ||
-                        Number(args.taskSessionID) < 1) {
-                        return callback(new Error('Error add a new comment for the task to the auditDB: ' +
-                            'incorrect taskSessionID: ' +  args.taskSessionID + '; comment: ' + args.modalComment));
-                    }
-
-                    log.addTaskComment(Number(args.taskSessionID), args.modalComment);
                     callback(null, args.modalComment);
                 });
         });
@@ -71,7 +71,7 @@ module.exports = function(args, callback) {
                 args.sessionID + '; comment: ' + args.modalComment));
         }
 
-        log.addActionComment(Number(args.sessionID), args.modalComment);
+        log.addActionComment(Number(args.sessionID), args.modalComment, args.username);
         callback(null, args.modalComment);
     }
 }

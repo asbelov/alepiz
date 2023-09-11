@@ -450,11 +450,15 @@ var JQueryNamespace = (function ($) {
                 taskLabel = '';
             }
 
-            var description = row.description ?
-                escapeHtml(row.description)
-                    .replace(/{{highlightOpen}}/g, '<span class="highLight">')
-                    .replace(/{{highlightClose}}/g, '</span>') :
-                '';
+            var description = '';
+            if(row.description) {
+                // trying to determine if there are HTML tags in the description
+                description = /<\/[a-z]+>/gi.test(row.description) || /<br>/gi.test(row.description) ?
+                    row.description : escapeHtml(row.description);
+                description = description
+                        .replace(/{{highlightOpen}}/g, '<span class="highLight">')
+                        .replace(/{{highlightClose}}/g, '</span>');
+            }
 
             var error = row.error ?
                 escapeHtml(row.actionName)  + ': ' + escapeHtml(row.error)

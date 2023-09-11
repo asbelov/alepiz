@@ -403,7 +403,7 @@ function updateCache() {
                 if (err) log.error('Error sending cache: ', err.message);
             });
 
-        } else log.info('Creating empty cache. Nothing to send to children');
+        } else log.info('The cache update is complete, but an empty cache has been created.');
 
         // getting data again from updated top level counters (f.e. with active collectors)
         var topCounters = new Set(), topOCIDs = new Set();
@@ -441,25 +441,27 @@ function updateCache() {
                     callback();
                 });
         }, function () {
-            if (topCounters.size) getCountersValues(topCounters, undefined,true);
-
-            log.info('Cache update completed for ', serverName,
-                ', data for update: ', objectsAndCountersForUpdate.length,
-                ', mode: ', (updateMode ? 'full' : 'partial'),
-                ' hist: ',
-                (updateMode && updateMode.getHistoryVariables ? updateMode.getHistoryVariables.length : 0),
+            if(cache) {
+                log.info('Cache update completed for ', serverName,
+                    ', data for update: ', objectsAndCountersForUpdate.length,
+                    ', mode: ', (updateMode ? 'full' : 'partial'),
+                    ' hist: ',
+                    (updateMode && updateMode.getHistoryVariables ? updateMode.getHistoryVariables.length : 0),
                     '/', cache.variablesHistory.size,
-                '; expr: ',
-                (updateMode && updateMode.getVariablesExpressions ? updateMode.getVariablesExpressions.length : 0),
+                    '; expr: ',
+                    (updateMode && updateMode.getVariablesExpressions ? updateMode.getVariablesExpressions.length : 0),
                     '/', cache.variablesExpressions.size,
-                '; props: ',
-                (updateMode && updateMode.geObjectsProperties ? updateMode.geObjectsProperties.length : 0),
+                    '; props: ',
+                    (updateMode && updateMode.geObjectsProperties ? updateMode.geObjectsProperties.length : 0),
                     '/', cache.objectsProperties.size,
-                '; active counters: ', topCounters.size,
-                (cache.countersObjects.objects ? ' objects: ' + cache.countersObjects.objects.size : ''),
-                (cache.countersObjects.counters ? ', counters: ' + cache.countersObjects.counters.size : ''),
-                (cache.countersObjects.objectName2OCID ?
-                    ', objectName2OCID: ' + cache.countersObjects.objectName2OCID.size : ''));
+                    '; active counters: ', topCounters.size,
+                    (cache.countersObjects.objects ? ' objects: ' + cache.countersObjects.objects.size : ''),
+                    (cache.countersObjects.counters ? ', counters: ' + cache.countersObjects.counters.size : ''),
+                    (cache.countersObjects.objectName2OCID ?
+                        ', objectName2OCID: ' + cache.countersObjects.objectName2OCID.size : ''));
+            }
+
+            if (topCounters.size) getCountersValues(topCounters, undefined,true);
 
             updateCacheInProgress = 0;
             prevTimeWhenCacheWasUpdated = Date.now();

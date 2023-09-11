@@ -323,7 +323,7 @@ function updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs,
                             // this hack is used for save the old group name in the workFlows[0].oldGroupName
                             if(workflows.length) workflows[0].oldGroupName = taskData.groupName;
                             tasks.processWorkflows(args.username, taskID, workflows, 'change', null,
-                            null,function() {
+                            function() {
                                 transactionsDB.end(callback);
                             });
                         });
@@ -357,8 +357,7 @@ function removeTasks(username, removedTaskIDs, workflow, callback) {
             first we send the message, then we delete the task, because we cannot get the properties of the task
             to send the message after deleting the task
              */
-            tasks.processWorkflows(username, removedTaskID, workflow, 'remove', null, null,
-                function() {
+            tasks.processWorkflows(username, removedTaskID, workflow, 'remove', null,function() {
                 tasksDB.removeTask(username, removedTaskID, callback);
             });
         }, function(err) {
@@ -502,10 +501,10 @@ function processTaskExecutionCondition(args, taskID, hasRightsForRunByActions,
             filterTaskActionIDs: filterTaskActionIDs,
             runTaskFrom: 'taskMaker',
             runOnLocalNode: true,
-        }, function(err, taskResult) {
+        }, function(err) {
             if(err) log.error('User ', args.username, ': run task: ', err.message);
 
-            tasks.processWorkflows(args.username, taskID, workflow, 'execute', err, taskResult, callback);
+            tasks.processWorkflows(args.username, taskID, workflow, 'execute', err, callback);
         });
 
         return;
@@ -546,11 +545,10 @@ function processApproves(username, taskActionID, newApproves, workflow, callback
                     taskActionID: taskActionID,
                     runTaskFrom: 'taskMaker',
                     runOnLocalNode: true,
-                }, function(err, taskResult) {
+                }, function(err) {
                     if(err) log.error('User ', username, ': run task when processed approves: ', err.message);
 
-                    tasks.processWorkflows(username, taskID, workflow, 'execute', err, taskResult,
-                        function() {
+                    tasks.processWorkflows(username, taskID, workflow, 'execute', err, function() {
 
                         transactionsDB.begin(function(err) {
                             if(err) {
@@ -583,8 +581,7 @@ function processApproves(username, taskActionID, newApproves, workflow, callback
                     addTaskToTaskServer(username, taskID, runType, workflow,function(err) {
                         if(err) return callback(err);
 
-                        tasks.processWorkflows(username, taskID, workflow, 'approve', null,
-                            null, callback);
+                        tasks.processWorkflows(username, taskID, workflow, 'approve', null, callback);
                     });
                 });
             // was launched, but again approved to run, or was canceled, but again approved
@@ -608,7 +605,7 @@ function processApproves(username, taskActionID, newApproves, workflow, callback
                                     if(err) return callback(err);
 
                                     tasks.processWorkflows(username, taskID, workflow, 'approve', null,
-                                        null,callback);
+                                        callback);
                                 });
                             })
                         });
@@ -621,7 +618,7 @@ function processApproves(username, taskActionID, newApproves, workflow, callback
                     if(err) return callback(err);
                     taskClient.cancelTask(taskID);
 
-                    tasks.processWorkflows(username, taskID, workflow, 'cancel', null,  null, callback);
+                    tasks.processWorkflows(username, taskID, workflow, 'cancel', null, callback);
                 });
             } else callback(new Error('Unknown runType: ' + runType + ' for task ID ' + taskID));
         });

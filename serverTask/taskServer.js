@@ -102,7 +102,7 @@ tasks.startCheckConditions(function (err) {
                         runType: tasksRunCondition.runType,
                     }, function (err, taskResult, username) {
                         if(err) log.error('Error running task ', taskID, ', by conditions : ', err.message);
-                        tasks.processWorkflows(username, taskID, workflow, 'execute', err, taskResult, callback);
+                        tasks.processWorkflows(username, taskID, workflow, 'execute', err, callback);
                     });
                 });
             }, function (err) {
@@ -148,7 +148,7 @@ function scheduleTask(taskID, timestamp, workflow) {
             taskID: taskID,
         }, function (err, taskResult, username) {
             if(err) log.error('Error running task ', taskID, ' at ', new Date(timestamp).toLocaleString(), ': ', err.message);
-            tasks.processWorkflows(username, taskID, workflow, 'execute', err, taskResult, function() {});
+            tasks.processWorkflows(username, taskID, workflow, 'execute', err, function() {});
         });
         return;
     }
@@ -160,7 +160,7 @@ function scheduleTask(taskID, timestamp, workflow) {
             taskID: taskID,
         }, function (err, taskResult, username) {
             if (err) log.error('Error running task ', taskID, ' at ', new Date(timestamp).toLocaleString(), ': ', err.message);
-            tasks.processWorkflows(username, taskID, workflow, 'execute', err, taskResult, function() {});
+            tasks.processWorkflows(username, taskID, workflow, 'execute', err, function() {});
         });
     }, runTime);
     scheduledTasks.set(taskID, scheduledTaskTimer);
@@ -185,7 +185,7 @@ function addConditionTask(taskID, message) {
         runType: message.runType,
     }, function (err, taskResult, username) {
         if(err) log.error('Error running task ', taskID, ', by conditions : ', err.message);
-        tasks.processWorkflows(username, taskID, message.workflow, 'execute', err, taskResult, function() {});
+        tasks.processWorkflows(username, taskID, message.workflow, 'execute', err, function() {});
     });
 }
 

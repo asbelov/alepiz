@@ -39,6 +39,7 @@ auditServerRunner.start(function (err, auditServerThreads) {
             });
 
         } else if (messageObj) {
+
             // get log records or session data from audit
             if (messageObj.auditData !== undefined) {
                 return auditServerThreads[0].sendAndReceive(messageObj, callback);
@@ -51,8 +52,8 @@ auditServerRunner.start(function (err, auditServerThreads) {
 
                     log.debug('Sending message to the audit servers: ',
                         messageObj.sessionID || messageObj.taskSessionID, ': ',
-                        (messageObj.messageBody || messageObj.username ||
-                            ('stopTime: ' + messageObj.stopTimestamp) || messageObj),
+                        (messageObj.messageBody ||
+                        (messageObj.stopTimestamp && ('stopTime: ' + messageObj.stopTimestamp)) || messageObj),
                         ', number of servers: ', auditServerThreads.length);
 
                     async.each(auditServerThreads, function (auditServerThread, callback) {

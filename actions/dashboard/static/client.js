@@ -1985,20 +1985,20 @@ var JQueryNamespace = (function ($) {
 
                 for(var name in mainProps) {
                     var re = new RegExp('%:' + name + ':%', 'gim');
-                    str = str.replace(re, mainProps[name]);
+                    str = str.replace(re, escapeHtml(mainProps[name]));
                     if(hiddenVariables[name]) hiddenDataPart[hiddenVariables[name]] = mainProps[name];
                 }
 
                 variables[OCID].eventDescription.forEach(function(eventDescription, idx) {
                     str += template.intervalsDivider
-                        .replace('%:EVENT_DESCRIPTION:%', eventDescription)
+                        .replace('%:EVENT_DESCRIPTION:%', escapeHtml(eventDescription))
                         .replace('%:EVENT_TIME:%', variables[OCID].disableIntervals[idx]);
                 });
 
                 if(props[OCID]) {
                     for(name in props[OCID]) {
                         re = new RegExp('%:' + name + ':%', 'gim');
-                        str = str.replace(re, props[OCID][name]);
+                        str = str.replace(re, escapeHtml(props[OCID][name]));
                         if(hiddenVariables[name]) hiddenDataPart[hiddenVariables[name]] = props[OCID][name];
                     }
                 }
