@@ -315,7 +315,10 @@ tasks.cancelTaskWithCondition = function(taskID) {
  */
 tasks.processWorkflows = function (username, taskID, workflows, action, error, callback) {
 
-    if(!workflows.length) return callback();
+    if(!workflows.length) {
+        log.info('User: ', username, ': task ', taskID, '; action: ', action, ': workflow is not configured.');
+        return callback();
+    }
 
     tasks.getTaskParameters(username, taskID, function (err, taskParams) {
         if (err) {

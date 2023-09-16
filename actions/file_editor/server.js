@@ -88,7 +88,11 @@ module.exports = function(args, callback) {
     function saveFile(filePath, content, codePage, callback) {
         if(content === undefined) return callback(new Error('Content for file ' + filePath + ' is undefined'));
 
-        var outBuffer = iconv.encode(content, codePage);
+        if(!codePage) var outBuffer = Buffer.from(content); // UTF8 was selected
+        else if(!iconv.encodingExists(codePage)) {
+            return callback(new Error('Can\'t write file ' + filePath + ': code page ' + codePage +
+                ' not exist for encode the file'));
+        } else outBuffer = iconv.encode(content, codePage);
 
         /**
          * iconv.encode returns UNIX-style line feeds. convert line feeds in the received buffer to the format

@@ -192,7 +192,14 @@ var JQueryNamespace = (function ($) {
 
             runTaskOnceElm.click(taskUpdated);
 
-            M.Collapsible.init(document.querySelectorAll('.collapsible'), {});
+            M.Collapsible.init(document.querySelectorAll('.collapsible'), {
+                onOpenEnd: function () {
+                    $('textarea').each(function() {
+                        M.textareaAutoResize($(this));
+                    });
+                    M.updateTextFields();
+                }
+            });
             M.Tooltip.init(document.querySelectorAll('.toolTipped'), {inDuration: 500});
             M.FormSelect.init(document.querySelectorAll('select'), {});
             M.updateTextFields(); // update active inputs
@@ -477,7 +484,7 @@ var JQueryNamespace = (function ($) {
 
     /**
      * Set shared counters
-     * @param {Array<Object>} objects [{id:.., }]
+     * @param {Array<{id: number}>} objects an array with object IDs
      * @param {string|null} label optGroup label
      * @param {string|null} id exclusive attribute for options
      * @param {function()} callback callback()
@@ -1020,7 +1027,6 @@ var JQueryNamespace = (function ($) {
 
             M.FormSelect.init(document.querySelectorAll('select'), {});
             M.updateTextFields(); // update active inputs and textAreas
-            M.textareaAutoResize($('textarea'));
 
             $('input[type=radio]').change(taskUpdated);
             $('[data-actionParameter]').change(taskUpdated);
@@ -1077,7 +1083,6 @@ var JQueryNamespace = (function ($) {
 
                 taskUpdated();
                 M.updateTextFields(); // update active inputs and textAreas
-                M.textareaAutoResize($('textarea'));
             });
 
             if(typeof(callback) === 'function') callback();
