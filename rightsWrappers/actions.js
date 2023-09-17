@@ -198,7 +198,7 @@ rightsWrapper.checkForObjectsCompatibility = function (cfg, objectsNames, callba
             objects = cfg.dontShowForObjects.toLowerCase().split(/\s*[,;]\s*/);
             for (var i = 0; i < objectsNames.length; i++) {
                 if (objects.indexOf(objectsNames[i]) > -1)
-                    return callback(new Error('Action "'+actionID+'" is not compatible with selected objects ' +
+                    return callback(new Error('Action "' + actionID + '" is not compatible with selected objects ' +
                         objectsNames.join(', ') + ' according to dontShowForObjects parameter'));
             }
             return callback();
@@ -209,7 +209,7 @@ rightsWrapper.checkForObjectsCompatibility = function (cfg, objectsNames, callba
             objectsDB.getObjectsFromGroups(groupsNames, objectsNames, function(err, objects){
                 if(err) return callback(err);
                 if(!objects.length) return checkForShowOnlyForObjectsOrForObjectsInGroups(callback);
-                return callback(new Error('Action "'+actionID+'" is not compatible with selected objects ' +
+                return callback(new Error('Action "' + actionID + '" is not compatible with selected objects ' +
                     objectsNames.join(', ') + ' according to dontShowForObjectsInGroups parameter'));
             });
             return;
@@ -222,13 +222,13 @@ rightsWrapper.checkForObjectsCompatibility = function (cfg, objectsNames, callba
     function checkForShowOnlyForObjectsOrForObjectsInGroups(callback){
         if(!cfg.showOnlyForObjects && !cfg.showOnlyForObjectsInGroups) return callback();
 
-        if(cfg.showOnlyForObjectsInGroups){
+        if(cfg.showOnlyForObjectsInGroups) {
             var groupsNames = cfg.showOnlyForObjectsInGroups.toLowerCase().split(/\s*[,;]\s*/);
             objectsDB.getObjectsFromGroups(groupsNames, objectsNames, function(err, objects){
                 if(err) return callback(err);
                 if(objects.length === objectsNames.length) return callback();
                 if(!cfg.showOnlyForObjects)
-                    return callback(new Error('Action "'+actionID+'" is not compatible with selected objects ' +
+                    return callback(new Error('Action "' + actionID + '" is not compatible with selected objects ' +
                         objectsNames.join(', ') + ' according to showForObjectsInGroups parameter'));
 
                 var objectsNotInGroups = objectsNames.filter(function(object){
@@ -291,7 +291,7 @@ function checkForObjectsPropertiesCompatibility(cfg, objectsNames, callback) {
             }
             for(var i = 0; i < rows.length; i++) {
                 if(dontShowForObjectsWithProperties.indexOf(rows[i].name.toLowerCase()) !== -1) {
-                    return callback(new Error('Action "'+actionID+'" is not compatible with selected objects ' +
+                    return callback(new Error('Action "' + actionID + '" is not compatible with selected objects ' +
                         objectsNames.join(', ') + ' according to dontShowForObjectsWithProperties parameter'));
                 }
                 if(!cfg.dontShowForObjectsWithProperties &&
