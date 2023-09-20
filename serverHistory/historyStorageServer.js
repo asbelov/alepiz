@@ -11,6 +11,7 @@ const countersDB = require("../models_db/countersDB");
 const historyStorage = require('./historyStorage');
 const setShift = require('../lib/utils/setShift');
 var parameters = require('./historyParameters');
+const truncate = require('../serverDB/truncateWal');
 const Conf = require('../lib/conf');
 const confHistory = new Conf('config/history.json');
 parameters.init(confHistory.get());
@@ -29,7 +30,6 @@ var transactionInProgress = 0;
 var transactionDescriptionInProgress = '';
 var transactionsFunctions = new Set();
 var callbackOnStop;
-var lastTruncate = Date.now();
 
 var slowRecords = {
     timeAvg: 0,
@@ -151,26 +151,7 @@ function init(callback) {
 }
 
 function truncateWal() {
-    if(Date.now() - lastTruncate < 30000) return;
-    lastTruncate = Date.now();
-    fs.stat(dbPath + '-wal', (err, stat) => {
-        if (err) {
-            if (err.code !== 'ENOENT') log.error('Can\'t stat ', dbPath + '-wal: ', err.message);
-        } else if (stat.size > 104857600) { // 100Mb
-            log.info('Size of ', dbPath + '-wal file is a ',
-                Math.round(stat.size/1048576), 'Mb. Truncating wal and optimizing DB...');
-            try {
-                db.pragma('wal_checkpoint(TRUNCATE)');
-            } catch (err) {
-                log.error('Can\' truncate WAL checkpoint: ', err.message);
-            }
-            try {
-                db.pragma('optimize');
-            } catch (err) {
-                log.error('Can\' optimize DB: ', err.message);
-            }
-        }
-    });
+    truncate.truncateWal(dbPath, db, 104857600); // 104857600 = 100Mb
 }
 
 function addSlowRecord(receiveTime, recordsNum) {
@@ -796,7 +777,7 @@ function delRecords(IDs, daysToKeepHistory, daysToKeepTrends, _callback) {
             } catch (err) {
                 deleteRecordsDebugInfo.push('stmtTrends ' + timeInterval + ' ' + err);
                 return callback(new Error('Can\'t prepare to delete data from trends' + timeInterval +
-                    'min table for objects ' + IDs.join(', ') + ': ' + err.messgage));
+                    'min table for objects ' + IDs.join(', ') + ': ' + err.message));
             }
         }
 

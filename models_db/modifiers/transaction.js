@@ -10,8 +10,7 @@ var transaction = {};
 module.exports = transaction;
 
 var delayedCallbacks = new Set(),
-    transactionInProgress = false,
-    truncateInProgress = 0;
+    transactionInProgress = false;
 
 
 /**
@@ -65,22 +64,10 @@ transaction.rollback = function(err, callback){
  * @param  {function(Error)} callback callback(err)
  */
 function runDelayedTransaction(err, callback) {
-    if(!delayedCallbacks.size) {
-        transactionInProgress = false;
-        var now = Date.now();
-        if(!truncateInProgress && now - truncateInProgress > 900000) {
-            truncateInProgress = now;
-            db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function (err) {
-                if (err) log.warn('Can\'t truncate WAL journal file: ', err.message);
-                truncateInProgress = 0;
-            });
-        }
-        callback(err);
-        return;
-    }
+    transactionInProgress = false;
+    if(!delayedCallbacks.size) return callback(err);
 
     var delayedCallback = setShift(delayedCallbacks);
-    transactionInProgress = false;
     // trying to fix bug with RangeError: Maximum call stack size exceeded
     // transaction.begin(delayedCallback);
     var t = setTimeout(transaction.begin, 0, delayedCallback);

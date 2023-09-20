@@ -1,9 +1,6 @@
 /*
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
-
-
-
 const log = require('../lib/log')(module);
 const async = require('async');
 const IPC = require('../lib/IPC');
@@ -18,7 +15,11 @@ var dbServerThread, dbQueryServerThreads, dbTransServerThreads = new Map(), stop
 var dbTransServerThreadsInitStatus = new Map();
 var dbChildrenNum = confSqlite.get('dbChildrenNum') || 0;
 
-var writeOperations = 0, readOperations = 0, prepareOperations = 0, otherOperations = 0, transServerNum = 0;
+var writeOperations = 0,
+    readOperations = 0,
+    prepareOperations = 0,
+    otherOperations = 0,
+    transServerNum = 0;
 var cfg = confSqlite.get(); // configuration for each module
 cfg.id = 'dbServer';
 

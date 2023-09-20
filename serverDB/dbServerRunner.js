@@ -4,8 +4,9 @@
 
 // starting dbServer thread
 const log = require('../lib/log')(module);
-const thread = require("../lib/threads");
-const path = require("path");
+const thread = require('../lib/threads');
+const path = require('path');
+const truncateWal = require('./truncateWal');
 const Conf = require('../lib/conf');
 const confSqlite = new Conf('config/sqlite.json');
 
@@ -19,7 +20,13 @@ var dbServer = {
 module.exports = dbServer;
 
 dbServer.start = function (callback) {
+    /**
+     * @type {{disableServer: Boolean}}
+     */
     var cfg = confSqlite.get(); // configuration for each module
+
+    var dbPath = path.join(__dirname, '..', confSqlite.get('path'));
+    truncateWal.initTruncateWal(dbPath);
 
     if(cfg.disableServer) {
         log.info('dbServer is disabled in configuration and not started');

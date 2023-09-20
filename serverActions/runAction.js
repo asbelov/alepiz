@@ -191,7 +191,7 @@ function runAction(param, callback) {
 
             //executionMode === 'server'
             getOwnObjectIDs(objects, actionCfg,function (err, filteredObjects) {
-                if(err) return callback(err);
+                //if(err) return callback(err);
 
                 if(param.args.o && Array.isArray(filteredObjects)) {
                     // there are no objects for this action in this instance of Alepiz and

@@ -385,7 +385,7 @@ function addOrUpdateTaskAndRemoveActions(taskID, newTaskID, userID, timestamp, t
         tasksDBSave.addTask(newTaskID, userID, timestamp, taskName, groupID,function(err) {
             if(err) {
                 return callback(new Error('Can\'t insert a new task "' + taskName + '", userID "' + userID +
-                    '", timestamp: "' + timestamp + '", groupID: "' + groupID + ', taskActionID: '+ taskActionID +
+                    '", timestamp: "' + timestamp + '", groupID: "' + groupID + ', taskActionID: ' + taskActionID +
                     '": ' + err.message));
             }
             callback(null, newTaskID);

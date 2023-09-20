@@ -150,7 +150,7 @@ db.run = function (sql, args) {
     if(args.length > 0 && typeof args[args.length - 1] === 'function') var callback = args.pop();
 
     var operationSuccessfullyComplete = false,
-        retryAttemptsAfterDBLock = Number(confSqlite.get('retryAttemptsAfterDBLock'))  || 60,
+        retryAttemptsAfterDBLock = Number(confSqlite.get('retryAttemptsAfterDBLock'))  || 20,
         retryAttemptsPause = Number(confSqlite.get('retryAttemptsPause'))  || 500;
 
     if(!args.length) {
@@ -164,13 +164,12 @@ db.run = function (sql, args) {
                 // if DB is locked, try to retry operation
                 if(err.message.indexOf('database is locked') !== -1) {
                     if(idx + 1 < retryAttemptsAfterDBLock) {
-                        log.warn('Try to retry ', idx + 1, '/',  retryAttemptsAfterDBLock, ': ', err.message);
+                        log.debug('Try to retry ', idx + 1, '/',  retryAttemptsAfterDBLock, ' db.exec: ', err.message);
                         return setTimeout(callback, retryAttemptsPause);
                     }
-                    err = new Error(err.message + '; retryAttemptsAfterDBLock: ' + retryAttemptsAfterDBLock +
-                        '; retryAttemptsPause: ' + retryAttemptsPause);
-                }
-                return callback(err);
+                    log.warn(err.message, '; retryAttemptsAfterDBLock: ', retryAttemptsAfterDBLock,
+                        '; retryAttemptsPause: ', retryAttemptsPause, '; sql: ', sql, '; args: ', args);
+                } else return callback(err);
             }
             if(Date.now - startQueryTime >
                 (confSqlite.get('slowQueryExecutionTime') || slowQueryExecutionTime)) {
@@ -214,13 +213,12 @@ db.run = function (sql, args) {
             // if DB is locked, try to retry operation
             if(err.message.indexOf('database is locked') !== -1) {
                 if(idx + 1 < retryAttemptsAfterDBLock) {
-                    log.warn('Try to retry ', idx + 1, '/',  retryAttemptsAfterDBLock, ': ', err.message);
+                    log.debug('Try to retry ', idx + 1, '/',  retryAttemptsAfterDBLock, ' db.run: ', err.message);
                     return setTimeout(callback, retryAttemptsPause);
                 }
-                err = new Error(err.message + '; retryAttemptsAfterDBLock: ' + retryAttemptsAfterDBLock +
-                    '; retryAttemptsPause: ' + retryAttemptsPause);
-            }
-            return callback(err);
+                log.warn(err.message, '; retryAttemptsAfterDBLock: ', retryAttemptsAfterDBLock,
+                    '; retryAttemptsPause: ', retryAttemptsPause, '; sql: ', sql, '; args: ', args);
+            } else return callback(err);
         }
         if(Date.now - startQueryTime >
             (confSqlite.get('slowQueryExecutionTime') || slowQueryExecutionTime)) {
@@ -431,13 +429,12 @@ function STMT(sql, prepareArgs) {
                 // if DB is locked, try to retry operation
                 if(err.message.indexOf('database is locked') !== -1) {
                     if(idx + 1 < retryAttemptsAfterDBLock) {
-                        log.warn('Try to retry ', idx + 1, '/',  retryAttemptsAfterDBLock, ': ', err.message);
+                        log.debug('Try to retry ', idx + 1, '/',  retryAttemptsAfterDBLock, ' stmt.run: ', err.message);
                         return setTimeout(callback, retryAttemptsPause);
                     }
-                    err = new Error(err.message + '; retryAttemptsAfterDBLock: ' + retryAttemptsAfterDBLock +
-                        '; retryAttemptsPause: ' + retryAttemptsPause);
-                }
-                return callback(err);
+                    log.warn(err.message, '; retryAttemptsAfterDBLock: ', retryAttemptsAfterDBLock,
+                        '; retryAttemptsPause: ', retryAttemptsPause, '; sql: ', sql, '; args: ', args);
+                } else return callback(err);
             }
             if(Date.now - startQueryTime >
                 (confSqlite.get('slowQueryExecutionTime') || slowQueryExecutionTime)) {

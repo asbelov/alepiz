@@ -473,7 +473,8 @@ function sendMessage (username, taskID, param, taskParam, actionDescription, cal
     var actionsDescription = [],
         actionsDescriptionHTML = [],
         num = 1,
-        objectsSet = new Set();
+        objectsSet = new Set(),
+        taskObjectsMap = new Map(); // use Map to create a list of objects with non-repeating objects
     for(var taskActionID in taskParam.actions) {
 
         actionsDescription.push(String(num++) + '. ' + escapeHtml(taskParam.actions[taskActionID].name) +
@@ -486,27 +487,33 @@ function sendMessage (username, taskID, param, taskParam, actionDescription, cal
             taskParam.actions[taskActionID].descriptionHTML + '</span></span></li>');
 
         // create object list
-        var taskObjects = [];
         if(Array.isArray(taskParam.actions[taskActionID].parameters)) {
             taskParam.actions[taskActionID].parameters.every(param => {
                 if (param.name !== 'o') return true; // continue
 
                 try {
-                    var obj = JSON.parse(param.value);
+                    var objects = JSON.parse(param.value);
                 } catch (err) {
                     log.warn('User: ', username, ': task: ', taskID, ': can\'t parse objects for action ',
                         taskParam.actions[taskActionID].name, ' - ', param.value, ': ', err.message);
                     return false; // break
                 }
-                if (!Array.isArray(obj)) {
+                if (!Array.isArray(objects)) {
                     log.warn('User: ', username, ': task: ', taskID, ': objects for action ',
                         taskParam.actions[taskActionID].name, ' are not an array: ', param.value);
                     return false; // break
                 }
-                Array.prototype.push.apply(taskObjects, obj);
+                objects.forEach(obj => taskObjectsMap.set(obj.id, obj.name));
             });
         }
     }
+
+    /**
+     * convert Map of objects to array
+     * @type {Array<{id: number, name: string}>}
+     */
+    var taskObjects = [];
+    taskObjectsMap.forEach((name, id) => taskObjects.push({id: id, name: name}));
 
     actionDescription = actionDescription.replace(/at .+?:\d+:\d+.+$/ims, '');
     getOwnObjectIDs(taskObjects, null, function (err, filteredObjects) {

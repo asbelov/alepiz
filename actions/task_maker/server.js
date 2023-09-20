@@ -295,7 +295,7 @@ function updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs,
                 }
 
                 if(taskData && taskData.groupID !== newTaskGroup) {
-                    log.info('User ', args.username, ': move task ', taskID, ' from "', taskData.groupName,
+                    log.info('User ', args.username, ': move the task ', taskID, ' from "', taskData.groupName,
                         '" (', taskData.groupID ,') to "', args.newTaskGroupName, '" (', newTaskGroup, ')');
                 }
                 // running all tasks in series for correct transaction processing, and if error occurred in any of
