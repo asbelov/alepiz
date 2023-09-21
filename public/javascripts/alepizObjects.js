@@ -32,6 +32,7 @@ var alepizObjectsNamespace = (function($) {
         minSearchStrLength = 2,
         timeWhenNoObjectsWereFound = 0,
         redrawObjectsInProgress = false,
+        lastDrawingObjects = [],
         /** used for get data about objects when used object grouping
          * @type {{id: number, name: string, description: string, color: string, disabled: number, sortPosition: number}}
          * @example
@@ -111,10 +112,12 @@ var alepizObjectsNamespace = (function($) {
                 // if search string length < minSearchStrLength or < prevSearchStrLength
                 if(useGlobalSearch === true &&
                     (searchStr.length < minSearchStrLength || searchStr.length < prevSearchStrLength)) {
+                    // if search string is small or new search string less than previous search string
+                    // then try to switch from global search mode and filter the previous object list
                     useGlobalSearch = false;
                     reDrawObjects(objectDrawFunctionBeforeSearch, function () {
-                        // when find nothing, try to use globalSearch again
-                        if(!filterObject() && searchStr.length >= minSearchStrLength) {
+                        // when find nothing try to use globalSearch again
+                        if(!objectsListElm.find('li').length && searchStr.length >= minSearchStrLength) {
                             globalSearchObjects(searchStr,function (isDrawObjects) {
                                 if(!isDrawObjects) return;
                                 alepizActionsNamespace.createActionsList(null, function () {
@@ -124,7 +127,7 @@ var alepizObjectsNamespace = (function($) {
                             });
                         }
                     });
-                } else if(useGlobalSearch === true || !filterObject()) {
+                } else if(useGlobalSearch === true) {
                     globalSearchObjects(searchStr,function (isDrawObjects) {
                         if(!isDrawObjects) return;
                         alepizActionsNamespace.createActionsList(null, function () {
@@ -132,6 +135,18 @@ var alepizObjectsNamespace = (function($) {
                             alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
                         });
                     });
+                } else { // useGlobalSearch === false
+                    var filteredObjects = filterObjects(lastDrawingObjects);
+                    if(filteredObjects.length) drawObjectsList(filteredObjects, true);
+                    else { // switch to global search mode
+                        globalSearchObjects(searchStr,function (isDrawObjects) {
+                            if(!isDrawObjects) return;
+                            alepizActionsNamespace.createActionsList(null, function () {
+                                alepizMainNamespace.setBrowserHistory();
+                                alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
+                            });
+                        });
+                    }
                 }
             }
 
@@ -147,7 +162,7 @@ var alepizObjectsNamespace = (function($) {
             } else if(!searchStrAdd.trim().length) { // search string is empty
                 reDrawObjects();
             } else {
-                filterObject();
+                drawObjectsList(lastDrawingObjects);
                 var checkedFiltersNum = alepizFiltersNamespace.getCheckedFilterNames().length;
                 if(searchStrAdd) ++checkedFiltersNum;
                 filterCounterContainerElm.removeClass('hide');
@@ -275,64 +290,32 @@ var alepizObjectsNamespace = (function($) {
         }
     }
 
-    function filterObject() {
-        var res = filterList(searchObjectsAddElm.val(), objectsListElm, 'data-object-name');
-        if(useGlobalSearch === true) return res;
-
-        return filterList(searchObjectsElm.val(), objectsListElm, 'data-object-name', true);
-    }
-
-    function filterList(initSearchStr, listElm, objectNameAttr, savePrevFilter) {
-
-        var listRows = listElm.find('li');
-        if (!initSearchStr.length) {
-            if(!savePrevFilter) listRows.removeClass('hide');
-            return;
-        }
-
+    function createSearchStrRE(initSearchStr) {
         var searchStrRE = '(.*' + initSearchStr.
-            // remove empty strings
-            split(/[\r\n]/).filter(str => str.trim()).join('\n').
-            // escape regExp symbols except *
-            replace(/[-\/\\^$+?.()|[\]{}]/g, '\\$&').
-            // replace '|*&' or '&*|' to '&', don't ask why
-            replace(/[&|]\**[&|]/, '&').
-            // replace '*' characters to '.*'
-            replace(/\*+/g, '.*').
-            // replace '_' characters to '.'
-            replace(/_/g, '.').
-            // replace spaces around and ',', '|', '\r', '\n' characters to '.*)|(.*'
-            replace(/\s*[,|\r\n]+\s*/g, '.*)|(.*').
-            // replace spaces around and '&' characters to '.*)&(.*'
-            replace(/\s*&+\s*/g, '.*)&(.*').
-            // remove forward and backward spaces characters
-            replace(/^\s+/, '').replace(/\s+$/, '')
+                // remove empty strings
+                split(/[\r\n]/).filter(str => str.trim()).join('\n').
+                // escape regExp symbols except *
+                replace(/[-\/\\^$+?.()|[\]{}]/g, '\\$&').
+                // replace '|*&' or '&*|' to '&', don't ask why
+                replace(/[&|]\**[&|]/, '&').
+                // replace '*' characters to '.*'
+                replace(/\*+/g, '.*').
+                // replace '_' characters to '.'
+                replace(/_/g, '.').
+                // replace spaces around and ',', '|', '\r', '\n' characters to '.*)|(.*'
+                replace(/\s*[,|\r\n]+\s*/g, '.*)|(.*').
+                // replace spaces around and '&' characters to '.*)&(.*'
+                replace(/\s*&+\s*/g, '.*)&(.*').
+                // remove forward and backward spaces characters
+                replace(/^\s+/, '').replace(/\s+$/, '')
             + '.*)';
 
         try {
-            var searchRE = new RegExp(searchStrRE, 'ig');
+            return new RegExp(searchStrRE, 'ig');
         } catch (e) {
             console.log('Error creating regExp from object search string:', initSearchStr, '->',
                 searchStrRE, ':', e.message);
-            return;
         }
-
-        // try to find the search string in the names of the current objects and hide the objects that do
-        // not match the search string
-        var numberOfFoundedObjects = 0;
-        if(!savePrevFilter) $('input[' + objectNameAttr + ']').closest('li').removeClass('hide');
-        listRows.find('input[' + objectNameAttr + ']').each(function () {
-            var objectName = $(this).attr(objectNameAttr);
-            if (!searchRE.test(objectName) && !$(this).is(':checked')) {
-                $(this).closest('li').addClass('hide');
-            } else numberOfFoundedObjects++;
-            searchRE.lastIndex = 0;
-        });
-
-        // nothing was filtered out. show all objects
-        if (!numberOfFoundedObjects) listRows.removeClass('hide');
-
-        return numberOfFoundedObjects;
     }
 
     function globalSearchObjects(searchStr, callback) {
@@ -382,7 +365,6 @@ var alepizObjectsNamespace = (function($) {
                 //M.toast({html: 'No objects found or too many objects found', displayLength: 3000});
             }
             var isDrawObjects = drawObjectsList(objects);
-            if(searchStrAdd.length) filterObject();
 
             if(!lastObjectDrawFunction.search) objectDrawFunctionBeforeSearch = lastObjectDrawFunction;
             lastObjectDrawFunction = {
@@ -398,7 +380,6 @@ var alepizObjectsNamespace = (function($) {
                 globalSearchObjects(globalSearchLastParam.searchStr, globalSearchLastParam.callback);
             }
 
-            filterObject();
             if(typeof callback === 'function') callback(isDrawObjects);
         });
     }
@@ -455,7 +436,6 @@ var alepizObjectsNamespace = (function($) {
 
                 //objects: [{name: objectName1, description: objectDescription1, id: objectID1, selected: <true|false>, color: <color>:<shade>, disabled: <1|0>},...]
                 var isDrawObjects = drawObjectsList(objects);
-                filterObject();
 
                 lastObjectDrawFunction = {
                     func: createObjectsList,
@@ -464,7 +444,6 @@ var alepizObjectsNamespace = (function($) {
                 };
 
                 setCheckedObjectCounter();
-                filterObject();
                 if(typeof(callback) === 'function') return callback(isDrawObjects);
             }
         );
@@ -495,14 +474,13 @@ var alepizObjectsNamespace = (function($) {
             function(objects) {
                 bodyElm.css({cursor: 'auto'});
                 if(!isClearObjectListWhenObjectNotFound && (!objects || !objects.length)) {
-                    filterObject();
+                    drawObjectsList(lastDrawingObjects)
                     if(typeof(callback) === 'function') callback();
                     return;
                 }
 
                 //objects: [{name: objectName1, description: objectDescription1, id: objectID1, selected: <true|false>, color: <color>:<shade>, disabled: <1|0>},...]
                 var isDrawObjects = drawObjectsList(objects);
-                filterObject();
                 lastObjectDrawFunction = {
                     func: createObjectsListByInteractions,
                     search: false,
@@ -510,50 +488,90 @@ var alepizObjectsNamespace = (function($) {
                 };
 
                 setCheckedObjectCounter();
-                filterObject();
                 if(typeof(callback) === 'function') return callback(isDrawObjects);
             }
         );
     }
 
+    function filterObjects(objects) {
+        var searchObjectsStr = searchObjectsElm.val();
+        var searchObjectsAddStr = searchObjectsAddElm.val();
+        var searchRE = searchObjectsStr ? createSearchStrRE(searchObjectsStr) : null;
+        var searchREAdd = searchObjectsAddStr ? createSearchStrRE(searchObjectsAddElm.val()) : null;
+
+        if(searchREAdd) {
+            var filteredObjectsAdd = objects.filter(object => {
+                var res = searchREAdd.test(object.name);
+                searchREAdd.lastIndex = 0;
+                return res;
+            });
+        } else filteredObjectsAdd = objects;
+
+        // nothing was filtered out. show all objects
+        if(!filteredObjectsAdd.length) filteredObjectsAdd = objects;
+
+        if(searchRE && !useGlobalSearch) {
+            var filteredObjects = filteredObjectsAdd.filter(object => {
+                var res = searchRE.test(object.name);
+                searchRE.lastIndex = 0;
+                return res;
+            });
+            if(!filteredObjects.length && searchREAdd) filteredObjects = filteredObjectsAdd;
+        } else filteredObjects = filteredObjectsAdd;
+
+        return filteredObjects;
+    }
+
     /*
     Draw objects list
 
-    objects: [{name: objectName1, description: objectDescription1, id: objectID1, selected: <true|false>, color: <color>:<shade>, disabled: <1|0>},...]
+    objects: [{
+        name: objectName1,
+        description: objectDescription1,
+        id: objectID1,
+        selected: <true|false>,
+        color: <color>:<shade>,
+        disabled: <1|0>},...]
     about color and shade look at http://materializecss.com/color.html
     callback()
      */
     var previousHTMLWithObjectList;
-    function drawObjectsList(objects) {
+    function drawObjectsList(objects, dontFilterObjects) {
         var html = '';
 
         if(objects && objects.length) {
-            var elements = groupingObjects(objects);
-            html = elements.sort(function(a,b) {
-                if(a.sortPosition > b.sortPosition) return 1;
-                if(a.sortPosition < b.sortPosition) return -1;
-                if(a.name.toUpperCase() > b.name.toUpperCase()) return 1;
-                if(a.name.toUpperCase() < b.name.toUpperCase()) return -1;
+            lastDrawingObjects = objects;
+
+            var filteredObjects = dontFilterObjects ? objects : filterObjects(objects);
+            // nothing was filtered out. show all objects
+            if(!filteredObjects.length) filteredObjects = objects;
+
+            var elements = groupingObjects(filteredObjects);
+            html = elements.sort(function (a, b) {
+                if (a.sortPosition > b.sortPosition) return 1;
+                if (a.sortPosition < b.sortPosition) return -1;
+                if (a.name.toUpperCase() > b.name.toUpperCase()) return 1;
+                if (a.name.toUpperCase() < b.name.toUpperCase()) return -1;
                 return 0;
             }).map(function (obj) {
                 var id = Array.isArray(obj.id) ? obj.id.join('-') : obj.id;
                 return ('\
 <li>\
-        <a class="tooltipped row ' + (obj.cnt ? 'group' : 'object') +
+    <a class="tooltipped row ' + (obj.cnt ? 'group' : 'object') +
                     '" data-object-list data-position="right" data-tooltip="' +
                     escapeHtml(obj.description ? obj.name + ': ' + obj.description : obj.name) + '">\
-            <div class="col s2 object-checkbox">\
-                <label>\
-                    <input type="checkbox" id="' + id + '" data-object-name="' + obj.name + '"' +
+        <div class="col s2 object-checkbox">\
+            <label>\
+                <input type="checkbox" id="' + id + '" data-object-name="' + obj.name + '"' +
                     (obj.selected || (obj.cnt && obj.cnt === obj.selectedObjects) ? ' checked' : '') +
                     ' data-object-type="' + (obj.cnt ? 'group' : 'object') + '"/>\
-                    <span></span>\
-                </label>\
-            </div>\n\
-            <div class="col s9 truncate object-label' + (obj.disabled ? ' italic' : '') +
+                <span></span>\
+            </label>\
+        </div>\n\
+        <div class="col s9 truncate object-label' + (obj.disabled ? ' italic' : '') +
                     getCSSClassForObjectColor(obj) + '" data-object-id="' + id + '">' + escapeHtml(obj.name) +
                     (obj.cnt ? ' [' + obj.cnt + ']' : '') + '</div>\
-        </a>\
+    </a>\
 </li>');
             }).join('');
         }
@@ -781,6 +799,6 @@ var alepizObjectsNamespace = (function($) {
         runSearchObjectsWhenNoActionFound: runSearchObjectsWhenNoActionFound,
         goToTop: goToTop,
         reDrawObjects: reDrawObjects,
-        filterList: filterList,
+        createSearchStrRE: createSearchStrRE,
     }
 })(jQuery);

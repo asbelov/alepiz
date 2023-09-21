@@ -62,11 +62,13 @@ var alepizActionsNamespace = (function($) {
 
     function initEvents() {
         var prevSearchActionStr = '';
+        var charNumAfterActionNotFound = 0;
         searchActionsElm.keydown(function (e) {
             if (e.keyCode === 13) return false;
             if (e.which === 27) {
                 $(this).val('');
                 searchIconElm.removeClass('hide');
+                charNumAfterActionNotFound = 0;
                 return;
             }
 
@@ -82,11 +84,19 @@ var alepizActionsNamespace = (function($) {
             }
             prevSearchActionStr = searchActionStr;
 
-            if (searchActionsAutocompleteInstance &&
+            if(searchActionsAutocompleteInstance.count ||
+                searchActionStr.length < searchActionsAutocompleteInstance.options.minLength) {
+                charNumAfterActionNotFound = 0;
+            } else charNumAfterActionNotFound++;
+
+            // switch to search objects after action not found
+            if (!alepizMainNamespace.getConfig().maximizeSideNav &&
+                searchActionsAutocompleteInstance &&
                 searchActionStr.length >= searchActionsAutocompleteInstance.options.minLength &&
-                !searchActionsAutocompleteInstance.count) {
+                charNumAfterActionNotFound > 1) {
                 $(this).val('');
                 prevSearchActionStr = '';
+                charNumAfterActionNotFound = 0;
                 alepizObjectsNamespace.runSearchObjectsWhenNoActionFound(searchActionStr);
             }
         });

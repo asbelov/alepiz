@@ -71,11 +71,40 @@ alepizFiltersNamespace = (function($) {
             } else {
                 searchIconElm.addClass('hide');
             }
-            alepizObjectsNamespace.filterList(searchStr, objectsFilterElm, 'data-object-filter');
+            filterList(searchStr);
         });
 
         // find it at alepizObjects.js
         //searchObjectsAddElm.keyup(function () {})
+    }
+
+    function filterList(initSearchStr) {
+
+        var listRows = objectsFilterElm.find('li');
+        if (!initSearchStr.length) {
+            listRows.removeClass('hide');
+            return;
+        }
+
+        var searchRE = alepizObjectsNamespace.createSearchStrRE(initSearchStr);
+        if(!searchRE) return;
+
+        // try to find the search string in the names of the current objects and hide the objects that do
+        // not match the search string
+        var numberOfFoundedObjects = 0;
+        $('input[data-object-filter]').closest('li').removeClass('hide');
+        listRows.find('input[data-object-filter]').each(function () {
+            var objectName = $(this).attr('data-object-filter');
+            if (!searchRE.test(objectName) && !$(this).is(':checked')) {
+                $(this).closest('li').addClass('hide');
+            } else numberOfFoundedObjects++;
+            searchRE.lastIndex = 0;
+        });
+
+        // nothing was filtered out. show all objects
+        if (!numberOfFoundedObjects) listRows.removeClass('hide');
+
+        return numberOfFoundedObjects;
     }
 
     function createObjectsFiltersTab(filter, callback) {
@@ -188,8 +217,7 @@ alepizFiltersNamespace = (function($) {
             if($(this).text() === 'AND') $(this).text('OR');
             else $(this).text('AND');
             var config = alepizMainNamespace.getConfig();
-            var filter = getFilterExpression(true);
-            config.objectFilter = filter;
+            config.objectFilter = getFilterExpression(true);
             alepizMainNamespace.saveConfig();
         });
     }

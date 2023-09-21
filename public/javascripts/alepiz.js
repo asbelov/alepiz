@@ -501,7 +501,6 @@ alepizMainNamespace = (function($) {
             reload(true);
         });
 
-
         objectGroupIconElm.click(function () {
             objectGroupIconCrossOutElm.toggleClass('hide');
             var selectedObjectIDs = alepizObjectsNamespace.getSelectedObjects().map(function (obj) { return String(obj.id); });
