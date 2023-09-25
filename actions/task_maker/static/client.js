@@ -402,8 +402,10 @@ var JQueryNamespace = (function ($) {
             var taskGroups = getTaskGroups();
             var workflowGroups = getWorkflowGroups();
             var selectedGroupID = taskGroupForSearchElm.val();
-            selectedGroupID = workflowGroups[selectedGroupID] !== undefined ?
-                workflowGroups[selectedGroupID] : selectedGroupID
+            if(workflowGroups[selectedGroupID] !== undefined) {
+                selectedGroupID = workflowGroups[selectedGroupID];
+                taskUpdated();
+            }
 
             var htmlForNewTaskGroupsElm = taskGroups.map(function (group) {
                 var selected = group.id === selectedGroupID ? ' selected' : '';
@@ -540,7 +542,7 @@ var JQueryNamespace = (function ($) {
     }
 
     /**
-     * get array with shared counters for specific objects from all counters fro specific objects
+     * get array with shared counters for specific objects from all counters for specific objects
      * @param {number} objectsNum number of objects
      * @param {Array<Object>} countersArray an array of the counters
      * @return {Object} sharedCounters[<counterID>] = {
@@ -708,8 +710,6 @@ var JQueryNamespace = (function ($) {
             var actions = data.actions;
             var task = data.parameters;
             var OCIDs = data.OCIDs || [];
-            var objectsForOCIDs = data.objects || {};
-            var countersForOCIDs = data.counters;
             var taskObjects = [];
 
             $('#taskExecutionConditionsDescription').text('');
@@ -732,50 +732,9 @@ var JQueryNamespace = (function ($) {
                 // run setSharedCounters(objects); after draw all 'From task actions' options
                 setSharedCounters(objects, null,null, function () {
                     M.FormSelect.init(taskExecutionConditionElm[0], {});
-
-                    // convert array to string
-                    taskExecutionConditionElmPrevValue = OCIDs.map(function (OCID) {
-                        return String(OCID);
+                    OCIDs.forEach(function (OCID) {
+                        taskExecutionConditionElm.find('option[value="' + OCID + '"]').prop('selected', true);
                     });
-                    var optionsHtml =
-                        '<optgroup label="From task saved data" data-value="savedTaskExecutionCondition">';
-                    // 11 is a run once completed
-                    var selected = task.runType === 11 ? '' : ' selected';
-                    if(OCIDs.length > 20) { // on many conditions for task
-
-                        var counters = {};
-                        OCIDs.forEach(function (OCID) {
-                            var counterName = countersForOCIDs[OCID];
-                            if(!counters[counterName]) counters[counterName] = [objectsForOCIDs[OCID]];
-                            else counters[counterName].push(objectsForOCIDs[OCID]);
-                        });
-
-                        var conditionStrings = [];
-                        for(var counterName in counters) {
-                            conditionStrings.push(counterName + ' for ' + counters[counterName].join(','));
-                        }
-
-                        $('#taskExecutionConditionsDescription').text('Condition description: ' +
-                            conditionStrings.join('; '));
-
-                        optionsHtml += '<option value="' + OCIDs.join(',') +
-                            '"' + selected + ' data-value="savedTaskExecutionCondition">' +
-                            'Ask to run for ' + OCIDs.length + ' saved task conditions</option>';
-                    } else {
-                        OCIDs.forEach(function (OCID) {
-                            // remove option with equal OCID
-                            taskExecutionConditionElm.find('option[value="' + OCID + '"]').remove();
-                            optionsHtml += '<option value="' + OCID +
-                                '"' + selected +
-                                ' data-value="savedTaskExecutionCondition">Ask to run when ' +
-                                countersForOCIDs[OCID] + ' for ' + objectsForOCIDs[OCID] + '</option>';
-                        });
-                    }
-                    optionsHtml += '</optgroup>';
-                    // 11 is a run once completed
-                    if(task.runType !== 11) taskExecutionConditionElm.val('');
-                    taskExecutionConditionElm.append(optionsHtml);
-
                     setActiveTaskConditionOption(task.runType, function () {
                         // disable option for running task immediately after saving
                         $('option[value=runByActions]').prop('disabled', !data.canExecuteTask);
@@ -785,13 +744,6 @@ var JQueryNamespace = (function ($) {
                 });
             });
 
-
-            var workflowGroups = getWorkflowGroups();
-            var selectedGroupID = taskGroupForSearchElm.val();
-            selectedGroupID = workflowGroups[selectedGroupID] !== undefined ?
-                workflowGroups[selectedGroupID] : selectedGroupID;
-
-            newTaskGroupElm.val(selectedGroupID);
 
             $('#taskID').val(taskID || '');
 
@@ -810,6 +762,16 @@ var JQueryNamespace = (function ($) {
                     }
                 }
             } else taskUpdated('');
+
+            var workflowGroups = getWorkflowGroups();
+            var selectedGroupID = taskGroupForSearchElm.val();
+            if(workflowGroups[selectedGroupID] !== undefined) {
+                selectedGroupID = workflowGroups[selectedGroupID];
+                taskUpdated();
+            }
+
+            newTaskGroupElm.val(selectedGroupID);
+
 
             var taskActionIDs = Object.keys(actions);
             var html = '';
@@ -1101,36 +1063,13 @@ var JQueryNamespace = (function ($) {
             case 11: // run once completed
             case 0: // run permanently
             case 1: // run once
-                taskExecutionConditionElmPrevValue =
-                    [taskExecutionConditionElm.find('option[data-value="OCIDsFromTaskActions"]').attr('value')];
-                taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
-                var taskExecutionConditionVal = taskExecutionConditionElm.val();
-                if((!taskExecutionConditionVal || !taskExecutionConditionVal.length) && runType === 11) {
-                    $('option[data-requiredOption="last"]').
-                    after('<option data-value="completed" value="runCompleted">' +
-                        'The task was completed. The task execution condition does not exist</option>');
-                    taskExecutionConditionElmPrevValue = ['runCompleted'];
-                    taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
-                }
-                runTaskOnceElm.prop('checked', runType === 1 || runType === 11); // true for run once
                 taskExecuteTimeSettingsAreaElm.addClass('hide');
                 taskExecutionConditionDivElm.removeClass('l4').addClass('l6');
-                //taskExecutionConditionDivElm.removeClass('l6').addClass('l4');
-                //taskExecuteConditionSettingsAreaElm.removeClass('hide');
                 callback();
                 break;
             case 2: // run now
-                taskExecutionConditionElmPrevValue = ['runNow'];
-                taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
-                taskExecuteConditionSettingsAreaElm.addClass('hide');
-                taskExecuteTimeSettingsAreaElm.addClass('hide');
-                taskExecutionConditionDivElm.removeClass('l4').addClass('l6');
-                setSharedCounters(objects, null, null, callback);
-                break;
             case 12: // run now completed
-                $('option[value="runNow"]').after('<option data-value="completed" value="runCompleted">' +
-                    'Task execution completed (Run the task immediately)</option>');
-                taskExecutionConditionElmPrevValue = ['runCompleted'];
+                taskExecutionConditionElmPrevValue = ['runNow'];
                 taskExecutionConditionElm.val(taskExecutionConditionElmPrevValue);
                 taskExecuteConditionSettingsAreaElm.addClass('hide');
                 taskExecuteTimeSettingsAreaElm.addClass('hide');

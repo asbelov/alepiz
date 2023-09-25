@@ -31,19 +31,16 @@ const unique = require('../../lib/utils/unique');
  * @param {string} args.runTaskAtDateTimestamp stringified timestamp of the date when the task should be started
  * @param {string} args.runTaskAtTime time (HH:MM) when task should be started
  * @param {string} args.runTaskOnce should the task be running only once
+ * @param {string} args.taskUpdated have any changes been made to the task
  * @param {function(Error)|function()} callback callback(err)
  */
 module.exports = function(args, callback) {
     log.debug('Starting action "' + args.actionName + '" with parameters', args);
 
-    try {
-        taskClient.connect('taskMaker:server', function (err) {
-            if(err) return callback(err);
-            saveTask(args, callback);
-        });
-    } catch(err){
-        callback(err);
-    }
+    taskClient.connect('taskMaker:server', function (err) {
+        if(err) return callback(err);
+        saveTask(args, callback);
+    });
 };
 
 /**
@@ -63,6 +60,7 @@ module.exports = function(args, callback) {
  * @param {string} args.runTaskAtDateTimestamp stringified timestamp of the date when the task should be started
  * @param {string} args.runTaskAtTime time (HH:MM) when task should be started
  * @param {string} args.runTaskOnce should the task be running only once
+ * @param {string} args.taskUpdated have any changes been made to the task
  * @param {function(Error)|function()} callback callback(err)
  */
 function saveTask(args, callback) {
@@ -200,6 +198,7 @@ function saveTask(args, callback) {
  * @param {string} args.runTaskAtDateTimestamp stringified timestamp of the date when the task should be started
  * @param {string} args.runTaskAtTime time (HH:MM) when task should be started
  * @param {string} args.runTaskOnce should the task be running only once
+ * @param {string} args.taskUpdated have any changes been made to the task
  * @param {number} taskID task ID
  * @param {Object} actions object with task actions (see example)
  * @param {Object} actionsIDsObj actionsIDsObj[actionID] = [taskActionID1, taskActionID2,..]
@@ -219,9 +218,14 @@ function saveTask(args, callback) {
  */
 function updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs,
                     workflows, callback) {
+
+    if(!args.taskUpdated) {
+        log.info('User ', args.username, ': not updating the task ', taskID, ' because no changes have been made');
+        return callback();
+    }
     if(taskID === 0) return callback();
 
-    log.info('User ', args.username, ': starting update task ', taskID, '; actions num: ', Object.keys(actions).length);
+    log.info('User ', args.username, ': starting update the task ', taskID, '; actions num: ', Object.keys(actions).length);
     log.debug('Actions: ', actions);
 
     if(!args.actionsOrder || typeof args.actionsOrder !== 'string') {
@@ -547,7 +551,7 @@ function processApproves(username, taskActionID, newApproves, workflow, callback
                     runOnLocalNode: true,
                 }, function(err) {
                     if(err) log.error('User ', username, ': run task when processed approves: ', err.message);
-
+log.info('!!!Run task ', taskID)
                     tasks.processWorkflows(username, taskID, workflow, 'execute', err, function() {
 
                         transactionsDB.begin(function(err) {

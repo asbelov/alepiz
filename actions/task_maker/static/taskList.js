@@ -199,7 +199,7 @@ var taskListJQueryNamespace = (function ($) {
      * @param {function(number, string)} [initTaskListParameters.onRemove] run on click on "x" task button
      * @param {function(number, string)} [initTaskListParameters.onComplete] use this function on complete drawing task list
      * @param {Array<number>} [initTaskListParameters.removedTasks] task list, which is not showing
-     * @param {Boolean} [initTaskListParameters.reloadTaskListMode
+     * @param {Boolean} [initTaskListParameters.reloadTaskListMode] the automatic task list update mode is used
      * @param {function()} callback
      */
     function init(taskListAreaElm, initTaskListParameters, callback) {
@@ -262,7 +262,7 @@ var taskListJQueryNamespace = (function ($) {
 
             dateFromElm.change(function() {
                 taskListParameters.onChangeTaskList(function(err) {
-                    if (err || !$(this).val()) {
+                    if (err || !dateFromElm.val()) {
                         dateFromElm.val(prevDateFrom);
                         return;
                     }
@@ -288,7 +288,7 @@ var taskListJQueryNamespace = (function ($) {
 
             dateToElm.change(function() {
                 taskListParameters.onChangeTaskList(function(err) {
-                    if (err || !$(this).val()) {
+                    if (err || !dateToElm.val()) {
                         dateToElm.val(prevDateTo);
                         return;
                     }
@@ -318,7 +318,7 @@ var taskListJQueryNamespace = (function ($) {
                     if(err) return filterByTaskNameElm.val(prevFilterByTaskNameVal || '');
 
                     prevFilterByTaskNameVal = filterByTaskNameElm.val();
-                    if(e.which === 27) $(this).val(''); // When pressing Esc, clear search field
+                    if(e.which === 27) filterByTaskNameElm.val(''); // When pressing Esc, clear search field
                     drawTasksList(taskListParameters);
                 });
             });
@@ -328,7 +328,7 @@ var taskListJQueryNamespace = (function ($) {
                     if (err) return filterByTaskOwnerElm.val(prevFilterByTaskOwnerVal || '');
 
                     prevFilterByTaskOwnerVal = filterByTaskOwnerElm.val();
-                    if (e.which === 27) $(this).val(''); // When pressing Esc, clear search field
+                    if (e.which === 27) filterByTaskOwnerElm.val(''); // When pressing Esc, clear search field
                     drawTasksList(taskListParameters);
                 });
             });
@@ -349,7 +349,7 @@ var taskListJQueryNamespace = (function ($) {
         Updated at <span id="taskListUpdateTime">' + new Date().toLocaleTimeString() + '</span></div>\
     <div class="col s12 m8 l4 input-field" style="margin-bottom: 0">\
         <input type="text" id="filterByTaskName"/>\
-        <label for="filterByTaskName">Task name or ID</label>\
+        <label for="filterByTaskName">Task name or ID (search by all groups)</label>\
     </div>\
     <div class="col s12 m4 l2 input-field" style="margin-bottom: 0">\
         <input type="text" id="filterByTaskOwner"/>\
@@ -395,7 +395,7 @@ var taskListJQueryNamespace = (function ($) {
      * @param {function(number, string)|function()} [initTaskListParameters.onComplete] use this function on
      *  complete drawing the task list
      * @param {Array<number>} [initTaskListParameters.removedTasks] task list, which is not showing
-     * @param {Boolean} [initTaskListParameters.reloadTaskListMode
+     * @param {Boolean} [initTaskListParameters.reloadTaskListMode] the automatic task list update mode is used
      * @param {function()|function(number, string)} [callback] callback(activeTaskID, activeTaskName), where      *
      *     activeTaskID - active task ID or undefined
      *     activeTaskName - activeTaskName or undefined
@@ -445,14 +445,22 @@ var taskListJQueryNamespace = (function ($) {
             }
             workflowGroups = data.fullWorkflowGroups || {};
             taskGroups = data.taskGroups;
-            // create taskGroups selector
-            var htmlForTaskGroupForSearchElm = data.allowedTaskGroups.map(function (group) {
-                var selected = group.id === data.groupID ? ' selected' : '';
-                return '<option value="' + group.id + '"' + selected + '>' + group.name + '</option>';
-            }).join('');
 
             var taskGroupForSearchElm = $('#taskGroupForSearch');
+            var filterByTaskNameVal = $('#filterByTaskName').val();
+            // create taskGroups selector
+            if(filterByTaskNameVal) {
+                var htmlForTaskGroupForSearchElm = '<option value="0" selected>Search by all groups</option>';
+            } else {
+                htmlForTaskGroupForSearchElm = data.allowedTaskGroups.map(function (group) {
+                    var selected = group.id === data.groupID && !filterByTaskNameVal ? ' selected' : '';
+                    return '<option value="' + group.id + '"' + selected + '>' + group.name + '</option>';
+                }).join('');
+            }
+
             taskGroupForSearchElm.html(htmlForTaskGroupForSearchElm);
+            if(filterByTaskNameVal) taskGroupForSearchElm.attr('disabled', '1');
+            else taskGroupForSearchElm.removeAttr('disabled');
             M.FormSelect.init(taskGroupForSearchElm[0], {});
 
             // start to create the task list
@@ -476,15 +484,17 @@ var taskListJQueryNamespace = (function ($) {
 
             if(!Array.isArray(tasksData)) tasksData = [];
 
-            // set fromDate to timestamp of last showed task
-            if(tasksData.length && tasksData[tasksData.length - 1].timestamp < timestampFrom) {
-                $('#taskDateFrom').val(getDateString(new Date(tasksData[tasksData.length - 1].timestamp)));
-                taskDateFromInstance.setDate(new Date(tasksData[tasksData.length - 1].timestamp));
-            }
-
             var taskLaunchMode = {}, tasksCnt = 0;
 
-            tasksData.sort(function (a, b) {return b.timestamp - a.timestamp }).forEach(function(task) {
+            // Tasks are sorted by approval time and by task modification time
+            // changeStatusTimestamp is an approval time; timestamp is a task modification time
+            tasksData.sort(function (a, b) {
+                var aTimestamp = a.changeStatusTimestamp && a.changeStatusTimestamp > a.timestamp ?
+                    a.changeStatusTimestamp : a.timestamp;
+                var bTimestamp = b.changeStatusTimestamp && b.changeStatusTimestamp > b.timestamp ?
+                    b.changeStatusTimestamp : b.timestamp;
+                return bTimestamp - aTimestamp;
+            }).forEach(function(task) {
 
                 if($.isArray(initTaskListParameters.removedTasks)) {
                     // don't showing removed tasks in the task list
@@ -495,8 +505,12 @@ var taskListJQueryNamespace = (function ($) {
                 if(!task.name) var taskName = unnamedTaskName;
                 else taskName = escapeHtml(task.name);
 
-                if((!taskListParameters.removedTasks.length && !taskListParameters.selectedTaskID) ||
-                taskListParameters.selectedTaskID === task.id) {
+                if((!taskListParameters.removedTasks.length &&
+                        (typeof taskListParameters.aprovedTasks !== 'object' ||
+                        !Object.keys(taskListParameters.aprovedTasks).length) &&
+                        !taskListParameters.selectedTaskID) ||
+                    taskListParameters.selectedTaskID === task.id
+                ) {
                     activeTaskName = taskName;
                     taskListParameters.selectedTaskID = task.id; // set selectedTaskID for the first task in the list
                 }
@@ -554,7 +568,7 @@ var taskListJQueryNamespace = (function ($) {
     <i class="material-icons circle' + approveBtnClass + '"' + approveAttr + '>' + icon + '</i>\
     <span>#' + escapeHtml(task.id) + ': </span><span class="title">' + taskName + '</span><span>' + runStateComment +
                     '</span>\
-    <p>Created at ' + new Date(task.timestamp).toLocaleString() + ' by ' + escapeHtml(task.ownerFullName) +
+    <p>Modified at ' + new Date(task.timestamp).toLocaleString() + ' by ' + escapeHtml(task.ownerFullName) +
                     ' (' + escapeHtml(task.ownerName)+ ')' + approvedComment + '</p>\
     <span class="secondary-content">' + addHTML + removeHTML + '</span><span data-is-approved>' + approvedTaskInput +
                     '</span>\
@@ -562,6 +576,12 @@ var taskListJQueryNamespace = (function ($) {
 ';
                 tasksCnt++;
             });
+
+            // set fromDate to timestamp of last showed task
+            if(tasksData.length && tasksData[tasksData.length - 1].timestamp < timestampFrom) {
+                $('#taskDateFrom').val(getDateString(new Date(tasksData[tasksData.length - 1].timestamp)));
+                taskDateFromInstance.setDate(new Date(tasksData[tasksData.length - 1].timestamp));
+            }
 
             var taskListElm = $('#taskList');
 
@@ -579,7 +599,9 @@ var taskListJQueryNamespace = (function ($) {
             if(activeTaskName)  {
                 // select an active task
                 selectTask($('a[data-task-id="' + taskListParameters.selectedTaskID + '"]'), reloadTaskListMode, true);
-            } else if(!taskListParameters.removedTasks.length) {
+            } else if(!taskListParameters.removedTasks.length &&
+                (typeof taskListParameters.aprovedTasks !== 'object' ||
+                !Object.keys(taskListParameters.aprovedTasks).length)) {
                 // select the first child if the task is not selected and there are no removed tasks
                 selectTask(taskListElm.children().first(), reloadTaskListMode, true);
             }
@@ -596,7 +618,9 @@ var taskListJQueryNamespace = (function ($) {
                     selectTask($('a[data-task-id="' + taskListParameters.selectedTaskID + '"]'));
                 }
 
-                if(initTaskListParameters && typeof initTaskListParameters.onRemove === 'function') initTaskListParameters.onRemove(taskID, taskName);
+                if(initTaskListParameters && typeof initTaskListParameters.onRemove === 'function') {
+                    initTaskListParameters.onRemove(taskID, taskName);
+                }
             });
 
             $('a[data-task-id]').click(function() {
@@ -656,7 +680,10 @@ var taskListJQueryNamespace = (function ($) {
                     delete taskListParameters.aprovedTasks[taskID];
                 }
 
-                selectTask(taskElm, false, true);
+                // unselect any selected tasks
+                if(taskListParameters.selectedTaskID) {
+                    selectTask($('a[data-task-id="' + taskListParameters.selectedTaskID + '"]'));
+                }
             });
 
             $('i[data-merge-task-btn]').click(function(event){

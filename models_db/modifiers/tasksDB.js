@@ -15,19 +15,19 @@ module.exports = tasksDB;
  * @param {number} taskID new task ID
  * @param {number} userID user ID
  * @param {number} timestamp create task timestamp (Date.now())
- * @param {string|null} name task name
+ * @param {string|null} taskName task name
  * @param {number} groupID task group ID
  * @param {function(Error)|function()} callback callback(err)
  */
-tasksDB.addTask = function(taskID, userID, timestamp, name, groupID, callback) {
-    if(!name) name = null;
+tasksDB.addTask = function(taskID, userID, timestamp, taskName, groupID, callback) {
+    if(!taskName) taskName = null;
 
     db.run('INSERT INTO tasks (id, userID, timestamp, name, groupID) ' +
         'VALUES ($id, $userID, $timestamp, $name, $groupID)', {
         $id: taskID,
         $userID: userID,
         $timestamp: timestamp,
-        $name: name,
+        $name: taskName,
         $groupID: groupID,
     }, callback);
 };
@@ -46,6 +46,7 @@ tasksDB.updateTask = function(taskID, taskName, groupID, callback) {
         $taskID: taskID,
         $name: taskName,
         $groupID: groupID,
+        $timestamp: Date.now(),
     }, callback);
 };
 

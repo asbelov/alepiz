@@ -157,7 +157,8 @@ WHERE tasks.timestamp >= $timestampFrom AND tasks.timestamp <= $timestampTo AND 
         (param.ownerName ? ' AND users.name like $ownerName' : '') +
         (param.taskName ? ' AND tasks.name like $taskName' : '') +
         (param.taskID ? ' AND tasks.id=$taskID' : '') +
-        ' AND tasks.groupID = $groupID ORDER by tasks.timestamp DESC LIMIT 500', {
+        (!param.taskID && !param.taskName ? ' AND tasks.groupID = $groupID' : '') +
+        ' ORDER by tasks.timestamp DESC LIMIT 500', {
 
             $timestampFrom: timestampFrom,
             $timestampTo: timestampTo,
@@ -188,7 +189,8 @@ WHERE tasks.timestamp <= $timestampTo AND \
         (param.ownerName ? ' AND users.name like $ownerName' : '') +
         (param.taskName ? ' AND tasks.name like $taskName' : '') +
         (param.taskID ? ' AND tasks.id=$taskID' : '') +
-        ' AND tasks.groupID = $groupID ORDER by tasks.timestamp DESC LIMIT 500', {
+        (!param.taskID && !param.taskName ? ' AND tasks.groupID = $groupID' : '') +
+        ' ORDER by tasks.timestamp DESC LIMIT 500', {
 
                     $timestampTo: timestampTo,
                     $ownerName: param.ownerName ? param.ownerName : undefined,
@@ -227,7 +229,7 @@ tasksDB.getTaskActions = function(taskID, callback) {
 /**
  * Get actionIDs (action dir) by taskActionIDs (id in tasksActions table)
  * @param {Array} taskActionIDs array with taskActionIDs
- * @param {function(Error)|function(null, Object)} callback(err, taskActionID2actionID), where
+ * @param {function(Error)|function(null, Object)} callback callback(err, taskActionID2actionID), where
  *    taskActionID2actionID is a object like {<taskActionID>: <actionID>, ...}
  */
 tasksDB.getActionsIDs = function (taskActionIDs, callback) {

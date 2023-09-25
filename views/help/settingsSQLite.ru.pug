@@ -99,6 +99,13 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         li.
                             slowQueryExecutionTime - максимальное время выполнение SQL запроса, после которого в лог
                             будет добавлена запись о медленном выполнении запроса. По умолчанию 20000мс.
+                        li.
+                            maxWalSize - максимальный размер файла журнала (db.db-wal) в байтах, при превышении
+                            которого будет производится операция сжатия журнала с помощью pragma wal_checkpoint(TRUNCATE).
+                            По умолчанию 10485760 (10Mb).
+                        li.
+                            truncatePeriod - период проверки размера файла журнала в миллисекундах для сжатия.
+                            По умолчанию 60000.
                         li options - опции для движка БД better-sqlite3
                         ul.browser-default
                             li verbose - (true|false) выводить в лог все SQL запросы. По умолчанию false.

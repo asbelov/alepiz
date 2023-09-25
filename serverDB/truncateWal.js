@@ -14,7 +14,12 @@ module.exports = {
     truncateWal: truncateWal,
 }
 
-function init(dbPath) {
+/**
+ * Initializing sqlite DB
+ * @param {string} dbPath path to database file
+ * @param {Object} conf conf object fom conf.js
+ */
+function init(dbPath, conf) {
     var db;
 
     log.info('Open DB file ', dbPath, ' for truncating the WAL journal');
@@ -35,9 +40,31 @@ function init(dbPath) {
         log.warn('Can\'t set some required pragma modes to ', dbPath, ' for truncating the WAL journal: ', err.message);
     }
 
-    setInterval(truncateWal, 60000, dbPath, db, 10485760); // 10Mb = 1024  * 1024 * 10
+    periodicallyTruncateWall(dbPath, db, conf);
 }
 
+/**
+ * Periodically truncate journal wal file
+ * @param {string} dbPath path to database file
+ * @param {Object} db db objects
+ * @param {Object} conf conf object fom conf.js
+ */
+function periodicallyTruncateWall(dbPath, db, conf) {
+    // 10Mb = 1024  * 1024 * 10
+    var maxWalSize = conf && typeof conf.get === 'function' ? conf.get('maxWalSize') || 10485760 : 10485760;
+    var truncatePeriod = conf && typeof conf.get === 'function' ? conf.get('truncatePeriod') || 60000 : 60000;
+
+    truncateWal(dbPath, db, maxWalSize);
+    var t = setTimeout(periodicallyTruncateWall, truncatePeriod, dbPath, db, conf);
+    t.unref();
+}
+
+/**
+ * Truncate sqlite journal wal file
+ * @param {string} dbPath path to database file
+ * @param {Object} db db objects
+ * @param {number} maxWalSize max wal file size (bytes) after which file will be truncated
+ */
 function truncateWal(dbPath, db, maxWalSize) {
     if(!db) {
         log.error('DB ', dbPath, ' is not initializing');
@@ -47,23 +74,25 @@ function truncateWal(dbPath, db, maxWalSize) {
     if(Date.now() - lastTruncate < 30000) return;
     lastTruncate = Date.now();
     truncateInProgress = true;
-    fs.stat(dbPath + '-wal', (err, stat) => {
-        if (err) {
-            if (err.code !== 'ENOENT') log.error('Can\'t stat ', dbPath + '-wal: ', err.message);
-        } else if (stat.size > maxWalSize) {
-            log.info('Size of ', dbPath + '-wal journal file is a ',
-                Math.round(stat.size/1048576), 'Mb. Truncating wal and optimizing DB...');
-            try {
-                db.pragma('wal_checkpoint(TRUNCATE)');
-            } catch (err) {
-                log.error('Can\' truncate WAL checkpoint: ', err.message);
-            }
-            try {
-                db.pragma('optimize');
-            } catch (err) {
-                log.error('Can\' optimize DB: ', err.message);
-            }
+    try {
+        var stat = fs.statSync(dbPath + '-wal');
+    } catch (err) {
+        if (err.code !== 'ENOENT') return log.error('Can\'t stat ', dbPath + '-wal: ', err.message);
+    }
+
+    if (stat.size > maxWalSize) {
+        log.info('Size of ', dbPath + '-wal journal file is a ',
+            Math.round(stat.size / 1048576), 'Mb. Truncating wal and optimizing DB...');
+        try {
+            db.pragma('wal_checkpoint(TRUNCATE)');
+        } catch (err) {
+            log.error('Can\' truncate WAL checkpoint: ', err.message);
         }
-        truncateInProgress = false;
-    });
+        try {
+            db.pragma('optimize');
+        } catch (err) {
+            log.error('Can\' optimize DB: ', err.message);
+        }
+    }
+    truncateInProgress = false;
 }

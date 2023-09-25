@@ -26,7 +26,7 @@ dbServer.start = function (callback) {
     var cfg = confSqlite.get(); // configuration for each module
 
     var dbPath = path.join(__dirname, '..', confSqlite.get('path'));
-    truncateWal.initTruncateWal(dbPath);
+    truncateWal.initTruncateWal(dbPath, confSqlite);
 
     if(cfg.disableServer) {
         log.info('dbServer is disabled in configuration and not started');
