@@ -12,7 +12,6 @@ const actions = require('../lib/actionsConf');
 const browserLog = require('../serverAudit/browserLog'); // used for delete messages counter for session
 const unique = require('../lib/utils/unique');
 const actionClient = require('../serverActions/actionClient');
-const objectFilterDB = require("../models_db/objectsFilterDB");
 
 const Conf = require('../lib/conf');
 const confActions = new Conf('config/actions.json');
@@ -73,70 +72,58 @@ router.post('/'+confActions.get('dir')+'/:action',
         log.debug('Creating a new session for user: ', username, ',  action: ', actionCfg.name,
             ', sessionID: ', sessionID);
 
-        if (!'o' in req.body) {
-            log.error('Error while initialisation action "', actionID, '": ',
-                'parameter "o" with object names is not present');
-            return next(err);
+        try {
+            var objects = JSON.parse(req.body.o);
         }
-        objectFilterDB.getObjectsByNames(req.body.o.split(','), username, function(err, objectsFull) {
+        catch (err) {
+            objects = [];
+        }
+        async.parallel([
+            // get action configuration and check for objects compatibility
+            function(callback){
+                rightsWrapper.checkForObjectsCompatibility(actionCfg, objects, callback);
+            },
+            // check user rights for view this action
+            function(callback){
+                rightsWrapper.checkActionRights(username, actionID, 'ajax', callback);
+            }
+        ], function(err){
             if(err) {
-                log.error('Error getting object information action "', actionID, '": ',
-                    err.message, '. Objects: ', req.body.o);
+                log.error('Error while checking rights for action "', actionID, '": ', err.message);
                 return next(err);
             }
-            var objects = objectsFull.map((obj) => {
-                return {
-                    name: obj.name,
-                    id: obj.id,
-                }
-            });
-            async.parallel([
-                // get action configuration and check for objects compatibility
-                function(callback){
-                    rightsWrapper.checkForObjectsCompatibility(actionCfg, objects, callback);
-                },
-                // check user rights for view this action
-                function(callback){
-                    rightsWrapper.checkActionRights(username, actionID, 'ajax', callback);
-                }
-            ], function(err){
+
+            var result = {};
+            result.action = actionCfg;
+            result.objects = objects;
+
+            var actionLink = result.action.link;
+            result.action.link += '_' + String(sessionID);
+            result.action.sessionID = sessionID;
+
+            var actionHomePage = path.join(__dirname, '..', actionLink, result.action.homePage);
+
+            if(req.body.actionUpdate === '1') {
+                actionsForUpdate.set(actionID, {
+                    ajax: true,
+                    server: true
+                });
+            }
+
+            log.info('Display a new action ', result.action.name,
+                (req.body.actionUpdate === '1' ? ' with reload' : '' ), ' for objects: ', result.objects);
+
+            res.render(actionHomePage, result, function(err, html) {
                 if(err) {
-                    log.error('Error while checking rights for action "', actionID, '": ', err.message);
+                    log.error('Can\'t render action html page "', actionHomePage, '": ', err.message);
                     return next(err);
                 }
 
-                var result = {};
-                result.action = actionCfg;
-                result.objects = objects;
-
-                var actionLink = result.action.link;
-                result.action.link += '_' + String(sessionID);
-                result.action.sessionID = sessionID;
-
-                var actionHomePage = path.join(__dirname, '..', actionLink, result.action.homePage);
-
-                if(req.body.actionUpdate === '1') {
-                    actionsForUpdate.set(actionID, {
-                        ajax: true,
-                        server: true
-                    });
-                }
-
-                log.info('Display a new action ', result.action.name,
-                    (req.body.actionUpdate === '1' ? ' with reload' : '' ), ' for objects: ', result.objects);
-
-                res.render(actionHomePage, result, function(err, html) {
-                    if(err) {
-                        log.error('Can\'t render action html page "', actionHomePage, '": ', err.message);
-                        return next(err);
-                    }
-
-                    res.json({
-                        html: html,
-                        params: result.action
-                    });
-                })
-            });
+                res.json({
+                    html: html,
+                    params: result.action
+                });
+            })
         });
     });
 });
@@ -243,7 +230,7 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode',
             // does not return the action result.
             // If you want get action result (f.e. to callbackAfterExec(result, callback)) set
             // the returnActionResult parameter to true. default false
-            returnActionResult: actionCfg.returnActionResult,
+            returnActionResult: actionCfg.returnActionResult || confActions.get('returnActionResult'),
             // if true, then data will be an array of all results returned from the current and remote servers
             runAjaxOnRemoteServers: actionCfg.runAjaxOnRemoteServers,
             slowAjaxTime: actionCfg.slowAjaxTime,

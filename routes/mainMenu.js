@@ -8,17 +8,31 @@
 var log = require('../lib/log')(module);
 var express = require('express');
 var router = express.Router();
-var objectFilterDB = require('../models_db/objectsFilterDB');
-var rightsObjectsDB = require('../rightsWrappers/objectsDB');
+var createObjectList = require('./createObjectList');
 var actions = require('./../lib/actionsConf');
 var objectsFilter = require('./objectsFilter');
 var user = require('../lib/user');
 var prepareUser = require('../lib/utils/prepareUser');
+const webServerCacheExpirationTime = require('../serverWeb/webServerCacheExpirationTime');
 const Conf = require("../lib/conf");
-const confActions = new Conf('config/actions.json');
-const confInterface = new Conf('config/interface.json');
-const confNavBarLinks = new Conf('config/navBarLinks.json');
-const confObjectGroups = new Conf('config/objectGroups.json');
+var confActions = new Conf('config/actions.json', webServerCacheExpirationTime());
+var confInterface = new Conf('config/interface.json', webServerCacheExpirationTime());
+var confNavBarLinks = new Conf('config/navBarLinks.json', webServerCacheExpirationTime());
+var confObjectGroups = new Conf('config/objectGroups.json', webServerCacheExpirationTime());
+
+// change reload time for reload configurations from files
+var prevWebServerCacheExpirationTime = webServerCacheExpirationTime();
+setTimeout(function () {
+    var newWebServerCacheExpirationTime = webServerCacheExpirationTime();
+    if(newWebServerCacheExpirationTime === prevWebServerCacheExpirationTime) return;
+
+    log.info('webServerCacheExpirationTime was changed from ', prevWebServerCacheExpirationTime, ' to ',
+        newWebServerCacheExpirationTime);
+    prevWebServerCacheExpirationTime = newWebServerCacheExpirationTime;
+    confInterface = new Conf('config/interface.json', newWebServerCacheExpirationTime);
+    confNavBarLinks = new Conf('config/navBarLinks.json', newWebServerCacheExpirationTime);
+    confObjectGroups = new Conf('config/objectGroups.json', newWebServerCacheExpirationTime);
+}, 30000);
 
 module.exports = router;
 
@@ -101,7 +115,7 @@ function filterObjectsByInteractions(objectsNamesStr, user, filterNames,
     else objectsNames = objectsNamesStr.split(',');
 
     user = prepareUser(user);
-    objectFilterDB.filterObjectsByInteractions(objectsNames, user, function(err, objects) {
+    createObjectList.filterObjectsByInteractions(objectsNames, user, function(err, objects) {
         if(err) return callback(err);
         objectsFilter.applyFilterToObjects(filterNames, filterExpression, objects, callback);
     });
@@ -154,7 +168,7 @@ function searchObjects(initSearchStr, user, filterNames,
     log.debug('Run search: "', initSearchStr, '" -> "', searchStr, '": length: ', searchStr.length);
 
     user = prepareUser(user);
-    objectFilterDB.searchObjects(searchStr, user, function(err, objects) {
+    createObjectList.searchObjects(initSearchStr, user, function(err, objects) {
         if(err) return callback(err);
         objectsFilter.applyFilterToObjects(filterNames, filterExpression, objects, callback);
     });
@@ -173,7 +187,7 @@ function getObjectsByNames(objectsNamesStr, user, filterNames,
                            filterExpression, callback) {
     if(!objectsNamesStr || typeof(objectsNamesStr) !== 'string') return callback(null, []);
 
-    objectFilterDB.getObjectsByNames(objectsNamesStr.split(','), prepareUser(user),
+    createObjectList.getObjectsByNames(objectsNamesStr.split(','), prepareUser(user),
         function(err, objects) {
         if(err) return callback(err);
         objectsFilter.applyFilterToObjects(filterNames, filterExpression, objects, callback);
@@ -190,7 +204,7 @@ function getObjectsByNames(objectsNamesStr, user, filterNames,
  * objects like [{name: ..., id: ..., description: ..., sortPosition:...}, {...}, ...]
  */
 function getObjectsByIDs(objectIDs, user, filterNames, filterExpression, callback) {
-    rightsObjectsDB.getObjectsByIDs(prepareUser(user), objectIDs, function(err, objects) {
+    createObjectList.getObjectsByIDs(prepareUser(user), objectIDs, function(err, objects) {
         if(err) return callback(err);
         objectsFilter.applyFilterToObjects(filterNames, filterExpression, objects, callback);
     });

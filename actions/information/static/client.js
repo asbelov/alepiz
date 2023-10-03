@@ -106,6 +106,17 @@ var JQueryNamespace = (function ($) {
         html += '</tbody>';
 
         tableElm.html(html);
+
+        $('th').click(function () {
+            var items = {};
+            $('table tbody tr td:nth-child(' + ($(this).index() + 1) + ')').each(function () {
+                items[$(this).text()] = true;
+            });
+            navigator.clipboard.writeText(Object.keys(items).join('\n')).then(() => {
+                M.toast({html: 'Clipboard contents:<br/><br/>' +
+                        Object.keys(items).sort().map(s => escapeHtml(s)).join('<br/>')})
+            });
+        });
     }
 
     function makeURLForDataBrowser(objectName, leftOCIDs, rightOCIDs) {

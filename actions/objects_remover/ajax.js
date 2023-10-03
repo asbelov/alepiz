@@ -3,7 +3,7 @@
  */
 
 var log = require('../../lib/log')(module);
-var objectsFilterDB = require('../../models_db/objectsFilterDB');
+var objectsFilterDB = require('../../routes/createObjectList');
 var prepareUser = require('../../lib/utils/prepareUser');
 var async = require('async');
 

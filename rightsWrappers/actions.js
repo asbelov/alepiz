@@ -7,6 +7,7 @@ var prepareUser = require('../lib/utils/prepareUser');
 var rightsDB = require('../models_db/usersRolesRightsDB');
 var objectsDB = require('../models_db/objectsDB');
 var objectsProperties = require('../models_db/objectsPropertiesDB');
+const webServerCacheExpirationTime = require('../serverWeb/webServerCacheExpirationTime');
 var Conf = require('../lib/conf');
 const conf = new Conf('config/common.json');
 const confActions = new Conf('config/actions.json');
@@ -15,6 +16,8 @@ var systemUser = conf.get('systemUser') || 'system';
 
 var rightsWrapper = {};
 module.exports = rightsWrapper;
+
+var objectPropertiesCache = new Map();
 
 /**
  * Check user rights for specific action
@@ -92,6 +95,10 @@ rightsWrapper.checkActionRights = function (user, actionIDOrFolder, executionMod
 
         log.debug(actionIDOrFolder, '(', actionFolder, '): execution mode: ',executionMode, '; user: ', user,
             '; rights: ', rights, {
+                /**
+                 * @param {{EXPECTED_USERNAME: string, USERNAME: string}} vars
+                 * @return {boolean}
+                 */
             func: (vars) => vars.EXPECTED_USERNAME === vars.USERNAME,
             vars: {
                 "EXPECTED_USERNAME": user,
@@ -135,8 +142,8 @@ rightsWrapper.checkActionRights = function (user, actionIDOrFolder, executionMod
  * checking action for compatibility with selected objects according action configuration parameters:
  *  dontShowForObjects, dontShowForObjectsInGroups, showOnlyForObjects, showOnlyForObjectsInGroups
  *  checking is case-insensitive
- * @param {Object} cfg action configuration
- * @param {Array|string} objectsNames array or stringified array of yhe object names for check action compatibility
+ * @param {Object} actionCfg action configuration
+ * @param {Array<{id: number, name: string}>} objects array of object names for check action compatibility
  * @param {function(Error)|function()} callback callback(err) if err, then error occurred or checkResult is false
  *
  * @example
@@ -151,42 +158,28 @@ rightsWrapper.checkActionRights = function (user, actionIDOrFolder, executionMod
  *    is some of selected objects are included in objects in showForObjectsInGroups
  *  if no then check not passed
  */
-rightsWrapper.checkForObjectsCompatibility = function (cfg, objectsNames, callback){
+rightsWrapper.checkForObjectsCompatibility = function (actionCfg, objects, callback){
 
-    if(!cfg || !cfg.actionID)
+    if(!actionCfg || !actionCfg.actionID)
         return callback(new Error('Configuration for action is not passed check for objects compatibility'));
 
-    var actionID = cfg.actionID;
+    var actionID = actionCfg.actionID;
 
-    if(typeof (objectsNames) === 'string'){
-        if(objectsNames) {
-            try {
-                var objects = JSON.parse(objectsNames);
-            }
-            catch (err) {
-                objects = objectsNames.split(',');
-            }
-        } else objectsNames = [];
-        objectsNames = objects;
+    if(Array.isArray(objects)) {
+        objects.filter(o =>
+            o.id && o.id === parseInt(String(o.id), 10) && o.name && typeof o.name === 'string');
+        var objectsNames = objects.map(o => o.name);
+    } else {
+        objectsNames = [];
     }
 
-    if(Array.isArray(objectsNames)) {
-        objectsNames = objectsNames.map(function (object) {
-            return typeof object === 'string' ? object : object.name
-        });
-    } else objectsNames = [];
-
-    // filter undefined, null or "" objects names from array
-    objectsNames = objectsNames.filter(function(objectName) {
-        return objectName;
-    });
     if(!objectsNames || !objectsNames.length) {
-        if (cfg.showWhenNoObjectsSelected) return callback();
+        if (actionCfg.showWhenNoObjectsSelected) return callback();
         return callback(new Error('Action "' + actionID +
             '" don\'t showing while no one objects are selected according to showWhenNoObjectsSelected parameter'));
     }
 
-    checkForObjectsPropertiesCompatibility(cfg, objectsNames, function (err) {
+    checkForObjectsPropertiesCompatibility(actionCfg, objects, function (err) {
         if(err) return callback(err);
 
         objectsNames = objectsNames.map(function(object){
@@ -194,113 +187,153 @@ rightsWrapper.checkForObjectsCompatibility = function (cfg, objectsNames, callba
             return '';
         });
 
-        if(cfg.dontShowForObjects) {
-            objects = cfg.dontShowForObjects.toLowerCase().split(/\s*[,;]\s*/);
+        if(actionCfg.dontShowForObjects) {
+            var dontShowObjectNames = actionCfg.dontShowForObjects.toLowerCase().split(/ *[,;] */);
             for (var i = 0; i < objectsNames.length; i++) {
-                if (objects.indexOf(objectsNames[i]) > -1)
+                if (dontShowObjectNames.indexOf(objectsNames[i]) > -1)
                     return callback(new Error('Action "' + actionID + '" is not compatible with selected objects ' +
                         objectsNames.join(', ') + ' according to dontShowForObjects parameter'));
             }
             return callback();
         }
 
-        if(cfg.dontShowForObjectsInGroups) {
-            var groupsNames = cfg.dontShowForObjectsInGroups.toLowerCase().split(/\s*[,;]\s*/);
-            objectsDB.getObjectsFromGroups(groupsNames, objectsNames, function(err, objects){
+        if(actionCfg.dontShowForObjectsInGroups) {
+            var groupsNames = actionCfg.dontShowForObjectsInGroups.toLowerCase().split(/\s*[,;]\s*/);
+            objectsDB.getObjectsFromGroups(groupsNames, objectsNames, function(err, objectNamesFromGroups){
                 if(err) return callback(err);
-                if(!objects.length) return checkForShowOnlyForObjectsOrForObjectsInGroups(callback);
+                if(!objectNamesFromGroups.length) {
+                    return checkForShowOnlyForObjectsOrForObjectsInGroups(actionCfg, objectsNames, callback);
+                }
                 return callback(new Error('Action "' + actionID + '" is not compatible with selected objects ' +
                     objectsNames.join(', ') + ' according to dontShowForObjectsInGroups parameter'));
             });
             return;
         }
 
-        checkForShowOnlyForObjectsOrForObjectsInGroups(callback);
+        checkForShowOnlyForObjectsOrForObjectsInGroups(actionCfg, objectsNames, callback);
     })
-
-    // function, because check it two times in a different places
-    function checkForShowOnlyForObjectsOrForObjectsInGroups(callback){
-        if(!cfg.showOnlyForObjects && !cfg.showOnlyForObjectsInGroups) return callback();
-
-        if(cfg.showOnlyForObjectsInGroups) {
-            var groupsNames = cfg.showOnlyForObjectsInGroups.toLowerCase().split(/\s*[,;]\s*/);
-            objectsDB.getObjectsFromGroups(groupsNames, objectsNames, function(err, objects){
-                if(err) return callback(err);
-                if(objects.length === objectsNames.length) return callback();
-                if(!cfg.showOnlyForObjects)
-                    return callback(new Error('Action "' + actionID + '" is not compatible with selected objects ' +
-                        objectsNames.join(', ') + ' according to showForObjectsInGroups parameter'));
-
-                var objectsNotInGroups = objectsNames.filter(function(object){
-                    if(objects.indexOf(object) === -1) return object;
-                });
-
-                log.debug('All selected objects: ', objectsNames, ', Objects in group: ', objects, ', ' +
-                    'Objects not in group: ', objectsNotInGroups);
-                objects = cfg.showOnlyForObjects.toLowerCase().split(/\s*[,;]\s*/);
-                for (i = 0; i < objectsNotInGroups.length; i++) {
-                    if (objects.indexOf(objectsNotInGroups[i]) === -1)
-                        return callback(new Error('Action "'+actionID+'" is not compatible with selected objects ' +
-                            objectsNames.join(', ') + ' according to showForObjectsInGroups and showForObjects parameters'));
-                }
-                return callback();
-            });
-            return;
-        }
-
-        if(cfg.showOnlyForObjects) {
-            var objects = cfg.showOnlyForObjects.toLowerCase().split(/\s*[,;]\s*/);
-            for (var i = 0; i < objectsNames.length; i++) {
-                if (objects.indexOf(objectsNames[i]) === -1)
-                    return callback(new Error('Action "'+actionID+'" is not compatible with selected objects ' +
-                        objectsNames.join(', ') + ' according to showForObjects parameter'));
-            }
-            callback();
-        }
-    }
 };
 
 /**
+ * Check for objects compatibility with specific action
+ * @param {Object} actionCfg action configuration
+ * @param {Array<string>} objectsNames an array with object names
+ * @param {function(Error)|function()} callback
+ */
+function checkForShowOnlyForObjectsOrForObjectsInGroups(actionCfg, objectsNames, callback){
+    if(!actionCfg.showOnlyForObjects && !actionCfg.showOnlyForObjectsInGroups) return callback();
+
+    if(actionCfg.showOnlyForObjectsInGroups) {
+        var groupsNames = actionCfg.showOnlyForObjectsInGroups.toLowerCase().split(/ *[,;] */);
+        objectsDB.getObjectsFromGroups(groupsNames, objectsNames, function(err, objectNamesFromGroups){
+            if(err) return callback(err);
+            if(objectNamesFromGroups.length === objectsNames.length) return callback();
+            if(!actionCfg.showOnlyForObjects)
+                return callback(new Error('Action "' + actionCfg.actionID + '" is not compatible with selected objects ' +
+                    objectsNames.join(', ') + ' according to showForObjectsInGroups parameter'));
+
+            var objectsNotInGroups = objectsNames.filter(function(object){
+                if(objectNamesFromGroups.indexOf(object) === -1) return object;
+            });
+
+            log.debug('All selected objects: ', objectsNames, ', Objects in group: ', objectNamesFromGroups, ', ' +
+                'Objects not in group: ', objectsNotInGroups);
+            var showOnlyForObjectNames = actionCfg.showOnlyForObjects.toLowerCase().split(/ *[,;] */);
+            for (i = 0; i < objectsNotInGroups.length; i++) {
+                if (showOnlyForObjectNames.indexOf(objectsNotInGroups[i]) === -1)
+                    return callback(new Error('Action "' + actionCfg.actionID +
+                        '" is not compatible with selected objects ' +
+                        objectsNames.join(', ') + ' according to showForObjectsInGroups and showForObjects parameters'));
+            }
+            return callback();
+        });
+        return;
+    }
+
+    if(actionCfg.showOnlyForObjects) {
+        var showOnlyForObjectNames = actionCfg.showOnlyForObjects.toLowerCase().split(/ *[,;] */);
+        for (var i = 0; i < objectsNames.length; i++) {
+            if (showOnlyForObjectNames.indexOf(objectsNames[i]) === -1)
+                return callback(new Error('Action "' + actionCfg.actionID +
+                    '" is not compatible with selected objects ' +
+                    objectsNames.join(', ') + ' according to showForObjects parameter'));
+        }
+        callback();
+    }
+}
+
+/**
  * Check for object properties compatibility with specific action
- * @param {Object} cfg action configuration
- * @param {Array} objectsNames array of yhe object names for check action compatibility
+ * @param {Object} actionCfg action configuration
+ * @param {Array<{id: number, name: string}>} objects array of the object for check action compatibility
  * @param {function(Error)|function()} callback callback(err) if err, then error occurred or checkResult is false
  */
-function checkForObjectsPropertiesCompatibility(cfg, objectsNames, callback) {
-    var actionID = cfg.actionID,
-        dontShowForObjectsWithProperties = cfg.dontShowForObjectsWithProperties ?
-            cfg.dontShowForObjectsWithProperties.toLowerCase().split(/\s*[,;]\s*/) : [],
-        showOnlyForObjectsWithProperties = cfg.showOnlyForObjectsWithProperties ?
-            cfg.showOnlyForObjectsWithProperties.toLowerCase().split(/\s*[,;]\s*/) : [];
+function checkForObjectsPropertiesCompatibility(actionCfg, objects, callback) {
+    var actionID = actionCfg.actionID,
+        dontShowForObjectNamesWithProperties = actionCfg.dontShowForObjectsWithProperties ?
+            actionCfg.dontShowForObjectsWithProperties.toLowerCase().split(/ *[,;] */) : [],
+        showOnlyForObjectNamesWithProperties = actionCfg.showOnlyForObjectsWithProperties ?
+            actionCfg.showOnlyForObjectsWithProperties.toLowerCase().split(/ *[,;] */) : [];
 
-    if(!showOnlyForObjectsWithProperties.length && !dontShowForObjectsWithProperties.length) return callback();
+    if(!showOnlyForObjectNamesWithProperties.length && !dontShowForObjectNamesWithProperties.length) {
+        return callback();
+    }
 
-    objectsDB.getObjectsByNames(objectsNames, function (err, rows) {
+    var objectsIDs = objects.map(o => o.id);
+
+    getObjectProperties(function (err, objectProperties) {
         if(err) {
-            return callback(new Error('Can\'t get objects by names ' + objectsNames.join(', ') +
+            return callback(new Error('Can\'t get objects properties for objects ' +
+                objects.map(o => o.name).join(', ') +
                 ' for checking action right for ' + actionID + ': ' + err.message));
         }
-        var objectsIDs = rows.map(function (obj) {
-            return obj.id;
-        });
+        for(var i = 0; i < objectProperties.length; i++) {
+            if(objectsIDs.indexOf(objectProperties[i].objectID) === -1) continue;
 
-        objectsProperties.getProperties(objectsIDs, function (err, rows) {
-            if(err) {
-                return callback(new Error('Can\'t get objects properties for objects ' + objectsNames.join(', ') +
-                    ' for checking action right for ' + actionID + ': ' + err.message));
+            if(dontShowForObjectNamesWithProperties.indexOf(objectProperties[i].name.toLowerCase()) !== -1) {
+                return callback(new Error('Action "' + actionID + '" is not compatible with selected objects ' +
+                    objects.map(o => o.name).join(', ') +
+                    ' according to dontShowForObjectsWithProperties parameter'));
             }
-            for(var i = 0; i < rows.length; i++) {
-                if(dontShowForObjectsWithProperties.indexOf(rows[i].name.toLowerCase()) !== -1) {
-                    return callback(new Error('Action "' + actionID + '" is not compatible with selected objects ' +
-                        objectsNames.join(', ') + ' according to dontShowForObjectsWithProperties parameter'));
-                }
-                if(!cfg.dontShowForObjectsWithProperties &&
-                    showOnlyForObjectsWithProperties.indexOf(rows[i].name.toLowerCase()) !== -1) return callback();
+            if(!actionCfg.dontShowForObjectsWithProperties &&
+                showOnlyForObjectNamesWithProperties.indexOf(objectProperties[i].name.toLowerCase()) !== -1) {
+                return callback();
             }
-            if(cfg.dontShowForObjectsWithProperties || !cfg.showOnlyForObjectsWithProperties) return callback();
+        }
+        if(actionCfg.dontShowForObjectsWithProperties || !actionCfg.showOnlyForObjectsWithProperties) {
+            return callback();
+        }
 
-            return callback(new Error('Action "'+actionID+'" is not compatible with selected objects ' +
-                objectsNames.join(', ') + ' according to showOnlyForObjectsWithProperties parameter'));
-        });
+        return callback(new Error('Action "'+actionID+'" is not compatible with selected objects ' +
+            objects.map(o => o.name).join(', ') +
+            ' according to showOnlyForObjectsWithProperties parameter'));
+    });
+}
+
+/**
+ * Get properties for all objects ans save to the cache
+ * @param {function(Error, Array<{
+ *      id: number,
+ *      objectID: number,
+ *      name: string,
+ *      value: string,
+ *      description: string,
+ *      mode: number
+ *      }>)} callback callback(err, objectProperties)
+ */
+function getObjectProperties(callback) {
+    var timestamp = objectPropertiesCache.get('timestamp');
+
+    if(timestamp && timestamp > Date.now() - webServerCacheExpirationTime()) {
+        return callback(null, objectPropertiesCache.get('data'));
+    }
+
+    objectsProperties.getProperties(null, function (err, objectProperties) {
+        if(objectProperties) {
+            objectPropertiesCache.set('timestamp', Date.now());
+            objectPropertiesCache.set('data', objectProperties);
+        }
+
+        callback(err, objectProperties);
     });
 }

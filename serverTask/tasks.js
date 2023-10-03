@@ -513,7 +513,10 @@ function sendMessage (username, taskID, param, taskParam, actionDescription, cal
      * @type {Array<{id: number, name: string}>}
      */
     var taskObjects = [];
-    taskObjectsMap.forEach((name, id) => taskObjects.push({id: id, name: name}));
+    taskObjectsMap.forEach((name, id) => {
+        taskObjects.push({id: id, name: name});
+        objectsSet.add(escapeHtml(name));
+    });
 
     actionDescription = actionDescription.replace(/at .+?:\d+:\d+.+$/ims, '');
     getOwnObjectIDs(taskObjects, null, function (err, filteredObjects) {
@@ -525,17 +528,12 @@ function sendMessage (username, taskID, param, taskParam, actionDescription, cal
             return callback();
         }
 
-        filteredObjects.forEach(o => {
-            if (o.name) objectsSet.add(escapeHtml(o.name));
-        });
-
         // copy param to the messageParam
         var messageParam = JSON.parse(JSON.stringify(param));
         messageParam.sender = username;
 
         // remove stack from error message
-        var objects = !objectsSet.size ? 'not selected' :
-            (objectsSet.size < 3 ? Array.from(objectsSet).join(', ') : Array.from(objectsSet).join('<br/>'));
+        var objects = !objectsSet.size ? 'not selected' : Array.from(objectsSet).sort().join('<br/>');
 
         if(typeof messageParam.variables !== 'object') messageParam.variables = {};
         messageParam.variables.TASK_ID = taskID;

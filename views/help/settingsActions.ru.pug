@@ -104,3 +104,13 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                             actions/. Например, для "Monitoring": { "data_browser": {}, "dashboard": {} } будет
                             отображаться группа Monitoring в которой будут отображаться два действия из каталогов
                             actions/data_browser и actions/dashboard. Объект, описывающий действие должен быть пустым.
+                        li.
+                            returnActionResult - (true|false) устанавливает состояние по умолчанию для параметра
+                            returnActionResult в действиях.
+                            Если параметр runActionOnRemoteServers установлен в true
+                            и требуется получить результат выполнения действия в браузер, необходимо установить этот
+                            параметр в true. Результат можно получить через функцию callbackAfterExec(result, callback)
+                            Результатом будет являться объект,
+                            с ключами - host:port связанного сервера, а значением - ответ от связанного сервера.
+                            Т.е. {"alepiz1.alepiz.com:10164": <action result from alepiz1>,
+                            "alepiz2.alepiz.com:10164": <action result from alepiz2>, ....}. По умолчанию false.

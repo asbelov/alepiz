@@ -12,7 +12,7 @@ module.exports = objectsPropertiesDB;
 
 /** Get objects properties for specified object IDs
  *
- * @param {Array[number]} objectsIDs - array of object IDs
+ * @param {Array[number]|null} objectsIDs - array of object IDs. null for return properties for all objects
  * @param {function(Error)|function(null, Array): void} callback - return Error or array with objects properties for
  * SQL query "SELECT * FROM objectsProperties WHERE objectID = ?" like
  * [{id:..., objectID:..., name:..., value:..., description:..., mode:...}, ...], where mode:

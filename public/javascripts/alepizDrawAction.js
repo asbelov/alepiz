@@ -36,11 +36,11 @@ callback(html), where html is a string with HTML page for active action
         // for debugging
         //if(actionParameters.length) alert('Action parameters: ' + JSON.stringify(actionParameters));
 
-        var objectNames = alepizObjectsNamespace.getSelectedObjectNames();
+        var objects = alepizObjectsNamespace.getSelectedObjects();
 
         // action: {html: ..., params: {...}}
         $.post(activeActionLink, {
-            o: objectNames.join(','),
+            o: JSON.stringify(objects),
             actionUpdate: (reqForUpdate ? 1 : 0),
             p: JSON.stringify(actionParameters)
         }, function(action) {

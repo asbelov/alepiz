@@ -506,24 +506,23 @@ alepizMainNamespace = (function($) {
             var selectedObjectIDs = alepizObjectsNamespace.getSelectedObjects().map(function (obj) { return String(obj.id); });
             config.groupingObjects = objectGroupIconCrossOutElm.hasClass('hide');
             saveConfig();
-            alepizObjectsNamespace.reDrawObjects(null, function () {
-                if(config.groupingObjects) {
-                    $('input[data-object-type="group"]').each(function () {
-                        var objectIDs = $(this).attr('id').split('-');
-                        var isAllObjectsSelectedItGroup = true;
-                        for(var i = 0; i < objectIDs.length; i++) {
-                            if(selectedObjectIDs.indexOf(objectIDs[i]) === -1) isAllObjectsSelectedItGroup = false;
-                        }
-                        if(isAllObjectsSelectedItGroup) $(this).prop('checked', true);
-                        else $(this).prop('checked', false);
-                    });
-                } else {
-                    $('input[data-object-name]').each(function () {
-                        var objectIDs = $(this).attr('id');
-                        if(selectedObjectIDs.indexOf(objectIDs) !== -1) $(this).prop('checked', true);
-                    });
-                }
-            });
+            alepizObjectsNamespace.drawObjectsList(alepizObjectsNamespace.lastDrawingObjects());
+            if(config.groupingObjects) {
+                $('input[data-object-type="group"]').each(function () {
+                    var objectIDs = $(this).attr('id').split('-');
+                    var isAllObjectsSelectedItGroup = true;
+                    for(var i = 0; i < objectIDs.length; i++) {
+                        if(selectedObjectIDs.indexOf(objectIDs[i]) === -1) isAllObjectsSelectedItGroup = false;
+                    }
+                    if(isAllObjectsSelectedItGroup) $(this).prop('checked', true);
+                    else $(this).prop('checked', false);
+                });
+            } else {
+                $('input[data-object-name]').each(function () {
+                    var objectIDs = $(this).attr('id');
+                    if(selectedObjectIDs.indexOf(objectIDs) !== -1) $(this).prop('checked', true);
+                });
+            }
         });
         objectGroupIconCrossOutElm.click(function () {
             objectGroupIconElm.trigger('click');

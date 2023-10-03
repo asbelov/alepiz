@@ -103,11 +103,11 @@ var alepizActionsNamespace = (function($) {
     }
 
     function createActionsList(initActiveActionLink, callback) {
-        var checkedObjectNames = alepizObjectsNamespace.getSelectedObjectNames();
+        var checkedObjects = alepizObjectsNamespace.getSelectedObjects();
         if(initActiveActionLink) activeActionLink = initActiveActionLink;
-        $.post('/mainMenu', {f: 'getActions', o: JSON.stringify(checkedObjectNames)}, function(actionsLayout) {
+        $.post('/mainMenu', {f: 'getActions', o: JSON.stringify(checkedObjects)}, function(actionsLayout) {
 
-            var drawData = createHTMLWithActionsList(actionsLayout, checkedObjectNames);
+            var drawData = createHTMLWithActionsList(actionsLayout, checkedObjects);
             if(drawData.html === prevActionsListHTML) {
                 if(typeof callback !== 'function') return;
                 return callback();

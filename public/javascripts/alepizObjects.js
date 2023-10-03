@@ -33,7 +33,9 @@ var alepizObjectsNamespace = (function($) {
         timeWhenNoObjectsWereFound = 0,
         redrawObjectsInProgress = false,
         lastDrawingObjects = [],
-        /** used for get data about objects when used object grouping
+        previousHTMLWithObjectList = '',
+
+    /** used for get data about objects when used object grouping
          * @type {{id: number, name: string, description: string, color: string, disabled: number, sortPosition: number}}
          * @example
          * {
@@ -535,7 +537,6 @@ var alepizObjectsNamespace = (function($) {
     about color and shade look at http://materializecss.com/color.html
     callback()
      */
-    var previousHTMLWithObjectList;
     function drawObjectsList(objects, dontFilterObjects) {
         var html = '';
 
@@ -590,6 +591,8 @@ var alepizObjectsNamespace = (function($) {
         $('div.material-tooltip').remove();
 
         objectsListElm.html(html);
+        if(!html) return;
+
         objectsTooltipInstances = M.Tooltip.init(document.querySelectorAll('a[data-object-list]'), {
             enterDelay: 500
         });
@@ -607,7 +610,7 @@ var alepizObjectsNamespace = (function($) {
         $('div[data-object-id]').click(function(eventObject){
             // set checkbox of current object checked
             var currentObjectID = $(eventObject.target).attr('data-object-id');
-            $('#'+currentObjectID).prop('checked', true);
+            $('#' + currentObjectID).prop('checked', true);
 
             if(!useGlobalSearch) searchObjectsElm.val('');
 
@@ -799,6 +802,8 @@ var alepizObjectsNamespace = (function($) {
         runSearchObjectsWhenNoActionFound: runSearchObjectsWhenNoActionFound,
         goToTop: goToTop,
         reDrawObjects: reDrawObjects,
+        drawObjectsList: drawObjectsList,
+        lastDrawingObjects: function () { return lastDrawingObjects; },
         createSearchStrRE: createSearchStrRE,
     }
 })(jQuery);

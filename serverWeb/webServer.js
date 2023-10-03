@@ -46,11 +46,13 @@ app.set('view engine', 'pug');
 
 // uncomment after placing your favicon in /public
 app.use(favicon(path.join(__dirname, '..', 'public', 'favicon.ico')));
-app.use(logger('short', {stream: {write: function(msg){log.info(msg);}}}));
 app.use(bodyParser.json({limit: confWebServer.get('downloadWebServerMaxSize') || '100Gb'}));
 app.use(bodyParser.urlencoded({ extended: false, limit: confWebServer.get('downloadWebServerMaxSize') || '100Gb',
     parameterLimit: confWebServer.get('parameterLimit') || 10000, }));
 
+logger.token('alepiz-user', req => req.session.username);
+app.use(logger(':remote-addr :alepiz-user :method :url :status :res[content-length] Bytes :response-time ms',
+    {stream: {write: function(msg){log.info(msg);}}}));
 
 webSecrets.get(function (err, web) {
     if(err) {
@@ -100,18 +102,18 @@ webSecrets.get(function (err, web) {
         next(err);
     });
 
-// error handlers
+    // error handler catch all errors
+    app.use(errorHandler);
 
-// production error handler
-// no stack traces leaked to user
-
-    app.use(function(err, req, res/*, next*/) {
-        res.status(err.status || 500);
-        res.render('error', {
-            message: err.message,
-            error: {err}
-        });
-    });
+    function errorHandler (err, req, res) {
+        log.error(err.stack);
+        if (req.xhr) {
+            res.status(500).send({ error: err });
+        } else {
+            res.status(500);
+            res.render('error', { error: err });
+        }
+    }
 
     /*
     var port = conf.get('port') || 3000;

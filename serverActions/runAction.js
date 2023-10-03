@@ -74,7 +74,7 @@ function runAction(param, callback) {
 
         if(!param.args) param.args = {};
 
-        var objects = [], objectsNames = [];
+        var objects = [];
         if(executionMode !== 'ajax') {
             if(!'o' in param.args || !param.args.o || typeof param.args.o !== 'string' || actionCfg.noObjectsRequired) {
                 param.args.o = '[]';
@@ -90,7 +90,6 @@ function runAction(param, callback) {
                     var ID = parseInt(objects[i].id, 10);
                     if (!isNaN(ID) && ID > 0 && objects[i].name && typeof (objects[i].name) === 'string') {
                         objects[i].id = ID;
-                        objectsNames.push(objects[i].name);
                         continue;
                     }
                     return callback(new Error('In action ' + actionID +
@@ -120,7 +119,7 @@ function runAction(param, callback) {
             function(callback) {
                 // we can't control, what action send to us by ajax
                 if(executionMode === 'ajax') return callback();
-                rightsWrapperActions.checkForObjectsCompatibility(actionCfg, objectsNames, callback);
+                rightsWrapperActions.checkForObjectsCompatibility(actionCfg, objects, callback);
             },
 
             function(callback) {

@@ -11,27 +11,19 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         script(src='/jquery/jquery.min.js')
         script(src='/jquery-ui/jquery-ui.min.js')
         script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/escapeHTML.js')
         script.
             var parameters = {
                 action: !{JSON.stringify(action)},
                 objects: !{JSON.stringify(objects)}
             };
-
-            var entityMap = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;',
-                '/': '&#x2F;',
-                '`': '&#x60;',
-                '=': '&#x3D;',
-            };
-
-            function escapeHtml(string) {
-                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
-                    return entityMap[s];
-                });
+        style.
+            th {
+                cursor: pointer;
+                color: #599eff;
+            }
+            th:hover {
+                text-decoration: underline;
             }
     body
         script(src='/javascripts/objectsSelector.js')

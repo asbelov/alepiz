@@ -19,6 +19,7 @@
     "showWhenNoObjectsSelected": true,
     "noObjectsRequired": true,
     "icon": "task",
+    "actionForObjects": "information",
     "refreshTaskList": 15000,
     "offsetDaysForRunTask": 1,
     "defaultTimeForRunTask": "00:20",

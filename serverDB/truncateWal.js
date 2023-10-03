@@ -51,7 +51,7 @@ function init(dbPath, conf) {
  */
 function periodicallyTruncateWall(dbPath, db, conf) {
     // 10Mb = 1024  * 1024 * 10
-    var maxWalSize = conf && typeof conf.get === 'function' ? conf.get('maxWalSize') || 10485760 : 10485760;
+    var maxWalSize = conf && typeof conf.get === 'function' ? conf.get('maxWalSize') || 5242880 : 5242880;
     var truncatePeriod = conf && typeof conf.get === 'function' ? conf.get('truncatePeriod') || 60000 : 60000;
 
     truncateWal(dbPath, db, maxWalSize);

@@ -69,7 +69,7 @@ function addNewObjects(user, args, callback){
         });
     }
 
-    // Top objects has order < 10 objectsFilterDB.js
+    // Top objects has order < 10 createObjectList.js
     if(!upLevelObjectsIDs.length && order > 9) {
         return callback(new Error('Up level objects are not set: ' + upLevelObjectsIDs +
             ' and object order is not set for top object: ' + order + ' >= 10'));
@@ -84,7 +84,7 @@ function addNewObjects(user, args, callback){
         if (err) return callback(new Error('Error begin transaction for editing or adding objects: ' + err.message));
 
         // add a new objects, its description and order
-        //  Top objects has order < 10 objectsFilterDB.js
+        //  Top objects has order < 10 createObjectList.js
 
         rightsWrapper.addObjects(user, newObjectsNames, description, order, disabled, color,
             args.timestamp, function (err, newObjectsIDs) {

@@ -70,10 +70,11 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                             input(type="text")#runTaskAtTime.timepicker
                             label(for="runTaskAtTime") Time
                     div.col.s12#taskExecutionConditionsDescription
+                    div.col.s12.truncate#taskObjectList
+
                     div.col.s12
                         input(type="hidden")#actionsOrder
                         ul(data-collapsible="expandable")#taskParametersArea.collapsible.z-depth-0
-
         div#modalChangeTaskConfirm.modal
             div.modal-content
                 h4 Change task confirmation

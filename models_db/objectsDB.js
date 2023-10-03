@@ -11,7 +11,15 @@ module.exports = objectsDB;
 
 /**
  * Get all data from objects table using SELECT * FROM objects
- * @param {function(Error)|function(null, Array)} callback callback(err, rows), where rows is
+ * @param {function(Error)|function(null, Array<{
+ *     id: number,
+ *     name: string,
+ *     description: string,
+ *     sortPosition: number,
+ *     color: string|null,
+ *     disabled: [0|1],
+ *     created: number
+ * }>)} callback callback(err, rows), where rows is
  * [{id:<objectID>, name:<objectName>, description:<objectDescription>, sortPosition:<object sort position>
  *     color:<objectColor>, disabled:<0|1>}, created:<timestamp>}, ..]
  */
@@ -20,9 +28,30 @@ objectsDB.getAllObjects = function(callback) {
 };
 
 /**
+ * Get data from interactions =table using SELECT * FROM interactions
+ * @param {function(Error)|function(null, Array<{
+ *  id: number,
+ *  objectID1: number,
+ *  objectID2: number,
+ *  type: 0|1|2
+ * }>)} callback callback(err, rows), where rows is [{id:<objectID>, ObjectID1:, objectID2: type:}, ... ]
+ */
+objectsDB.getAllInteractions = function (callback) {
+    db.all('SELECT * FROM interactions', callback);
+}
+
+/**
  * Get objects by object IDs and sorted by object names using SELECT * FROM objects WHERE id=?
  * @param {Array<number>} objectIDs an array with object IDs
- * @param {function(Error)|function(null, Array)} callback callback(err, rows), where rows is
+ * @param {function(Error)|function(null, Array<{
+ *     id: number,
+ *     name: string,
+ *     description: string,
+ *     sortPosition: number,
+ *     color: string|null,
+ *     disabled: 0|1,
+ *     created: number
+ * }>)} callback callback(err, rows), where rows is
  * [{id:<objectID>, name:<objectName>, description:<objectDescription>, sortPosition:<object sort position>
  *     color:<objectColor>, disabled:<0|1>}, created:<timestamp>}, ..]
  */
@@ -35,7 +64,15 @@ objectsDB.getObjectsByIDs = function(objectIDs, callback) {
  * Get objects by object names and sorted by object names
  * (exact comparison case insensitive) using SELECT * FROM objects WHERE name=?
  * @param {Array<string>} objectNames an array with object names
- * @param {function(Error)|function(null, Array)} callback callback(err, rows), where rows is
+ * @param {function(Error)|function(null, Array<{
+ *     id: number,
+ *     name: string,
+ *     description: string,
+ *     sortPosition: number,
+ *     color: string|null,
+ *     disabled: 0|1,
+ *     created: number
+ * }>)} callback callback(err, rows), where rows is
  * [{id:<objectID>, name:<objectName>, description:<objectDescription>, sortPosition:<object sort position>
  *     color:<objectColor>, disabled:<0|1>}, created:<timestamp>}, ..]
  */
@@ -50,7 +87,15 @@ objectsDB.getObjectsByNames = function(objectNames, callback) {
  * SQLite LIKE operator is case-insensitive. It means "A" LIKE "a" is true. However, for Unicode characters that are
  * not in the ASCII ranges, the LIKE operator is case sensitive e.g., "Ä" LIKE "ä" is false.
  * @param {Array<string>} objectNamesLike an array with object names in SQL like format
- * @param {function(Error)|function(null, Array)} callback callback(err, rows), where rows is
+ * @param {function(Error)|function(null, Array<{
+ *     id: number,
+ *     name: string,
+ *     description: string,
+ *     sortPosition: number,
+ *     color: string|null,
+ *     disabled: 0|1,
+ *     created: number
+ * }>)} callback callback(err, rows), where rows is
  * [{id:<objectID>, name:<objectName>, description:<objectDescription>, sortPosition:<object sort position>
  *     color:<objectColor>, disabled:<0|1>}, created:<timestamp>}, ..]
  */
@@ -64,7 +109,15 @@ objectsDB.getObjectsLikeNames = function(objectNamesLike, callback) {
  * @param {Array<number|string>} params object IDs or object names
  * @param {'id='|'name='|'name LIKE '} condition
  * @param {''|'COLLATE NOCASE'|'ESCAPE "\\" COLLATE NOCASE'} suffix
- * @param {function(Error)|function(null, Array)} callback callback(err, rows), where rows is
+ * @param {function(Error)|function(null, Array<{
+ *     id: number,
+ *     name: string,
+ *     description: string,
+ *     sortPosition: number,
+ *     color: string|null,
+ *     disabled: 0|1,
+ *     created: number
+ * }>)} callback callback(err, rows), where rows is
  * [{id:<objectID>, name:<objectName>, description:<objectDescription>, sortPosition:<object sort position>
  *     color:<objectColor>, disabled:<0|1>}, created:<timestamp>}, ..]
  */
@@ -136,8 +189,8 @@ objectsDB.getInteractions = function(IDs, callback){
  * this function can be used for less than 999 objects, according  SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999
  * https://www.sqlite.org/limits.html
  * @param {Array<string>} groupsNames
- * @param {Array<string>}objectsNames
- * @param {function(Error)|function(null, Array)} callback callback(err, objectNames), [<objectName1>, <objectName2>,..]
+ * @param {Array<string>} objectsNames
+ * @param {function(Error)|function(null, Array<string>)} callback callback(err, objectNames), [<objectName1>, <objectName2>,..]
  */
 objectsDB.getObjectsFromGroups = function(groupsNames, objectsNames, callback){
 

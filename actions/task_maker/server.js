@@ -256,7 +256,7 @@ function updateTask(args, taskID, actions, actionsIDsObj, filterTaskActionIDs,
         for (var actionID in actionsRights) {
             if (!actionsRights[actionID].view) {
                 return callback(new Error('User ' + args.username +
-                    ' has no rights for view actions in task ID ' + taskID + ': ' + err.message));
+                    ' has no rights for view actions in task ID ' + taskID));
             }
             // skip rights check for an unselected action. actionsIDsObj[actionID] = [taskActionID1, taskActionID2,..]
             if(!hasRightsForRunByActions) continue;
@@ -551,7 +551,7 @@ function processApproves(username, taskActionID, newApproves, workflow, callback
                     runOnLocalNode: true,
                 }, function(err) {
                     if(err) log.error('User ', username, ': run task when processed approves: ', err.message);
-log.info('!!!Run task ', taskID)
+
                     tasks.processWorkflows(username, taskID, workflow, 'execute', err, function() {
 
                         transactionsDB.begin(function(err) {

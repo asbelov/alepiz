@@ -316,7 +316,9 @@ var JQueryNamespace = (function ($) {
     }
 
     function showTaskChangeConfirmDialog(callback) {
-        if($('#taskUpdated').val()) {
+        var taskUpdatedVal = $('#taskUpdated').val();
+        // '0' do not show the dialog that the task was changed when changing the task group according to the workflow rules
+        if(taskUpdatedVal && taskUpdatedVal !== '0') {
             modalChangeTaskConfirmElm.modal({dismissible: false});
             modalChangeTaskConfirmElm.modal('open');
 
@@ -404,7 +406,7 @@ var JQueryNamespace = (function ($) {
             var selectedGroupID = taskGroupForSearchElm.val();
             if(workflowGroups[selectedGroupID] !== undefined) {
                 selectedGroupID = workflowGroups[selectedGroupID];
-                taskUpdated();
+                taskUpdated('0'); // Do not show the dialog that the task has been changed
             }
 
             var htmlForNewTaskGroupsElm = taskGroups.map(function (group) {
@@ -711,6 +713,7 @@ var JQueryNamespace = (function ($) {
             var task = data.parameters;
             var OCIDs = data.OCIDs || [];
             var taskObjects = [];
+            var actionsObjects = {};
 
             $('#taskExecutionConditionsDescription').text('');
 
@@ -719,7 +722,9 @@ var JQueryNamespace = (function ($) {
                     if(actionParam.name !== 'o' || !actionParam.value) return;
 
                     try {
-                        Array.prototype.push.apply(taskObjects, JSON.parse(String(actionParam.value)));
+                        var objects = JSON.parse(String(actionParam.value))
+                        Array.prototype.push.apply(taskObjects, objects);
+                        actionsObjects[taskActionID] = objects.map(object => object.name);
                     }  catch(err) {
                         //console.log('Error parsing o parameter: ', err.message);
                     }
@@ -767,7 +772,7 @@ var JQueryNamespace = (function ($) {
             var selectedGroupID = taskGroupForSearchElm.val();
             if(workflowGroups[selectedGroupID] !== undefined) {
                 selectedGroupID = workflowGroups[selectedGroupID];
-                taskUpdated();
+                taskUpdated('0'); // Do not show the dialog that the task has been changed
             }
 
             newTaskGroupElm.val(selectedGroupID);
@@ -791,6 +796,7 @@ var JQueryNamespace = (function ($) {
             } else $('#taskName').val(taskName);
 
             var newObjectSelectors = [];
+
             taskActionIDs.forEach(function (taskActionID) {
                 //if(!actions.hasOwnProperty(taskActionID) || !actions[taskActionID].name) continue;
                 taskActionID = Number(taskActionID);
@@ -812,6 +818,25 @@ var JQueryNamespace = (function ($) {
                 var startupOptions = [0,1,2,3].indexOf(action.startupOptions) !== -1 ?
                     action.startupOptions : 3;
 
+                if(actionsObjects[taskActionID].length) {
+                    var urlParameters = {
+                        'c': encodeURIComponent(actionsObjects[taskActionID].join(',')), // selected objects
+                    };
+
+                    var actionForObjects = parameters.action.actionForObjects;
+                    if(actionForObjects) {
+                        var actionPath = parameters.action.link.replace(/\/[^\/]+$/, '') + '/' + actionForObjects;
+                        urlParameters.a = encodeURIComponent(actionPath); // /action/information
+                    }
+
+                    var url = '/?' + Object.keys(urlParameters).map(function(key) {
+                        return key + '=' + urlParameters[key];
+                    }).join('&');
+
+                    var objectList = '<a href="' + url + '" target="_blank">' +
+                        actionsObjects[taskActionID].join(', ') + '</a>';
+                } else objectList = 'no objects';
+
                 html += '\
 <li data-tasks-actions-id="' +taskActionID+ '">\
     <input type="hidden" name="actionName-'+taskActionID+'" value="'+actionName+'"/>\
@@ -824,8 +849,9 @@ var JQueryNamespace = (function ($) {
             <li class="collection-item avatar">\
                 <i class="material-icons circle" data-action-selector-btn="' + taskActionID + '">'+actionIcon+'</i>\
                 <p class="title section">'+actionName.toUpperCase()+'</p>\
-                <p class="section">'+actionDescription.replace(/[\r\n]/g, '<br>')+'</p>\
-                <div class="row">\
+                <p>' + actionDescription.replace(/[\r\n]/g, '<br>') + '</p>\
+                <p><b>Objects:</b> ' + objectList + '</p>\
+                <div class="row no-margin" style="padding-top: 10px">\
                     <div class="col s12 m3 l3 no-padding">\
                         <label>\
                             <input type="radio" name="startupOptions-' + taskActionID +
@@ -960,6 +986,29 @@ var JQueryNamespace = (function ($) {
 
                 html += '</div></li>';
             });
+
+            if(taskObjects.length) {
+                var taskObjectsSet = new Set(taskObjects.map(o => o.name));
+                var urlParameters = {
+                    'c': encodeURIComponent(Array.from(taskObjectsSet).join(',')), // selected objects
+                };
+
+                var actionForObjects = parameters.action.actionForObjects;
+                if(actionForObjects) {
+                    var actionPath = parameters.action.link.replace(/\/[^\/]+$/, '') + '/' + actionForObjects;
+                    urlParameters.a = encodeURIComponent(actionPath); // /action/information
+                }
+
+                var url = '/?' + Object.keys(urlParameters).map(function(key) {
+                    return key + '=' + urlParameters[key];
+                }).join('&');
+
+                var objectList = '<a href="' + url + '" target="_blank">' +
+                    Array.from(taskObjectsSet).join(', ') + '</a>';
+            } else objectList = 'no objects';
+
+            $('#taskObjectList').html('<b>Task objects:</b> ' + objectList);
+
 
             if(!isCleanup) html += taskParametersAreaElm.html();
 

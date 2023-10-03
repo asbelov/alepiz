@@ -212,6 +212,12 @@ function stopServer(callback) {
 
     // if the server is killed by timeout, there will still be a saved update event state
     storeUpdateEventsData.saveUpdateEventsStatus(updateEventsStatusFilePath, updateEventsStatus);
+    if(!getCountersValueThreads || typeof getCountersValueThreads.stopAll !== 'function') {
+        storeUpdateEventsData.saveUpdateEventsStatus(updateEventsStatusFilePath, updateEventsStatus);
+        stopServerInProgress = 0;
+        if(typeof callback === 'function') callback();
+        return;
+    }
     getCountersValueThreads.stopAll(function(err) {
         if(err) {
             log.error('Error stopping children: ', err.message, '. Exiting for ', serverName, '...');

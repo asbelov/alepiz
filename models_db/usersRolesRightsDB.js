@@ -4,10 +4,8 @@
 
 var async = require('async');
 var db = require('./db');
-var Conf = require('../lib/conf');
-const conf = new Conf('config/common.json');
+const webServerCacheExpirationTime = require('../serverWeb/webServerCacheExpirationTime');
 
-var reloadRightsInterval = ( conf.get('reloadRightsIntervalSec') || 180 ) * 1000;
 var lastTimeWhenLoadedObjectRightsFromDB = 0;
 var lastTimeWhenLoadedActionsRightsFromDB = 0;
 
@@ -24,8 +22,7 @@ var objectsRights = new Map(),
  * @param {function(err)|function()} callback callback(err)
  */
 function loadObjectsRights(callback) {
-
-    if(Date.now() - lastTimeWhenLoadedObjectRightsFromDB < reloadRightsInterval) return callback();
+    if(lastTimeWhenLoadedObjectRightsFromDB > Date.now() - webServerCacheExpirationTime()) return callback();
     lastTimeWhenLoadedObjectRightsFromDB = Date.now();
 
     objectRightsCallbacksQueue.add(callback);
@@ -140,6 +137,7 @@ rightsDB.checkObjectsIDs = function(param, callback) {
 };
 
 /**
+ * It is used only in various actions and does not need caching
  * Checking user rights for a specific counter.
  * If the user does not have rights to the linked objects with the counter, then the user also does not have
  * rights to the counter.
@@ -220,7 +218,7 @@ rightsDB.checkCountersIDs = function(counters, param, callback) {
  * view: [0|1], run: [0|1], makeTask: [0|1], audit: [0|1]}...]
  */
 rightsDB.getRightsForActions = function(callback) {
-    if(Date.now() - lastTimeWhenLoadedActionsRightsFromDB < reloadRightsInterval) {
+    if(lastTimeWhenLoadedActionsRightsFromDB > Date.now() - webServerCacheExpirationTime()) {
         return callback(null, actionsRights);
     }
     lastTimeWhenLoadedActionsRightsFromDB = Date.now();
