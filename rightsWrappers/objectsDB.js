@@ -2,12 +2,13 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var log = require('../lib/log')(module);
-var objectsDB = require('../models_db/objectsDB');
-var objectsDBSave = require('../models_db/modifiers/objectsDB');
-var rightsDB = require('../models_db/usersRolesRightsDB');
-var prepareUser = require('../lib/utils/prepareUser');
-var checkIDs = require('../lib/utils/checkIDs');
+const log = require('../lib/log')(module);
+const objectsDB = require('../models_db/objectsDB');
+const objectsDBSave = require('../models_db/modifiers/objectsDB');
+const rightsDB = require('../models_db/usersRolesRightsDB');
+const prepareUser = require('../lib/utils/prepareUser');
+const checkIDs = require('../lib/utils/checkIDs');
+const objectListClient = require('../serverWeb/objectListClient');
 
 var rightsWrapper = {};
 module.exports = rightsWrapper;
@@ -15,22 +16,22 @@ module.exports = rightsWrapper;
 /**
  *  Rename objects
  * @param {string} user username
- * @param {Array} objects array of objects like [{id: ID1, name: "newObjectName1"}, {id: ID2, name: "newObjectName2"},... ]
+ * @param {Array} newObjects array of objects like [{id: ID1, name: "newObjectName1"}, {id: ID2, name: "newObjectName2"},... ]
  *  objects with an ID objects.id will be renamed to name in objects.name
  * @param {function(Error)|function(null, result: Boolean)} callback callback(error, result), where the result is
  * true when the objects have been renamed, or
  * false if the objects have not been renamed, because the objects parameter is not an array or an empty array
  */
-rightsWrapper.renameObjects = function(user, objects, callback){
+rightsWrapper.renameObjects = function(user, newObjects, callback){
 
-    if(!Array.isArray(objects) || !objects.length) return callback(null, false);
+    if(!Array.isArray(newObjects) || !newObjects.length) return callback(null, false);
 
-    var initIDs = objects.map(function(obj) {return obj.id});
+    var initIDs = newObjects.map(function(obj) {return obj.id});
 
     checkIDs(initIDs, function(err, checkedIDs) {
         if (err) {
             return callback(new Error('User ' + user + ' try to rename objects with incorrect IDs: ' +
-                JSON.stringify(objects) + ': ' + err.message ));
+                JSON.stringify(newObjects) + ': ' + err.message ));
         }
 
         user = prepareUser(user);
@@ -43,14 +44,16 @@ rightsWrapper.renameObjects = function(user, objects, callback){
         }, function (err) {
             if (err) {
                 return callback(new Error('User ' + user + ' has no rights for rename objects ' +
-                    JSON.stringify(objects) + ': ' + err.message ));
+                    JSON.stringify(newObjects) + ': ' + err.message ));
             }
 
-            objectsDBSave.renameObjects(objects, function(err) {
+            objectsDBSave.renameObjects(newObjects, function(err) {
                 if(err) {
                     return callback(new Error('Error while user ' + user +' rename objects ' +
-                        JSON.stringify(objects) + ': ' + err.message));
+                        JSON.stringify(newObjects) + ': ' + err.message));
                 }
+
+                objectListClient.renameObjectsInCache(newObjects);
 
                 callback(null, true);
             });
@@ -68,7 +71,7 @@ rightsWrapper.renameObjects = function(user, objects, callback){
  * @param {0|1} disabled is object disabled
  * @param {string|null} color object color
  * @param {number} createdTimestamp timestamp when object was created
- * @param {function(Error)|function(null, newObjectsIDs:Array, newObjectName:Object)} callback
+ * @param {function(Error)|function(null, newObjectsIDs:Array<number>, newObjectName:Object)} callback
  *  callback(err, newObjectsIDs, newObjectName), where newObjectsIDs - array with
  *  new object IDs, newObjectName - object like {<objectName1>: <objectID1>, ...}
  */
@@ -94,9 +97,29 @@ rightsWrapper.addObjects = function(user, newObjectsNames, newDescription, newOr
 
         // add a new objects, its description and order
         objectsDBSave.addObjects(newObjectsNames, newDescription, newOrder, (disabled ? 1 : 0), color,
-            createdTimestamp, callback);
+            createdTimestamp, function(err, objectIDs, objectNames) {
+                if(err) return callback(err);
+                objectListClient.addNewObjectsToCache(objectNames, newDescription, newOrder, (disabled ? 1 : 0),
+                    color, createdTimestamp);
+
+                return callback(null, objectIDs, objectNames);
+        });
     });
 };
+
+/**
+ * Delete objects from DB. Rights are not checked
+ * @param {Array<number>} objectIDs an array with object IDs
+ * @param {function(Error)|function()} callback callback(err)
+ */
+rightsWrapper.deleteObjects = function (objectIDs, callback) {
+    objectsDBSave.deleteObjects(objectIDs, function (err) {
+        if (err) return callback(err);
+
+        objectListClient.deleteObjectsFromCache(objectIDs);
+        callback();
+    });
+}
 
 /**
  * Check user permission to the objects and update object parameters for specific object IDs
@@ -137,14 +160,14 @@ rightsWrapper.updateObjectsInformation = function (user, initIDs, description, o
             IDs: checkedIDs,
             checkChange: true,
             errorOnNoRights: true
-        }, function (err, IDs) {
+        }, function (err, objectIDs) {
             if (err) {
                 return callback(new Error('User ' + user + ' has no rights when updating objects info for ' +
                     initIDs.join(', ') + '; description: ' + description +
                     '; order: ' + order + '; disabled: ' + disabled +': ' + err.message ));
             }
 
-            objectsDB.getObjectsByIDs(IDs, function (err, rows) {
+            objectsDB.getObjectsByIDs(objectIDs, function (err, rows) {
                 if(err) callback(new Error('User ' + user + ' got error when getting objects info for ' +
                     initIDs.join(', ') + ': ' + err.message ));
 
@@ -160,13 +183,14 @@ rightsWrapper.updateObjectsInformation = function (user, initIDs, description, o
 
                 if(!needToUpdate) return callback(null, null, objectNames);
 
-                objectsDBSave.updateObjectsInformation(IDs, updateData, function(err) {
+                objectsDBSave.updateObjectsInformation(objectIDs, updateData, function(err) {
                     if(err) {
                         return callback(new Error('User ' + user + ' got error when updating objects info for ' +
                             initIDs.join(', ') + '; description: ' + description + '; order: ' + order +
                             '; disabled: ' + disabled + '; color: ' + color + ': ' + err.message ), null, objectNames);
                     }
 
+                    objectListClient.updateObjectsInCache(objectIDs, updateData);
                     delete(updateData.$id);
                     callback(null, updateData, objectNames);
                 });
@@ -196,7 +220,7 @@ function getColor (color) {
  * @param {string} user - username
  * @param {Array} newInteractions - [{id1: <objectID1>, id2: <objectID2>, type: <interactionType>}];
  *  interaction types: 0 - include; 1 - intersect, 2 - exclude
- * @param {function} callback - callback(err)
+ * @param {function(Error)|function()|function(null, Boolean)} callback - callback(err, isChangesWasMade)
  * @returns {*}
  */
 rightsWrapper.insertInteractions = function(user, newInteractions, callback) {
@@ -270,7 +294,10 @@ rightsWrapper.insertInteractions = function(user, newInteractions, callback) {
 
                 objectsDBSave.insertInteractions(Array.from(notExistingNewInteractions), function (err) {
                     log.info('Saved not existing interactions: ', notExistingNewInteractions);
-                    return callback(err, true);
+                    if(err) return callback(err);
+
+                    objectListClient.insertInteractionsToCache(Array.from(notExistingNewInteractions));
+                    callback(null, true);
                 });
             });
         });
@@ -280,8 +307,9 @@ rightsWrapper.insertInteractions = function(user, newInteractions, callback) {
 /**
  * Deleting some objects interactions
  * @param {string} username username
- * @param {Array} interactionsForDeleting array of the interactions for delete like
- *  [{id1:<objectID1>, id2: <objectID2>, type: <interactionType>}]
+ * @param {Array<{id1: number, id2: number, type: 0|1|2}>} interactionsForDeleting
+ *      array of the interactions for delete like
+ *      [{id1:<objectID1>, id2: <objectID2>, type: <interactionType>}]
  * @param {function(err)|function()} callback
  */
 rightsWrapper.deleteInteractions = function(username, interactionsForDeleting, callback){
@@ -306,7 +334,11 @@ rightsWrapper.deleteInteractions = function(username, interactionsForDeleting, c
             errorOnNoRights: true
         }, function (err) {
             if (err) return callback(err);
-            objectsDBSave.deleteInteractions(interactionsForDeleting, callback);
+            objectsDBSave.deleteInteractions(interactionsForDeleting, function (err) {
+                if(err) return callback(err);
+                objectListClient.deleteInteractionFromCache(interactionsForDeleting);
+                callback();
+            });
         });
     });
 };

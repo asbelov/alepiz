@@ -58,17 +58,20 @@ objectsDB.renameObjects = function(objects, callback) {
  * @param {0|1} disabled - is object disabled
  * @param {string|null} color - object color
  * @param {number} createdTimestamp - timestamp when object was created
- * @param {function(Error)|function(null, newObjectsIDs:Array, newObjectName:Object)} callback -
- *  callback(err, newObjectsIDs, newObjectName), where newObjectsIDs - array with
- *  new object IDs, newObjectName - object like {<objectName1>: <objectID1>, ...}
+ * @param {function(Error)|function(null, newObjectsIDs:Array<number>, newObjectNames:Object)} callback -
+ *  callback(err, newObjectsIDs, newObjectNames), where newObjectsIDs - array with
+ *  new object IDs, newObjectNames - object like {<objectName1>: <objectID1>, ...}
  */
 objectsDB.addObjects = function(newObjectsNames, description, order, disabled,
                                 color, createdTimestamp, callback){
-    log.debug('Add objects: ', newObjectsNames, ', description: ', description, ', order: ', order, ', disabled: ', disabled);
+    log.debug('Add objects: ', newObjectsNames, ', description: ', description, ', order: ', order,
+        ', disabled: ', disabled);
 
     // Prepare statement for inserting new objects into a database
-    var stmt = db.prepare('INSERT INTO objects (id, name, description, sortPosition, disabled, color, created) VALUES ' +
-        '($id, $name, $description, $sortPosition, $disabled, $color, $created)', function(err) {
+    var stmt = db.prepare('INSERT INTO objects (id, name, description, sortPosition, disabled, ' +
+        'color, created) VALUES ($id, $name, $description, $sortPosition, $disabled, $color, $created)',
+        function(err) {
+
         if(err) return callback(err);
 
         // array with IDs of a new objects, which inserting
@@ -88,7 +91,7 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled,
             }, function (err, info) {
                 if(err) return callback(err);
                 // push new object ID into array
-                var newObjectID = this.lastID === undefined ? info.lastInsertRowid : this.lastID;
+                var newObjectID = this.lastID === undefined && info ? info.lastInsertRowid : this.lastID;
                 newObjectsIDs.push(newObjectID);
                 newObjects[name] = newObjectID;
                 callback();
@@ -115,7 +118,9 @@ objectsDB.updateObjectsInformation = function (objectIDs, updateData, callback) 
     // f.e. subQuery can be a ["description=$description", "disabled=$disabled", "color=$color"]
     for(var key in updateData) subQuery.push(key.substring(1) + '=' + key);
 
-    var stmt = db.prepare('UPDATE objects SET ' + subQuery.join(', ') + ' WHERE id=$id', function(err) {
+    var stmt = db.prepare('UPDATE objects SET ' + subQuery.join(', ') + ' WHERE id=$id',
+        function(err) {
+
         if(err) return callback(err);
         async.eachSeries(objectIDs, function(ID, callback) {
             updateData.$id = ID;
@@ -130,7 +135,8 @@ objectsDB.updateObjectsInformation = function (objectIDs, updateData, callback) 
 
 /**
  * Inserting new objects interactions. Check user rights before using it functions
- * @param {Array} interactions - [{id1: <objectID1>, id2: <objectID2>, type: <interactionType>}];
+ * @param {Array<{id1: number, id2: number, type: 0|1|2}>} interactions -
+ *  [{id1: <objectID1>, id2: <objectID2>, type: <interactionType>}];
  *  interaction types: 0 - include; 1 - intersect, 2 - exclude
  * @param {function(Error)|function()} callback - callback(err)
  */
@@ -155,14 +161,17 @@ objectsDB.insertInteractions = function(interactions, callback){
 
 /**
  * Deleting some objects interactions. Check user rights before using it functions
- * @param {Array} interactions - [{id1:<objectID1>, id2: <objectID2>, type: <interactionType>}];
+ * @param {Array<{id1: number, id2: number, type: 0|1|2}>} interactions -
+ *      [{id1:<objectID1>, id2: <objectID2>, type: <interactionType>}];
  *  interaction types: 0 - include; 1 - intersect, 2 - exclude
  * @param {function(Error)|function()} callback - callback(err)
  */
 objectsDB.deleteInteractions = function(interactions, callback){
     if(!interactions.length) return callback();
 
-    var stmt = db.prepare('DELETE FROM interactions WHERE objectID1=? AND objectID2=? AND type=?', function(err) {
+    var stmt = db.prepare('DELETE FROM interactions WHERE objectID1=? AND objectID2=? AND type=?',
+        function(err) {
+
         if(err) return callback(err);
 
         // eachSeries used for possible transaction rollback if error occurred
@@ -184,8 +193,9 @@ objectsDB.deleteInteractions = function(interactions, callback){
 objectsDB.addObjectsAlepizRelation = function (objectsAlepizRelations, callback) {
     if(!objectsAlepizRelations) return callback();
 
-    var stmt = db.prepare('INSERT INTO objectsAlepizRelation (id, objectID, alepizID) VALUES ($id, $objectID, $alepizID)',
-        function(err) {
+    var stmt = db.prepare('INSERT INTO objectsAlepizRelation (id, objectID, alepizID) ' +
+        'VALUES ($id, $objectID, $alepizID)',function(err) {
+
         if(err) return callback(err);
 
         async.eachSeries(objectsAlepizRelations, function(objectAlepizRelation, callback) {
@@ -210,7 +220,9 @@ objectsDB.addObjectsAlepizRelation = function (objectsAlepizRelations, callback)
 objectsDB.deleteObjectsAlepizRelation = function(objectIDs, callback) {
     if(!objectIDs.length) return callback();
 
-    var stmt = db.prepare('DELETE FROM objectsAlepizRelation WHERE objectID=?', function(err) {
+    var stmt = db.prepare('DELETE FROM objectsAlepizRelation WHERE objectID=?',
+        function(err) {
+
         if(err) return callback(err);
 
         async.eachSeries(objectIDs, function(objectID, callback) {

@@ -963,7 +963,7 @@ historyStorageServer.saveRecordsForObject = function (id, newObjectParameters, r
                     });
                 } catch (err) {
                     return callback(new Error('Can\'t insert data to trends' +
-                        timeInterval + 'min table: objectID: ' + id + ' trends: ' +
+                        timeInterval + 'min table: OCID: ' + id + ' trends: ' +
                         JSON.stringify(Object.fromEntries(trendData.entries())) + '; record: ' +
                         JSON.stringify(record) + ': ' + err.message));
                 }

@@ -78,12 +78,6 @@ fs.readFile(dumpFile, 'utf8', function(err, counterDebuggerDataObjStr) {
                 onMessage: function (message, callback) {
                     processMessage(message, null, callback);
                 },
-                onDisconnect: function() {  // exit on disconnect from parent (then server will be restarted)
-                    log.exit('Debugger was disconnected from server unexpectedly. Exiting');
-                    dumpData(function() {
-                        log.disconnect(function () { process.exit(2) });
-                    });
-                },
             });
 
             processCache();

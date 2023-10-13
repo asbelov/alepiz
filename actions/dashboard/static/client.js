@@ -885,11 +885,13 @@ var JQueryNamespace = (function ($) {
             $('#addAsComment').prop('checked', true);
         }
         setDisabledEventsControlPanel();
+        setTimeout(function () {
+            eventsFilterElm.focus();
+        }, 500);
 
         // waiting for making changes in database
         setTimeout(function () {
             startUpdate();
-            eventsFilterElm.focus();
             callback();
         }, 1500);
     }

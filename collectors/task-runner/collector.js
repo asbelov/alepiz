@@ -1,42 +1,33 @@
 //var log = require('../../lib/log')(module);
 const taskServer = require('../../serverTask/taskClient');
 
-var Conf = require('../../lib/conf');
+const Conf = require('../../lib/conf');
 const conf = new Conf('config/common.json');
-var systemUser = conf.get('systemUser') || 'system';
+const systemUser = conf.get('systemUser') || 'system';
 
 var collector = {};
 module.exports = collector;
-/*
-    get data and return it to server
 
-    prms - object with collector parameters {
-        <parameter1>: <value>,
-        <parameter2>: <value>,
-        ....
-        $id: <objectCounterID>,
-        $variables: {
-            <variable1>: <variableValue1>,
-            <variable2>: <variableValue2>,
-            ...
-        }; // all variables from counter
-    }
+/**
+ * Run the task
+ * @param {Object} param collector parameters
+ * @param {number} param.taskID task ID (from the Task maker action)
+ * @param {string} param.runOnLocalNode - Run the task only on a local instance of Alepiz
+ * @param {Object} param.$variables variables
+ * @param {function(Error)|function(null, string)} callback callback(err, <stringified taskResult>)
+ */
+collector.get = function(param, callback) {
 
-    where
-    $id - objectCounter ID
-    $variables - variables for collector from counter settings
-
-    callback(err, result)
-    result - object {timestamp: <timestamp>, value: <value>} or simple value
-*/
-
-collector.get = function(prms, callback) {
-
-    var taskID = parseInt(prms.taskID, 10);
-    if(!taskID) return callback(new Error('Incorrect task ID "' + prms.taskID + '" for running task'));
+    var taskID = parseInt(String(param.taskID), 10);
+    if(!taskID || taskID < 1) return callback(new Error('Incorrect task ID ' + param.taskID));
 
     /*
-    result: {
+    result: hostPort1: {
+        taskActionID1: actionData1,
+        taskActionID1: actionData2,
+        ...
+    },
+    hostPort2: {
         taskActionID1: actionData1,
         taskActionID1: actionData2,
         ...
@@ -45,8 +36,9 @@ collector.get = function(prms, callback) {
     taskServer.runTask({
         userName: systemUser,
         taskID: taskID,
-        variables: prms.$variables,
-        runTaskFrom: 'server',
+        variables: param.$variables,
+        runTaskFrom: 'collector:task-runner',
+        runOnLocalNode: !!param.runOnLocalNode,
     }, function(err, result) {
 		if(err) return callback(err);
 

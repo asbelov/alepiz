@@ -109,10 +109,13 @@ module.exports = function (parentModule) {
         connectToRemoteLogNodes(function () {
             async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
                 if (typeof clientIPC.send !== 'function') return callback();
-                clientIPC.send({
+                clientIPC.sendExt({
                     taskSessionID: taskSessionID,
                     taskComment: comment,
                     username: username,
+                }, {
+                    sendAndReceive: false,
+                    dontSaveUnsentMessage: true,
                 }, function (err) {
                     if(err) log.error('Error add a new comment to the task: ', err.message, ': ', hostPort);
                     callback();
@@ -131,10 +134,13 @@ module.exports = function (parentModule) {
         connectToRemoteLogNodes(function () {
             async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
                 if (typeof clientIPC.send !== 'function') return callback();
-                clientIPC.send({
+                clientIPC.sendExt({
                     sessionID: sessionID,
                     actionComment: comment,
                     username: username,
+                }, {
+                    sendAndReceive: false,
+                    dontSaveUnsentMessage: true,
                 }, function (err) {
                     if(err) log.error('Error add a new comment to the action: ', err.message, ': ', hostPort);
                     callback();

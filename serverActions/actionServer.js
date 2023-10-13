@@ -150,7 +150,7 @@ function addActionToQueue(param, callback) {
         if(err) return callback(err);
 
         // run ajax, addTask and notInQueue actions without queue
-        // param.notInQueue set in routes/actions.js for run the action started by the user without a queue
+        // param.notInQueue set in routes/routerActions.js for run the action started by the user without a queue
         if(param.executionMode !== 'server' || actionConf.notInQueue || param.notInQueue) {
             const myRunAction = actionConf.runActionInline ? runAction : runActionThreadByUser;
             ++processedNotInQueue;

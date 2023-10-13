@@ -332,18 +332,16 @@ var alepizObjectsNamespace = (function($) {
         }
 
         if(globalSearchLastParam.inProgress) {
+            if(typeof globalSearchLastParam.callback === 'function') globalSearchLastParam.callback();
             globalSearchLastParam = {
                 inProgress: true,
                 searchStr: searchStr,
                 callback: callback,
             };
-            if(typeof globalSearchLastParam.callback === 'function') globalSearchLastParam.callback();
             return;
         }
         globalSearchLastParam = {
             inProgress: true,
-            searchStr: searchStr,
-            callback: callback,
         };
 
         var searchStrAdd = searchObjectsAddElm.val();
@@ -378,11 +376,13 @@ var alepizObjectsNamespace = (function($) {
             setCheckedObjectCounter();
 
             if(globalSearchLastParam.inProgress) {
-                globalSearchLastParam.inProgress = false;
-                globalSearchObjects(globalSearchLastParam.searchStr, globalSearchLastParam.callback);
-            }
-
-            if(typeof callback === 'function') callback(isDrawObjects);
+                var searchStr = globalSearchLastParam.searchStr;
+                var callback = globalSearchLastParam.callback;
+                globalSearchLastParam = {
+                    inProgress: false,
+                };
+                if(searchStr) globalSearchObjects(searchStr, callback);
+            } else if(typeof callback === 'function') callback(isDrawObjects);
         });
     }
 

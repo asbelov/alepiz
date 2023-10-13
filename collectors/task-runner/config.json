@@ -7,8 +7,13 @@
     "runCollectorAsThread": "on",
     "parameters": {
         "taskID": {
-            "description": "Task ID (you can find this information in \"Task maker\" action)",
+            "description": "Task ID (see the Task maker action)",
             "checkAs": "Integer"
+        },
+        "runOnLocalNode": {
+            "description": "Run the task only on a local instance of Alepiz",
+            "canBeEmpty": "on",
+            "type": "checkbox"
         }
     }
 }

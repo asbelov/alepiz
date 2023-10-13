@@ -14,7 +14,6 @@ const Conf = require("../lib/conf");
 const confHistory = new Conf('config/history.json');
 parameters.init(confHistory.get());
 
-
 var serverIPC, stopHistoryInProgress = false;
 
 new proc.child({
@@ -102,6 +101,10 @@ function processIPCMessages(message, socket, callback) {
     log.warn('Unknown message ', message);
 }
 
+/**
+ * Stp history server
+ * @param {function(Error)} callback
+ */
 function stopHistory(callback) {
     if(stopHistoryInProgress) return;
     stopHistoryInProgress = true;
@@ -128,30 +131,24 @@ function stopHistory(callback) {
                 serverIPC = {
                     stop: function (callback) { callback(); }
                 }
-            } else log.exit('Closing IPC communication...');
+            } //else log.exit('Stops the server from accepting new connections and keeps existing connections...');
 
             // Stops the server from accepting new connections and keeps existing connections
-            serverIPC.stop(function(err) {
+            // serverIPC.stop() here always runs longer than a timeout of 15 seconds and never completes correctly
+            //serverIPC.stop(function(err) {
                 cache.dumpData(function() {
                     log.exit('History server is stopped');
                     callback(err);
                 });
-            });
-
-            setTimeout(function() {
-                cache.dumpData(function() {
-                    log.exit('Timeout occurred while waiting for the closing IPC communication. History server is stopped');
-                    callback(err);
-                });
-            }, 60000);
+            //});
         });
     });
 }
 
 /** Thin out records: decrease count of returned records to maxRecordsNum records
- * @param {Array} allRecords: array of records [{timestamp:..., data:...}, ...]
- * @param {uint} maxRecordsNum: required maximum number of records
- * @return thin out array of records [{timestamp:..., data:...}, ...]
+ * @param {Array<{timestamp: number, data: string|number}>} allRecords array of records [{timestamp:..., data:...}, ...]
+ * @param {uint} maxRecordsNum required maximum number of records
+ * @return {Array<{timestamp: number, data: string|number}>} thin out array of records [{timestamp:..., data:...}, ...]
  */
 function thinOutRecords(allRecords, maxRecordsNum) {
 

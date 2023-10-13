@@ -27,7 +27,7 @@ alepizFiltersNamespace = (function($) {
     }
 
     function initJQueryElements() {
-        objectsFilterElm = $('#objectsFilter');
+        objectsFilterElm = $('#objectListFilter');
         objectsTabSwitchElm = $('#objectsTabSwitch');
         filterTabSwitchElm = $('#filterTabSwitch');
         filterExpressionEditorElm = $('#filterExpressionEditor');

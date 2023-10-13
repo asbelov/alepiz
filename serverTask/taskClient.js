@@ -142,7 +142,10 @@ taskServer.runTask = function (param, callback) {
 
     async.eachOf(Object.fromEntries(allClientIPC), function (clientIPC, hostPort, callback) {
         if (typeof clientIPC.sendAndReceive !== 'function') return callback();
-        clientIPC.sendAndReceive(param, function(err, taskResult) {
+        clientIPC.sendExt(param, {
+            sendAndReceive: true,
+            dontSaveUnsentMessage: true,
+        }, function(err, taskResult) {
             taskResults[hostPort] = taskResult;
             callback(err);
         });

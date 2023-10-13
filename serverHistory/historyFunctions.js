@@ -18,7 +18,7 @@ module.exports = functions;
 functions.avg = function(id, parameters, callback) {
     if(parameters.length < 1) {
         return callback(new Error('Error in parameters for "avg(' +
-            parameters.join(', ') + ')" function for objectID: ' + id));
+            parameters.join(', ') + ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -27,7 +27,7 @@ functions.avg = function(id, parameters, callback) {
     history.get(id, shift, num, 1, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "avg(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});
@@ -81,7 +81,7 @@ functions.change = function(id, parameters, callback) {
     history.get(id, shift, num, recordsType, function(err, records, rawRecords) {
         if(err) {
             return callback(new Error('Error occurred while getting data from history for "change(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});
@@ -90,7 +90,7 @@ functions.change = function(id, parameters, callback) {
             records[0].data === undefined || records[records.length - 1].data === undefined) {
             /*
             return callback(new Error('No first or last records returned for "change(' + parameters.join(', ') +
-            ')" function for objectID: ' + id), {records: rawRecords});
+            ')" function for OCID: ' + id), {records: rawRecords});
              */
             return callback(null, {records: rawRecords});
         }
@@ -188,7 +188,7 @@ var compare  = {
 functions.count = function(id, parameters, callback) {
     if(parameters.length < 1) {
         return callback(new Error('Error in parameters for "count(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -204,13 +204,13 @@ functions.count = function(id, parameters, callback) {
             operator = 'nearest';
         } else {
             return callback(new Error('Error occurred while getting data from history for "count(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': <pattern> is not a number'));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': <pattern> is not a number'));
         }
     } else {
         operator = operator.toLowerCase();
         if(!(operator in compare)) {
             return callback(new Error('Invalid compare operator "' + operator + '" in function count(' +
-                parameters.join(', ') + ') for objectID ' + id));
+                parameters.join(', ') + ') for OCID ' + id));
         }
     }
 
@@ -220,7 +220,7 @@ functions.count = function(id, parameters, callback) {
     history.get(id, shift, num, recordsType, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "count(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         var result = 0;
@@ -232,7 +232,7 @@ functions.count = function(id, parameters, callback) {
                         result += Number(compare[operator](record.data, pattern, outlier));
                     } catch (e) {
                         log.error('Error occurred while calculating data from history for "count(' +
-                            parameters.join(', ') + ')" function for objectID: ' + id + ': ' + e.message);
+                            parameters.join(', ') + ')" function for OCID: ' + id + ': ' + e.message);
                     }
                 });
             }
@@ -285,7 +285,7 @@ functions.count.description = 'Number of values within the defined evaluation pe
 functions.delta = function(id, parameters, callback) {
     if(parameters.length < 1) {
         return callback(new Error('Error in parameters for "delta(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -294,7 +294,7 @@ functions.delta = function(id, parameters, callback) {
     history.get(id, shift, num, 1, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "delta(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});
@@ -349,7 +349,7 @@ functions.last = function(id, parameters, callback) {
     history.get(id, shift, num, null, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "last(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records || !records.length) return callback(null, {records: rawRecords});
@@ -381,7 +381,7 @@ functions.last.description = 'Return a last value.\n' +
 functions.max = function(id, parameters, callback) {
     if(parameters.length < 1) {
         return callback(new Error('Error in parameters for "max(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -390,7 +390,7 @@ functions.max = function(id, parameters, callback) {
     history.get(id, shift, num, 1, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "max(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});
@@ -430,7 +430,7 @@ functions.max.description = 'Highest value of an item within the defined evaluat
 functions.min = function(id, parameters, callback) {
     if(parameters.length < 1) {
         return callback(new Error('Error in parameters for "min(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -439,7 +439,7 @@ functions.min = function(id, parameters, callback) {
     history.get(id, shift, num, 1, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "min(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});
@@ -482,7 +482,7 @@ functions.nodata = function(id, parameters, callback, prevResult) {
 
         if (period !== parseInt(String(period), 10))
             return callback(new Error('Error in parameters for "nodata(' + period +
-                ')" function for objectID: ' + id + ': parameter mast be a pure time interval without "#"'));
+                ')" function for OCID: ' + id + ': parameter mast be a pure time interval without "#"'));
     }
     // get last history record
     history.get(id, 0, '#1', 0, function (err, records) {
@@ -495,7 +495,7 @@ functions.nodata = function(id, parameters, callback, prevResult) {
         });
             if(err) {
             return callback(new Error('Error occurred while getting data from history for "nodata('+ (period || '') +
-                ')" function for objectID: '+ id +': ' + err.message));
+                ')" function for OCID: '+ id +': ' + err.message));
         }
 
         var result = records && records[0] ? Date.now() - records[0].timestamp : Date.now();
@@ -542,7 +542,7 @@ functions.nodata.description = 'Checking for no data received.\n' +
 functions.regexp =  function(id, parameters, callback) {
     if(parameters.length < 2) {
         return callback(new Error('Error in parameters for "regexp(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var pattern = parameters[0];
@@ -554,13 +554,13 @@ functions.regexp =  function(id, parameters, callback) {
         var regExp = new RegExp(pattern, flags);
     } catch (err) {
         return callback(new Error('Incorrect regular expression "' + pattern + '" in "regexp(' +
-            parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message))
+            parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message))
     }
 
     history.get(id, shift, num, 2,function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "regexp(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});
@@ -614,7 +614,7 @@ functions.regexp.description = 'Checking if the latest (most recent) value match
 functions.sum = function(id, parameters, callback){
     if(parameters.length < 1) {
         return callback(new Error('Error in parameters for "sum(' + parameters.join(', ') +
-            ')" function for objectID: '+ id));
+            ')" function for OCID: '+ id));
     }
 
     var num = parameters[0];
@@ -623,7 +623,7 @@ functions.sum = function(id, parameters, callback){
     history.get(id, shift, num, 1, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "sum(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});
@@ -663,7 +663,7 @@ functions.sum.description = 'Sum of collected values within the defined evaluati
 functions.concat = function(id, parameters, callback){
     if(parameters.length < 1) {
         return callback(new Error('Error in parameters for "concat(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -675,7 +675,7 @@ functions.concat = function(id, parameters, callback){
     history.get(id, shift, num, 0, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "concat(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});
@@ -739,7 +739,7 @@ functions.outliersBrd = function(id, parameters, callback) {
 
     if(parameters.length < 1) {
         return callback(new Error('Error in parameters for "outliersBrd(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -748,12 +748,12 @@ functions.outliersBrd = function(id, parameters, callback) {
 
     if(borderType !== 'min' && borderType !== 'max')
         return callback(new Error('Error in parameters for "outliersBrd(' + parameters.join(', ') +
-            ')" function for objectID: ' + id + ': ' + parameters[2] + ' can be "min" or "max"'));
+            ')" function for OCID: ' + id + ': ' + parameters[2] + ' can be "min" or "max"'));
 
     history.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "borderTF(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records || !records.length || records.length < 3) return callback(null, {records: rawRecords});
@@ -825,7 +825,7 @@ functions.lastRob = function(id, parameters, callback) {
 
     if(parameters.length < 1) {
         return callback(new Error('Error in parameters for "lastRob(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -836,7 +836,7 @@ functions.lastRob = function(id, parameters, callback) {
     history.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "lastRob(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records || !records.length || records.length < 3) return callback(null, {records: rawRecords});
@@ -925,7 +925,7 @@ functions.avgTF = function(id, parameters, callback) {
 
     if(parameters.length < 1) {
         return callback(new Error('Error in parameters for "avgTF(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -935,7 +935,7 @@ functions.avgTF = function(id, parameters, callback) {
     history.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "avgTF(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});
@@ -1033,7 +1033,7 @@ functions.avgTF.description = 'Robustness average value of an item within the de
 functions.avgMed = function(id, parameters, callback) {
     if(parameters.length < 3) {
         return callback(new Error('Error in parameters for "avgMed(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -1043,12 +1043,12 @@ functions.avgMed = function(id, parameters, callback) {
     if(isNaN(parseFloat(String(outliersPercent))) || !isFinite(outliersPercent) || outliersPercent > 99 ||
         outliersPercent < 1) {
         return callback(new Error('Error in parameters for "avgMed(' + parameters.join(', ') +
-            ')" function for objectID: ' + id + ': outliersPercent not number or less than 1% or more than 99%'));
+            ')" function for OCID: ' + id + ': outliersPercent not number or less than 1% or more than 99%'));
     }
 
     history.get(id, shift, num,1,function(err, records, rawRecords) {
         if (err) return callback(new Error('Error occurred while getting data from history for "avgMed(' +
-            parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+            parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
 
         if(!records || !records.length || records.length < 3) return callback(null, {records: rawRecords});
 
@@ -1107,7 +1107,7 @@ functions.avgMed.description = 'Robustness average value of an item within the d
 functions.avgNear = function(id, parameters, callback) {
     if(parameters.length < 3) {
         return callback(new Error('Error in parameters for "avgNear(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -1119,23 +1119,23 @@ functions.avgNear = function(id, parameters, callback) {
 
     if(isNaN(parseFloat(String(patternValue))) || !isFinite(patternValue)) {
         return callback(new Error('Error in parameters for "avgNear(' + parameters.join(', ') +
-            ')" function for objectID: ' + id + ': patternValue is not number: ' + patternValue));
+            ')" function for OCID: ' + id + ': patternValue is not number: ' + patternValue));
     }
 
     if(isNaN(parseFloat(String(outliers))) || !isFinite(outliers) || outliers < 0) {
         return callback(new Error('Error in parameters for "avgNear(' + parameters.join(', ') +
-            ')" function for objectID: ' +  id + ': outliers is negative or not number: ' + outliers));
+            ')" function for OCID: ' +  id + ': outliers is negative or not number: ' + outliers));
     }
 
     if(count && count < 0) {
         return callback(new Error('Error in parameters for "avgNear(' + parameters.join(', ') +
-            ')" function for objectID: ' + id + ': num is negative: ' + count));
+            ')" function for OCID: ' + id + ': num is negative: ' + count));
     }
 
     history.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "avgNear(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});
@@ -1290,7 +1290,7 @@ function linearApprox(records, time, threshold) {
 functions.forecast = function(id, parameters, callback){
     if(parameters.length < 2) {
         return callback(new Error('Error in parameters for "forecast(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -1300,7 +1300,7 @@ functions.forecast = function(id, parameters, callback){
     history.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "forecast(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});
@@ -1341,7 +1341,7 @@ functions.forecast.description = 'Future value of the item.\n' +
 functions.timeLeft = function(id, parameters, callback){
     if(parameters.length < 2) {
         return callback(new Error('Error in parameters for "timeLeft(' + parameters.join(', ') +
-            ')" function for objectID: ' + id));
+            ')" function for OCID: ' + id));
     }
 
     var num = parameters[0];
@@ -1351,7 +1351,7 @@ functions.timeLeft = function(id, parameters, callback){
     history.get(id, shift, num,1, function(err, records, rawRecords) {
         if (err) {
             return callback(new Error('Error occurred while getting data from history for "timeLeft(' +
-                parameters.join(', ') + ')" function for objectID: ' + id + ': ' + err.message));
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
         }
 
         if(!records) return callback(null, {records: rawRecords});

@@ -44,7 +44,7 @@ function Editor(initCfg) {
         '(\.json)': 'javascript'
     };
     //var codemirror = parameters.action.link+'/static/CodeMirror-2.25';
-    var codemirror = '/codemirror';
+    var codemirror = parameters.action.link + '/' + parameters.action.staticDir + '/codemirror';
 
     init(initCfg);
 
@@ -304,7 +304,14 @@ function Editor(initCfg) {
                 autofocus: true,
                 onCursorActivity: function () {
                     editor.matchHighlight('CodeMirror-searching');
-                }/*,
+                },
+                highlightSelectionMatches: {
+                    minChars: 2,
+                    //showToken: /\w/,
+                    style:'matchhighlight',
+                    trim: true,
+                    annotateScrollbar: true
+                },/*
                 extraKeys:
                     {
                         'Ctrl-S': function () {
@@ -326,7 +333,7 @@ function Editor(initCfg) {
                     }
 
                  */
-            });
+        });
         SetCodemirrorSize(editElm);
 
         var mode = findCMHighlighter();

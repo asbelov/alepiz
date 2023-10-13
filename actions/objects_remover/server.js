@@ -1,19 +1,27 @@
 /*
- * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2015. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
  * Created by Alexander Belov on 16.05.2015.
  */
 
-var async = require('async');
-var rightsWrapper = require('../../rightsWrappers/objectsDB');
-var rawObjectsDB = require('../../models_db/modifiers/objectsDB');
-var log = require('../../lib/log')(module);
-var server = require('../../server/counterProcessor');
-var history = require('../../serverHistory/historyClient');
-var ajax = require('./ajax');
+const async = require('async');
+const objectDB = require('../../rightsWrappers/objectsDB');
+const log = require('../../lib/log')(module);
+const server = require('../../server/counterProcessor');
+const history = require('../../serverHistory/historyClient');
+const ajax = require('./ajax');
 
+/**
+ * remove objects
+ * @param {Object} args object with an action arguments
+ * @param {string} args.o stringified array with objects "[{id:.. name:.. }, ]"
+ * @param {string} args.actionName action name
+ * @param {string} args.deleteWithChildren is required delete included objects
+ * @param {string} args.username username
+ * @param {function (Error)|function()} callback callback(err)
+ */
 module.exports = function(args, callback) {
     log.debug('Starting action server ', args.actionName, ' with parameters', args);
 
@@ -56,12 +64,12 @@ module.exports = function(args, callback) {
         });
 
         if(!objectIDs.length || objectIDs.length !== objects.length) {
-            return callback(new Error('Incorrect object in ' + objects));
+            return callback(new Error('Incorrect objects in ' + JSON.stringify(objects, null, 4)));
         }
 
-        log.info('Checking user rights for removing objects for ', args.username,'...');
+        log.info('Checking user rights for removing objects for ', args.username, '...');
 
-        rightsWrapper.getObjectsCountersIDs(args.username, objectIDs, function(err, rows) {
+        objectDB.getObjectsCountersIDs(args.username, objectIDs, function(err, rows) {
             if(err) {
                 return callback(new Error('Error getting objectsCountersIDs: ' + err.message +
                     '; Objects: ' + objectNamesForRemove.join(', ')));
@@ -84,7 +92,7 @@ module.exports = function(args, callback) {
             history.connect('actionObjectRemover', function() {
 
                 // remove objects without checking rights for speed up.
-                // We do it above at rightsWrapper.getObjectsCountersIDs()
+                // We do it above at objectDB.getObjectsCountersIDs()
                 async.parallel([function (callback) {
                     log.info('Sending message to history for removing objects');
                     history.del(OCIDs, function (err) {
@@ -102,10 +110,16 @@ module.exports = function(args, callback) {
     });
 };
 
+/**
+ * Remove objects from DB
+ * @param {Array<string>} objectNamesForRemove an array with object names for remove (for log)
+ * @param {Array<number>} objectIDs an array with object IDs
+ * @param {function(Error)|function()} callback callback(err)
+ */
 function removeObjectsFromDatabase(objectNamesForRemove, objectIDs, callback) {
     log.info('Removing objects from database: ', objectNamesForRemove.join(', '),
         '; object IDs: ', objectIDs.join(', '));
-    rawObjectsDB.deleteObjects(objectIDs, function (err) {
+    objectDB.deleteObjects(objectIDs, function (err) {
         if (err) log.error(err.message);
         callback();
     });

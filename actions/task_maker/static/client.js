@@ -818,7 +818,7 @@ var JQueryNamespace = (function ($) {
                 var startupOptions = [0,1,2,3].indexOf(action.startupOptions) !== -1 ?
                     action.startupOptions : 3;
 
-                if(actionsObjects[taskActionID].length) {
+                if(actionsObjects[taskActionID] && actionsObjects[taskActionID].length) {
                     var urlParameters = {
                         'c': encodeURIComponent(actionsObjects[taskActionID].join(',')), // selected objects
                     };

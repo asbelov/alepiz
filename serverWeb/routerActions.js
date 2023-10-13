@@ -89,7 +89,7 @@ router.post('/'+confActions.get('dir')+'/:action',
             }
         ], function(err){
             if(err) {
-                log.error('Error while checking rights for action "', actionID, '": ', err.message);
+                log.info('Checking rights for action "', actionID, '" result: ', err.message);
                 return next(err);
             }
 

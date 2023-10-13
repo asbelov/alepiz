@@ -7,41 +7,24 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         title= action.name
         link(rel='stylesheet', href='/materialize-css/dist/css/materialize.css')
         link(rel='stylesheet', href='/material-design-icons/material-icons.css')
-        link(rel='stylesheet', href='/codemirror/lib/codemirror.css')
         meta(name="viewport" content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
         style.
             p {
                 margin-bottom: 0 !important;
             }
 
+            .cm-matchhighlight {
+                background: yellow !important
+            }
+
         script(src='/jquery/jquery.min.js')
         script(src='/materialize-css/dist/js/materialize.js')
-        script(src='/codemirror/lib/codemirror.js')
-        script(src='/codemirror/addon/mode/loadmode.js')
-        script(src='/codemirror/addon/search/searchcursor.js')
-        script(src='/codemirror/addon/search/match-highlighter.js')
         script.
             var parameters = {
                 action: !{JSON.stringify(action)},
                 objects: !{JSON.stringify(objects)}
             };
 
-            var entityMap = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;',
-                '/': '&#x2F;',
-                '`': '&#x60;',
-                '=': '&#x3D;'
-            };
-
-            function escapeHtml(string) {
-                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
-                    return entityMap[s];
-                });
-            }
     body
     main
         input(type="hidden")#editorResult
@@ -82,10 +65,15 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                         option(value="win1251") Windows CP-1251
                         option(value="cp866") MS-DOS CP-866
                     label Code page
+        link(rel = 'stylesheet', href= action.link + '/' + action.staticDir + '/codemirror/lib/codemirror.css')
+        script(src = action.link + '/' + action.staticDir + '/codemirror/lib/codemirror.js')
+        script(src = action.link + '/' + action.staticDir + '/codemirror/addon/mode/loadmode.js')
+        script(src = action.link + '/' + action.staticDir + '/codemirror/addon/search/searchcursor.js')
+        script(src = action.link + '/' + action.staticDir + '/codemirror/addon/search/match-highlighter.js')
 
-        script(src= action.link + "/" + action.staticDir + "/" + "editor.js")
-        script(src= action.link + "/../log_viewer_" + action.sessionID + "/" + action.staticDir + "/" + "menu.js")
-        script(src= action.link + "/" + action.staticDir + "/" + "client.js")
+        script(src = action.link + '/' + action.staticDir + '/editor.js')
+        script(src = action.link + '/../log_viewer_' + action.sessionID + '/' + action.staticDir + '/menu.js')
+        script(src = action.link + '/' + action.staticDir + '/client.js')
 
     footer
         input(type="hidden" name="actionName" value= action.name)

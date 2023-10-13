@@ -125,7 +125,7 @@ actionClient.runAction = function (param, callback) {
     var slowServerTime = Number(param.slowServerTime) === parseInt(String(param.slowServerTime), 10) &&
         Number(param.slowServerTime) > 1 ? Number(param.slowServerTime) : 15000;
 
-    // param.runActionOnRemoteServers set to true only when action was running from browser (from routes/actions.js)
+    // param.runActionOnRemoteServers set to true only when action was running from browser (from routes/routerActions.js)
     if ((param.executionMode === 'ajax' && param.runAjaxOnRemoteServers) ||
         (param.executionMode === 'server' && param.runActionOnRemoteServers) ||
         param.executionMode === 'makeTask'

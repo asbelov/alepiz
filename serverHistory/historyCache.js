@@ -492,10 +492,10 @@ historyCache.getByIdx = function(id, offset, cnt, maxRecordsCnt, recordsType, ca
         return callback(new Error('[getByIdx] incorrect object ID '+id));
     }
     if(Number(offset) !== parseInt(String(offset), 10) || offset < 0) {
-        return callback(new Error('[getByIdx] incorrect "offset" parameter ('+offset+') for objectID '+id));
+        return callback(new Error('[getByIdx] incorrect "offset" parameter ('+offset+') for OCID ' + id));
     }
     if(Number(cnt) !== parseInt(String(cnt), 10) || cnt < 1) {
-        return callback(new Error('[getByIdx] incorrect "cnt" parameter ('+cnt+') for objectID '+id));
+        return callback(new Error('[getByIdx] incorrect "cnt" parameter ('+cnt+') for OCID ' + id));
     }
 
     var cacheObj = cache.get(id);
@@ -615,12 +615,12 @@ historyCache.getByTime = function (id, timeShift, timeInterval, maxRecordsCnt, r
 
     if (timeShift !== parseInt(String(timeShift), 10) || timeShift < 0) {
         return callback(new Error('[getByTime] incorrect "timeShift" parameter (' + timeShift +
-            ') for objectID ' + id));
+            ') for OCID ' + id));
     }
 
     if (timeInterval !== parseInt(String(timeInterval), 10) || timeInterval < 0) {
         return callback(new Error('[getByTime] incorrect "timeInterval" parameter (' + timeInterval +
-            ') for objectID ' + id));
+            ') for OCID ' + id));
     }
 
     if (timeShift > 1477236595310) { // check for timestamp: 1477236595310 = 01/01/2000

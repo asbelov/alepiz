@@ -3,7 +3,7 @@
  */
 
 var log = require('../../lib/log')(module);
-var objectsFilterDB = require('../../routes/createObjectList');
+var objectListCreate = require('../../serverWeb/objectListCreate');
 var prepareUser = require('../../lib/utils/prepareUser');
 var async = require('async');
 
@@ -59,13 +59,13 @@ function getObjectsTree(user, objects, depth, maxObjectsCnt, callback) {
     if(depth > 20) return callback(null, objects);
 
     var newObjects = [];
-    // use async each because objectsFilterDB.filter return objects, which interact for all objects
+    // use async each because objectListCreate.filter return objects, which interact for all objects
     // in first function parameter. But we need to get all child objects for each object in objects
     async.eachLimit(objects, 20,function(object, callback) {
 
         if(maxObjectsCnt && objects.length >= maxObjectsCnt) return callback();
 
-        objectsFilterDB.filterObjectsByInteractions([object.name], user, function(err, rows) {
+        objectListCreate.filterObjectsByInteractions([object.name], user, function(err, rows) {
             if(err) return callback(err);
             if(!rows.length) return callback();
 
