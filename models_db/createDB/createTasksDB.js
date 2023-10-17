@@ -27,54 +27,39 @@ module.exports = function(callback){
                 createTasksActionsTable(function (err) {
                     if(err) return callback(err);
 
-                    log.debug('Creating tasksParameters table in database');
-                    db.run(
-                        'CREATE TABLE IF NOT EXISTS tasksParameters (' +
-                        'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
-                        'taskActionID INTEGER REFERENCES tasksActions(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
-                        'name TEXT NOT NULL,' +
-                        'value TEXT)', function (err) {
-                        if (err) {
-                            return callback(new Error('Can\'t create tasksParameters table in database: ' +
-                                err.message));
-                        }
+                    createTasksParametersTable(function (err) {
+                        if(err) return callback(err);
 
-                        db.run('CREATE INDEX IF NOT EXISTS taskActionID_tasksParameters_index on ' +
-                            'tasksParameters(taskActionID)', function (err) {
-                            if (err) {
-                                return callback(new Error('Can\'t create tasksParameters taskActionID ' +
-                                    'index in database: ' + err.message));
-                            }
+                        createTaskConditionsTable(function (err) {
+                            if (err) return callback(err);
 
-                            createTaskConditionsTable(function (err) {
+                            tasksRunConditionsOCIDs(function (err) {
                                 if (err) return callback(err);
 
-                                tasksRunConditionsOCIDs(function (err) {
-                                    if (err) return callback(err);
+                                db.get('SELECT COUNT(*) as count FROM tasksGroupsRoles', [],
+                                    function (err, row) {
 
-                                    db.get('SELECT COUNT(*) as count FROM tasksGroupsRoles', [], function (err, row) {
-                                        if (err || row.count) return callback();
+                                    if (err || row.count) return callback();
 
-                                        log.debug('Table tasksGroupsRoles is empty, inserting initial values into this table');
-                                        db.run(
-                                            'INSERT OR IGNORE INTO tasksGroupsRoles (id, taskGroupID, roleID) VALUES ' +
-                                            '(0, 0, 1), ' +
-                                            '(1, 0, 2), ' +
-                                            '(2, 1, 1), ' +
-                                            '(3, 2, 1), ' +
-                                            '(4, 3, 1), ' +
-                                            '(5, 4, 1), ' +
-                                            '(6, 5, 1), ' +
-                                            '(7, 6, 1), ' +
-                                            '(8, 6, 2), ' +
-                                            '(9, 7, 1)', function (err) {
-                                                if (err) {
-                                                    return callback(new Error('Can\'t insert initial roles into ' +
-                                                        'tasksGroupsRoles table in database: ' + err.message));
-                                                }
-                                                callback();
-                                            });
-                                    });
+                                    log.debug('Table tasksGroupsRoles is empty, inserting initial values into this table');
+                                    db.run(
+                                    'INSERT OR IGNORE INTO tasksGroupsRoles (id, taskGroupID, roleID) VALUES ' +
+                                        '(0, 0, 1), ' +
+                                        '(1, 0, 2), ' +
+                                        '(2, 1, 1), ' +
+                                        '(3, 2, 1), ' +
+                                        '(4, 3, 1), ' +
+                                        '(5, 4, 1), ' +
+                                        '(6, 5, 1), ' +
+                                        '(7, 6, 1), ' +
+                                        '(8, 6, 2), ' +
+                                        '(9, 7, 1)', function (err) {
+                                            if (err) {
+                                                return callback(new Error('Can\'t insert initial roles into ' +
+                                                    'tasksGroupsRoles table in database: ' + err.message));
+                                            }
+                                            callback();
+                                        });
                                 });
                             });
                         });
@@ -195,6 +180,48 @@ function createTasksActionsTable (callback) {
 
                 callback();
                 //});
+            });
+        });
+    });
+}
+
+function createTasksParametersTable(callback) {
+    log.debug('Creating tasksParameters table in database');
+    db.run(
+        'CREATE TABLE IF NOT EXISTS tasksParameters (' +
+        'id INTEGER PRIMARY KEY ASC AUTOINCREMENT,' +
+        'taskActionID INTEGER REFERENCES tasksActions(id) ON DELETE CASCADE ON UPDATE CASCADE,' +
+        'name TEXT NOT NULL,' +
+        'value TEXT)', function (err) {
+
+        if (err) {
+            return callback(new Error('Can\'t create tasksParameters table in database: ' +
+                err.message));
+        }
+
+        db.run('CREATE INDEX IF NOT EXISTS taskActionID_tasksParameters_index on ' +
+            'tasksParameters(taskActionID)', function (err) {
+            if (err) {
+                return callback(new Error('Can\'t create tasksParameters taskActionID ' +
+                    'index in database: ' + err.message));
+            }
+
+            db.run('CREATE INDEX IF NOT EXISTS name_tasksParameters_index on ' +
+                'tasksParameters(name)', function (err) {
+                if (err) {
+                    return callback(new Error('Can\'t create tasksParameters name ' +
+                        'index in database: ' + err.message));
+                }
+
+                db.run('CREATE INDEX IF NOT EXISTS value_tasksParameters_index on ' +
+                    'tasksParameters(value)', function (err) {
+                    if (err) {
+                        return callback(new Error('Can\'t create tasksParameters value ' +
+                            'index in database: ' + err.message));
+                    }
+
+                    callback();
+                });
             });
         });
     });

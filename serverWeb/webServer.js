@@ -22,6 +22,8 @@ const routerMainMenu = require('./routerMainMenu');
 const routerActions = require('./routerActions');
 const routerHelp = require('./routerHelp');
 const routerBrowserLog = require('./routerBrowserLog');
+const routerFileDownload = require('./routerFileDownload');
+
 const webSecrets = require("./webSecrets");
 const thread = require("../lib/threads");
 const exitHandler = require('../lib/exitHandler');
@@ -49,6 +51,7 @@ app.use(favicon(path.join(__dirname, '..', 'public', 'favicon.ico')));
 app.use(bodyParser.json({limit: confWebServer.get('downloadWebServerMaxSize') || '100Gb'}));
 app.use(bodyParser.urlencoded({ extended: false, limit: confWebServer.get('downloadWebServerMaxSize') || '100Gb',
     parameterLimit: confWebServer.get('parameterLimit') || 10000, }));
+app.use(express.json({ limit: confWebServer.get('downloadWebServerMaxSize') || '100Gb' }));
 
 logger.token('alepiz-user', req => req.session.username);
 app.use(logger(':remote-addr :alepiz-user :method :url :status :res[content-length] Bytes :response-time ms',
@@ -94,6 +97,7 @@ webSecrets.get(function (err, web) {
         app.use('/quill', express.static(path.join(__dirname, '..', 'node_modules', 'quill', 'dist')));
 
 
+        app.use(routerFileDownload);
         app.use(routerIndex);
         app.use(mainMenuRouter);
         app.use(routerActions);
@@ -102,8 +106,10 @@ webSecrets.get(function (err, web) {
 
 // catch 404 and forward to error handler
         app.use(function(req, res, next) {
-            var err = new Error('Not Found');
-            var str = req.protocol + '://' + req.hostname + req.originalUrl + ', IP: ' + req.ip + ', method: ' + req.method + ', param: ' + JSON.stringify(req.body)
+            var str = req.protocol + '://' + req.hostname + req.originalUrl + ', IP: ' + req.ip + ', method: ' +
+                req.method + ', param: ' + JSON.stringify(req.body)
+
+            var err = new Error('Not Found: ' + req.protocol + '://' + req.hostname + req.originalUrl);
             log.error('Not found: ', str);
             err.status = 404;
             next(err);

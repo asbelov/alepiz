@@ -91,9 +91,8 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled,
             }, function (err, info) {
                 if(err) return callback(err);
                 // push new object ID into array
-                var newObjectID = this.lastID === undefined && info ? info.lastInsertRowid : this.lastID;
-                newObjectsIDs.push(newObjectID);
-                newObjects[name] = newObjectID;
+                newObjectsIDs.push(id);
+                newObjects[name] = id;
                 callback();
             });
         }, function(err){

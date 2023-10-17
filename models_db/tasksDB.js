@@ -140,7 +140,26 @@ WHERE ' + (taskID ? 'tasks.id = ?' : 'users.name = ? AND tasks.name IS NULL'),
  *      }, ...]
  */
 tasksDB.getTaskList = function(username, timestampFrom, timestampTo, param, callback) {
-    db.all('\
+
+    // for searching like object search style using * and _
+    var taskName =
+        param.taskName ? '%' + param.taskName.replace(/[*]+/g, '%') + '%' : undefined;
+    var creatorName =
+        param.ownerName ? '%' + param.ownerName.replace(/[*]+/g, '%') + '%': undefined;
+
+    // for searching in the stringified objects array, like
+    // [{"id":59984,"name":"Test"},{"id":59985,"name":"Test1"}] using regexp
+    var objectSearchStrFromName = taskName ? '^.*"name":"' +
+        // convert SQL like style to regexp
+        escapeRegExp(taskName).replace(/%/g, '[^"]*').replace(/_/g, '[^"]') +
+        '".*$' : undefined;
+
+    // searching exactly taskID.
+    // if taskID is 2 then for "test-20" is false; "test-2" is true
+    var objectSearchStrFromID =
+        param.taskID ? '^.*"name":"([])|([^"]*[^0-9])' + param.taskID + '([^0-9][^"]*)|([])".*$' : undefined;
+
+        db.all('\
 SELECT tasks.id AS id, tasks.name AS name, tasks.timestamp AS timestamp, users.name AS ownerName, \
 users.fullName AS ownerFullName, tasksActions.actionID AS actionID, \
 tasksRunConditions.runType AS runType, \
@@ -149,22 +168,27 @@ tasksRunConditions.timestamp AS changeStatusTimestamp \
 FROM tasks \
 JOIN users ON tasks.userID = users.id \
 JOIN tasksActions ON tasksActions.taskID = tasks.id \
+JOIN tasksParameters ON tasksParameters.taskActionID=tasksActions.id \
 LEFT JOIN tasksRunConditions ON tasks.id = tasksRunConditions.taskID \
 LEFT JOIN users userApproved ON tasksRunConditions.userApproved = userApproved.id \
 LEFT JOIN users userCanceled ON tasksRunConditions.userCanceled = userCanceled.id \
 WHERE tasks.timestamp >= $timestampFrom AND tasks.timestamp <= $timestampTo AND \
         (users.name = $userName OR tasks.name NOTNULL)' +
-        (param.ownerName ? ' AND users.name like $ownerName' : '') +
-        (param.taskName ? ' AND tasks.name like $taskName' : '') +
-        (param.taskID ? ' AND tasks.id=$taskID' : '') +
+        (creatorName ? ' AND users.name like $ownerName' : '') +
+        (taskName ? ' AND tasks.name like $taskName ' +
+            'OR (tasksParameters.name="o" AND tasksParameters.value regexp $objectSearchStrFromName)' : '') +
+        (param.taskID ? ' AND tasks.id=$taskID OR ' +
+            '(tasksParameters.name="o" AND tasksParameters.value regexp $objectSearchStrFromID)' : '') +
         (!param.taskID && !param.taskName ? ' AND tasks.groupID = $groupID' : '') +
         ' ORDER by tasks.timestamp DESC LIMIT 500', {
 
             $timestampFrom: timestampFrom,
             $timestampTo: timestampTo,
-            $ownerName: param.ownerName ? param.ownerName : undefined,
-            $taskName: param.taskName ? param.taskName : undefined,
+            $ownerName: creatorName,
+            $taskName: taskName,
             $taskID: param.taskID ? param.taskID : undefined,
+            $objectSearchStrFromName: objectSearchStrFromName,
+            $objectSearchStrFromID: objectSearchStrFromID,
             $groupID: param.groupID,
             $userName: username,
         }, function(err, taskData) {
@@ -181,21 +205,26 @@ tasksRunConditions.timestamp AS changeStatusTimestamp \
 FROM tasks \
 JOIN users ON tasks.userID = users.id \
 JOIN tasksActions ON tasksActions.taskID = tasks.id \
+JOIN tasksParameters ON tasksParameters.taskActionID=tasksActions.id \
 LEFT JOIN tasksRunConditions ON tasks.id = tasksRunConditions.taskID \
 LEFT JOIN users userApproved ON tasksRunConditions.userApproved = userApproved.id \
 LEFT JOIN users userCanceled ON tasksRunConditions.userCanceled = userCanceled.id \
 WHERE tasks.timestamp <= $timestampTo AND \
         (users.name = $userName OR tasks.name NOTNULL)' +
-        (param.ownerName ? ' AND users.name like $ownerName' : '') +
-        (param.taskName ? ' AND tasks.name like $taskName' : '') +
-        (param.taskID ? ' AND tasks.id=$taskID' : '') +
+        (creatorName ? ' AND users.name like $ownerName' : '') +
+            (taskName ? ' AND tasks.name like $taskName ' +
+                'OR (tasksParameters.name="o" AND tasksParameters.value regexp $objectSearchStrFromName)' : '') +
+            (param.taskID ? ' AND tasks.id=$taskID OR ' +
+                '(tasksParameters.name="o" AND tasksParameters.value regexp $objectSearchStrFromID)' : '') +
         (!param.taskID && !param.taskName ? ' AND tasks.groupID = $groupID' : '') +
         ' ORDER by tasks.timestamp DESC LIMIT 500', {
 
                     $timestampTo: timestampTo,
-                    $ownerName: param.ownerName ? param.ownerName : undefined,
-                    $taskName: param.taskName ? param.taskName : undefined,
+                    $ownerName: creatorName,
+                    $taskName: taskName,
                     $taskID: param.taskID ? param.taskID : undefined,
+                    $objectSearchStrFromName: objectSearchStrFromName,
+                    $objectSearchStrFromID: objectSearchStrFromID,
                     $groupID: param.groupID,
                     $userName: username,
                 },
@@ -206,6 +235,16 @@ WHERE tasks.timestamp <= $timestampTo AND \
                 });
         });
 };
+
+/**
+ * Escape regExp characters in the string for make a regExp from the string
+ * @param {string} string string for regExp
+ * @return {string} string with escaped regExp characters
+ */
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
 
 /**
  * Getting list of all tasks groups, sorted by task names (SELECT * FROM tasksGroups ORDER BY name)

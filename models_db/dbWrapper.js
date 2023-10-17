@@ -71,7 +71,7 @@ function dbInit() {
     try {
         var bestDB = new Database(dbPath, options);
         bestDB.function('regexp', { deterministic: true }, (regex, text) => {
-            return new RegExp(regex).test(text) ? 1 : 0;
+            return new RegExp(regex, 'i').test(text) ? 1 : 0;
         });
     } catch (err) {
         log.throw('Can\'t open DB ', dbPath, ': ', err.message);

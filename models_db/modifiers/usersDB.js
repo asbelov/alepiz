@@ -41,7 +41,7 @@ usersDB.addUser = function(userProperties, callback) {
         $fullName: userProperties.fullName,
         $password: userProperties.password
     }, function (err, info) {
-        callback(err, this.lastID === undefined ? info.lastInsertRowid : this.lastID);
+        callback(err, id);
     });
 };
 
@@ -118,7 +118,7 @@ usersDB.addCommunicationMedia = function(userID, mediaID, address, callback) {
         $mediaID: mediaID,
         $address: address,
     }, function (err, info) {
-        callback(err, this.lastID === undefined ? info.lastInsertRowid : this.lastID);
+        callback(err, id);
     });
 };
 

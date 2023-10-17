@@ -65,4 +65,48 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                             cacheExpirationTime - время в мс сохранения в кэша списка объектов, прав на действия,
                             конфигураций действий и других данных, требуемых для отрисовки системного меню с объектами
                             и действиями. По умолчанию 60000
+                        li.
+                            downloadFileRestrictions - настройка разрешений для скачивания файлов действиями.
+                            Для скачивания файла в действии необходимо создать HTTP запрос
+                            GET /downloadFile/?filename=&lt;полный путь до файла&gt;
+                            Содержит массив объектов с разрешениями:
+                        ul.browser-default
+                            li.
+                                description - описание
+                            li.
+                                regExp - регулярное выражение, с которым будет сравниваться имя файла для скачивания.
+                                Если имя файла соответствует регулярному выражению, проверка на имя файла будет пройдена
+                            li.
+                                roles - массив с перечнем ролей пользователей, которым можно скачивать файл
+                            li.
+                                maxSize - максимальный размер файла, который можно скачивать. Можно указывать суффиксы
+                                Kb, Mb, Gb, Tb. Если не указано,
+                                используется глобальная настройка downloadWebServerMaxSize. Если и она не указана, то
+                                используется размер в 1Gb
+                            li.
+                                fileNameRoles - массив с правилами по которым формируется имя файла для сохранения.
+                                Правила в порядке следования в массиве применяются к исходному имени файла.
+                                Для изменения имени файла используется функция JavaScript replace(&lt;src&gt;, &lt;dest&gt;).
+                                Поиск производится с флагами "ig".
+                            ul.browser-default
+                                li src - регулярное выражение с описанием, что нужно заменить в имени файла
+                                li dest - выражение с описанием на что нужно заменить имя файла.
+                    h4.
+                        Пример функции для скачивания файла
+                    p.
+                        Функция должны вызываться по какому-то событию в web интерфейсе. Например, при нажатии на
+                        кнопку "Скачать"
+                    pre.
+                        function downloadFile (fileName) {
+                            let hiddenIFrameID = 'hiddenDownloader',
+                            iframe = document.getElementById(hiddenIFrameID);
+                            if (iframe === null) {
+                                iframe = document.createElement('iframe');
+                                iframe.id = hiddenIFrameID;
+                                iframe.style.display = 'none';
+                                document.body.appendChild(iframe);
+                            }
+                            iframe.src = '/downloadFile/?filename=' + encodeURIComponent(fileName);
+                        }
+
 

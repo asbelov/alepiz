@@ -202,7 +202,7 @@ function getTaskList(filterParam, callback) {
             return callback(new Error('Group ' + groupIDs[groupID] + ' is not allowed for user ' + filterParam.username));
         }
 
-        if(filterParam.userName) var ownerName = '%' + filterParam.userName + '%';
+        if(filterParam.userName) var ownerName = filterParam.userName;
 
         // if taskName is an integer, then try to search taskID
         if(filterParam.taskName) {
@@ -211,7 +211,7 @@ function getTaskList(filterParam, callback) {
             ) {
                 var taskID = parseInt(filterParam.taskName, 10);
             } else {
-                var taskName = '%' + filterParam.taskName + '%';
+                var taskName = filterParam.taskName;
             }
         }
 

@@ -376,12 +376,13 @@ var alepizObjectsNamespace = (function($) {
             setCheckedObjectCounter();
 
             if(globalSearchLastParam.inProgress) {
-                var searchStr = globalSearchLastParam.searchStr;
-                var callback = globalSearchLastParam.callback;
+                let savedSearchStr = globalSearchLastParam.searchStr;
+                let savedCallback = globalSearchLastParam.callback;
                 globalSearchLastParam = {
                     inProgress: false,
                 };
-                if(searchStr) globalSearchObjects(searchStr, callback);
+                if(savedSearchStr) globalSearchObjects(savedSearchStr, savedCallback);
+                else if(typeof callback === 'function') callback(isDrawObjects);
             } else if(typeof callback === 'function') callback(isDrawObjects);
         });
     }

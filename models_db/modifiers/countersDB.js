@@ -114,7 +114,7 @@ countersDB.insertCounter = function(counter, callback) {
         },
         function(err, info) {
             if (err) return callback(err);
-            callback(null, this.lastID === undefined ? info.lastInsertRowid : this.lastID);
+            callback(null, id);
         }
     );
 };

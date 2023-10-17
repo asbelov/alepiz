@@ -349,11 +349,11 @@ var taskListJQueryNamespace = (function ($) {
         Updated at <span id="taskListUpdateTime">' + new Date().toLocaleTimeString() + '</span></div>\
     <div class="col s12 m8 l4 input-field" style="margin-bottom: 0">\
         <input type="text" id="filterByTaskName"/>\
-        <label for="filterByTaskName">Task name or ID (search by all groups)</label>\
+        <label for="filterByTaskName">Task ID, name or object name (search by all groups)</label>\
     </div>\
     <div class="col s12 m4 l2 input-field" style="margin-bottom: 0">\
         <input type="text" id="filterByTaskOwner"/>\
-        <label for="filterByTaskOwner">Owner</label>\
+        <label for="filterByTaskOwner">Creator</label>\
     </div>\
     <div class="col s12 m8 l2 input-field" style="margin-bottom: 0">\
         <select id="taskGroupForSearch"></select>\

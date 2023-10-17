@@ -52,20 +52,17 @@ var alepizProcessActionNamespace = (function($) {
 
         if(!activeAction) return;
         //console.log(activeAction.rights)
-        // show "run action" button
-        if(activeAction.launcher && activeAction.rights.run && !activeAction.swapActionControlBtn) {
-            runActionFloatingBtnElm.removeClass('hide');
-        }
+        if(activeAction.launcher) {
+            // show "run action" button as main
+            if (activeAction.rights.run && (!activeAction.swapActionControlBtn ||
+                (activeAction.swapActionControlBtn && !activeAction.rights.makeTask))) {
 
-        // show one of "make task" buttons
-        if(activeAction.launcher && (activeAction.rights.makeTask || activeAction.swapActionControlBtn)) {
-            if(activeAction.launcher && activeAction.rights.run && !activeAction.swapActionControlBtn) {
-                makeTaskBtnElm.removeClass('hide');
-            } else {
+                runActionFloatingBtnElm.removeClass('hide');
+                if (activeAction.rights.makeTask) makeTaskBtnElm.removeClass('hide');
+            // show "make task" buttons as main
+            } else if (activeAction.rights.makeTask) {
                 makeTaskFloatingBtnElm.removeClass('hide');
-                if(activeAction.launcher && activeAction.rights.run && activeAction.swapActionControlBtn) {
-                    runActionSmallBtnElm.removeClass('hide');
-                }
+                if (activeAction.rights.run) runActionSmallBtnElm.removeClass('hide');
             }
         }
     }
