@@ -9,7 +9,7 @@ var alepizActionLogViewerNamespace = (function($) {
         bodyElm;
 
     var retrievingLogRecordsInProgress = 0;
-    var maxLogRecords = 200;
+    var maxLogRecords = 10000;
     var timeout = 60000;
     var activeCollapsibleSessionID;
 

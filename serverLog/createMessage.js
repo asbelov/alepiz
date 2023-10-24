@@ -79,7 +79,9 @@ function setColor(str, colorLabel) {
  */
 createMessage.createHeader = function (level, label, sessionID, date, TID_PID) {
     if(!date) date = new Date();
-    const timeStr = date.toLocaleTimeString() + '.' +
+
+    // add date for log level EXIT or THROW
+    const timeStr = (level.length > 1 ? date.toLocaleString() : date.toLocaleTimeString()) + '.' +
         String('00' + date.getMilliseconds()).replace(/^0*?(\d\d\d)$/, '$1');
 
     return setColor((timeStr), 'timestamp') +

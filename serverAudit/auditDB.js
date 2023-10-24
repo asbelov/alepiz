@@ -221,7 +221,7 @@ VALUES ($id, $userID, $sessionID, $actionID, $taskID, $taskSession, $startTimest
      */
     auditDB.getRecords = function(lastRecordID=0, sessionIDs, message) {
         var maxRecordsCnt = Number(confLog.get('maxRecordsReturnedFromDatabase'));
-        if(maxRecordsCnt !== parseInt(String(maxRecordsCnt), 10) || maxRecordsCnt <= 10 ) maxRecordsCnt = 1000;
+        if(maxRecordsCnt !== parseInt(String(maxRecordsCnt), 10) || maxRecordsCnt <= 100 ) maxRecordsCnt = 10000;
 
         if(!message) message = '';
         var queryFilter = message.replace(/"/g, '') ? ' AND messages.message MATCH $message ' : '';

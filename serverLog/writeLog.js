@@ -56,7 +56,7 @@ function writeLog(messageObj) {
         .replace(/\x1B\[\d+m/g, '') + '\n';
 
     var mainLogFile =
-        path.join(logDir, String(messageObj.level === 'EXIT' ?
+        path.join(logDir, String(messageObj.level.length > 1 ? // for EXIT or THROW log level
             (cfg.exitLogFileName || 'exit.log') : (cfg.file || 'log.log') + dateSuffix));
 
     var logFiles = Array.isArray(messageObj.filenames) ?

@@ -496,24 +496,7 @@ var JQueryNamespace = (function ($) {
                     .replace(/{{highlightClose}}/g, '</span>') :
                 '';
 
-            if(row.objects.length) {
-                var urlParameters = {
-                    'c': encodeURIComponent(row.objects.map(obj => obj.name).join(',')),
-                };
-
-                var actionPath = parameters.action.link.replace(/\/[^\/]+$/, '') + '/' + row.actionID;
-                urlParameters.a = encodeURIComponent(actionPath); // /action/information
-
-                var url = '/?' + Object.keys(urlParameters).map(function(key) {
-                    return key + '=' + urlParameters[key];
-                }).join('&');
-
-                var objectList = '<a href="' + url + '" target="_blank">' + row.objects.map(obj => {
-                    if(objects.length && filteredObjectIDs[obj.id]) {
-                        return '<span class="highLight">' + escapeHtml(obj.name) + '</span>';
-                    } else return escapeHtml(obj.name)
-                }).join(',<br/>') + '</a>';
-            } else objectList = '';
+            var objectListHTML = createObjectListHTML(row.objects, row.actionID, filteredObjectIDs);
 
             var actionName = actionIDFilter[row.actionID] ?
                 '<span class="highLight">' + escapeHtml(row.actionName) + '</span>' :
@@ -544,7 +527,7 @@ var JQueryNamespace = (function ($) {
                 '</td><td style="width: 35%">' + description +
                 '</td><td class="' + (actionComment ? 'green-text' : 'red-text' ) +
                     '" style="width: 20%; font-weight: normal; overflow-wrap: break-word;">' + (actionComment || error) +
-                '</td><td style="width: 10%; overflow-wrap: break-word;">' + objectList +
+                '</td><td style="width: 10%; overflow-wrap: break-word;">' + objectListHTML +
                 '</td><td class="hide">' + row.userID +
                 '</td></tr>';
             actions[row.actionID] = row.actionName;
@@ -601,28 +584,14 @@ var JQueryNamespace = (function ($) {
                 var highlightedTaskID = taskIDFilterElm.val() ?
                     '<span class="highLight">' + '#' + task.taskID + '</span>' : '#' + String(task.taskID);
 
-                if(Object.keys(task.objects).length) {
-
-                    var urlParameters = {
-                        'c': encodeURIComponent(Object.keys(task.objects).join(',')), // selected objects
-                    };
-
-                    if(actionForObjects) {
-                        var actionPath = parameters.action.link.replace(/\/[^\/]+$/, '') + '/' + actionForObjects;
-                        urlParameters.a = encodeURIComponent(actionPath); // /action/information
-                    }
-
-                    var url = '/?' + Object.keys(urlParameters).map(function(key) {
-                        return key + '=' + urlParameters[key];
-                    }).join('&');
-
-                    var objectList = '<a href="' + url + '" target="_blank">' +
-                        Object.keys(task.objects).map(name => {
-                        if(objects.length && filteredObjectIDs[task.objects[name]]) {
-                            return '<span class="highLight">' + escapeHtml(name) + '</span>';
-                        } else return escapeHtml(name)
-                    }).join(',<br/>') + '</a>';
-                } else objectList = '';
+                var taskObjects = [];
+                for(var name in task.objects) {
+                    taskObjects.push({
+                        id: task.objects[name],
+                        name: name,
+                    });
+                }
+                var objectListHTML = createObjectListHTML(taskObjects, actionForObjects, filteredObjectIDs);
 
                 tableHTML += '<tr style="cursor:pointer; font-weight: bold" data-task-session-id="' + taskSession +
                     '"  data-task-id="' + task.taskID +
@@ -648,7 +617,7 @@ var JQueryNamespace = (function ($) {
                             (task.taskComment ||
                             (task.error.length ?
                                 '* ' + task.error.join('</br>* ') : '')) +
-                    '</td><td style="overflow-wrap: break-word;">' + objectList +
+                    '</td><td style="overflow-wrap: break-word;">' + objectListHTML +
                     '</td><td class="hide">' + task.userID +
                     '</td></tr>';
 
@@ -736,5 +705,60 @@ var JQueryNamespace = (function ($) {
                 taskIDElm.val('');
             }
         });
+    }
+
+    /**
+     * Create HTML with object list not longer then maxObjectListStrLength = 512
+     * @param {Array<{id: number, name: string}>} objects array with objects
+     * @param {string} actionID action ID
+     * @param {Array<number>} filteredObjectIDs array with filtered objects IDs
+     * @return {string} HTML with link and object list
+     */
+    function createObjectListHTML(objects, actionID, filteredObjectIDs) {
+        const maxObjectListStrLength = 256;
+
+        var objectList = {};
+        var objectListStr = '';
+        if(objects.length) {
+            var urlParameters = {
+                'c': encodeURIComponent(objects.map(obj => obj.name).join(',')),
+            };
+
+            if(actionID) {
+                var actionPath = parameters.action.link.replace(/\/[^\/]+$/, '') + '/' + actionID;
+                urlParameters.a = encodeURIComponent(actionPath); // /action/information
+            }
+
+            var url = '/?' + Object.keys(urlParameters).map(function(key) {
+                return key + '=' + urlParameters[key];
+            }).join('&');
+
+            objects.forEach(object => {
+                if(filteredObjectIDs[object.id]) {
+                    objectListStr += object.name;
+                    objectList[object.name.toLowerCase()]  = '<span class="highLight">' +
+                        escapeHtml(object.name) + '</span>';
+                }
+            });
+
+            objects.forEach(object => {
+                if(!filteredObjectIDs[object.id] && objectListStr.length < maxObjectListStrLength) {
+                    objectListStr += object.name;
+                    objectList[object.name.toLowerCase()]  = escapeHtml(object.name);
+                }
+            });
+
+            var objectListHTML = Object.keys(objectList)
+                .sort()
+                .map(name => objectList[name])
+                .join(',</br>');
+
+            if(objectListStr.length >= maxObjectListStrLength) {
+                objectListHTML += '... (' + objects.length + ' objects)';
+            }
+            return '<a href="' + url + '" target="_blank">' + objectListHTML + '</a>';
+        } else return 'No objects'
+
+
     }
 })(jQuery); // end of jQuery name space

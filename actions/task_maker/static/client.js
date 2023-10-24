@@ -834,7 +834,7 @@ var JQueryNamespace = (function ($) {
                     }).join('&');
 
                     var objectList = '<a href="' + url + '" target="_blank">' +
-                        actionsObjects[taskActionID].join(', ') + '</a>';
+                        actionsObjects[taskActionID].sort().join(', ') + '</a>';
                 } else objectList = 'no objects';
 
                 html += '\
@@ -849,7 +849,8 @@ var JQueryNamespace = (function ($) {
             <li class="collection-item avatar">\
                 <i class="material-icons circle" data-action-selector-btn="' + taskActionID + '">'+actionIcon+'</i>\
                 <p class="title section">'+actionName.toUpperCase()+'</p>\
-                <p>' + actionDescription.replace(/[\r\n]/g, '<br>') + '</p>\
+                <p style="overflow-wrap: anywhere;">' +
+                    actionDescription.replace(/[\r\n]/g, '<br>') + '</p>\
                 <p><b>Objects:</b> ' + objectList + '</p>\
                 <div class="row no-margin" style="padding-top: 10px">\
                     <div class="col s12 m3 l3 no-padding">\
@@ -1004,7 +1005,7 @@ var JQueryNamespace = (function ($) {
                 }).join('&');
 
                 var objectList = '<a href="' + url + '" target="_blank">' +
-                    Array.from(taskObjectsSet).join(', ') + '</a>';
+                    Array.from(taskObjectsSet).sort().join(', ') + '</a>';
             } else objectList = 'no objects';
 
             $('#taskObjectList').html('<b>Task objects:</b> ' + objectList);
