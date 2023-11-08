@@ -26,8 +26,9 @@ module.exports = historyGet;
  * @param {number} id OCID
  * @param {string|number} shift records or initial timestamp or time shift from the last record
  * @param {string|number} num records number or final timestamp or time period from the <shift>
- * @param {0|1|2} recordsType 0 - any, 1 - number, 2 - string
- * @param {function(Error)|function(null, Array<[data: *, timestamp: number]>)} callback
+ * @param {0|1|2|null} recordsType 0 - any, 1 - number, 2 - string.
+ *  When recordsType is null, return received records in any cases
+ * @param {function(Error)|function(null, Array<{data: *, timestamp: number}>)} callback
  *  callback(err, records), where records: [{data:.., timestamp:..}, ....]
  * @example
  *

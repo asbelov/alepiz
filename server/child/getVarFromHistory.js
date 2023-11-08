@@ -75,10 +75,14 @@ function getVarFromHistory(historyVariable, variables, getVariableValue, param, 
             function(err, OCID, variableObjectName) {
 
             if(err) {
+                /*
+                in some cases, the absence of OCID is normal behavior.
+                Therefore, we write the log when the debug is enabled
+                */
                 variablesDebugInfo.result = err.message;
                 log.options(param.objectName, '(', param.counterName, ' #', param.counterID, '): ', err.message, {
                     filenames: ['counters/' + param.counterID, 'counters'],
-                    level: 'I'
+                    level: 'D'
                 });
                 // Do not return an error if the OCID for getting history data cannot be found
                 return callback(null, null, variablesDebugInfo);

@@ -368,7 +368,7 @@ functions.last = function(id, parameters, callback) {
     });
 };
 
-functions.last.description = 'Return a last value.\n' +
+functions.last.description = 'Return a specific value.\n' +
     '\n' +
     'last([#<recordsShift>])\n' +
     'recordsShift: evaluation point is moved the number of records back. Default #0\n' +
@@ -376,6 +376,48 @@ functions.last.description = 'Return a last value.\n' +
     'last(<timeShift>, [<period>])\n' +
     'timeShift: evaluation point is moved the number of milliseconds.\n' +
     'period: the evaluation period in milliseconds. Returns the value in this time interval. ' +
+    'If omitted, then <period> will be equal to <timeShift>\n';
+
+functions.getTimestamp = function(id, parameters, callback) {
+    if(!parameters || (!parameters[0] && !parameters[1])) { // getTimestamp() = getTimestamp(#0)
+        var shift = 0;
+        var num = '#1'; // getByIdx
+    } else {
+        shift = parameters[0];
+        num = String(parameters[0]).charAt(0) === '#' ? 1 : parameters[1] || parameters[0];
+    }
+
+    // set recordsType to null for get getTimestamp record in any cases (see cache.get())
+    history.get(id, shift, num, null, function(err, records, rawRecords) {
+        if (err) {
+            return callback(new Error('Error occurred while getting data from history for "getTimestamp(' +
+                parameters.join(', ') + ')" function for OCID: ' + id + ': ' + err.message));
+        }
+
+        if(!records || !records.length) return callback(null, {records: rawRecords});
+
+        var result = records[records.length - 1].timestamp;
+        log.debug('FUNC: getTimestamp(', parameters.join(', '), ') = ', result, '; records: ', records, {
+            func: (vars) => vars.EXPECTED_OCID === vars.OCID,
+            vars: {
+                "EXPECTED_OCID": id
+            }
+        });
+        callback(null, {
+            data: result,
+            records: rawRecords
+        });
+    });
+};
+
+functions.getTimestamp.description = 'Return a timestamp of the specific record.\n' +
+    '\n' +
+    'getTimestamp([#<recordsShift>])\n' +
+    'recordsShift: evaluation point is moved the number of records back. Default #0\n' +
+    '\n' +
+    'getTimestamp(<timeShift>, [<period>])\n' +
+    'timeShift: evaluation point is moved the number of milliseconds.\n' +
+    'period: the evaluation period in milliseconds. Returns the timestamp in this time interval. ' +
     'If omitted, then <period> will be equal to <timeShift>\n';
 
 functions.max = function(id, parameters, callback) {

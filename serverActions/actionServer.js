@@ -10,6 +10,7 @@ const log = require('../lib/log')(module);
 const IPC = require('../lib/IPC');
 const proc = require('../lib/proc');
 const setShift = require('../lib/utils/setShift')
+const unique = require('../lib/utils/unique');
 const Conf = require('../lib/conf');
 const conf = new Conf('config/common.json');
 const confActions = new Conf('config/actions.json');
@@ -25,33 +26,35 @@ const path = require("path");
 const runAction = require('./runAction');
 
 var systemUser = conf.get('systemUser') || 'system';
-var runActionProcess, runActionThread, runActionThreadByUser;
+var runActionProcess, runActionInQueue, runActionThreadNotInQueue;
 
 // initialize exit handler: dumping update events status on exit
 log.info('Starting the action runner server...');
 
 var actionsQueueSystem = new Set(),
     actionQueueUser = new Set(),
-    lastProcessedAction = {},
+    actionsInProgress = new Map(),
+    hungActions = new Map(),
     processedNotInQueue = 0,
     processedInQueue = 0,
     droppedAction = 0,
+    maxConcurrentActionsNum = 0,
     maxMemSize = confActions.get('maxMemSize') || conf.get('maxMemSize') || 4096,
     maxQueueLength = confActions.get('maxQueueLength') || 1000;
 
 /**
  * @description Action server configuration
- * @type {{serverNumber: number, userServerNumber: number, id: string}}
+ * @type {{serverNumber: number, queueServerNumber: number, id: string}}
  */
 var cfg = confActions.get();
 
-attachRunAction(cfg.serverNumber || 5, function (err, _runActionBySystemUser) {
+attachRunAction(cfg.serverNumber || 10, function (err, _runActionInQueue) {
     if(err) throw err;
 
-    attachRunAction(cfg.userServerNumber || 3, function (err, _runActionByUser) {
+    attachRunAction(cfg.queueServerNumber || 10, function (err, _runActionNotInQueue) {
         if (err) throw err;
-        runActionThread = _runActionBySystemUser;
-        runActionThreadByUser = _runActionByUser;
+        runActionInQueue = _runActionInQueue;
+        runActionThreadNotInQueue = _runActionNotInQueue;
 
         cfg.id = 'actionServer';
         new IPC.server(cfg, function (err, msg, socket, callback) {
@@ -84,19 +87,15 @@ attachRunAction(cfg.serverNumber || 5, function (err, _runActionBySystemUser) {
             maxQueueLength = confActions.get('maxQueueLength') || 1000;
             var memUsage = Math.round(process.memoryUsage().rss / 1048576);
 
-            log.info('Queue system: ', actionsQueueSystem.size , '/', maxQueueLength, ', user: ', actionQueueUser.size,
-                '; processed in queue: ', processedInQueue,
-                ', not in queue: ', processedNotInQueue,
-                '; dropped: ', droppedAction,
-                (lastProcessedAction.startTime ?
-                    '. Action "' + lastProcessedAction.action.conf.name + '" started on ' +
-                    new Date(lastProcessedAction.startTime).toLocaleString() :
-                    '. No action processing'),
+            log.info('Queue system/max/user: ', actionsQueueSystem.size , '/', maxQueueLength, '/', actionQueueUser.size,
+                '; in progress/max/hung: ', (actionsInProgress.size + processedNotInQueue), '/',
+                maxConcurrentActionsNum, '/', hungActions.size,
+                '; processed/dropped: ', processedInQueue, '/', droppedAction,
                 '. Memory: ', memUsage, 'Mb/', maxMemSize, 'Mb');
 
             droppedAction = processedInQueue = 0;
 
-            if (memUsage * 1.5 > maxMemSize && (lastProcessedAction.startTime || processedNotInQueue)) {
+            if (memUsage * 1.5 > maxMemSize && (actionsInProgress.size || hungActions.size || processedNotInQueue)) {
                 try {
                     global.gc();
                     log.warn('Processing garbage collection on server... Before ', memUsage, 'Mb, after ',
@@ -152,7 +151,7 @@ function addActionToQueue(param, callback) {
         // run ajax, addTask and notInQueue actions without queue
         // param.notInQueue set in routes/routerActions.js for run the action started by the user without a queue
         if(param.executionMode !== 'server' || actionConf.notInQueue || param.notInQueue) {
-            const myRunAction = actionConf.runActionInline ? runAction : runActionThreadByUser;
+            const myRunAction = actionConf.runActionInline ? runAction : runActionThreadNotInQueue;
             ++processedNotInQueue;
             myRunAction(param, function (err, data) {
                 --processedNotInQueue;
@@ -171,7 +170,8 @@ function addActionToQueue(param, callback) {
             // drop action if action queue too big.
             if(actionsQueueSystem.size > maxQueueLength) {
                 ++droppedAction;
-                return callback(new Error('Action queue length too big ' + actionsQueueSystem.size + '/' + maxQueueLength +
+                return callback(new Error('Action queue length too big ' + actionsQueueSystem.size + '/' +
+                    maxQueueLength +
                     ' for run action ' + param.actionID + '. Action will not be running.'));
             }
 
@@ -194,25 +194,51 @@ All actions can be running in order
  * If system queue is not empty, then run action from system queue
  */
 function runActionFromQueue() {
+    var _maxConcurrentActionsNum = confActions.get('maxConcurrentActionsNum');
+    if(!_maxConcurrentActionsNum ||
+        _maxConcurrentActionsNum !== parseInt(String(_maxConcurrentActionsNum), 10) ||
+        _maxConcurrentActionsNum < 1) _maxConcurrentActionsNum = 40;
 
-    if(lastProcessedAction.startTime) {
-        var actionTimeout = lastProcessedAction.action.conf.timeout;
-        if(Number(actionTimeout) !== parseInt(String(actionTimeout), 10) || actionTimeout < 0) actionTimeout = 60000;
-        else actionTimeout *= 1000;
+    if(maxConcurrentActionsNum !== _maxConcurrentActionsNum) {
+        if(maxConcurrentActionsNum) {
+            log.info('Parameter maxConcurrentActionsNum was changed from ', maxConcurrentActionsNum, ' to ',
+                _maxConcurrentActionsNum);
+        }
 
-        if (actionTimeout && Date.now() - lastProcessedAction.startTime < actionTimeout) return;
-
-        log.warn('Action ', lastProcessedAction.action.conf.name, ' processed from ',
-            new Date(lastProcessedAction.startTime).toLocaleString(),
-            ' (', Math.round((Date.now() - lastProcessedAction.startTime) / 1000), 'sec/', actionTimeout/1000,
-            'sec). Running the next action');
+        maxConcurrentActionsNum = _maxConcurrentActionsNum;
     }
+
+    // checking for halted actions
+    if(actionsInProgress.size > maxConcurrentActionsNum) {
+        actionsInProgress.forEach((actionInProgress, actionProgressID) => {
+            if (actionInProgress.startTime) {
+                var actionTimeout = actionInProgress.action.conf.timeout;
+                if (Number(actionTimeout) !== parseInt(String(actionTimeout), 10) || actionTimeout < 0) {
+                    actionTimeout = 60000;
+                } else actionTimeout *= 1000;
+
+                if (actionTimeout && Date.now() - actionInProgress.startTime < actionTimeout) return;
+
+                log.warn('Action ', actionInProgress.action.conf.name, ' runs for a long time. Processed from ',
+                    new Date(actionInProgress.startTime).toLocaleString(),
+                    '. Process time/Action timeout: ',
+                    Math.round((Date.now() - actionInProgress.startTime) / 1000), 'sec/',
+                    actionTimeout / 1000, 'sec');
+
+                hungActions.set(actionProgressID, actionInProgress);
+                actionsInProgress.delete(actionProgressID);
+            }
+        });
+    }
+
+    // too many concurrent actions are in progress
+    if(actionsInProgress.size > maxConcurrentActionsNum) return;
 
     // run actions from user queue
     if(actionQueueUser.size) return runQueue(actionQueueUser);
 
     // run actions from system queue
-    if(actionsQueueSystem.size) return runQueue(actionsQueueSystem);
+    if(!actionsInProgress.size && actionsQueueSystem.size) return runQueue(actionsQueueSystem);
 }
 
 /**
@@ -222,15 +248,27 @@ function runActionFromQueue() {
 function runQueue(actionQueue) {
     var action = setShift(actionQueue);
 
-    const myRunAction = action.conf.runActionInline ? runAction : runActionThread;
-    lastProcessedAction = {
+    var actionProgressID = unique.createID();
+
+    const myRunAction = action.conf.runActionInline ? runAction : runActionInQueue;
+    actionsInProgress.set(actionProgressID, {
         startTime: Date.now(),
         action: action,
-    };
+    });
     myRunAction(action.param, function (err, data) {
         ++processedInQueue;
         action.callback(err, data);
-        lastProcessedAction = {};
+        actionsInProgress.delete(actionProgressID);
+
+        if(hungActions.has(actionProgressID)) {
+            var actionInProgress = hungActions.get(actionProgressID);
+            log.info('Hung action ', actionInProgress.action.conf.name, ' is finished. Processed from ',
+                new Date(actionInProgress.startTime).toLocaleString(),
+                '. Process time/Action timeout: ',
+                Math.round((Date.now() - actionInProgress.startTime) / 1000), 'sec/',
+                actionInProgress.action.conf.timeout / 1000, 'sec');
+            hungActions.delete(actionProgressID)
+        }
         var t = setTimeout(runActionFromQueue, 0);
         t.unref();
     });
