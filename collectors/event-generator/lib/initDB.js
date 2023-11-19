@@ -190,7 +190,9 @@ function createDisabledEventsTable(db) {
             'timestamp INTEGER NOT NULL,' +
             'user TEXT NOT NULL,' +
             'commentID INTEGER NOT NULL REFERENCES comments(id) ON DELETE NO ACTION ON UPDATE CASCADE,' +
+            'disableFrom INTEGER,' + // in ms from 1970
             'disableUntil INTEGER NOT NULL,' + // in ms from 1970
+            'disableDaysOfWeek TEXT,' + // 0-6: 0 for Sunday, 1 for Monday, 2 for Tuesday, and so on
             'intervals TEXT)').run();
     } catch (err) { // time intervals is a string <fromInMs>-<toInMs>;<fromInMs>-<toInMs>;<fromInMs>-<toInMs>...
         throw(new Error('Can\'t create disabledEvents table in events database: ' + err.message));

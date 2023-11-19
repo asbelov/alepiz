@@ -174,7 +174,7 @@ countersDB.getAllParameters = function (callback) {
 
 /**
  * Get historical variables data
- * @param {string|number} counter counterID or parent counter name
+ * @param {null|string|number} counter counterID or parent counter name. null for get all counter data
  * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows): rows:
  * [{name:<variableName>, counterID, objectID, objectName, parentCounterName, function, functionParameters,
  * objectVariable, description, variableOrder, OCID, counterName, parentCounterID}]

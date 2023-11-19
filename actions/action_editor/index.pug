@@ -64,9 +64,17 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                             * Copyright © #{new Date().getFullYear()}. Alexander Belov. Contacts: <asbel@alepiz.com>
                             * Created on #{new Date().toLocaleString()}
                             */
-                            var log = require('../../lib/log')(module);
+
+                            const _log = require('../../lib/log');
 
                             module.exports = function(args, callback) {
+                                // For the audit to work correctly, all functions using log.* must be inside this function
+
+                                var log = _log({
+                                    sessionID: args.actionCfg.launcherPrms.sessionID,
+                                    filename: __filename,
+                                });
+
                                 log.info('Starting action server ', args.actionName, ' with parameters', args);
 
                                 /* Enter your server code here */
@@ -146,6 +154,12 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                             }
 
                             var JQueryNamespace = (function ($) {
+                                /**
+                                 * @name parameters
+                                 * @global
+                                 * @property {Object} action
+                                 * @property {Array} objects
+                                */
                                 $(function () {
                                     init(); // Will run after finishing drawing the page
                                 });
@@ -242,6 +256,12 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                     script(src='/materialize-css/dist/js/materialize.js')
                                     script(src='/javascripts/escapeHTML.js')
                                     script.
+                                        /**
+                                         * @name action
+                                         * @property {string} action.name
+                                         * @property {string} action.link
+                                         * @property {string} action.staticDir
+                                        */
                                         var parameters = {
                                             action: #{'!{JSON.stringify(action)}'},
                                             objects: #{'!{JSON.stringify(objects)}'}

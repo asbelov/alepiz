@@ -5,9 +5,7 @@
 const async = require('async');
 const path = require('path');
 const log = require('../../lib/log')(module);
-const Conf = require('../../lib/conf');
-const confCollectors = new Conf('config/collectors.json');
-const confSettings = new Conf(confCollectors.get('dir') + '/event-generator/settings.json');
+const getEventsDBPaths = require('./lib/getEventsDBPaths');
 const runInThread = require('../../lib/runInThread');
 
 var collector = {};
@@ -91,18 +89,7 @@ function init(callback) {
     if(initializationInProgress) return callback();
 
     initializationInProgress = true;
-    var cfg = confSettings.get();
-
-    if(Array.isArray(cfg.db) && cfg.db.length) {
-        var dbPaths = cfg.db.map(function (obj) {
-            if (obj && obj.path && obj.file) {
-                if(obj.relative) return path.join(__dirname, '..', '..', obj.path, obj.file);
-                else return path.join(obj.path, obj.file);
-            } else log.error('Can\'t create DB path from ', cfg.db, ': ', obj);
-        });
-    } else if (cfg.dbPath && cfg.dbFile) {
-        dbPaths = [path.join(__dirname, '..', '..', cfg.dbPath, cfg.dbFile)];
-    }
+    var dbPaths = getEventsDBPaths();
 
     async.each(dbPaths, function (dbPath, callback) {
         runInThread(path.join(__dirname, 'lib', 'eventGenerator.js'), {},

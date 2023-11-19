@@ -8,6 +8,12 @@ const transactions = require('../modifiers/transaction');
 const auditDB = require('../../serverAudit/auditDB');
 const async = require('async');
 
+// for DB events
+const Database = require("better-sqlite3");
+const Conf = require('../../lib/conf');
+const confCollectors = new Conf('config/collectors.json');
+const getEventsDBPaths = require('../../' + confCollectors.get('dir') + '/event-generator/lib/getEventsDBPaths');
+
 /*
 Used for modifying the DB when changing the DB structure when updating the Alepiz version
  */
@@ -18,6 +24,7 @@ var modifiersFunctions = [
     moveAuditUsersDataToTasksActions,
     remove_name_timestamp_index_onTasks,
     addTaskNamesInAuditDB,
+    addEventsDbDisableFromAndDisableDaysOfWeekColumns,
 ];
 
 module.exports = function (callback) {
@@ -261,9 +268,47 @@ function addTaskNamesInAuditDB(callback) {
                     log.info('Inserted ', insertedRows, ' rows into the taskNames table');
                 }
 
+                auditDB.close();
                 callback();
             })
 
         });
     });
+}
+
+/**
+ * Added at 12.11.2023
+ * Add disableFrom and disableDaysOfWeek columns into the events DB
+ * @param {function()|function(Error)} callback
+ */
+function addEventsDbDisableFromAndDisableDaysOfWeekColumns (callback){
+    var dbPaths = getEventsDBPaths();
+
+    dbPaths.forEach(dbPath => {
+        try {
+            var eventDB = new Database(dbPath, {});
+        } catch (err) {
+            throw(new Error('Can\'t initialise event database ' + dbPath + ': ' + err.message));
+        }
+
+        try {
+            eventDB.prepare('ALTER TABLE disabledEvents ADD COLUMN disableFrom INTEGER').run();
+            log.info('Creating new column "disableFrom" in the ' + dbPath + ' database.');
+        } catch (err) {
+            // column already exist
+            log.debug('Can\'t create new column "disableFrom" in the ' + dbPath + ' database : ' + err.message);
+        }
+
+        try {
+            eventDB.prepare('ALTER TABLE disabledEvents ADD COLUMN disableDaysOfWeek TEXT').run();
+            log.info('Creating new column "disabledEvents" in the ' + dbPath + ' database.');
+        } catch (err) {
+            // column already exist
+            log.debug('Can\'t create new column "disableDaysOfWeek" in the ' + dbPath + ' database : ' + err.message);
+        }
+
+        eventDB.close();
+    });
+
+    callback();
 }

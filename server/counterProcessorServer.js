@@ -793,16 +793,24 @@ function processChildMessage(message, callback) {
     //log.debug('Received value[s] ', values, ' from OCID ', OCID, ' getting values for depended on counters ', message);
     // run confServer.get() without parameters for speedup
     /**
+     * @type {{servers: Object}}
+     */
+    var cfg = confServer.get();
+    /**
      * @type {{returnedValuesProcessedLimit: number, sleepTimeAfterValueProcessed: number}}
      */
-    var cfg = confServer.get().servers[serverID];
+    var cfgServers = cfg.servers[serverID];
     updateCollectorData(message.collector, function (err, collectorParam) {
 
         var sleepTimeAfterValueProcessed = collectorParam.get('sleepTimeAfterValueProcessed');
-        if(!sleepTimeAfterValueProcessed) sleepTimeAfterValueProcessed = Number(cfg.sleepTimeAfterValueProcessed) || 0;
+        if(!sleepTimeAfterValueProcessed) {
+            sleepTimeAfterValueProcessed = Number(cfgServers.sleepTimeAfterValueProcessed) || 0;
+        }
 
         var returnedValuesProcessedLimit = collectorParam.get('returnedValuesProcessedLimit');
-        if(!returnedValuesProcessedLimit) returnedValuesProcessedLimit = Number(cfg.returnedValuesProcessedLimit) || 1000;
+        if(!returnedValuesProcessedLimit) {
+            returnedValuesProcessedLimit = Number(cfgServers.returnedValuesProcessedLimit) || 1000;
+        }
 
         async.eachLimit(values, returnedValuesProcessedLimit, function (value, callback) {
             // can be received from collector JavaScript
@@ -815,7 +823,7 @@ function processChildMessage(message, callback) {
                 counter.parentObjectValue = value;
             });
 
-            getCountersValues(dependedCounters, message.variables, false, cfg);
+            getCountersValues(dependedCounters, message.variables, false, cfgServers);
 
             if(values.length < 2) return callback();
 

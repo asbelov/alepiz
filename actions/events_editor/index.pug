@@ -18,28 +18,13 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         script(src='/jquery/jquery.min.js')
         script(src='/jquery-ui/jquery-ui.min.js')
         script(src='/materialize-css/dist/js/materialize.js')
+        script(src='/javascripts/escapeHTML.js')
+
         script.
             var parameters = {
                 action: !{JSON.stringify(action)},
                 objects: !{JSON.stringify(objects)}
             };
-
-            var entityMap = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;',
-                '/': '&#x2F;',
-                '`': '&#x60;',
-                '=': '&#x3D;',
-            };
-
-            function escapeHtml(string) {
-                return String(string).replace(/[&<>"'`=\/]/g, function (s) {
-                    return entityMap[s];
-                });
-            }
     body
         script(src='/javascripts/objectsSelector.js')
         script(src= action.link + '/' + action.staticDir + '/' + 'client.js')
@@ -83,24 +68,41 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
 
                     div#disabled-tab-panel.row
                         input(type="hidden")#disable-time-intervals
+                        input(type="hidden")#disableFrom
                         input(type="hidden")#disableUntil
                         input(type="hidden")#disable-comment
                         div.col.l3.m6.s6.input-field
+                            input(type="text" data-onchange-watchdog).datepicker#disableFromDate
+                            label(for="disableFromDate") From date
+                        div.col.l3.m6.s6.input-field
+                            input(type="text" data-onchange-watchdog).timepicker#disableFromTime
+                            label(for="disableFromTime") From time
+                        div.col.l3.m6.s6.input-field
                             input(type="text" data-onchange-watchdog).datepicker#disableUntilDate
-                            label(for="disableUntilDate") Disabling until date
-                        div.col.l2.m6.s6.input-field
+                            label(for="disableUntilDate") To date
+                        div.col.l3.m6.s6.input-field
                             input(type="text" data-onchange-watchdog).timepicker#disableUntilTime
-                            label(for="disableUntilTime") Disabling until time
-                        div.col.l2.m4.s4.input-field
+                            label(for="disableUntilTime") To time
+                        div.col.l3.m6.s6.input-field
+                            select(multiple data-onchange-watchdog)#disableDaysOfWeek
+                                option(value="0") Sun
+                                option(value="1") Mon
+                                option(value="2") Tue
+                                option(value="3") Wed
+                                option(value="4") Thu
+                                option(value="5") Fri
+                                option(value="6") Sat
+                            label Days of week
+                        div.col.l3.m6.s6.input-field
                             input(type="text").timepicker#disableTimeIntervalFrom
                             label(for="disableTimeIntervalFrom") From
-                        div.col.l2.m4.s4.input-field
+                        div.col.l3.m5.s6.input-field
                             input(type="text").timepicker#disableTimeIntervalTo
                             label(for="disableTimeIntervalTo") To
-                        div.col.l1.m2.s2.input-field
+                        div.col.l1.m3.s3.input-field
                             a.btn-floating.waves-effect.waves-light#add-disabled-interval-btn
                                 i.material-icons add
-                        div.col.l2.m2.s2.input-field.switch
+                        div.col.l2.m4.s3.input-field.switch
                             label
                                 span Off
                                 input(type='checkbox' data-switch-panel)#switchOnDisable

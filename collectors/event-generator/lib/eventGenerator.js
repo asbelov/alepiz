@@ -10,12 +10,14 @@ const conf = new Conf('config/common.json');
 const confCollectors = new Conf('config/collectors.json');
 const confSettings = new Conf(confCollectors.get('dir') + '/event-generator/settings.json');
 const eventActions = require('./eventsActions');
+const isEventDisabled = require('./isEventDisabled');
 const setShift = require('../../../lib/utils/setShift');
+
 
 var eventGenerator = {};
 module.exports = eventGenerator;
 
-const systemUser = conf.get('systemUser') || 'system';
+const systemUser = String(conf.get('systemUser') || 'system');
 var isEventProcessedOrNotInitialized = Date.now();
 var db,
     dbPath,
@@ -45,8 +47,6 @@ eventGenerator.init = function (_dbPath, callback) {
     callback();
 }
 
-eventGenerator.isEventDisabled = isEventDisabled; // for ajax
-
 eventGenerator.get = eventGenerator.getOnce = function (param, callback) {
     param.$dataTimestamp = Date.now();
 
@@ -70,7 +70,7 @@ eventGenerator.get = eventGenerator.getOnce = function (param, callback) {
             Stack: RangeError: Maximum call stack size exceeded
             ...
          */
-        var t = setTimeout(processQueue, 0);
+        var t = setImmediate(processQueue);
         t.unref();
     });
 }
@@ -114,7 +114,8 @@ function eventGeneratorGet(param, callback) {
                 enableEvents(db, {events: [{OCID: OCID}]});
             }
             else {
-                if(isEventDisabled(disabledEventsCache.get(OCID).intervals)) {
+                if(isEventWithOCIDDisabled(OCID,
+                    param.$variables.OBJECT_NAME + '(' + param.$variables.COUNTER_NAME + ')' )) {
                     if(!eventsCache.has(OCID)) {
                         log.info('Disabled event occurred: ', param.$variables.OBJECT_NAME,
                             '(', param.$variables.COUNTER_NAME, '): importance: ',
@@ -143,26 +144,13 @@ function eventGeneratorGet(param, callback) {
                 userName: systemUser,
                 taskID: param.problemTaskID,
                 variables: param.$variables,
-                runTaskFrom: 'eventGenerator'
+                runTaskFrom: 'eventGenerator',
+                runOnLocalNode: false,
             },function(err) {
                 if(err) log.error(err.message, ' for ', dbPath);
             });
         }
-/*
-// !!! moved to collector.js
-        if(Number(param.eventDuration) === parseInt(String(param.eventDuration), 10)) {
-            param.eventDuration = Number(param.eventDuration);
 
-            setTimeout(function(newEventID, param, callback) {
-            /// ??? solveEvent(param, eventTimestamp)
-                callback(solveEvent(param, eventTimestamp), newEventID ? 1 : undefined);
-                param.$variables.UPDATE_EVENT_STATE = 0;
-                eventGenerator.get(param, callback);
-                }, (!param.eventDuration || param.eventDuration < 1 ? 0 : param.eventDuration * 1000),
-                newEventID, param, callback);
-            return;
-        }
-*/
         // save new event to history database too
         if(newEventID) callback(null, 1);
         else callback();
@@ -193,13 +181,15 @@ function solveEvent(param, eventTimestamp) {
 
     var runTaskOnSolve = confSettings.get('runTaskOnSolve');
     if(runTaskOnSolve &&
-        (!disabledEventsCache.has(OCID) || !isEventDisabled(disabledEventsCache.get(OCID).intervals)) &&
+        (!disabledEventsCache.has(OCID) || !isEventWithOCIDDisabled(OCID,
+            param.$variables.OBJECT_NAME + '(' + param.$variables.COUNTER_NAME + ')')) &&
         Number(param.solvedTaskID) && !dontRunTask) {
         taskServer.runTask({
             userName: systemUser,
             taskID: param.solvedTaskID,
             variables: param.$variables,
             runTaskFrom: 'eventGenerator',
+            runOnLocalNode: false,
         },function(err) {
             if(err) log.error(err.message, ' for ', dbPath);
         });
@@ -273,38 +263,24 @@ function addToQueue(param, callback) {
     }
 }
 
-
-/*
-check is event disabled or enabled now
-   intervals: <from>-<to>;<from>-<to>;<from>-<to>
-
-   return true (event is disabled) or false (event is enabled)
+/**
+ * Check is event disabled
+ * @param {number} OCID event OCID
+ * @param {string} eventDescription event description for log
+ * @return {boolean} true (event is disabled) or false (event is enabled)
  */
-function isEventDisabled(intervalsStr, startTime, endTime) {
-    if(!intervalsStr) return true;
-    if(!startTime) startTime = Date.now();
-    if(!endTime) endTime = Date.now();
+function isEventWithOCIDDisabled (OCID, eventDescription) {
+    var disableFrom = disabledEventsCache.get(OCID).disableFrom;
+    var disableDaysOfWeekStr = disabledEventsCache.get(OCID).disableDaysOfWeek;
+    var intervals = disabledEventsCache.get(OCID).intervals
 
-    var eventsTimeFrom = startTime - (new Date(new Date(startTime).setHours(0,0,0,0))).getTime();
-    var eventTimeTo = endTime - (new Date(new Date(endTime).setHours(0,0,0,0))).getTime();
-    var intervals = intervalsStr.split(';');
-
-    for(var i = 0; i < intervals.length; i++) {
-        var fromTo = intervals[i].split('-');
-        if(eventsTimeFrom > Number(fromTo[0]) && eventTimeTo < Number(fromTo[1])) return true;
-    }
-    return false;
+    return isEventDisabled(eventDescription, disableFrom, disableDaysOfWeekStr, intervals);
 }
 
-/*
-    enable: {
-        events: [{
-                OCID: OCID
-            }, {
-            .....
-            }]
-    }
-    callback(err) or nothing
+/**
+ * Enable specific events
+ * @param {Object} db database object
+ * @param {{events: Array<{OCID: number}>}} enable events OCID for enable {events: [{OCID: ..}, ...]}
  */
 function enableEvents(db, enable) {
     log.info('Enable events: ', enable, ' for ' + dbPath);

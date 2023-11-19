@@ -290,9 +290,7 @@
 
         if (objects[id] && objects[id].length) {
             objects[id] = objects[id].sort(function (a, b) {
-                if(a.name.toUpperCase() < b.name.toUpperCase()) return -1;
-                if(a.name.toUpperCase() > b.name.toUpperCase()) return 1;
-                return 0;
+                return a.name.toUpperCase().localeCompare(b.name.toUpperCase());
             });
 
             addObjectsToPanel(null, function() {
@@ -530,9 +528,7 @@
 
                 Array.prototype.push.apply(objects[id], newObjects);
                 objects[id] = objects[id].sort(function (a, b) {
-                    if(a.name.toUpperCase() < b.name.toUpperCase()) return -1;
-                    if(a.name.toUpperCase() > b.name.toUpperCase()) return 1;
-                    return 0;
+                    return a.name.toUpperCase().localeCompare(b.name.toUpperCase());
                 });
             }
             if(elmTag === 'SELECT') $(elm).val(objects[id].length ? objects[id].map(function(object){ return object.id }): []);

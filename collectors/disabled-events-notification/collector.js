@@ -42,6 +42,24 @@ module.exports = collector;
 
 var db;
 
+/**
+ * Informs about the upcoming enable of disabled events
+ * @param {Object} param collector parameters
+ * @param {number} param.daysBeforeEnable number of days before the events will be enabled
+ * @param {string} param.disablePeriod events disable period in days
+ * @param {function(Error)|function(null, {
+ *     counterID: number,
+ *     objectName: string,
+ *     counterName: string,
+ *     disableUntil: string,
+ *     disableFrom: string,
+ *     disableDaysOfWeek: string,
+ *     disableTime: string,
+ *     user: string,
+ *     timeIntervals: number
+ * })} callback callback(err, result)
+ * @return {*}
+ */
 collector.get = function(param, callback) {
 
     if(!db) return initDB(param, callback);
@@ -50,9 +68,11 @@ collector.get = function(param, callback) {
     var disablePeriod = Number(param.disablePeriod) * 86400000;
 
     try {
-        var rows = db.prepare('SELECT events.counterID AS counterID, events.objectName AS objectName, events.counterName AS counterName, ' +
+        var rows = db.prepare('SELECT events.counterID AS counterID, events.objectName AS objectName, ' +
+            'events.counterName AS counterName, ' +
             'disabledEvents.disableUntil AS disableUntil, disabledEvents.timestamp AS timestamp,' +
             'disabledEvents.user AS user, disabledEvents.intervals AS disableIntervals ' +
+            'disabledEvents.disableFrom AS disableFrom, disabledEvents.disableDaysOfWeek AS disableDaysOfWeek ' +
             'FROM disabledEvents JOIN events ON disabledEvents.eventID = events.id ' +
             'WHERE disabledEvents.disableUntil < ? AND disabledEvents.disableUntil - disabledEvents.timestamp > ?')
             .all([checkTime, disablePeriod]);
@@ -81,6 +101,9 @@ collector.get = function(param, callback) {
             objectName: row.objectName,
             counterName: row.counterName,
             disableUntil: new Date(row.disableUntil).toLocaleString().replace(/\.\d\d\d\d,/, ''),
+            disableFrom: row.disableFrom ?
+                new Date(row.disableFrom).toLocaleString().replace(/\.\d\d\d\d,/, '')  : '-',
+            disableDaysOfWeek: row.disableDaysOfWeek || '-',
             disableTime: new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, ''),
             user: row.user,
             timeIntervals: disabledTimeIntervals || '-',
@@ -90,12 +113,10 @@ collector.get = function(param, callback) {
     callback(null, results);
 };
 
-/*
-    destroy objects when reinitialize collector
-    destroy function is not required and can be skipping
-
-    callback(err);
-*/
+/**
+ * Destroy objects when reinitialize collector
+ * @param {function(Error)|function()} callback callback(err)
+ */
 collector.destroy = function(callback) {
     /* if has an objects, that can be destroyed while reinitialize collectors
         do this here
@@ -111,6 +132,11 @@ collector.destroy = function(callback) {
     callback();
 };
 
+/**
+ * Initialize the events database
+ * @param {Object} param collector parameters
+ * @param {function(Error)|function()} callback callback(err
+ */
 function initDB(param, callback) {
     var dbPath = path.join(__dirname, '..', '..',
         confOptionsEventGenerator.get('dbPath'),

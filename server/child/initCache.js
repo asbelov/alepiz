@@ -38,7 +38,7 @@ module.exports = initCache;
  *         }
  *     },
  *     variablesHistory: Map<counterID: Number, Map<
- *         <historicalVariableName>:
+ *         <historicalVariableName>: {
  *              name: String,
  *              counterID: Number,
  *              objectID: Number,
@@ -51,7 +51,7 @@ module.exports = initCache;
  *              variableOrder: String,
  *              OCID: Number,
  *              counterName: String,
- *              parentCounterID: Number
+ *              parentCounterIDs: Set<number>
  *         }, ... ,
  *    variablesExpressions: Map<counterID: Number, Map<
  *         <expressionVariableName>: {

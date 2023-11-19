@@ -15,7 +15,7 @@ const Conf = require('../../lib/conf');
 const confCollectors = new Conf('config/collectors.json');
 const confActions = new Conf('config/actions.json');
 const confOptionsEventGenerator = new Conf(confCollectors.get('dir') + '/event-generator/settings.json');
-var eventDisabled = require('../../' + confCollectors.get('dir') + '/event-generator/lib/eventGenerator').isEventDisabled; // only for isEventsDisabled()
+var isEventDisabled = require('../../' + confCollectors.get('dir') + '/event-generator/lib/isEventDisabled');
 var checkIDs = require('../../lib/utils/checkIDs');
 
 var db;
@@ -28,6 +28,15 @@ function ajax(args, callback) {
 
     if(args.hostPort) hostPort = args.hostPort;
 
+    /**
+     *
+     * @type {{
+     *     restrictions: {
+     *         Default: Object,
+     *     },
+     *     actions: Array<{id: number, name: string}>
+     * }}
+     */
     var cfg = args.actionCfg;
     if(!cfg || !cfg.restrictions) return callback(new Error('Can\'t find "restrictions" in action configuration'));
 
@@ -47,6 +56,23 @@ function ajax(args, callback) {
 
         var role = rows[0].roleName;
         if(!role) return callback(new Error('Can\'t find any role for user ' + args.username + '(' + user +')'));
+
+        /**
+         *
+         * @type {{
+         *     Importance: number,
+         *     Sound: Boolean,
+         *     Hints: Boolean,
+         *     Info: Boolean,
+         *     History: Boolean,
+         *     Links: Boolean,
+         *     Message: Boolean,
+         *     Historical: Boolean,
+         *     Current: Boolean,
+         *     Disabled: Boolean,
+         *     Comments: Boolean
+         * }}
+         */
         var restrictions = cfg.restrictions[role] || cfg.restrictions.Default;
         if(!restrictions) {
             return callback(new Error('Can\'t find restrictions for role ' + role + ' user ' + args.username +
@@ -156,7 +182,9 @@ SELECT events.id AS id, events.OCID AS OCID, events.parentOCID AS parentOCID, ev
 events.counterID AS counterID, events.counterName AS counterName, events.data AS eventDescription, \
 events.timestamp AS timestamp, events.importance AS importance, events.commentID AS commentID, \
 events.startTime AS startTime, events.endTime AS endTime, events.pronunciation AS pronunciation, \
-disabledEvents.disableUntil AS disableUntil, disabledEvents.intervals AS disableIntervals, disabledEvents.user AS disableUser \
+disabledEvents.disableUntil AS disableUntil, disabledEvents.intervals AS disableIntervals, \
+disabledEvents.user AS disableUser, disabledEvents.disableFrom AS disableFrom, \
+disabledEvents.disableDaysOfWeek AS disableDaysOfWeek \
 FROM events \
 LEFT JOIN disabledEvents ON disabledEvents.eventID=events.id \
 WHERE (' + condition.join(' OR ') + ') AND events.importance <= ? ' +
@@ -195,13 +223,17 @@ ORDER BY disabledEvents.eventID DESC, events.startTime DESC').all(queryParameter
                 event.disableUntil = disabledOCID[event.OCID].disableUntil;
                 event.disableIntervals = disabledOCID[event.OCID].disableIntervals;
                 event.disableUser = disabledOCID[event.OCID].disableUser;
+                event.disableFrom = disabledOCID[event.OCID].disableFrom;
+                event.disableDaysOfWeek = disabledOCID[event.OCID].disableDaysOfWeek
             }
 
             //log.info('event all: ', event.objectName, ':', event.counterName, ':', event);
             // sort events
             if (!event.disableUntil ||
                 event.disableUntil < now ||
-                !eventDisabled(event.disableIntervals, event.startTime, event.endTime)) {
+                    !isEventDisabled( event.objectName + '(' + event.counterName + ') from ajax',
+                        event.disableFrom, event.disableDaysOfWeek, event.disableIntervals,
+                    event.startTime, event.endTime)) {
 
                 //log.info('event prn: ', event.objectName, ':', event.counterName, ':', event);
                 if (args.getDataForCurrentEvents && event.endTime === null ) current.push(event);
@@ -228,7 +260,9 @@ SELECT events.id AS id, events.OCID AS OCID, events.parentOCID AS parentOCID, ev
 events.counterID AS counterID, events.counterName AS counterName, events.data AS eventDescription, \
 events.timestamp AS timestamp, events.importance AS importance, events.commentID AS commentID, \
 events.startTime AS startTime, events.endTime AS endTime, events.pronunciation AS pronunciation, \
-disabledEvents.disableUntil AS disableUntil, disabledEvents.intervals AS disableIntervals, disabledEvents.user AS disableUser \
+disabledEvents.disableUntil AS disableUntil, disabledEvents.intervals AS disableIntervals, \
+disabledEvents.user AS disableUser, disabledEvents.disableFrom AS disableFrom, \
+disabledEvents.disableDaysOfWeek AS disableDaysOfWeek \
 FROM events \
 LEFT JOIN disabledEvents ON disabledEvents.eventID=events.id \
 WHERE events.OCID = ? AND events.importance <= ? \
@@ -241,6 +275,25 @@ ORDER BY disabledEvents.eventID DESC, events.startTime DESC LIMIT 100').all([OCI
     });
 }
 
+/**
+ *
+ * @param {Object} args ajax args
+ * @param {number} args.from get events from date
+ * @param {number} args.to get events to date
+ * @param {Object} args.ObjectsIDs an array with object IDs
+ * @param maxImportance max event importance
+ * @param {function(Error)|function(null, Array<{
+ *     id: number,
+ *     timestamp: number,
+ *     user: string,
+ *     recipients: string,
+ *     subject: string,
+ *     comment: string,
+ *     eventsCount: number,
+ *     importance: number,
+ *
+ * }>)} callback callback(err, result)
+ */
 function getDashboardDataForHistoryCommentedEvents (args, maxImportance, callback) {
 
     // convert time from UTC for support different TZ in browser and server

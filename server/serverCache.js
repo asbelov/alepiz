@@ -23,7 +23,7 @@ module.exports = createCache;
  * @param {Array<number>} updateMode.getVariablesExpressions countersIDs
  * @param {Array<number>} updateMode.geObjectsProperties objectID
  * @param {string} serverName server name for log
- * @param {function()|function(Error, Object, Object, Object, Object)} callback(err, counterObjectNames, {
+ * @param {function()|function(Error, Object, Object, Object, Object)} callback callback(err, counterObjectNames, {
  *      OCIDs: Map(<OCID>, <Map(<objectID>, <counterID>)>
  *      objects: Map(<objectID, objectName>)
  *      objectName2OCID: Map(<objectNameInUpperCase>, <Map(<counterID>, <OCID>)>)
@@ -255,7 +255,19 @@ function getVariables(initIDs, func, key, variables, debugStr, callback) {
             rows.forEach(function (row) {
                 var id = row[key];
                 if(!variables.has(id)) variables.set(id, new Map());
-                variables.get(id).set(row.name, row);
+                var variablesForCounter = variables.get(id);
+
+                if(!variablesForCounter.has(row.name)) {
+                    if(row.parentCounterID !== undefined) {
+                        row.parentCounterIDs = new Set([row.parentCounterID]);
+                        delete row.parentCounterID;
+                    }
+                    variablesForCounter.set(row.name, row);
+                } else {
+                    if(row.parentCounterID) {
+                        variablesForCounter.get(row.name).parentCounterIDs.add(row.parentCounterID);
+                    } else variablesForCounter.set(row.name, row);
+                }
             });
             log.debug('Update cache ', debugStr, ': ', variables.size);
             callback();

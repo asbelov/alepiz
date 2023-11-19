@@ -70,7 +70,7 @@ function runDelayedTransaction(err, callback) {
     var delayedCallback = setShift(delayedCallbacks);
     // trying to fix bug with RangeError: Maximum call stack size exceeded
     // transaction.begin(delayedCallback);
-    var t = setTimeout(transaction.begin, 0, delayedCallback);
+    var t = setImmediate(transaction.begin, delayedCallback);
     t.unref();
     callback(err);
 }

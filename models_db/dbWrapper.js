@@ -311,7 +311,6 @@ db.all = function (sql, args) {
  *  execution result
  */
 db.exec = function (sql, callback) {
-    // db.exec('PRAGMA wal_checkpoint(TRUNCATE)', function(err) {});
     if(sql.toUpperCase().trim().indexOf('PRAGMA ') === 0) {
         sql = sql.replace(/\s*PRAGMA */i, '');
         try {
@@ -363,7 +362,7 @@ function STMT(sql, prepareArgs) {
     if (prepareArgs.length > 0 && typeof prepareArgs[prepareArgs.length - 1] === 'function') {
         var callback = prepareArgs.pop();
         if (typeof callback === 'function') {
-            var t = setTimeout(callback, 0);
+            var t = setImmediate(callback);
             t.unref();
         }
     }

@@ -120,6 +120,9 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                         "April", "May", "June", "July", "August", "September", "October", "November",
                                         "December"]
                                     li.
+                                        dayNames - массив с названиями дней недели, начиная с воскресенья.
+                                        ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+                                    li.
                                         actions - действия, которые можно вызвать для объекта, с которым произошло событие.
                                         Ссылки на действия отображаются в столбце Info для таблиц Historical events,
                                         Current events и Disabled events.
@@ -366,8 +369,15 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                                 'ENABLE' или 'DISABLE'. Может использоваться только в секциях
                                                 disableEvents или enableEvents
                                             li.
+                                                %:DISABLE_FROM:% - при отключении события время c которого событие
+                                                будет отключено. Может использоваться только в секции disableEvents
+                                            li.
                                                 %:DISABLE_UNTIL:% - при отключении события время до которого событие
                                                 будет отключено. Может использоваться только в секции disableEvents
+                                            li.
+                                                %:DISABLE_DAYS_OF_WEEK:% - при отключении события
+                                                дни недели в которые событие будет отключено.
+                                                Может использоваться только в секции disableEvents
                                             li.
                                                 %:NEW_DISABLE_TIME_INTERVAL:% - при отключении события новый интервал
                                                 времени для отключения. Может использоваться только в секции disableEvents
@@ -451,13 +461,13 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                                                 &quot;tables&quot;: [&quot;currentEvents&quot;],
                                                                 &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(0,138,0);\&quot;&gt;Following events was marked as solved:&lt;/strong&gt;&lt;/h3&gt;&quot;,
                                                                 &quot;eventTemplate&quot;: &quot;&lt;p&gt;&lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/p&gt;&quot;,
-                                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;ervalsDivider&quot;: &quot;,\n\t\t\tand &quot;
+                                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;errValuesSeparator&quot;: &quot;,\n\t\t\t and &quot;
                                                             },
                                                             &quot;disableEvents&quot;: {
                                                                 &quot;subject&quot;: &quot;Disable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
                                                                 &quot;objectsListLength&quot;: 100,
                                                                 &quot;countersListLength&quot;: 300,
-                                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(0,0,0);\&quot;&gt;Following events was disabled until %:DISABLE_UNTIL:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.&lt;/strong&gt;&lt;/h3&gt;&quot;,
+                                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(0,0,0);\&quot;&gt;Following events was disabled from %:DISABLE_FROM:% to %:DISABLE_UNTIL:% on %:DISABLE_DAYS_OF_WEEK:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.&lt;/strong&gt;&lt;/h3&gt;&quot;,
                                                                 &quot;eventTemplate&quot;: &quot;&lt;p&gt;%:ACTION:%: &lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/p&gt;&quot;,
                                                                 &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                                             },
@@ -468,7 +478,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                                                 &quot;tables&quot;: [&quot;disabledEvents&quot;],
                                                                 &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(0,71,178);\&quot;&gt;Following events was enabled:&lt;/strong&gt;&lt;/h3&gt;&quot;,
                                                                 &quot;eventTemplate&quot;: &quot;&lt;p&gt;%:ACTION:%: &lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/p&gt;&quot;,
-                                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;lsDivider&quot;: &quot;,\n\t\t\tand &quot;
+                                                                &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;lsDivider&quot;: &quot;,\n\t\t\t and &quot;
                                                             }
                                                         }
                                     li.
@@ -609,6 +619,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                         "updateInterval": 15,
                                         "commentsInterval": 3,
                                         "monthNames": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+                                        "dayNames": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
                                         "actions": [{
                                             "ID": "data_browser",
                                             "name": "graph"
@@ -731,7 +742,7 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                                                 &quot;subject&quot;: &quot;Disable events: %:OBJECTS_LIST:%: %:COUNTERS_LIST:%&quot;,
                                                 &quot;objectsListLength&quot;: 100,
                                                 &quot;countersListLength&quot;: 300,
-                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(0,0,0);\&quot;&gt;Following events was disabled until %:DISABLE_UNTIL:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.&lt;/strong&gt;&lt;/h3&gt;&quot;,
+                                                &quot;bodyHeader&quot;: &quot;&lt;br/&gt;&lt;br/&gt;&lt;h3&gt;&lt;strong style=\&quot;color: rgb(0,0,0);\&quot;&gt;Following events was disabled from %:DISABLE_FROM:% to %:DISABLE_UNTIL:% on %:DISABLE_DAYS_OF_WEEK:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.&lt;/strong&gt;&lt;/h3&gt;&quot;,
                                                 &quot;eventTemplate&quot;: &quot;&lt;p&gt;%:ACTION:%: &lt;strong&gt;%:OBJECT_NAME:%:&lt;/strong&gt;&lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/p&gt;&quot;,
                                                 &quot;intervalsDivider&quot;: &quot;&lt;p&gt;&lt;blockquote&gt;and &lt;span style=\&quot;color: rgb(0,102,204);\&quot;&gt; %:EVENT_DESCRIPTION:%&lt;/span&gt; occurred at &lt;strong&gt;%:EVENT_TIME:%&lt;/strong&gt;&lt;/blockquote&gt;&lt;/p&gt;&quot;
                                             },
@@ -1072,28 +1083,28 @@ html(lang="ru" xml:lang="ru" xmlns="http://www.w3.org/1999/xhtml")
                         системы мониторинга. В этом случае можно воспользоваться Solve problem. Событие принудительно
                         будет помечено как решенное.
 
-                    h5 Disable selected events until...
+                    h5 Disable selected events
                     p.
                         Можно временно отключить генерацию события. Например, ночью выполняется резервное копирование
                         сервера и дисковая подсистема в это время загружена выше нормы. Самый простой способ не получать
                         сообщения каждую ночь о высокой загрузке дисковой подсистемы - это на время резервного
                         копирования отключить такое событие.
+                    ul.browser-default
+                        li From date - дата с которой событие будет отключено. Это обязательный элемент для заполнения.
 
-                    h6 Date
-                    p.
-                        Дата до которой событие будет отключено. Это обязательный элемент для заполнения.
-                        Возможно, в будущем расписание события поменяется и для того, чтобы возобновилось
-                        информирование служит дата окончания события
+                        li.
+                            From time - время c которого событие будет отключено (с учетом указанной даты).
+                            Это обязательный элемент для заполнения.
+                        li To date - дата до которой событие будет отключено. Это обязательный элемент для заполнения.
 
-                    h6 Time
-                    p.
-                        Время до которого событие будет отключено (с учетом указанной даты). Это обязательный
-                        элемент для заполнения.
-
-                    h6 In time interval per day &lt;From&gt; &lt;To&gt;
-                    p.
-                        Если указан временной интервал, то событие будет отключено только на указанный временной
-                        интервал внутри суток.
+                        li.
+                            To time - время до которого событие будет отключено (с учетом указанной даты). Это обязательный
+                            элемент для заполнения.
+                        li on days - дни недели в которые событие будет отключено.
+                        li.
+                            in time interval per day &lt;From&gt; &lt;To&gt; -
+                            если указан временной интервал, то событие будет отключено только на указанный временной
+                            интервал внутри суток.
                     p.
                         Если временной интервал для выбранного события уже был установлен, новый временной интервал будет
                         добавлен к предыдущему. Если временные интервалы пересекаются, система объединит интервалы

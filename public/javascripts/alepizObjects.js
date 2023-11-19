@@ -552,9 +552,7 @@ var alepizObjectsNamespace = (function($) {
             html = elements.sort(function (a, b) {
                 if (a.sortPosition > b.sortPosition) return 1;
                 if (a.sortPosition < b.sortPosition) return -1;
-                if (a.name.toUpperCase() > b.name.toUpperCase()) return 1;
-                if (a.name.toUpperCase() < b.name.toUpperCase()) return -1;
-                return 0;
+                return a.name.toUpperCase().localeCompare(b.name.toUpperCase())
             }).map(function (obj) {
                 var id = Array.isArray(obj.id) ? obj.id.join('-') : obj.id;
                 return ('\

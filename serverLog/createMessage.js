@@ -93,23 +93,45 @@ createMessage.createHeader = function (level, label, sessionID, date, TID_PID) {
  * Convert args to string and create message body
  * @param {Array} args array of the message parts. Parts can be any types
  * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} level message debug level
- * @param {number} objectDepth object depth for log object
+ * @param {{
+ *     printObjectWithDepth: number,
+ *     printMaxArrayLength: number,
+ *     printMaxStringLength: number,
+ *     printCompactLevel: number,
+ *     printBreakLength: number,
+ * }} cfg log object size
  * @returns {string} message body
  */
-createMessage.createBody = function (args, level, objectDepth) {
+createMessage.createBody = function (args, level, cfg) {
+
+    var objectDepth = Number(cfg.printObjectWithDepth) || 10;
+    var maxArrayLength = Number(cfg.printMaxArrayLength) || 100;
+    var maxStringLength = Number(cfg.printMaxStringLength) || 2000;
+    var compactLevel = cfg.printCompactLevel === false ? false : Number(cfg.printCompactLevel) || 10;
+    var breakLength= Number(cfg.printBreakLength) || 80;
+
     return args.map(arg => {
-        if (typeof arg === 'number'/* || !isNaN(arg)*/) return setColor(String(arg), 'number');
-        if (typeof arg === 'string') return setColor(arg.replace(/[\r\n]+$/, ''), level);
+        if (typeof arg === 'number') return setColor(String(arg), 'number');
         if (typeof arg === 'boolean') return setColor(String(arg), 'boolean');
+        if (typeof arg === 'string') {
+            if(arg.length > maxStringLength) arg = arg.substring(0, maxStringLength) + '...';
+            return setColor(arg.replace(/[\r\n]+$/, ''), level);
+        }
 
         try {
-            var str = (util.inspect(arg, {
+            return (util.inspect(arg, {
                 colors: true,
                 showHidden: true,
                 depth: objectDepth,
+                maxArrayLength: maxArrayLength,
+                maxStringLength: maxStringLength, // strings in the objects
+                compact: compactLevel,
+                breakLength: breakLength,
             }));
 
-            return str.split('\n').length > 1 ? '\n' + str : str.replace('\n', '');
+            // use util.inspect formatting
+            //if (typeof arg === 'string') return str.replace(/[\r\n]+$/, '');
+            //return str.split('\n').length > 1 ? '\n' + str : str.replace('\n', '');
         } catch(err) {
             return '(ERROR CONVERTING OBJECT TO STRING: ' + err.message+')'
         }

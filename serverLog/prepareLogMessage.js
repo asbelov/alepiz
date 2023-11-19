@@ -51,7 +51,7 @@ function prepareLogMessage(level, args, options, label) {
     }
 
     var message =
-        createMessage.createBody(args, level, Number(cfg.printObjectWithDepth) || 10);
+        createMessage.createBody(args, level, cfg);
 
     return {
         level: level,

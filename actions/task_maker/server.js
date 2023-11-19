@@ -357,12 +357,19 @@ function removeTasks(username, removedTaskIDs, workflow, callback) {
         }
 
         async.eachSeries(removedTaskIDs, function (removedTaskID, callback) {
-            /*
-            first we send the message, then we delete the task, because we cannot get the properties of the task
-            to send the message after deleting the task
-             */
-            tasks.processWorkflows(username, removedTaskID, workflow, 'remove', null,function() {
-                tasksDB.removeTask(username, removedTaskID, callback);
+            tasksDB.cancelTask(username, removedTaskID, function(err) {
+                if (err) {
+                    log.error('User ', username, ': error while canceling the task ', removedTaskID,
+                        '  in DB before removing: ', err);
+                }
+                taskClient.cancelTask(removedTaskID);
+                /*
+                first we send the message, then we delete the task, because we cannot get the properties of the task
+                to send the message after deleting the task
+                 */
+                tasks.processWorkflows(username, removedTaskID, workflow, 'remove', null, function () {
+                    tasksDB.removeTask(username, removedTaskID, callback);
+                });
             });
         }, function(err) {
             if(err) return transactionsDB.rollback(err, callback);

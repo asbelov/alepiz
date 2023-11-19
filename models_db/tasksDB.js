@@ -179,7 +179,7 @@ WHERE tasks.timestamp >= $timestampFrom AND tasks.timestamp <= $timestampTo AND 
             'OR (tasksParameters.name="o" AND tasksParameters.value regexp $objectSearchStrFromName)' : '') +
         (param.taskID ? ' AND tasks.id=$taskID OR ' +
             '(tasksParameters.name="o" AND tasksParameters.value regexp $objectSearchStrFromID)' : '') +
-        (!param.taskID && !param.taskName ? ' AND tasks.groupID = $groupID' : '') +
+        (!param.taskID && !taskName && !creatorName ? ' AND tasks.groupID = $groupID' : '') +
         ' ORDER by tasks.timestamp DESC LIMIT 500', {
 
             $timestampFrom: timestampFrom,
@@ -216,7 +216,7 @@ WHERE tasks.timestamp <= $timestampTo AND \
                 'OR (tasksParameters.name="o" AND tasksParameters.value regexp $objectSearchStrFromName)' : '') +
             (param.taskID ? ' AND tasks.id=$taskID OR ' +
                 '(tasksParameters.name="o" AND tasksParameters.value regexp $objectSearchStrFromID)' : '') +
-        (!param.taskID && !param.taskName ? ' AND tasks.groupID = $groupID' : '') +
+        (!param.taskID && !param.taskName  && !creatorName ? ' AND tasks.groupID = $groupID' : '') +
         ' ORDER by tasks.timestamp DESC LIMIT 500', {
 
                     $timestampTo: timestampTo,

@@ -2,6 +2,7 @@
  * Copyright © 2021. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
+const _log = require('../../../lib/log');
 var log = require('../../../lib/log')(module);
 
 var eventsCache = new Map(), disabledEventsCache = new Map();
@@ -23,7 +24,14 @@ function init(cache, _enableEvents, _onSolvedEvent, _onEvent) {
 }
 
 function dashboard(db, param) {
-    //log.info('Run event action: ', param);
+    /*
+    log = _log({
+        sessionID: param.sessionID,
+        filename: __filename,
+    });
+     */
+
+    log.debug('Run event action: ', param);
 
     try {
         var stmt = db.prepare('SELECT id, OCID, counterID FROM events WHERE id=?');
@@ -96,6 +104,8 @@ param = {
 
     enableDisabled: enable or disable events
     disableUntil: <timestamp>
+    disableFrom: <timestamp>
+    disableDaysOfWeek: string
     intervals:
     subject:
     comment:
@@ -104,6 +114,10 @@ param = {
  */
 
 function eventEditor(db, param) {
+    log = _log({
+        sessionID: param.sessionID,
+        filename: __filename,
+    });
 
     var transaction = db.transaction(() => {
 
@@ -148,6 +162,8 @@ function eventEditor(db, param) {
             recipients: null,
             comment: param.comment,
             disableUntil: param.disableUntil,
+            disableFrom: param.disableFrom,
+            disableDaysOfWeek: param.disableDaysOfWeek,
             intervals: param.intervals,
             replaceIntervals: true,
         });
@@ -246,9 +262,9 @@ function removeTimeIntervals(db, timeIntervals) {
         }).join(';') || null;
 
         try {
-            db.run('UPDATE disabledEvents SET intervals=$intervals WHERE OCID=$OCID', {
+            db.prepare('UPDATE disabledEvents SET intervals=$intervals WHERE OCID=$OCID').run({
                 OCID: event.OCID,
-                intervals: newTimeIntervals
+                intervals: newTimeIntervals,
             });
         } catch (err) {
             return log.warn('Can\'t update time interval to ' + newTimeIntervals +
@@ -277,6 +293,9 @@ comment: {
     comment: comment
     disableUntil: timestamp
     intervals: <timeFrom>-<timeTo>; <timeFrom>-<timeTo>;
+    disableFrom: <timestamp>
+    disableDaysOfWeek: string
+
 }
 
 callback(err)
@@ -302,16 +321,35 @@ function addCommentsOrDisableEvents(db, param) {
         log.info('Disable ', param.events.length, ' events: ', (param.events.length < 5 ? param : param.subject) );
 
         if(!param.disableUntil || Number(param.disableUntil) !== parseInt(String(param.disableUntil), 10) ||
-            param.disableUntil < Date.now() + 120000)
-            return log.warn('Disable time limit is not set or incorrect for ', param);
+            param.disableUntil < Date.now() + 120000) {
+            return log.warn('End time for disable event is not set or incorrect: ', param);
+        } else param.disableUntil = Number(param.disableUntil)
+
+        if(param.disableFrom) {
+            if(Number(param.disableFrom) !== parseInt(String(param.disableFrom), 10) ||
+                param.disableFrom >= param.disableUntil)
+            {
+                return log.warn('Start time for disable event is incorrect: ', param);
+            }
+            param.disableFrom = Number(param.disableFrom);
+        }
+
+        if(param.disableDaysOfWeek) {
+            var daysOfWeek = param.disableDaysOfWeek.split(',');
+            if(!daysOfWeek.every(dayOfWeek => [0,1,2,3,4,5,6].indexOf(Number(dayOfWeek)) !== -1)) {
+                return log.warn('Disable days of week are incorrect: ', param);
+            }
+        } else param.disableDaysOfWeek = null;
 
         if (param.intervals) {
             var intervals = param.intervals.split(';');
             for (var i = 0; i < intervals.length; i++) {
                 var fromTo = intervals[i].split('-');
                 if (fromTo.length !== 2 ||
-                    Number(fromTo[0]) !== parseInt(fromTo[0], 10) || Number(fromTo[0]) < 0 || Number(fromTo[0] > 86400000) ||
-                    Number(fromTo[1]) !== parseInt(fromTo[1], 10) || Number(fromTo[1]) < 0 || Number(fromTo[1] > 86400000)) {
+                    Number(fromTo[0]) !== parseInt(fromTo[0], 10) || Number(fromTo[0]) < 0 ||
+                        Number(fromTo[0] > 86400000) ||
+                    Number(fromTo[1]) !== parseInt(fromTo[1], 10) || Number(fromTo[1]) < 0 ||
+                        Number(fromTo[1] > 86400000)) {
                     return log.warn('Invalid time interval "' + intervals[i] + '" for disable events: ', param);
                 }
             }
@@ -350,11 +388,14 @@ function addCommentsOrDisableEvents(db, param) {
                         null;
                 }
 
-                query = 'UPDATE disabledEvents SET eventID=$eventID, timestamp=$timestamp, user=$user, commentID=$commentID, ' +
-                    'disableUntil=$disableUntil, intervals=$intervals WHERE OCID=$OCID';
+                query = 'UPDATE disabledEvents SET eventID=$eventID, timestamp=$timestamp, user=$user, ' +
+                    'commentID=$commentID, disableUntil=$disableUntil, disableFrom=$disableFrom, ' +
+                    'disableDaysOfWeek=$disableDaysOfWeek, intervals=$intervals WHERE OCID=$OCID';
             } else {
-                query = 'INSERT INTO disabledEvents (eventID, OCID, timestamp, user, disableUntil, intervals, commentID) ' +
-                    'VALUES ($eventID, $OCID, $timestamp, $user, $disableUntil, $intervals, $commentID)';
+                query = 'INSERT INTO disabledEvents (eventID, OCID, timestamp, user, disableUntil, disableFrom, ' +
+                    'disableDaysOfWeek, intervals, commentID) ' +
+                    'VALUES ($eventID, $OCID, $timestamp, $user, $disableUntil, $disableFrom, $disableDaysOfWeek, ' +
+                    '$intervals, $commentID)';
             }
             try {
                 db.prepare(query).run({
@@ -362,7 +403,9 @@ function addCommentsOrDisableEvents(db, param) {
                     OCID: eventOCID,
                     timestamp: timestamp,
                     user: param.user,
-                    disableUntil: Number(param.disableUntil),
+                    disableUntil: param.disableUntil,
+                    disableFrom: param.disableFrom ? param.disableFrom : null,
+                    disableDaysOfWeek: param.disableDaysOfWeek,
                     intervals: clearIntervals(param.intervals),
                     commentID: param.commentID
                 });

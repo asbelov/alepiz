@@ -71,13 +71,13 @@ function truncateWal(dbPath, db, maxWalSize) {
         return;
     }
 
-    if(Date.now() - lastTruncate < 30000) return;
+    if(truncateInProgress || Date.now() - lastTruncate < 30000) return;
     lastTruncate = Date.now();
     truncateInProgress = true;
     try {
         var stat = fs.statSync(dbPath + '-wal');
     } catch (err) {
-        if (err.code !== 'ENOENT') return log.error('Can\'t stat ', dbPath + '-wal: ', err.message);
+        if (err.code !== 'ENOENT') return log.info('Can\'t stat ', dbPath + '-wal: ', err.message);
     }
 
     if (stat.size > maxWalSize) {

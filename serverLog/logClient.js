@@ -57,6 +57,24 @@ module.exports = function (parentModule) {
         }
     }
 
+    /**
+     * @type {{
+     *      debug: Function,
+     *      info: Function,
+     *      warn: Function,
+     *      error: Function,
+     *      exit: Function,
+     *      throw: Function,
+     *      [raw]: Function,
+     *      [options]: Function,
+     *      [addNewSession]: Function,
+     *      [addSessionResult]: Function,
+     *      [addTaskComment]: Function,
+     *      [addActionComment]: Function,
+     *      [getAuditData]: Function,
+     *      [disconnect]: Function,
+     * }}
+     */
     var logObj = createLogObject(parentModule, sessionID, label, sendToLogServer);
 
     logObj.raw = function(level, args) {

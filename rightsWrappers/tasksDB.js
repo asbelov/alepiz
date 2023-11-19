@@ -33,7 +33,7 @@ rightsWrapper.checkActionsRights = function(username, actionIDs, checkedRights, 
     username = prepareUser(username);
 
     if(!Array.isArray(actionIDs) || !actionIDs.length) {
-        return callback(new Error('Error in actions specified for checking rights: ' +
+        return callback(new Error('An empty list of actions for rights verification was received. List of actions: ' +
             JSON.stringify(actionIDs, null, 4) ));
     }
 
@@ -293,13 +293,22 @@ rightsWrapper.addOrUpdateTask = function(username, task, actions, callback) {
 
     tasksDB.getActionsIDs(task.actionsOrder, function(err, taskActionID2actionID) {
         if (err) {
-            return callback(new Error('Can\'t get actions IDs by taskActionID IDs "' + task.actionsOrder + '": ' +
-            err.message));
+            return callback(new Error('Error while get actions IDs by taskActionID IDs "' +
+                JSON.stringify(task.actionsOrder, null, 4) + '": ' + err.message));
+        }
+
+        var actionList = Object.values(taskActionID2actionID);
+        if(!actionList.length) {
+            return callback(new Error('Can\'t get actions IDs by taskActionID IDs "' +
+                JSON.stringify(task.actionsOrder, null, 4) +
+                '": no actions were returned: ' + JSON.stringify(taskActionID2actionID. null, 4)));
         }
 
         rightsWrapper.checkActionsRights(username, Object.values(taskActionID2actionID), 'modify',
             function (err) {
-            if (err) return callback(err);
+            if (err) {
+                return callback(err);
+            }
 
             usersDB.getID(username, function(err, userID) {
                 if (err) return callback(new Error('Can\'t get userID for user "' + username + '": ' + err.message));

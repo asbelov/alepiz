@@ -2,7 +2,7 @@
  * Copyright © 2019. Alexander Belov. Contacts: <asbel@alepiz.com>
  * Created on 2019-6-10 16:59:55
 */
-const log = require('../../lib/log')(module);
+const _log = require('../../lib/log');
 const activeCollector = require('../../server/activeCollector'); // for insert
 const communication = require('../../lib/communication');
 const prepareUser = require('../../lib/utils/prepareUser');
@@ -13,7 +13,33 @@ const confMyNode = new Conf('config/node.json');
 
 const eventGenerator = 'event-generator';
 
+/**
+ *
+ * @param {Object} args
+ * @param {string} args.actionName action name
+ * @param {"enableEvents"|"addAsHint"|"addAsComment"|"solveProblem"|"disableEvents"|"removeTimeIntervals"} args.action
+ * @param {Object} args.actionCfg
+ * @param {string} args.username
+ * @param {string} args.subject
+ * @param {string} args.recipients
+ * @param {string} args.message
+ * @param {string} args.disableUntil
+ * @param {string} args.disableFrom
+ * @param {string} args.disableDaysOfWeek
+ * @param {string} args.disableTimeInterval
+ * @param {string} args.timeIntervalsForRemove
+ * @param {string} args.comment
+ * @param {string} args.hiddenMessageData
+ * @param {string} args.replyTo
+ * @param callback
+ * @return {*}
+ */
 module.exports = function(args, callback) {
+    var log = _log({
+        sessionID: args.actionCfg.launcherPrms.sessionID,
+        filename: __filename,
+    });
+
     log.debug('Starting action server "', args.actionName, '" with parameters', args);
 
     var action = args.action;
@@ -26,6 +52,13 @@ module.exports = function(args, callback) {
     var eventIDs = getSelectedEventsIDs(args);
     if(!eventIDs.length) return callback();
 
+    /**
+     *
+     * @type {{
+     *     dontSendMessage: Boolean,
+     *     restrictions: Object,
+     * }}
+     */
     var cfg = args.actionCfg;
     if(!cfg || !cfg.restrictions) return callback(new Error('Can\'t find "restrictions" in action configuration'));
     var user = prepareUser(args.username);
@@ -50,11 +83,11 @@ module.exports = function(args, callback) {
         var restrictAction = restrictions.Message;
         if(restrictAction !== true) {
             if (!restrictAction ||
-                (action.enableEvents && !restrictAction.Enable) ||
-                ((action.addAsHint || action.addAsHintForObject) && !restrictAction.Hints) ||
-                (action.addAsComment && !restrictAction.Comments) ||
-                (action.solveProblem && !restrictAction.Solve) ||
-                ((action.disableEvents || action.removeTimeIntervals) && !restrictAction.Disable)
+                (action === 'enableEvents' && !restrictAction.Enable) ||
+                ((action === 'addAsHint' || action.addAsHintForObject) && !restrictAction.Hints) ||
+                (action === 'addAsComment' && !restrictAction.Comments) ||
+                (action === 'solveProblem' && !restrictAction.Solve) ||
+                ((action === 'disableEvents' || action === 'removeTimeIntervals') && !restrictAction.Disable)
             ) {
                 return callback(new Error('Access denied for ' + user + ' and action : "' + action + '", args: ' +
                     JSON.stringify(args)));
@@ -75,9 +108,13 @@ module.exports = function(args, callback) {
                 recipients: args.recipients || null,
                 comment: args.message || null,
                 disableUntil: args.disableUntil || null,
+                disableFrom: args.disableFrom || null,
+                disableDaysOfWeek: args.disableDaysOfWeek || null,
                 intervals: args.disableTimeInterval || null,
                 // for remove time intervals '<from>-<to>,<from>-<to>,...'
                 timeIntervalsForRemove: args.timeIntervalsForRemove || null,
+
+                sessionID: args.actionCfg.launcherPrms.sessionID,
             }, function (err) {
                 if (err) return callback(err);
 
@@ -109,39 +146,40 @@ module.exports = function(args, callback) {
             });
         });
     });
-};
 
-function getSelectedEventsIDs(args) {
-    const hostPort = (args.hostPort ?
-            args.hostPort :
-            confActions.get('serverAddress') + ':' + confActions.get('serverPort'))
-        + ':';
+    function getSelectedEventsIDs(args) {
+        const hostPort = (args.hostPort ?
+                args.hostPort :
+                confActions.get('serverAddress') + ':' + confActions.get('serverPort'))
+            + ':';
 
-    var eventIDs = new Set(),
-        notEnableEventAction = args.action !== 'enableEvents';
-    for(var key in args) {
+        var eventIDs = new Set(),
+            notEnableEventAction = args.action !== 'enableEvents';
+        for(var key in args) {
 
-        // example of selected event: 'selectCurrentEvent_127.0.0.1:10164:51095': 'on'
-        // event not selected
-        if(!args[key]) continue;
+            // example of selected event: 'selectCurrentEvent_127.0.0.1:10164:51095': 'on'
+            // event not selected
+            if(!args[key]) continue;
 
-        if(key.indexOf('selectDisabledEvent_' + hostPort) === 0) {
-            eventIDs.add(
-                parseInt(key.replace('selectDisabledEvent_' + hostPort, '')));
-        } else if(notEnableEventAction) {
-            if(key.indexOf('selectCurrentEvent_' + hostPort) === 0) {
+            if(key.indexOf('selectDisabledEvent_' + hostPort) === 0) {
                 eventIDs.add(
-                    parseInt(key.replace('selectCurrentEvent_' + hostPort, '')));
-            } else if(key.indexOf('selectHistoryEvent_' + hostPort) === 0) {
-                eventIDs.add(
-                    parseInt(key.replace('selectHistoryEvent_' + hostPort, '')));
-            } else if(key.indexOf('selectHistoryCommentedEvent_' + hostPort) === 0) {
-                eventIDs.add(
-                    parseInt(key.replace('selectHistoryCommentedEvent_' + hostPort, '')));
+                    parseInt(key.replace('selectDisabledEvent_' + hostPort, '')));
+            } else if(notEnableEventAction) {
+                if(key.indexOf('selectCurrentEvent_' + hostPort) === 0) {
+                    eventIDs.add(
+                        parseInt(key.replace('selectCurrentEvent_' + hostPort, '')));
+                } else if(key.indexOf('selectHistoryEvent_' + hostPort) === 0) {
+                    eventIDs.add(
+                        parseInt(key.replace('selectHistoryEvent_' + hostPort, '')));
+                } else if(key.indexOf('selectHistoryCommentedEvent_' + hostPort) === 0) {
+                    eventIDs.add(
+                        parseInt(key.replace('selectHistoryCommentedEvent_' + hostPort, '')));
+                }
             }
         }
-    }
 
-    log.info('Number of events selected for the ', hostPort, ' ', eventIDs.size);
-    return Array.from(eventIDs);
-}
+        log.info('Number of events selected for the ', hostPort, ' ', eventIDs.size);
+        return Array.from(eventIDs);
+    }
+};
+

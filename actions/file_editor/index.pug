@@ -32,34 +32,35 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         input(type="hidden")#editorFileID
         div(style="height: 98vh; overflow: hidden; margin: 10px 0px 0px 10px")#tmodule
             div.row#EditorForm
-                p.input-field.col.s2
+                p.input-field.col.s6.m6.l3
                     select#selectService
                     label Select service
-                p.input-field.col.s2
+                p.input-field.col.s6.m6.l3
                     select#selectFile
                     label Select file
-                p.input-field.col
+                p.input-field.col.s6.m6.l1
                     input(type="text")#searchInput
                     label(for="searchInput") Search
-                p(style="width:60px").input-field.col
-                    label
-                        input(type="checkbox")#doReplaceCheckBox
-                        span
-                p.input-field.col
+                p.input-field.col.s6.m6.l1
                     input(type="text")#replaceInput
                     label(for="replaceInput") Replace
-                p.input-field.col
-                    a.btn-floating.waves-effect.waves-light#searchBtn
-                        i.material-icons search
-                p(style="width:60px").input-field.col
-                    label
-                        input(type="checkbox")#searchDirection
-                        span#searchDirectionLabel up
-                p(style="width:60px").input-field.col
-                    label
-                        input(type="checkbox")#searchAsRegExp
-                        span#searchAsRegExpLabel re
-                p.input-field.col.s2
+                div.row.row.no-margin.no-padding.col.s6.m6.l3
+                    p(style="width:60px").input-field.col.s3
+                        label
+                            input(type="checkbox")#doReplaceCheckBox
+                            span
+                    p.input-field.col.s3
+                        a.btn-floating.waves-effect.waves-light#searchBtn
+                            i.material-icons search
+                    p(style="width:60px").input-field.col.s3
+                        label
+                            input(type="checkbox")#searchDirection
+                            span#searchDirectionLabel up
+                    p(style="width:60px").input-field.col.s3
+                        label
+                            input(type="checkbox")#searchAsRegExp
+                            span#searchAsRegExpLabel re
+                p.input-field.col.s6.m6.l1
                     select#codePage
                         option(value="" selected) Default UTF-8
                         option(value="win1251") Windows CP-1251

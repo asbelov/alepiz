@@ -26,7 +26,7 @@ module.exports = getVarFromHistory;
  * @param {string} historyVariable.objectName object name for get historical data
  * @param {string} historyVariable.objectVariable variable with the object name for get historical data
  * @param {string} historyVariable.parentCounterName parent counter name for get historical data
- * @param {string} historyVariable.parentCounterID parent counter ID for get historical data
+ * @param {Set<number>} historyVariable.parentCounterIDs Set of the parent counter IDs for get historical data
  * @param {Object} variables list of the variables, like {<name>: <value>, ....}
  * @param {function(string, function)} getVariableValue function for get variable value for unresolved variable
  * @param {Object} param for debug information
@@ -200,7 +200,7 @@ function parameterValueFromHuman(parameter) {
  * @param {string} historyVariable.objectName object name for get historical data
  * @param {string} historyVariable.objectVariable variable with the object name for get historical data
  * @param {string} historyVariable.parentCounterName parent counter name for get historical data
- * @param {string} historyVariable.parentCounterID parent counter ID for get historical data
+ * @param {Set<number>} historyVariable.parentCounterIDs Set of the parent counter IDs for get historical data
  * @param {Object} variables list of the variables, like {<name>: <value>, ....}
  * @param {function(string, function)} getVariableValue function for get variable value for unresolved variable
  * @param {Object} param for debug information
@@ -239,8 +239,19 @@ function calcOCID(historyVariable, variables, getVariableValue, param, callback)
                         variableObjectName = String(res.value).toUpperCase();
                     }
 
-                    var OCID = param.countersObjects.objectName2OCID.has(variableObjectName) ?
-                        param.countersObjects.objectName2OCID.get(variableObjectName).get(Number(historyVariable.parentCounterID)) : null;
+                    var OCID = null;
+                    if(param.countersObjects.objectName2OCID.has(variableObjectName)) {
+                        for (let parentCounterID in historyVariable.parentCounterIDs) {
+                            var _OCID = param.countersObjects.objectName2OCID
+                                .get(variableObjectName)
+                                .get(Number(parentCounterID));
+                            if(_OCID) {
+                                OCID = _OCID;
+                                break;
+                            }
+                        }
+                    }
+
                     if (!OCID) {
                         return callback(new Error('Can\'t get OCID for object ' + variableObjectName +
                             ' and counterID: ' + historyVariable.parentCounterName));
@@ -253,8 +264,19 @@ function calcOCID(historyVariable, variables, getVariableValue, param, callback)
             } else variableObjectName = String(res.value).toUpperCase();
         } else variableObjectName = String(historyVariable.objectVariable).toUpperCase();
 
-        var OCID = param.countersObjects.objectName2OCID.has(variableObjectName) ?
-            param.countersObjects.objectName2OCID.get(variableObjectName).get(Number(historyVariable.parentCounterID)) : null;
+        var OCID = null;
+        if(param.countersObjects.objectName2OCID.has(variableObjectName)) {
+            for (let parentCounterID in historyVariable.parentCounterIDs) {
+                var _OCID = param.countersObjects.objectName2OCID
+                    .get(variableObjectName)
+                    .get(Number(parentCounterID));
+                if(_OCID) {
+                    OCID = _OCID;
+                    break;
+                }
+            }
+        }
+
         if (!OCID) {
             return callback(new Error('Can\'t get OCID for object ' + variableObjectName +
                 ' and counterID: ' + historyVariable.parentCounterName));
@@ -265,8 +287,16 @@ function calcOCID(historyVariable, variables, getVariableValue, param, callback)
             OCID = historyVariable.OCID;
         } else {
             variableObjectName = param.objectName;
-            OCID = param.countersObjects.counters.has(Number(historyVariable.parentCounterID)) ?
-                param.countersObjects.counters.get(Number(historyVariable.parentCounterID)).objectsIDs.get(Number(param.objectID)) : null;
+            OCID = null;
+            for (let parentCounterID in historyVariable.parentCounterIDs) {
+                if(param.countersObjects.counters.has(Number(parentCounterID))) {
+                    OCID = param.countersObjects.counters
+                        .get(Number(parentCounterID))
+                        .objectsIDs.get(Number(param.objectID));
+                    break;
+                }
+            }
+
             if (!OCID) {
                 return callback(new Error('Can\'t get OCID for object ' + variableObjectName +
                     ' and counter: ' + historyVariable.parentCounterName));

@@ -49,27 +49,28 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
     main
         div(style="height: 98vh; overflow: hidden; margin: 10px 0px 0px 10px")#tmodule
             div.row.no-margin#LogViewerForm
-                p.input-field.col.s2
+                p.input-field.col.s6.m6.l3
                     select#selectService
                     label Select service
-                p.input-field.col.s3
+                p.input-field.col.s6.m6.l3
                     select#selectFile
                     label Select file
-                p.input-field.col.s3
+                p.input-field.col.s8.m4.l2
                     input(type="text")#searchInput
                     label(for="searchInput") Search
-                p.input-field.col
-                    a.btn-floating.waves-effect.waves-light#searchBtn
-                        i.material-icons#searchBtnIcon search
-                p(style="width:60px").input-field.col
-                    label
-                        input(type="checkbox")#searchDirection
-                        span#searchDirectionLabel up
-                p(style="width:60px").input-field.col
-                    label
-                        input(type="checkbox")#searchAsRegExp
-                        span#searchAsRegExpLabel re
-                p.input-field.col.s2
+                div.row.row.no-margin.no-padding.col.s4.m4.l3
+                    p.input-field.col.s4
+                        a.btn-floating.waves-effect.waves-light#searchBtn
+                            i.material-icons#searchBtnIcon search
+                    p(style="width:60px").input-field.col.s4
+                        label
+                            input(type="checkbox")#searchDirection
+                            span#searchDirectionLabel up
+                    p(style="width:60px").input-field.col.s4
+                        label
+                            input(type="checkbox")#searchAsRegExp
+                            span#searchAsRegExpLabel re
+                p.input-field.col.s12.m4.l1
                     select#codePage
                         option(value="") Default UTF-8
                         option(value="win1251") Windows CP-1251

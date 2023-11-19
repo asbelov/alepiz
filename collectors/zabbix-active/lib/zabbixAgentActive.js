@@ -36,6 +36,17 @@ var initializingDelay = Number(confSettings.get('initializingDelay') || 120000);
 var startTime = Date.now();
 var delayedData = new Set();
 
+/**
+ * Get data from zabbix active agent
+ * @param {Object} param collector parameters
+ * @param {string} param.zabbixHostname zabbix hostname from zabbix agent configuration
+ * @param {string} param.pollingFreq zabbix agent pulling data frequency to collector
+ * @param {string} param.onlyNumeric filter not numeric data
+ * @param {string} param.item zabbix item name
+ * @param {string} param.itemParameters parameters for zabbix item
+ * @param {string} param.$id OCID
+ * @param {function()|function(Error, string)||function(Error, Array) } callback callback(err, result)
+ */
 collector.get = function(param, callback) {
 
     if(!param || !param.zabbixHostname) return callback();

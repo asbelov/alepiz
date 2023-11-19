@@ -113,14 +113,19 @@ function sortFiles(files, order) {
     files.forEach(function (file) {
         if(/\d\d$/.test(file)) ++numericNames;
     });
+
+    files = files.sort((a, b) => {
+        var path_a = a.split(path.sep);
+        var path_b = b.split(path.sep);
+        if (path_a.length !== path_b.length) return path_a.length - path_b.length;
+        return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
     //if count of files with digits in its names more, then 66%, then sorting descending
     //else sorting files acceding
     //(may be file names contain a date and try to show files with the names with last dates at first)
-    if(numericNames * 1.5 > files.length) files = files.sort().reverse();
-    else files = files.sort();
+    if(numericNames * 1.5 > files.length) files = files.reverse();
     var sortedFiles = [];
     order.forEach(function (template) {
-
         for(var i = 0; i < files.length;) {
             if(files[i].toUpperCase().indexOf(template) !== -1) {
                 sortedFiles.push(files[i]);

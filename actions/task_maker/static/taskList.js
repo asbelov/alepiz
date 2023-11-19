@@ -448,8 +448,9 @@ var taskListJQueryNamespace = (function ($) {
 
             var taskGroupForSearchElm = $('#taskGroupForSearch');
             var filterByTaskNameVal = $('#filterByTaskName').val();
+            var filterByTaskOwner = $('#filterByTaskOwner').val()
             // create taskGroups selector
-            if(filterByTaskNameVal) {
+            if(filterByTaskNameVal || filterByTaskOwner) {
                 var htmlForTaskGroupForSearchElm = '<option value="0" selected>Search by all groups</option>';
             } else {
                 htmlForTaskGroupForSearchElm = data.allowedTaskGroups.map(function (group) {
@@ -459,7 +460,7 @@ var taskListJQueryNamespace = (function ($) {
             }
 
             taskGroupForSearchElm.html(htmlForTaskGroupForSearchElm);
-            if(filterByTaskNameVal) taskGroupForSearchElm.attr('disabled', '1');
+            if(filterByTaskNameVal || filterByTaskOwner) taskGroupForSearchElm.attr('disabled', '1');
             else taskGroupForSearchElm.removeAttr('disabled');
             M.FormSelect.init(taskGroupForSearchElm[0], {});
 

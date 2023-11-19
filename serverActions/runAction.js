@@ -286,6 +286,7 @@ function runAction(param, callback) {
                         module.sessionID = sessionParameters.sessionID;
                         sessionIDs.delete(sessionParameters.sessionID);
 
+                        clearTimeout(actionTimeoutWatchdog);
 
                         if (err) {
                             // add sessionID to print action execution error in the audit
@@ -308,31 +309,40 @@ function runAction(param, callback) {
                             error: err ? err.message : null,
                         });
 
+                        // Print the complete message. Error was printed before
                         if (!err) {
+                            var completeMessage = '';
+                            var logLevelFunc = log.info;
+
+                            // the action was completed after action timeout expired
+                            if(typeof callback !== 'function') {
+                                completeMessage = 'after timeout expired (' +
+                                    Math.round((Date.now() - startActionTimestamp) / 1000) + '/' +
+                                    actionCfg.timeout + 'sec)'
+                                logLevelFunc = log.warn;
+                            }
+
                             if (filteredObjects.length !== objects.length) {
-                                log.info('The "', actionCfg.name,
-                                    '" action is completed successfully with result: ',
+                                logLevelFunc('The "', actionCfg.name,
+                                    '" action is completed ', completeMessage, ' with result: ',
                                     result, ' for objects: ',
-                                    filteredObjects.map(o=>o.name).join(', '), '; all action objects: ',
-                                    objects.map(o=>o.name).join(', '));
+                                    filteredObjects.map(o=> o.name).join(', '),
+                                    '; all action objects: ', objects.map(o=>o.name).join(', '));
                             } else {
-                                log.info('The "', actionCfg.name,
-                                    '" action is completed successfully with result: ',
+                                logLevelFunc('The "', actionCfg.name,
+                                    '" action is completed ', completeMessage,' with result: ',
                                     result,
                                     (filteredObjects.length ?
-                                        ', selected objects: ' + filteredObjects.map(o=>o.name).join(', ') :
+                                        ', selected objects: ' +
+                                            filteredObjects.map(o=> o.name).join(', ') :
                                         ', objects were not selected'),
                                     ', applyToOwnObjects: ', !!actionCfg.applyToOwnObjects,
                                     ', noObjectsRequired: ', !!actionCfg.noObjectsRequired);
                             }
                         }
-                        clearTimeout(actionTimeoutWatchdog);
 
-                        if (typeof callback !== 'function') {
-                            log.error('Action ', actionCfg.name, ' returned after timeout ', actionCfg.timeout,
-                                'sec result: ', result, (err ? '; Error: ' + err.message : ' '), ' executing time: ',
-                                Math.round((Date.now() - startActionTimestamp) / 1000), 'sec');
-                        } else {
+                        // the action was completed before action timeout expired
+                        if (typeof callback === 'function') {
                             var savedCallback = callback;
                             callback = null;
                             savedCallback(err, result);

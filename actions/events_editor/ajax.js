@@ -127,7 +127,10 @@ function getEvents(user, objectsIDs, callback) {
                 }
 
                 try {
-                    var disabledRows = db.prepare('SELECT disabledEvents.OCID AS OCID, disabledEvents.disableUntil AS disableUntil, ' +
+                    var disabledRows = db.prepare('SELECT disabledEvents.OCID AS OCID, ' +
+                        'disabledEvents.disableFrom AS disableFrom, ' +
+                        'disabledEvents.disableUntil AS disableUntil, ' +
+                        'disabledEvents.disableDaysOfWeek AS disableDaysOfWeek, ' +
                         'disabledEvents.intervals AS intervals, \n' +
                         'comments.subject AS subject, comments.comment AS comment FROM disabledEvents ' +
                         'JOIN comments ON disabledEvents.commentID=comments.id').all();

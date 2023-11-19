@@ -238,7 +238,7 @@ function runActionFromQueue() {
     if(actionQueueUser.size) return runQueue(actionQueueUser);
 
     // run actions from system queue
-    if(!actionsInProgress.size && actionsQueueSystem.size) return runQueue(actionsQueueSystem);
+    if(actionsQueueSystem.size) return runQueue(actionsQueueSystem);
 }
 
 /**
@@ -269,7 +269,7 @@ function runQueue(actionQueue) {
                 actionInProgress.action.conf.timeout / 1000, 'sec');
             hungActions.delete(actionProgressID)
         }
-        var t = setTimeout(runActionFromQueue, 0);
+        var t = setImmediate(runActionFromQueue);
         t.unref();
     });
 }

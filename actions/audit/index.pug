@@ -17,6 +17,12 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
         script(src='/javascripts/alepizActionLogViewer.js')
         script.
             var parameters = {
+                /**
+                 * @name action
+                 * @property {string} action.name
+                 * @property {string} action.link
+                 * @property {string} action.staticDir
+                 */
                 action: !{JSON.stringify(action)},
                 objects: !{JSON.stringify(objects)}
             };

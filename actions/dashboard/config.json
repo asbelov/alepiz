@@ -39,6 +39,7 @@
         "November",
         "December"
     ],
+    "dayNames": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
     "actions": [
         {
             "ID": "data_browser",
@@ -225,7 +226,7 @@
                 "EVENT_DESCRIPTION": "Description",
                 "EVENT_TIME": "Time"
             },
-            "bodyHeader": "<br/><br/><h3><strong style=\"color: rgb(0,0,0);\">Following events was disabled until %:DISABLE_UNTIL:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.</strong></h3>",
+            "bodyHeader": "<br/><br/><h3><strong style=\"color: rgb(0,0,0);\">Following events was disabled from %:DISABLE_FROM:% to %:DISABLE_UNTIL:% on %:DISABLE_DAYS_OF_WEEK:% and added time interval for disable event per day: %:NEW_DISABLE_TIME_INTERVAL:%.</strong></h3>",
             "eventTemplate": "<p>%:ACTION:%: <strong>%:OBJECT_NAME:%:</strong><span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></p>",
             "intervalsDivider": "<p><blockquote>and <span style=\"color: rgb(0,102,204);\"> %:EVENT_DESCRIPTION:%</span> occurred at <strong>%:EVENT_TIME:%</strong></blockquote></p>"
         },

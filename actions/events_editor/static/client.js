@@ -42,8 +42,11 @@ var JQueryNamespace = (function ($) {
         //commentEditorTabElm = $('#comment-editor-tab');
         addDisabledIntervalBtnElm = $('#add-disabled-interval-btn');
         disabledIntervalsPanelElm = $('#disabled-intervals');
+        disableFromDateElm = $('#disableFromDate');
+        disableFromTimeElm = $('#disableFromTime');
         disableUntilDateElm = $('#disableUntilDate');
         disableUntilTimeElm = $('#disableUntilTime');
+        disableDaysOfWeekElm = $('#disableDaysOfWeek');
         disableTimeIntervalsElm = $('#disable-time-intervals');
         disableTimeIntervalFromElm = $('#disableTimeIntervalFrom');
         disableTimeIntervalToElm = $('#disableTimeIntervalTo');
@@ -60,6 +63,7 @@ var JQueryNamespace = (function ($) {
         counterDescriptionElm = $('#counterDescription');
         counterDescriptionSharedElm = $('#counterDescriptionShared');
         disableUntilElm = $('#disableUntil');
+        disableFromElm = $('#disableFrom');
         openCounterSettingsElm = $('#openCounterSettings');
 
         init(true);
@@ -78,7 +82,13 @@ var JQueryNamespace = (function ($) {
         counterGroupsList = {},
         allCounterGroupsList = {};
 
-    var tabInstance, disableUntilDateInstance, disableUntilTimeInstance, disableTimeIntervalFromInstance, disableTimeIntervalToInstance,
+    var tabInstance,
+        disableFromDateInstance,
+        disableFromTimeInstance,
+        disableUntilDateInstance,
+        disableUntilTimeInstance,
+        disableTimeIntervalFromInstance,
+        disableTimeIntervalToInstance,
         importanceFilterElm,
         counterGroupsFilterElm,
         eventsListElm,
@@ -112,14 +122,18 @@ var JQueryNamespace = (function ($) {
         addDisabledIntervalBtnElm,
         disabledIntervalsPanelElm,
         disabledEventsNoTimeIntervalsText,
+        disableFromDateElm,
+        disableFromTimeElm,
         disableUntilDateElm,
         disableUntilTimeElm,
+        disableDaysOfWeekElm,
         disableTimeIntervalsElm,
         disableTimeIntervalFromElm,
         disableTimeIntervalToElm,
         switchOnHintCBElm,
         switchOnDisableCBElm,
         switchOnSettingsElm,
+        disableFromElm,
         disableUntilElm,
         openCounterSettingsElm
         ;
@@ -155,6 +169,12 @@ var JQueryNamespace = (function ($) {
         })
 
         function saveChanges() {
+            var dateFrom = getDateTimestampFromStr(disableFromDateElm.val());
+            var timeFrom = getTimeFromStr(disableFromTimeElm.val());
+
+            var disableFrom = dateFrom && timeFrom ? dateFrom + timeFrom : '';
+            disableFromElm.val(disableFrom);
+
             var dateUntil = getDateTimestampFromStr(disableUntilDateElm.val());
             var timeUntil = getTimeFromStr(disableUntilTimeElm.val());
 
@@ -436,6 +456,20 @@ var JQueryNamespace = (function ($) {
 
         $(window).resize(setEventsListHeight);
 
+        disableFromDateInstance = M.Datepicker.init(document.getElementById('disableFromDate'), {
+            container: document.body,
+            firstDay: 1,
+            format: 'dd mmmm, yyyy',
+            setDefaultDate: true,
+            showClearBtn: true,
+        });
+
+        disableFromTimeInstance = M.Timepicker.init(document.getElementById('disableFromTime'), {
+            container: 'body',
+            twelveHour: false,
+            showClearBtn: true,
+        });
+
         disableUntilDateInstance = M.Datepicker.init(document.getElementById('disableUntilDate'), {
             container: document.body,
             firstDay: 1,
@@ -449,6 +483,8 @@ var JQueryNamespace = (function ($) {
             twelveHour: false,
             showClearBtn: true,
         });
+
+        M.FormSelect.init(disableDaysOfWeekElm[0], {});
 
         disableTimeIntervalFromInstance = M.Timepicker.init(document.getElementById('disableTimeIntervalFrom'), {
             container: 'body',
@@ -496,8 +532,11 @@ var JQueryNamespace = (function ($) {
 
         switchOnDisableCBElm.click(function () {
             if($(this).is(':checked')) {
+                disableFromDateElm.prop('disabled', false);
+                disableFromTimeElm.prop('disabled', false);
                 disableUntilDateElm.prop('disabled', false);
                 disableUntilTimeElm.prop('disabled', false);
+                disableDaysOfWeekElm.prop('disabled', false);
                 disableTimeIntervalFromElm.prop('disabled', false);
                 disableTimeIntervalToElm.prop('disabled', false);
                 addDisabledIntervalBtnElm.removeClass('disabled');
@@ -505,22 +544,12 @@ var JQueryNamespace = (function ($) {
                 quillDisableComment.enable(true);
                 //drawDisabled();
             } else {
-                /*
-                disableUntilDateElm.val('');
-                disableUntilTimeElm.val('');
-                disableTimeIntervalFromElm.val('');
-                disableTimeIntervalToElm.val('');
-                disableCommentSubjectElm.val('');
-                quillDisableComment.setText('');
-                quillDisableCommentInit = quillDisableComment.getHtml();
-                disablingTimeIntervals = [];
-                disableTimeIntervalsElm.val('');
-                disabledIntervalsPanelElm.html(disabledEventsNoTimeIntervalsText);
-                */
 
-
+                disableFromDateElm.prop('disabled', true);
+                disableFromTimeElm.prop('disabled', true);
                 disableUntilDateElm.prop('disabled', true);
                 disableUntilTimeElm.prop('disabled', true);
+                disableDaysOfWeekElm.prop('disabled', true);
                 disableTimeIntervalFromElm.prop('disabled', true);
                 disableTimeIntervalToElm.prop('disabled', true);
                 addDisabledIntervalBtnElm.addClass('disabled');
@@ -881,8 +910,11 @@ var JQueryNamespace = (function ($) {
 
         var disabled = mergeDisabled();
 
+        disableFromDateElm.val('');
+        disableFromTimeElm.val('');
         disableUntilDateElm.val('');
         disableUntilTimeElm.val('');
+        disableDaysOfWeekElm.val('');
         disableCommentSubjectElm.val('');
         quillDisableComment.setText('');
         quillDisableCommentInit = quillDisableComment.getHtml();
@@ -895,11 +927,25 @@ var JQueryNamespace = (function ($) {
         var sharedDisabled = getSharedDisabled(disabled);
         if(!sharedDisabled) return;
 
+        if(sharedDisabled.disableFrom) {
+            disableFromDateElm.val(getDateString(sharedDisabled.disableFrom));
+            var d = new Date(sharedDisabled.disableFrom);
+            disableFromTimeElm.val(String('0' + d.getHours() + ':' + '0' +
+                d.getMinutes()).replace(/\d(\d\d)/g, '$1'));
+        }
+
         if(sharedDisabled.disableUntil) {
             disableUntilDateElm.val(getDateString(sharedDisabled.disableUntil));
-            var d = new Date(sharedDisabled.disableUntil);
-            disableUntilTimeElm.val(String('0' + d.getHours() + ':' + '0' + d.getMinutes()).replace(/\d(\d\d)/g, '$1'));
+            d = new Date(sharedDisabled.disableUntil);
+            disableUntilTimeElm.val(String('0' + d.getHours() + ':' + '0' +
+                d.getMinutes()).replace(/\d(\d\d)/g, '$1'));
         }
+
+        if(sharedDisabled.disableDaysOfWeek && typeof sharedDisabled.disableDaysOfWeek === 'string') {
+            disableDaysOfWeekElm.val(sharedDisabled.disableDaysOfWeek.split(','))
+        }
+        M.FormSelect.init(disableDaysOfWeekElm[0], {});
+
         if(sharedDisabled.intervals !== '-' && typeof sharedDisabled.intervals === 'string') {
             disablingTimeIntervals = sharedDisabled.intervals.split(';');
             disableTimeIntervalsElm.val(disablingTimeIntervals.join(';'));
@@ -1045,7 +1091,7 @@ var JQueryNamespace = (function ($) {
         if(objects.length === 1) return disabled[objects[0].id] || null;
 
 
-        var sharedSubject, sharedComment, sharedDisableUntil, sharedIntervals,
+        var sharedSubject, sharedComment, sharedDisableFrom, sharedDisableUntil, sharedDisableDaysOfWeek, sharedIntervals,
             eventsObjectsIDs = Object.keys(disabled).map(objectID => Number(objectID));
         for(var i = 0; i < objects.length; i++) {
             var objectID = objects[i].id;
@@ -1053,8 +1099,14 @@ var JQueryNamespace = (function ($) {
             // no disabled for object
             if(eventsObjectsIDs.indexOf(objectID) === -1) return null;
 
+            if(sharedDisableFrom === undefined) sharedDisableFrom = disabled[objectID].disableFrom;
+            if(sharedDisableFrom !== disabled[objectID].disableFrom) sharedDisableFrom = null;
+
             if(sharedDisableUntil === undefined) sharedDisableUntil = disabled[objectID].disableUntil;
             if(sharedDisableUntil !== disabled[objectID].disableUntil) sharedDisableUntil = null;
+
+            if(sharedDisableDaysOfWeek === undefined) sharedDisableDaysOfWeek = disabled[objectID].disableDaysOfWeek;
+            if(sharedDisableDaysOfWeek !== disabled[objectID].disableDaysOfWeek) sharedDisableDaysOfWeek = '';
 
             if(sharedIntervals === undefined) sharedIntervals = disabled[objectID].intervals;
             if(sharedIntervals !== disabled[objectID].intervals) sharedIntervals = '-';
@@ -1065,13 +1117,16 @@ var JQueryNamespace = (function ($) {
             if(sharedComment === undefined) sharedComment = disabled[objectID].comment;
             if(sharedComment !== disabled[objectID].comment) sharedComment = null;
 
-            if(sharedDisableUntil === null && sharedIntervals === '-' &&
+            if(sharedDisableUntil === null && sharedDisableFrom === null &&
+                sharedDisableDaysOfWeek === '' && sharedIntervals === '-' &&
                 sharedComment === null && sharedSubject === null) return null;
 
         }
 
         return {
+            disableFrom: sharedDisableFrom,
             disableUntil: sharedDisableUntil,
+            disableDaysOfWeek: sharedDisableDaysOfWeek,
             intervals: sharedIntervals,
             subject: sharedSubject,
             comment: sharedComment
@@ -1080,7 +1135,8 @@ var JQueryNamespace = (function ($) {
 
     /*
     Merge disabled from multiple selected events
-    return object: { <objectID>: {disableUntil:.., intervals:.., subject:..., comment:..}, ... }
+    return object: { <objectID>: {disableFrom:..., disableUntil:.., sharedDisableDaysOfWeek,
+        intervals:.., subject:..., comment:..}, ... }
      */
     function mergeDisabled() {
         var disabled = {},
@@ -1095,7 +1151,9 @@ var JQueryNamespace = (function ($) {
                 if(disabled[objectID] === undefined) {
                     disabled[objectID] = {
                         count: 1,
+                        disableFrom: event.disabled[objectID].disableFrom,
                         disableUntil: event.disabled[objectID].disableUntil,
+                        disableDaysOfWeek: event.disabled[objectID].disableDaysOfWeek,
                         intervals: event.disabled[objectID].intervals,
                         subject: event.disabled[objectID].subject,
                         comment: event.disabled[objectID].comment,
@@ -1103,10 +1161,22 @@ var JQueryNamespace = (function ($) {
                     continue;
                 } else ++disabled[objectID].count;
 
+                if(disabled[objectID].disableFrom !== null &&
+                    disabled[objectID].disableFrom !== event.disabled[objectID].disableFrom
+                ) {
+                    disabled[objectID].disableFrom = null;
+                }
+
                 if(disabled[objectID].disableUntil !== null &&
                     disabled[objectID].disableUntil !== event.disabled[objectID].disableUntil
                 ) {
                     disabled[objectID].disableUntil = null;
+                }
+
+                if(disabled[objectID].disableDaysOfWeek !== '' &&
+                    disabled[objectID].disableDaysOfWeek !== event.disabled[objectID].disableDaysOfWeek
+                ) {
+                    disabled[objectID].disableDaysOfWeek = '';
                 }
 
                 if(disabled[objectID].intervals !== '-' &&
@@ -1132,7 +1202,8 @@ var JQueryNamespace = (function ($) {
         var objectsNum = countersIDs.length;
         for(var objectID in disabled) {
             if(disabled[objectID].count !== objectsNum ||
-                (disabled[objectID].disableUntil === null && disabled[objectID].intervals === '-' &&
+                (disabled[objectID].disableFrom === null && disabled[objectID].disableUntil === null &&
+                    disabled[objectID].disableDaysOfWeek === '' && disabled[objectID].intervals === '-' &&
                     disabled[objectID].subject === null && disabled[objectID].comment === null)) {
                 delete disabled[objectID];
             }

@@ -189,6 +189,7 @@ function Menu(cInitCfg, initMainObject, callback) {
 
         selectServiceElm.innerHTML = '';
         if (objects.length > 0) {
+            objects = objects.sort(function (a, b) { return a.name.toLowerCase().localeCompare(b.name.toLowerCase()) });
             for (var i = 0; i < objects.length; i++) {
                 var optionElm = new Option(objects[i].name, objects[i].id);
                 if (i === 0) {

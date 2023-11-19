@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
+ * Copyright © 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /*
@@ -25,7 +25,57 @@ var JQueryNamespace = (function ($) {
         initElementsRestrictions(init);
     });
 
-    // path to ajax
+    /**
+     * @name parameters
+     * @global
+     * @property {Object} action
+     * @property {number} action.commentsInterval
+     * @property {string} action.actionForSeveralObjects
+     * @property {Array<{
+     *     tip: string,
+     *     name: string,
+     *     importance: number
+     *     subject: string,
+     *     default: Object,
+     *     autoApplyFor: Array<{
+     *         actions: Array<string>,
+     *         importance: Array<number>,
+     *         objectNameRE: Array<string>,
+     *         counterNameRE: Array<string>,
+     *         startEventTimeLessMin: number,
+     *         endEventTimeLessMin: number,
+     *         eventDescriptionRE: Array<string>,
+     *         counterNameRE: Array<string>,
+     *         objectNameRE: Array<string>,
+     *     }>,
+     *     replyTo: string,
+     *     recipients: Array<string>,
+     * }>} action.messageTemplates
+     * @property {Object.<{
+     *     tables: Array,
+     *     autoApplyFor: Array
+     *     name: string,
+     *     bodyHeader: string,
+     *     hiddenData: Object,
+     *     eventTemplate: string,
+     *     intervalsDivider: string,
+     *     subject: string,
+     *     objectsListLength: number,
+     *     countersListLength: number,
+     * }>} action.actionsMessageTemplates
+     * @property {{
+     *     data: Array,
+     *     onChipAdd: function,
+     * }} action.rcptOptions
+     * @property {string} replyTo
+     * @property {Array} dayNames,
+     * @property {Object} importance
+     */
+
+    /**
+     * path to ajax
+     * @type string
+     */
     var serverURL = parameters.action.link + '/ajax';
     var bodyElm,
         eventsFilterElm,
@@ -38,6 +88,7 @@ var JQueryNamespace = (function ($) {
         disabledEventsHeaderElm,
         removeIntervalsElm,
         timeIntervalsElm,
+        disableDaysOfWeekElm,
         enableEventsElm,
         disabledEventsControlElm,
         hintDialogInstance,
@@ -75,6 +126,30 @@ var JQueryNamespace = (function ($) {
         gettingDataInProgress = 0,
         updatePaused = 0,
         actionConfig = {},
+        /**
+         *
+         * @type {{
+         *     importanceFilter: Boolean,
+         *     Message: {
+         *         Historical: Boolean,
+         *         Current: Boolean,
+         *         Disabled: Boolean,
+         *         Comments: Boolean,
+         *         Solve: Boolean,
+         *         Enable: Boolean,
+         *         Disable: Boolean,
+         *     },
+         *     Historical: Boolean,
+         *     Current: Boolean,
+         *     Disabled: Boolean,
+         *     Comments: Boolean,
+         *     Sound: string,
+         *     Hints: Boolean,
+         *     Info: boolean,
+         *     History: Boolean,
+         *     Links: Boolean
+         * }}
+         */
         restrictions = {},
         actions = [],
         useHints = true,
@@ -88,11 +163,15 @@ var JQueryNamespace = (function ($) {
     var getDataForCurrentEvents = false;
     var getDataForDisabledEvents = false;
 
-    jQuery.expr[':'].icontains = function(a, i, m) {
+    jQuery.expr[':'].i_contains = function(a, i, m) {
         return jQuery(a).text().toUpperCase()
             .indexOf(m[3].toUpperCase()) >= 0;
     };
 
+    /**
+     * @external Quill
+     * @see https://quilljs.com/docs/quickstart/
+     */
     Quill.prototype.getHtml = function () {
         return this.container.querySelector('.ql-editor').innerHTML;
     };
@@ -119,6 +198,7 @@ var JQueryNamespace = (function ($) {
         updateTimeElm = $('#updateTime');
         removeIntervalsElm = $('#removeTimeIntervals');
         timeIntervalsElm = $('#timeIntervalsForRemove');
+        disableDaysOfWeekElm = $('#disableDaysOfWeek')
         enableEventsElm = $('#enableEvents');
         disabledEventsControlElm = $('#disabledEventsControl');
 
@@ -154,8 +234,12 @@ var JQueryNamespace = (function ($) {
         now.setHours(5, 0, 0, 0);
         // calc minutes to next day 5:00
         setUntilDateTimeControl(Math.floor((now.getTime() - Date.now()) / 60000) + 1);
-        // add 15 minutes to current time
-        //setUntilDateTimeControl(15);
+
+        M.Datepicker.init(document.getElementById('disableFromDate'), {
+            firstDay: 1,
+            format: 'dd mmmm, yyyy',
+            setDefaultDate: true,
+        });
 
         M.Datepicker.init(document.getElementById('disableUntilDate'), {
             firstDay: 1,
@@ -163,7 +247,8 @@ var JQueryNamespace = (function ($) {
             setDefaultDate: true,
         });
 
-        var commentsInterval = Number(parameters.action.commentsInterval) === parseInt(String(parameters.action.commentsInterval), 10) &&
+        var commentsInterval =
+            Number(parameters.action.commentsInterval) === parseInt(String(parameters.action.commentsInterval), 10) &&
             Number(parameters.action.commentsInterval) > 1 ? Number(parameters.action.commentsInterval) : 2;
         commentsFromInstance = M.Datepicker.init(document.getElementById('commentsFrom'), {
             firstDay: 1,
@@ -196,6 +281,17 @@ var JQueryNamespace = (function ($) {
             showClearBtn: false
         });
 
+        M.Timepicker.init(document.getElementById('disableFromTime'), {
+            twelveHour: false,
+            showClearBtn: false
+        });
+
+        var daysOfWeek = parameters.action.dayNames.map(function (dayOfWeek, idx) {
+            return '<option value="' + idx + '">' + dayOfWeek + '</option>';
+        });
+        disableDaysOfWeekElm.append(daysOfWeek.join(''));
+        M.FormSelect.init(disableDaysOfWeekElm[0], {});
+
         M.Timepicker.init(document.getElementById('disableTimeIntervalFrom'), {
             twelveHour: false,
             showClearBtn: true
@@ -215,14 +311,16 @@ var JQueryNamespace = (function ($) {
         });
 
         $('#disableEvents').click(function () {
-            if(getDateTimestampFromStr($('#disableUntilDate').val()) + getTimeFromStr($('#disableUntilTime').val()) < Date.now()) {
+            if(getDateTimestampFromStr($('#disableUntilDate').val()) + getTimeFromStr($('#disableUntilTime').val()) <
+                Date.now() ||
+                getDateTimestampFromStr($('#disableFromDate').val()) + getTimeFromStr($('#disableFromTime').val()) <
+                Date.now()
+            ) {
                 var now = new Date();
                 if(now.getHours() < 3) now.setDate(now.getDate() + 1);
                 now.setHours(5, 0, 0, 0);
-                // calc minutes to next day 5:00
+                // calc minutes to next day at 5:00
                 setUntilDateTimeControl(Math.round(Math.floor((now.getTime() - Date.now()) / 60000) + 1));
-                // add 15 minutes to current time
-                //setUntilDateTimeControl(15);
             }
         });
 
@@ -232,9 +330,10 @@ var JQueryNamespace = (function ($) {
             outDuration: 0, // default 300
             onOpenEnd: function(el) {  // Callback for Collapsible open
                 setTimeout(function() {
-                    if($(el).find('tbody').find('tr').get().length === 1)
-                        $(el).find('tbody').html('<tr><td colspan="10" style="text-align: center;">Updating information...</td></tr>');
-
+                    if($(el).find('tbody').find('tr').get().length === 1) {
+                        $(el).find('tbody')
+                            .html('<tr><td colspan="10" style="text-align: center;">Updating information...</td></tr>');
+                    }
                     if ($(el).attr('id') === 'currentEvents') {
                         actionConfig.openCurrent = true
                         startUpdate();
@@ -670,22 +769,29 @@ var JQueryNamespace = (function ($) {
                     $('#showEditor').remove();
                 } else {
                     var actionRestrictions = restrictions.Message;
-                    if(actionRestrictions.Comments === false) $('#addAsComment').prop('disabled', true).prop('checked', false);
+                    if(actionRestrictions.Comments === false) {
+                        $('#addAsComment').prop('disabled', true).prop('checked', false);
+                    }
                     if(actionRestrictions.Hints === false) {
                         $('#addAsHint').prop('disabled', true).prop('checked', false);
                         $('#addAsHintForObject').prop('disabled', true).prop('checked', false);
                     }
-                    if(actionRestrictions.Solve === false) $('#solveProblem').prop('disabled', true).prop('checked', false);
+                    if(actionRestrictions.Solve === false) {
+                        $('#solveProblem').prop('disabled', true).prop('checked', false);
+                    }
                     if(actionRestrictions.Enable === false) {
                         $('#enableEvents').prop('disabled', true).prop('checked', false);
-                        $('#removeTimeIntervals').prop('disabled', true).prop('checked', false);
+                        $('#removeTimeIntervals').prop('disabled', true);
                     }
                     if(actionRestrictions.Disable === false) {
                         $('#disableEvents').prop('disabled', true).prop('checked', false);
-                        $('#disableUntilDate').prop('disabled', true).prop('checked', false);
-                        $('#disableUntilTime').prop('disabled', true).prop('checked', false);
-                        $('#disableTimeIntervalFrom').prop('disabled', true).prop('checked', false);
-                        $('#disableTimeIntervalTo').prop('disabled', true).prop('checked', false);
+                        $('#disableUntilDate').prop('disabled', true);
+                        $('#disableFromDate').prop('disabled', true);
+                        $('#disableUntilTime').prop('disabled', true);
+                        $('#disableFromTime').prop('disabled', true);
+                        $('#disableDaysOfWeek').prop('disabled', true);
+                        $('#disableTimeIntervalFrom').prop('disabled', true);
+                        $('#disableTimeIntervalTo').prop('disabled', true);
                     }
                 }
 
@@ -826,20 +932,42 @@ var JQueryNamespace = (function ($) {
             var messageBody = quill.getHtml();
             // remove first 2 new lines and add better style to <p>
             if(addCommentElm.val()) {
-                messageBody = '<p style=\'margin: 0 0 .0001pt 0; font-family: "Calibri","sans-serif";font-size: 13pt;font-weight: bold;\'>' + addCommentElm.val() + '</p>' + messageBody.replace(/^<p><br><\/p>/i, '');
+                messageBody =
+                    '<p style=\'margin: 0 0 .0001pt 0; font-family: "Calibri","sans-serif";' +
+                    'font-size: 13pt;font-weight: bold;\'>' + addCommentElm.val() + '</p>' +
+                    messageBody.replace(/^<p><br><\/p>/i, '');
                 addCommentElm.val('');
             }
-            $('#message').val(messageBody.replace(/^<p><br><\/p><p><br><\/p>/i, '').replace(/<p>/gi, '<p style=\'margin: 0 0 .0001pt 0; font-family: "Calibri","sans-serif"; font-size: 13pt\'>'));
+            $('#message').val(messageBody
+                .replace(/^<p><br><\/p><p><br><\/p>/i, '')
+                .replace(/<p>/gi, '<p style=\'margin: 0 0 .0001pt 0; font-family: "Calibri","sans-serif"; ' +
+                    'font-size: 13pt\'>'));
 
             if($('#disableEvents').is(':checked')) {
                 var dateUntil = getDateTimestampFromStr($('#disableUntilDate').val());
                 var timeUntil = getTimeFromStr($('#disableUntilTime').val());
 
                 if (dateUntil && timeUntil) var disableUntil = dateUntil + timeUntil;
-                else return callback(new Error('Please set date and time for disabled event'));
+                else return callback(new Error('Please set date and time for the disabled event'));
 
                 if(disableUntil > Date.now()) $('#disableUntil').val(disableUntil);
-                else return callback(new Error('Please set the limit of date and time for disabled event more than current time'));
+                else {
+                    return callback(new Error(
+                        'Please set a date and time limit for the disabled event later than the current time'));
+                }
+
+                var dateFrom = getDateTimestampFromStr($('#disableFromDate').val());
+                var timeFrom = getTimeFromStr($('#disableFromTime').val());
+
+                if (dateFrom && timeFrom) {
+                    var disableFrom = dateFrom + timeFrom;
+
+                    if(disableFrom < disableUntil) $('#disableFrom').val(disableFrom);
+                    else {
+                        return callback(new Error(
+                            'Please set the start time before the end time of the disabled event'));
+                    }
+                }
 
                 var timeStrFrom = $('#disableTimeIntervalFrom').val();
                 var timeStrTo = $('#disableTimeIntervalTo').val();
@@ -855,7 +983,8 @@ var JQueryNamespace = (function ($) {
                     }
                 } else {
                     if(timeStrFrom || timeStrTo) {
-                        return callback(new Error('Please set correct time interval: ' + timeStrFrom + ' - ' + timeStrTo));
+                        return callback(new Error('Please correct the time interval: ' +
+                            timeStrFrom + ' - ' + timeStrTo));
                     }
                     $('#disableTimeInterval').val('');
                 }
@@ -898,15 +1027,23 @@ var JQueryNamespace = (function ($) {
 
     function setUntilDateTimeControl(addMinutes) {
         var now = new Date();
+        $('#disableFromDate').val(getDateString(now));
+        $('#disableFromTime').val(String('0' + now.getHours() + ':' + '0' +
+            now.getMinutes()).replace(/\d(\d\d)/g, '$1'));
+
         now.setMinutes(now.getMinutes() + addMinutes);
         $('#disableUntilDate').val(getDateString(now));
-        $('#disableUntilTime').val(String('0' + now.getHours() + ':' + '0' + now.getMinutes()).replace(/\d(\d\d)/g, '$1'));
+        $('#disableUntilTime').val(String('0' + now.getHours() + ':' + '0' +
+            now.getMinutes()).replace(/\d(\d\d)/g, '$1'));
     }
 
     function applyTemplate (template) {
         var _maxMessageImportance = template.importance !== undefined ? Number(template.importance) : 0;
         if(messageTopImportance !== undefined && _maxMessageImportance > messageTopImportance) {
-            M.toast({html: 'Can\'t use template. Importance of added events is higher than allowed in template', displayLength: 5000});
+            M.toast({
+                html: 'Can\'t use template. Importance of added events is higher than allowed in template',
+                displayLength: 5000
+            });
             return;
         }
         maxMessageImportance = _maxMessageImportance;
@@ -916,7 +1053,9 @@ var JQueryNamespace = (function ($) {
             if(prevSubject) { // remove template subjects from subject
                 parameters.action.messageTemplates.forEach(function (t) {
                     if(!t || !t.subject) return;
-                    if (prevSubject.indexOf(t.subject + ' ') !== -1) prevSubject = prevSubject.replace(t.subject + ' ', '');
+                    if (prevSubject.indexOf(t.subject + ' ') !== -1) {
+                        prevSubject = prevSubject.replace(t.subject + ' ', '');
+                    }
                 });
             }
 
@@ -984,7 +1123,8 @@ var JQueryNamespace = (function ($) {
         });
 
         var startUpdateTime = new Date();
-        lastUpdateElm.text('Start update at ' + startUpdateTime.toLocaleString().replace(/\.\d\d\d\d,/, ''));
+        lastUpdateElm.text('Start update at ' +
+            startUpdateTime.toLocaleString().replace(/\.\d\d\d\d,/, ''));
 
         $.ajax({
             type: 'POST',
@@ -1004,7 +1144,8 @@ var JQueryNamespace = (function ($) {
                     bodyElm.css("cursor", "auto");
                     gettingDataInProgress = 0;
                     var lastUpdateTime = new Date();
-                    lastUpdateElm.text('No data at ' + lastUpdateTime.toLocaleString().replace(/\.\d\d\d\d,/, ''));
+                    lastUpdateElm.text('No data at ' +
+                        lastUpdateTime.toLocaleString().replace(/\.\d\d\d\d,/, ''));
                     updateTimeElm.text(' (' + Math.round((lastUpdateTime - startUpdateTime) / 10) / 100 + 'sec)');
                     if (typeof callback === 'function') callback();
                     return;
@@ -1167,7 +1308,7 @@ var JQueryNamespace = (function ($) {
     </thead>\
     <tbody id="historyEventsTableForCommentedEvents">\
         <tr>\
-            <td colspan="12" style="text-align: center;">Waiting for initializing...</td> \
+            <td colspan="100" style="text-align: center;">Waiting for initializing...</td> \
         </tr>\
     </tbody>\
 </table>');
@@ -1228,7 +1369,7 @@ var JQueryNamespace = (function ($) {
     </thead>\
     <tbody id="historyEventsTableForHistoryData">\
         <tr>\
-            <td colspan="12" style="text-align: center;">Waiting for initializing...</td> \
+            <td colspan="100" style="text-align: center;">Waiting for initializing...</td> \
         </tr>\
     </tbody>\
 </table>');
@@ -1316,6 +1457,8 @@ var JQueryNamespace = (function ($) {
         var disabledEventsCheckedElms = $('input[disabledEventCheckBox]:checked');
         var disabledEventsCheckedCnt = disabledEventsCheckedElms.get().length;
 
+        disableDaysOfWeekElm.val('');
+
         timeIntervalsElm.empty();
         removeIntervalsElm.prop('checked', false);
         removeIntervalsElm.prop('disabled', true);
@@ -1331,33 +1474,51 @@ var JQueryNamespace = (function ($) {
         }
 
         if(disabledEventsCheckedCnt === 1) {
-
             if(eventsData.disabled) {
-                var eventID = Number(disabledEventsCheckedElms.attr('disabledEventCheckBox'));
+                // disabledEventCheckBox = '127.0.0.1:10164:<eventID>
+                var eventID = disabledEventsCheckedElms.attr('disabledEventCheckBox');
                 for (var i = 0; i < eventsData.disabled.length; i++) {
+                    console.log(eventsData.disabled[i], eventID)
+
                     if (eventsData.disabled[i].id === eventID) {
                         if (eventsData.disabled[i] && eventsData.disabled[i].disableUntil) {
+                            if (eventsData.disabled[i].disableFrom) {
+                                var disableFrom = new Date(eventsData.disabled[i].disableFrom);
+                                $('#disableFromDate').val(getDateString(disableFrom));
+                                $('#disableFromTime').val(String('0' + disableFrom.getHours() + ':' + '0' +
+                                    disableFrom.getMinutes()).replace(/\d(\d\d)/g, '$1'));
+                            }
+
                             var disableUntil = new Date(eventsData.disabled[i].disableUntil);
                             $('#disableUntilDate').val(getDateString(disableUntil));
-                            $('#disableUntilTime').val(String('0' + disableUntil.getHours() + ':' + '0' + disableUntil.getMinutes()).replace(/\d(\d\d)/g, '$1'));
-                        }
-                        if(eventsData.disabled && eventsData.disabled[i] && eventsData.disabled[i].disableIntervals) {
-                            var intervals = eventsData.disabled[i].disableIntervals.split(';').map(function (interval) {
-                                return '<option value="' + interval + '">' + getTimeFromTimeInterval(interval) + '</option>';
-                            });
+                            $('#disableUntilTime').val(String('0' + disableUntil.getHours() + ':' + '0' +
+                                disableUntil.getMinutes()).replace(/\d(\d\d)/g, '$1'));
 
-                            //if (intervals.length) timeIntervalsElm.append('<option disabled>Choose time intervals</option>' + intervals.join(''));
-                            if (intervals.length) {
-                                removeIntervalsElm.prop('disabled', false);
-                                timeIntervalsElm.prop('disabled', false);
-                                timeIntervalsElm.append(intervals.join(''));
+                            if (eventsData.disabled[i].disableDaysOfWeek) {
+                                disableDaysOfWeekElm.val(eventsData.disabled[i].disableDaysOfWeek.split(','))
+                            }
+
+                            if (eventsData.disabled[i].disableIntervals) {
+                                var intervals = eventsData.disabled[i].disableIntervals.split(';').map(function (interval) {
+                                    return '<option value="' + interval + '">' +
+                                        getTimeFromTimeInterval(interval) +
+                                        '</option>';
+                                });
+
+                                if (intervals.length) {
+                                    removeIntervalsElm.prop('disabled', false);
+                                    timeIntervalsElm.prop('disabled', false);
+                                    timeIntervalsElm.append(intervals.join(''));
+                                }
                             }
                         }
+
                         break;
                     }
                 }
             }
         }
+        M.FormSelect.init(disableDaysOfWeekElm[0], {});
         M.FormSelect.init(timeIntervalsElm[0], {});
 
         if(!disabledEventsCheckedCnt) {
@@ -1372,8 +1533,13 @@ var JQueryNamespace = (function ($) {
         //dd = h * 3600000 + m * 60000;
         //m = (dd - h*360000) / 60000
 
-        var from = ('0' + Math.floor(fromTo[0] / 3600000) + ':0' + Math.floor((fromTo[0] - Math.floor(fromTo[0] / 3600000) * 3600000) / 60000)).replace(/\d(\d\d)/g, '$1');
-        var to = ('0' + Math.floor(fromTo[1] / 3600000) + ':0' + Math.floor((fromTo[1] - Math.floor(fromTo[1] / 3600000) * 3600000) / 60000)).replace(/\d(\d\d)/g, '$1');
+        var from = ('0' + Math.floor(fromTo[0] / 3600000) + ':0' +
+            Math.floor((fromTo[0] - Math.floor(fromTo[0] / 3600000) * 3600000) / 60000))
+            .replace(/\d(\d\d)/g, '$1');
+
+        var to = ('0' + Math.floor(fromTo[1] / 3600000) + ':0' +
+            Math.floor((fromTo[1] - Math.floor(fromTo[1] / 3600000) * 3600000) / 60000))
+            .replace(/\d(\d\d)/g, '$1');
 
         return from + '-' + to;
     }
@@ -1449,29 +1615,59 @@ var JQueryNamespace = (function ($) {
                 if(!results || typeof results !== 'object' || !Object.values(results)[0]) return;
                 var row = Object.values(results)[0];
 
-                var disabledTimeIntervals = '';
-                if (row.disableUntil && row.disableIntervals) {
-                    var intervals = row.disableIntervals.split(';'),
-                        lastMidnight = new Date(new Date().setHours(0, 0, 0, 0)).getTime(); // last midnight
+                if (row.disableUntil) {
+                    if (row.disableIntervals) {
+                        var intervals = row.disableIntervals.split(';'),
+                            // last midnight
+                            lastMidnight =
+                                new Date(new Date().setHours(0, 0, 0, 0)).getTime();
 
-                    disabledTimeIntervals = ', time intervals: ' + intervals.map(function (interval) {
-                        var fromTo = interval.split('-');
-                        var from = new Date(lastMidnight + Number(fromTo[0])).toLocaleTimeString().replace(/:\d\d$/, '');
-                        var to = new Date(lastMidnight + Number(fromTo[1])).toLocaleTimeString().replace(/:\d\d$/, '');
-                        return from + '-' + to;
-                    }).join('; ');
+                        var disabledTimeIntervals = ', time intervals: ' + intervals.map(function (interval) {
+                            var fromTo = interval.split('-');
+                            var from = new Date(lastMidnight +
+                                Number(fromTo[0])).toLocaleTimeString().replace(/:\d\d$/, '');
+                            var to = new Date(lastMidnight +
+                                Number(fromTo[1])).toLocaleTimeString().replace(/:\d\d$/, '');
+                            return from + '-' + to;
+                        }).join('; ');
+                    } else disabledTimeIntervals = '';
+
+
+                    if (row.disableDaysOfWeek) {
+                        var disableDaysOfWeek = ' on' + row.disableDaysOfWeek.split(',')
+                            .map(dayOfWeek => parameters.action.dayNames[Number(dayOfWeek)])
+                            .join(',');
+                    } else disableDaysOfWeek = '';
+
+                    if (row.disableFrom) {
+                        var disableFrom = new Date(row.disableFrom).toLocaleString();
+                    } else disableFrom = 'Now'
                 }
 
-                var user = row.user ? "<p class='margin-0'><strong>Created by: </strong>" + row.user + '</p>' : '';
-                var recipients = row.recipients ? "<p class='margin-0'><strong>Message was sending to:</strong> " + row.recipients + '</p>' : '';
-                var text = '<p>' + (row.comment ? row.comment.replace(/<ul>/gmi, '<ul class=browser-default>').replace(/<(h\d)>/gmi, '<$1 style="font-size:2em">') : '') + '</p>';
-                var time = row.timestamp ? "<p class='margin-0'><strong>Date: </strong>" + new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, '') + '</p>' : '';
-                var disabledUntil = row.disableUntil ? '<p class="margin-0"><strong>Event will be disabled until </strong>' + new Date(row.disableUntil).toLocaleString() + disabledTimeIntervals + '</p>' : '';
+                var user = row.user ?
+                    "<p class='margin-0'><strong>Created by: </strong>" + row.user + '</p>' : '';
+
+                var recipients = row.recipients ?
+                    "<p class='margin-0'><strong>Message was sending to:</strong> " + row.recipients + '</p>' : '';
+
+                var text = '<p>' + (row.comment ?
+                    row.comment.replace(/<ul>/gmi, '<ul class=browser-default>').replace(/<(h\d)>/gmi,
+                        '<$1 style="font-size:2em">') : '') + '</p>';
+
+                var time = row.timestamp ?
+                    "<p class='margin-0'><strong>Date: </strong>" +
+                    new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, '') + '</p>' :
+                    '';
+
+                var disableTime = row.disableUntil ?
+                    '<p class="margin-0"><strong>Event will be disabled from </strong>' + disableFrom + ' to ' +
+                    new Date(row.disableUntil).toLocaleString() + disableDaysOfWeek + disabledTimeIntervals + '</p>' :
+                    '';
 
                 bodyElm.css("cursor", "auto");
                 callback({
                     subject: row.subject,
-                    text: text + '<br/><br/>' + user + recipients + disabledUntil + time
+                    text: text + '<br/><br/>' + user + recipients + disableTime + time
                 });
             }
         });
@@ -1484,8 +1680,10 @@ var JQueryNamespace = (function ($) {
             elm = $('#historyEventsTable');
             var skipFilterAttr = '';
         } else skipFilterAttr = ' data-skip-search-filter ';
-        if (!result || !result.length) tablePartHTML = '<tr><td colspan="12" style="text-align: center;">No history events</td></tr>';
-        else {
+        if (!result || !result.length) {
+            tablePartHTML =
+                '<tr><td colspan="100" style="text-align: center;">No historical events</td></tr>';
+        } else {
             var maxWidth = Math.round((elm.width() * 0.2 > $(window).width() ? $(window).width() : elm.width()) * 0.5);
             result.sort((a, b) => b.startTime - a.startTime).forEach(function (row, idx) {
                 if(idx > maxEventsNumberInTable) return;
@@ -1493,16 +1691,18 @@ var JQueryNamespace = (function ($) {
 
                 var importance = getHumanImportance(row.importance);
                 // use bgcolor attribute for instead style for possible to change color of the row on mouse over
-                var color = importance ? importance.color : 'auto';
-                var style = row.endTime ? '' : 'font-weight:bold;';
+                var color = importance ? importance.color.trim() : 'auto';
+                var styleFontWeight = row.endTime ? '' : 'font-weight:bold;';
                 var importanceText = importance ? importance.text : row.importance;
                 var isChecked = $('input#selectHistoryEvent_'+ row.id+':checked').length ? ' checked' : '';
                 var hintLink = useHints && row.hintID ? '<div class="chip small-chip" hintID="' + row.hintID +'">hint</div> ' : '';
                 var historyLink = useHistory ? '<div class="chip small-chip" data-OCIDForHistory="' + row.OCID +'">history</div> ' : '';
 
                 tablePartHTML += '\
-<tr historyEventsRow OCID="' + row.OCID + '" importance="' +row.importance+ '" bgcolor="' + color + '" ' +
-                    skipFilterAttr + 'style="cursor: pointer;' + style + '">\
+<tr historyEventsRow OCID="' + row.OCID + '" importance="' + row.importance + '" ' +
+                    'onmouseover="this.style.backgroundColor=\'lightgrey\'" onmouseout="this.style.backgroundColor=\'' +
+                    color + '\'" ' +
+                    skipFilterAttr + 'style="cursor: pointer; background-color: ' + color + ';' + styleFontWeight + '">\
     <td class="hide">' + row.id + '</td>\
     <td class="hide">' + row.OCID + '</td>\
     <td class="hide" counterName>' + row.counterName + '</td>\
@@ -1583,8 +1783,9 @@ var JQueryNamespace = (function ($) {
         var tablePartHTML = '';
 
         var eventsTableElm = $('#eventsTable');
-        if (!result || !result.length) tablePartHTML = '<tr><td colspan="11" style="text-align: center;">No events</td></tr>';
-        else {
+        if (!result || !result.length) {
+            tablePartHTML = '<tr><td colspan="100" style="text-align: center;">No events</td></tr>';
+        } else {
             var maxWidth = Math.round($(window).width() * 0.5);
             result.sort((a, b) => b.startTime - a.startTime).forEach(function (row) {
                 if(restrictions.importanceFilter && importanceFilter > -1 && row.importance > importanceFilter) return;
@@ -1597,18 +1798,23 @@ var JQueryNamespace = (function ($) {
                 var commentLink = useInfo && row.commentID ? '<div class="chip small-chip" commentID="' + row.commentID +'" OCID="' + row.OCID +'">info</div> ' : '';
                 var historyLink = useHistory ? '<div class="chip small-chip" data-OCIDForHistory="' + row.OCID +'">history</div> ' : '';
 
+                // use bgcolor attribute instead style for save possible to change color of the row on mouse over
                 tablePartHTML += '\
-<tr currentEventsRow OCID="' + row.OCID + '" importance="' +row.importance+ '" bgcolor="' + color + // use bgcolor attribute instead style for possible to change color of the row on mouse over
-                    '" style="cursor: pointer;">\
+<tr currentEventsRow OCID="' + row.OCID + '" importance="' +row.importance+ '" ' +
+                    'onmouseover="this.style.backgroundColor=\'lightgrey\'" onmouseout="this.style.backgroundColor=\'' +
+                    color + '\'" ' + '" style="cursor: pointer; background-color: ' + color + ';">\
     <td class="hide">' + row.id + '</td>\
     <td class="hide">' + row.OCID + '</td>\
     <td class="hide" counterName>' + row.counterName + '</td>\
     <td class="hide">' + row.startTime + '</td>\
     <td class="hide">' + row.endTime + '</td>\
     <td data-object-name="' + row.objectName +'">' + escapeHtml(row.objectName) + '</td>\
-    <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
+    <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' +
+                    floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
     <td class="hide">' + importanceText + '</td>\
-    <td>' + (row.startTime ? new Date(row.startTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
+    <td>' +
+        (row.startTime ? new Date(row.startTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') +
+        '</td>\
     <td>' + (row.startTime ? getHumanTime(Date.now() - row.startTime) : '-') + '</td>\
     <td>' + new Date(row.timestamp).toLocaleString().replace(/\.\d\d\d\d,/, '') + '</td>\
     <td preventCheckboxCheck class="small-padding">' +
@@ -1617,7 +1823,8 @@ var JQueryNamespace = (function ($) {
                     '</td>\
                     <td preventCheckboxCheck>\
                         <label>\
-                            <input type="checkbox" selectEventCheckbox counterID="' + row.counterID + '" id="selectCurrentEvent_'+ row.id+'"' + isChecked + '/>\
+                            <input type="checkbox" selectEventCheckbox counterID="' + row.counterID +
+                                '" id="selectCurrentEvent_'+ row.id+'"' + isChecked + '/>\
             <span></span>\
         </label>\
     </td>\
@@ -1629,24 +1836,57 @@ var JQueryNamespace = (function ($) {
         eventsTableElm.html(tablePartHTML);
     }
 
+    /**
+     *
+     * @param {Array<{
+     *     id: number,
+     *     OCID: number,
+     *     eventsCount: number
+     *     startTime: number,
+     *     endTime: number,
+     *     hintID: number,
+     *     commentID: number
+     *     importance: number,
+     *     disableIntervals: string,
+     *     disableDaysOfWeek: string,
+     *     eventDescription: string,
+     *     objectName: string,
+     *     counterName: string,
+     *     counterID: number,
+     *     disableFrom: number
+     *     disableUntil: number,
+     *     parentOCID: number,
+     *     subject: string,
+     *     recipients: string,
+     *     timestamp: number,
+     *     disableUser: string,
+     *     eventsCount; number,
+     *
+     * }>} result SQL query result
+     */
     function drawDisableEventsTable(result) {
         var tablePartHTML = '';
 
         var disabledEventsTableElm = $('#disabledEventsTable');
-        if (!result || !result.length) tablePartHTML = '<tr><td colspan="15" style="text-align: center;">No disabled events</td></tr>';
-        else {
+        if (!result || !result.length) {
+            tablePartHTML = '<tr><td colspan="100" style="text-align: center;">No disabled events</td></tr>';
+        } else {
             var maxWidth = Math.round($(window).width() * 0.5);
             result.sort((a, b) => b.startTime - a.startTime).forEach(function (row) {
                 if(restrictions.importanceFilter && importanceFilter > -1 && row.importance > importanceFilter) return;
                 var importance = getHumanImportance(row.importance);
                 // use bgcolor attribute for instead style for possible to change color of the row on mouse over
                 var color = importance ? importance.color : 'auto';
-                var style = row.endTime ? '' : 'font-weight:bold;';
+                var styleFontWeight = row.endTime ? '' : 'font-weight:bold;';
                 var importanceText = importance ? importance.text : row.importance;
                 var isChecked = $('input#selectDisabledEvent_' + row.id + ':checked').length ? ' checked' : '';
-                var hintLink = useHints && row.hintID ? '<div class="chip small-chip" hintID="' + row.hintID +'">hint</div> ' : '';
-                var commentLink = useInfo && row.commentID ? '<div class="chip small-chip" commentID="' + row.commentID +'" OCID="' + row.OCID +'">info</div> ' : '';
-                var historyLink = useHistory ? '<div class="chip small-chip" data-OCIDForHistory="' + row.OCID +'">history</div> ' : '';
+                var hintLink = useHints && row.hintID ?
+                    '<div class="chip small-chip" hintID="' + row.hintID +'">hint</div> ' : '';
+                var commentLink = useInfo && row.commentID ?
+                    '<div class="chip small-chip" commentID="' + row.commentID + '" OCID="' + row.OCID +
+                    '">info</div> ' : '';
+                var historyLink = useHistory ?
+                    '<div class="chip small-chip" data-OCIDForHistory="' + row.OCID +'">history</div> ' : '';
 
                 if(row.disableIntervals) { // remove same intervals
                     var disableIntervalsObj = {};
@@ -1655,23 +1895,53 @@ var JQueryNamespace = (function ($) {
                     });
 
                     var disableIntervals = Object.keys(disableIntervalsObj).join(' ');
-                } else disableIntervals = '';
+                } else disableIntervals = 'All time';
+
+                if(row.disableDaysOfWeek) {
+                    var disableDaysOfWeek = row.disableDaysOfWeek.split(',')
+                        .map(dayOfWeek => parameters.action.dayNames[Number(dayOfWeek)])
+                        .join(',');
+                } else disableDaysOfWeek = 'All days';
+
+                var eventDescription = floatToHuman(row.eventDescription ?
+                    row.eventDescription : row.counterName);
+
+                var startTime = row.startTime ?
+                    new Date(row.startTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-';
+
+                var endTime = row.endTime ?
+                    new Date(row.endTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-';
+
+                var duration = row.startTime ?
+                    getHumanTime((row.endTime ? row.endTime : Date.now()) - row.startTime) : '-';
+
+                var disableFrom = row.disableFrom ?
+                    new Date(row.disableFrom).toLocaleString().replace(/\.\d\d(\d\d),/, '.$1') :
+                    'Now';
+
+                var disableUntil = new Date(row.disableUntil)
+                    .toLocaleString()
+                    .replace(/\.\d\d(\d\d),/, '.$1');
 
                 tablePartHTML += '\
-<tr disabledEventsRow OCID="' + row.OCID + '" importance="' + row.importance + '" bgcolor="' + color +
-                    '" style="cursor: pointer;' + style + '">\
+<tr disabledEventsRow OCID="' + row.OCID + '" importance="' + row.importance + '" ' +
+                    'onmouseover="this.style.backgroundColor=\'lightgrey\'" onmouseout="this.style.backgroundColor=\'' +
+                    color + '\'" ' +
+                    '" style="cursor: pointer; background-color: ' + color + ';' + styleFontWeight + '">\
     <td class="hide">' + row.id + '</td>\
     <td class="hide">' + row.OCID + '</td>\
     <td class="hide" counterName>' + row.counterName + '</td>\
     <td class="hide">' + row.startTime + '</td>\
     <td class="hide">' + row.endTime + '</td>\
     <td data-object-name="' + row.objectName +'">' + escapeHtml(row.objectName) + '</td>\
-    <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' + floatToHuman(row.eventDescription ? row.eventDescription : row.counterName) + '</td>\
+    <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;">' + eventDescription + '</td>\
     <td class="hide">' + importanceText + '</td>\
-    <td>' + (row.startTime ? new Date(row.startTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
-    <td>' + (row.endTime ? new Date(row.endTime).toLocaleString().replace(/\.\d\d\d\d,/, '') : '-') + '</td>\
-    <td>' + (row.startTime ? getHumanTime((row.endTime ? row.endTime : Date.now()) - row.startTime) : '-') + '</td>\
-    <td>' + new Date(row.disableUntil).toLocaleString().replace(/\.\d\d(\d\d),/, '.$1') + '</td>\
+    <td>' + startTime + '</td>\
+    <td>' + endTime + '</td>\
+    <td>' + duration + '</td>\
+    <td>' + disableFrom + '</td>\
+    <td>' + disableUntil + '</td>\
+    <td>' + disableDaysOfWeek + '</td>\
     <td>' + disableIntervals + '</td>\
     <td>' +  escapeHtml(row.disableUser) + '</td>\
     <td preventCheckboxCheck class="small-padding">' +
@@ -1680,7 +1950,8 @@ var JQueryNamespace = (function ($) {
                     '</td>\
                     <td preventCheckboxCheck>\
                         <label>\
-                            <input type="checkbox" selectEventCheckbox counterID="' + row.counterID + '" disabledEventCheckBox="'+ row.id + '" id="selectDisabledEvent_' + row.id + '"' + isChecked + '/>\
+                            <input type="checkbox" selectEventCheckbox counterID="' + row.counterID +
+                    '" disabledEventCheckBox="'+ row.id + '" id="selectDisabledEvent_' + row.id + '"' + isChecked + '/>\
             <span></span>\
         </label>\
     </td>\
@@ -1691,26 +1962,44 @@ var JQueryNamespace = (function ($) {
         disabledEventsTableElm.html(tablePartHTML);
     }
 
+    /**
+     *
+     * @param {Array<{
+     *     importance: number,
+     *     id: number,
+     *     subject: string,
+     *     eventsCount: number,
+     *     comment: string,
+     *     user: string,
+     *     recipients: string,
+     *     timestamp: number,
+     * }>} result
+     */
     function drawHistoryCommentedEventsTable(result) {
         var tablePartHTML = '',
             historyCommentedEventsTableElm = $('#historyCommentedEventsTable'),
             maxWidth = Math.round($(window).width() * 0.5);
 
-        if (!result.length) tablePartHTML = '<tr><td colspan="8" style="text-align: center;">No commented events</td></tr>';
-        else {
+        if (!result.length) {
+            tablePartHTML = '<tr><td colspan="100" style="text-align: center;">No commented events</td></tr>';
+        } else {
             result.sort((a, b) => b.timestamp - a.timestamp).forEach(function (row) {
                 if(restrictions.importanceFilter && importanceFilter > -1 && row.importance > importanceFilter) return;
                 var importance = getHumanImportance(row.importance);
                 // use bgcolor attribute for instead style for possible to change color of the row on mouse over
                 var color = importance ? importance.color : 'auto';
                 var commentLink = '<div class="chip small-chip" commentID="' + row.id +'">info</div> ';
-                var eventLink = '<div class="chip small-chip" data-commentIDForEvents="' + row.id +'">events&nbsp;:' +
-                    row.eventsCount + '</div> ';
+                var eventLink = '<div class="chip small-chip" data-commentIDForEvents="' + row.id +
+                    '">events&nbsp;:' + row.eventsCount + '</div> ';
 
                 tablePartHTML += '\
-<tr historyCommentedEventsRow importance="' + row.importance + '" bgcolor="' + color +'">\
+<tr historyCommentedEventsRow importance="' + row.importance + '" ' +
+                    'onmouseover="this.style.backgroundColor=\'lightgrey\'" onmouseout="this.style.backgroundColor=\'' +
+                    color + '\'" style="cursor: pointer; background-color: ' + color + ';">\
     <td class="hide">' + row.id + '</td>\
-    <td style="max-width:'+maxWidth+'px;overflow-wrap: break-word;"><div class="comment-body"><p class="comment-header">' + escapeHtml(row.subject) + '</p>' +
+    <td style="max-width:' + maxWidth +
+                    'px;overflow-wrap: break-word;"><div class="comment-body"><p class="comment-header">' +
+                    escapeHtml(row.subject) + '</p>' +
                     (row.comment ?
                         row.comment
                             .replace(/<ul>/gmi, '<ul class=browser-default>')
@@ -1743,14 +2032,19 @@ var JQueryNamespace = (function ($) {
     function getHumanTime ( timestamp ) {
         var seconds = Math.round(timestamp / 1000);
         if (seconds <= 0) return '0sec';
-        return [   [Math.floor(seconds / 31536000), function(y) { return y === 1 ? y + 'year ' : y + 'years ' }],
-            [Math.floor((seconds % 31536000) / 86400), function(y) { return y === 1 ? y + 'day ' : y + 'days ' }],
-            [Math.floor(((seconds % 31536000) % 86400) / 3600), function(y) { return y + (y === 1 ? 'hour ' : 'hours ' )}],
-            [Math.floor((((seconds % 31536000) % 86400) % 3600) / 60), function(y) {return y + 'min '}],
-            [(((seconds % 31536000) % 86400) % 3600) % 60, function(y) {return y + 'sec'}]
+        return [
+            [Math.floor(seconds / 31536000), (y)=> y === 1 ? y + 'year ' : y + 'years ' ],
+            [Math.floor((seconds % 31536000) / 86400), (y)=> y === 1 ? y + 'day ' : y + 'days ' ],
+            [Math.floor(((seconds % 31536000) % 86400) / 3600), (y) => y + (y === 1 ? 'hour ' : 'hours ' ) ],
+            [Math.floor((((seconds % 31536000) % 86400) % 3600) / 60), (y)=> y + 'min '],
+            [(((seconds % 31536000) % 86400) % 3600) % 60, (y)=> y + 'sec']
         ].map(function(level) {
             return level[0] ? level[1](level[0]) : '';
-        }).join('').replace(/^([^ ]+ [^ ]+) ?.*$/, '$1').replace(/(\.\d\d)\d*/, '$1 ').trim() || '0 sec';
+        })
+            .join('')
+            .replace(/^([^ ]+ [^ ]+) ?.*$/, '$1')
+            .replace(/(\.\d\d)\d*/, '$1 ')
+            .trim() || '0 sec';
     }
 
     function floatToHuman(str) {
@@ -1766,8 +2060,23 @@ var JQueryNamespace = (function ($) {
     function composeMessage() {
 
         lastAction = $('input[name="action"]:checked').attr('id');
+
+        /**
+         * @type {{
+         *     tables: Array,
+         *     autoApplyFor: Array
+         *     name: string,
+         *     bodyHeader: string,
+         *     hiddenData: Object,
+         *     eventTemplate: string,
+         *     intervalsDivider: string,
+         *     subject: string,
+         *     objectsListLength: number,
+         *     countersListLength: number,
+         * }}
+         */
         var template = parameters.action.actionsMessageTemplates[lastAction];
-        if(!template) template = parameters.action.actionsMessageTemplates.addAsComment;
+        if(!template) template = parameters.action.actionsMessageTemplates['addAsComment'];
         var func = lastAction.indexOf('addAsHint') === 0 ? 'getHint' : 'getComment';
 
         var variables = {}, objectsNames = {}, countersNames = {};
@@ -1777,7 +2086,8 @@ var JQueryNamespace = (function ($) {
         if(!template.tables) checkedEventsElms = $('table').find('input[selectEventCheckbox]:checked').get();
         else {
             template.tables.forEach(function (tableID) {
-                Array.prototype.push.apply(checkedEventsElms, $('#' + tableID).find('input[selectEventCheckbox]:checked').get())
+                Array.prototype.push.apply(checkedEventsElms, $('#' + tableID)
+                    .find('input[selectEventCheckbox]:checked').get());
             })
         }
 
@@ -1794,13 +2104,29 @@ var JQueryNamespace = (function ($) {
             var importance = Number(trElm.attr('importance'));
             if(maxImportance === undefined || importance < maxImportance) maxImportance = importance;
 
-            var tdElements = trElm.find('td').get(), variablesInRow = {};
+            var tdElements = trElm.find('td').get();
+            /**
+             *
+             * @type {{
+             *      START_TIME: string,
+             *      END_TIME: string,
+             *      START_TIME_MS: number,
+             *      END_TIME_MS: number,
+             *      OCID: number,
+             *      DURATION: string,
+             *      OBJECT_NAME: string,
+             *      COUNTER_NAME: string,
+             *      EVENT_DESCRIPTION: string,
+             * }}
+             */
+            var variablesInRow = {};
             trElm.closest('table').find('th').get().forEach(function(thElm, idx) {
                 var name = $(thElm).attr('var');
                 if(name) variablesInRow[name] = $(tdElements[idx]).text();
             });
             if(!variablesInRow.END_TIME || variablesInRow.END_TIME === '-') variablesInRow.END_TIME = 'NOW';
-            var interval = variablesInRow.START_TIME + ' - ' + variablesInRow.END_TIME + ' (' + variablesInRow.DURATION + ')';
+            var interval = variablesInRow.START_TIME + ' - ' + variablesInRow.END_TIME + ' (' +
+                variablesInRow.DURATION + ')';
 
             if(!variables[variablesInRow.OCID]) {
                 variables[variablesInRow.OCID] = {
@@ -1831,6 +2157,19 @@ var JQueryNamespace = (function ($) {
                     if(!Array.isArray(template.autoApplyFor)) return;
                     //console.log('template.autoApplyFor', template.autoApplyFor)
                     for(var i = 0; i < template.autoApplyFor.length; i++) {
+                        /**
+                         * @type {{
+                         *      actions: Array<string>,
+                         *      importance: Array<number>,
+                         *      objectNameRE: Array<string>,
+                         *      counterNameRE: Array<string>,
+                         *      startEventTimeLessMin: number,
+                         *      endEventTimeLessMin: number,
+                         *      eventDescriptionRE: Array<string>,
+                         *      counterNameRE: Array<string>,
+                         *      objectNameRE: Array<string>,
+                         * }}
+                         */
                         var condition = template.autoApplyFor[i];
 
                         if(Array.isArray(condition.actions) && condition.actions.indexOf(lastAction) === -1) {
@@ -1844,15 +2183,21 @@ var JQueryNamespace = (function ($) {
                         }
 
                         if(condition.startEventTimeLessMin && variablesInRow.START_TIME_MS &&
-                            Date.now() - Number(condition.startEventTimeLessMin) * 60000 > Number(variablesInRow.START_TIME_MS)) {
-                            console.log('condition.startEventTimeLessMin', condition.startEventTimeLessMin, variablesInRow.START_TIME_MS)
+                            Date.now() - Number(condition.startEventTimeLessMin) * 60000 >
+                            Number(variablesInRow.START_TIME_MS)
+                        ) {
+                            console.log('condition.startEventTimeLessMin', condition.startEventTimeLessMin,
+                                variablesInRow.START_TIME_MS)
                             continue;
                         }
 
                         if(condition.endEventTimeLessMin && variablesInRow.END_TIME_MS &&
                             variablesInRow.END_TIME !== 'NOW' &&
-                            Date.now() - Number(condition.endEventTimeLessMin) * 60000 > Number(variablesInRow.END_TIME_MS)) {
-                            //console.log('condition.endEventTimeLessMin', condition.endEventTimeLessMin, variablesInRow.END_TIME_MS)
+                            Date.now() - Number(condition.endEventTimeLessMin) * 60000 >
+                            Number(variablesInRow.END_TIME_MS)
+                        ) {
+                            //console.log('condition.endEventTimeLessMin', condition.endEventTimeLessMin,
+                            // variablesInRow.END_TIME_MS)
                             continue;
                         }
 
@@ -1885,7 +2230,8 @@ var JQueryNamespace = (function ($) {
                                     break;
                                 }
                             }
-                            //console.log('condition.eventDescriptionRE', condition.eventDescriptionRE, variablesInRow.EVENT_DESCRIPTION, j)
+                            //console.log('condition.eventDescriptionRE', condition.eventDescriptionRE,
+                            // variablesInRow.EVENT_DESCRIPTION, j)
                             if(j === -1) continue;
                         }
 
@@ -1945,7 +2291,20 @@ var JQueryNamespace = (function ($) {
 
         if(template.bodyHeader) {
             var messageBody = template.bodyHeader;
-            messageBody = messageBody.replace('%:DISABLE_UNTIL:%', $('#disableUntilTime').val() + ' ' + $('#disableUntilDate').val());
+            messageBody = messageBody.replace('%:DISABLE_UNTIL:%', $('#disableUntilTime').val() + ' ' +
+                $('#disableUntilDate').val());
+
+            messageBody = messageBody.replace('%:DISABLE_FROM:%', $('#disableFromTime').val() + ' ' +
+                $('#disableFromDate').val());
+
+            var disableDaysOfWeek = disableDaysOfWeekElm.val();
+            if(disableDaysOfWeek.length) {
+                var disableDaysOfWeekStr =
+                    disableDaysOfWeek.map(dayOfWeek => parameters.action.dayNames[Number(dayOfWeek)]).join(',');
+            } else disableDaysOfWeekStr = 'all days';
+            messageBody = messageBody.replace('%:DISABLE_DAYS_OF_WEEK:%', disableDaysOfWeekStr);
+
+
 
             var disableTimeIntervalFrom = $('#disableTimeIntervalFrom').val();
             var disableTimeIntervalTo = $('#disableTimeIntervalTo').val();
@@ -2058,7 +2417,9 @@ var JQueryNamespace = (function ($) {
             quill.setSelection(0, 0);
             //quill.insertText(index, messageBody, {}, "user");
 
-            if(messageTopImportance === undefined || maxImportance < messageTopImportance) messageTopImportance = maxImportance;
+            if(messageTopImportance === undefined || maxImportance < messageTopImportance) {
+                messageTopImportance = maxImportance;
+            }
 
         });
     }
@@ -2097,7 +2458,8 @@ var JQueryNamespace = (function ($) {
 
 
         var urlParameters = {
-            't': encodeURIComponent(Number(startTime) - 900000 + '-' + (Number(endTime) ? Number(endTime) + 900000 : Date.now())), // timestamps in ms
+            't': encodeURIComponent(Number(startTime) - 900000 + '-' + (Number(endTime) ?
+                Number(endTime) + 900000 : Date.now())), // timestamps in ms
             'l': encodeURIComponent(OCIDs.join('-')), // show graph for this OCID with align to left
             'n': '0', // don't auto update
             'y': '0--0-',
@@ -2190,7 +2552,7 @@ var JQueryNamespace = (function ($) {
         var rows = $("tbody").find("tr").addClass('hide');
         if (searchStr.length) {
             rows.find("input[selectEventCheckbox]:checked").closest('tr').removeClass('hide');
-            rows.filter(":icontains('" + searchStr + "')").removeClass('hide');
+            rows.filter(":i_contains('" + searchStr + "')").removeClass('hide');
             rows.find("[data-skip-search-filter]").removeClass('hide');
         } else {
             rows.removeClass('hide');
