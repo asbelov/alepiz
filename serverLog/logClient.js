@@ -10,6 +10,7 @@ const prepareLogMessage = require('./prepareLogMessage');
 const writeLog = require('./writeLog');
 const connectToRemoteNodes = require("../lib/connectToRemoteNodes");
 const createLabel = require('./createLabel');
+const createMessage = require('./createMessage');
 const exitHandler = require('../lib/exitHandler');
 
 const Conf = require('../lib/conf');
@@ -36,6 +37,7 @@ var clientIPC, allClientIPC, callbacksWhileConnecting = [];
  *  disconnect: Function,
  *  addTaskComment: Function,
  *  addActionComment: Function,
+ *  createMessage: Function,
  * }}
  */
 module.exports = function (parentModule) {
@@ -73,6 +75,7 @@ module.exports = function (parentModule) {
      *      [addActionComment]: Function,
      *      [getAuditData]: Function,
      *      [disconnect]: Function,
+     *      [createMessage]: Function,
      * }}
      */
     var logObj = createLogObject(parentModule, sessionID, label, sendToLogServer);
@@ -170,6 +173,14 @@ module.exports = function (parentModule) {
     logObj.getAuditData = getAuditData;
 
     logObj.disconnect = clientIPC.stop;
+
+    /**
+     * Create a log message from the arguments of the createMessage function. Arguments can be of any type
+     * @return {string} log message
+     */
+    logObj.createMessage = function () {
+        return createMessage.createBody(Array.prototype.slice.call(arguments), null, confLog.get());
+    }
 
     return logObj;
 }

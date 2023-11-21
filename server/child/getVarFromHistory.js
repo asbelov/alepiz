@@ -228,20 +228,22 @@ function calcOCID(historyVariable, variables, getVariableValue, param, callback)
                     var res = variablesReplace(historyVariable.objectVariable, variables);
 
                     if(!res) {
-                        return callback(new Error('Can\'t get OCID for object variable "' +
-                            historyVariable.objectVariable + '" and counterID: ' + historyVariable.parentCounterName));
+                        return callback(new Error(log.createMessage('Can\'t calculate variables in the object name ',
+                            'expression "', historyVariable.objectVariable,
+                            '" for counter ', historyVariable.parentCounterName)));
                     }
                     else {
                         if (res.unresolvedVariables.length) {
-                            return callback(new Error('Found unresolved variables while calculating object name from ' +
-                                historyVariable.objectVariable + ': ' + res.unresolvedVariables.join(', ')));
+                            return callback(new Error(log.createMessage(
+                                'Found unresolved variables while calculating object name from ',
+                                historyVariable.objectVariable, ': ', res.unresolvedVariables)));
                         }
                         variableObjectName = String(res.value).toUpperCase();
                     }
 
                     var OCID = null;
                     if(param.countersObjects.objectName2OCID.has(variableObjectName)) {
-                        for (let parentCounterID in historyVariable.parentCounterIDs) {
+                        for (let parentCounterID of historyVariable.parentCounterIDs) {
                             var _OCID = param.countersObjects.objectName2OCID
                                 .get(variableObjectName)
                                 .get(Number(parentCounterID));
@@ -253,8 +255,9 @@ function calcOCID(historyVariable, variables, getVariableValue, param, callback)
                     }
 
                     if (!OCID) {
-                        return callback(new Error('Can\'t get OCID for object ' + variableObjectName +
-                            ' and counterID: ' + historyVariable.parentCounterName));
+                        return callback(new Error(log.createMessage('Can\'t get OCID for object ', variableObjectName,
+                            ' and counterID: ', historyVariable.parentCounterName, ' objectID: ', param.objectID,
+                            ' counterIDs: ', historyVariable.parentCounterIDs)));
                     }
 
                     callback(null, OCID, variableObjectName);
@@ -266,7 +269,7 @@ function calcOCID(historyVariable, variables, getVariableValue, param, callback)
 
         var OCID = null;
         if(param.countersObjects.objectName2OCID.has(variableObjectName)) {
-            for (let parentCounterID in historyVariable.parentCounterIDs) {
+            for (let parentCounterID of historyVariable.parentCounterIDs) {
                 var _OCID = param.countersObjects.objectName2OCID
                     .get(variableObjectName)
                     .get(Number(parentCounterID));
@@ -278,8 +281,9 @@ function calcOCID(historyVariable, variables, getVariableValue, param, callback)
         }
 
         if (!OCID) {
-            return callback(new Error('Can\'t get OCID for object ' + variableObjectName +
-                ' and counterID: ' + historyVariable.parentCounterName));
+            return callback(new Error(log.createMessage('Can\'t get OCID for object ', variableObjectName,
+                ' and counterID: ', historyVariable.parentCounterName, ' objectID: ', param.objectID,
+                ' counterIDs: ', historyVariable.parentCounterIDs)));
         }
     } else {
         if (historyVariable.OCID) {
@@ -288,7 +292,7 @@ function calcOCID(historyVariable, variables, getVariableValue, param, callback)
         } else {
             variableObjectName = param.objectName;
             OCID = null;
-            for (let parentCounterID in historyVariable.parentCounterIDs) {
+            for (let parentCounterID of historyVariable.parentCounterIDs) {
                 if(param.countersObjects.counters.has(Number(parentCounterID))) {
                     OCID = param.countersObjects.counters
                         .get(Number(parentCounterID))
@@ -298,8 +302,9 @@ function calcOCID(historyVariable, variables, getVariableValue, param, callback)
             }
 
             if (!OCID) {
-                return callback(new Error('Can\'t get OCID for object ' + variableObjectName +
-                    ' and counter: ' + historyVariable.parentCounterName));
+                return callback(new Error(log.createMessage('Can\'t get OCID for object ', variableObjectName,
+                    ' and counter: ', historyVariable.parentCounterName, ' objectID: ', param.objectID,
+                    ' counterIDs: ', historyVariable.parentCounterIDs)));
             }
         }
     }

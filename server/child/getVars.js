@@ -2,7 +2,7 @@
  * Copyright © 2022. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-//const log = require('../../lib/log')(module);
+const log = require('../../lib/log')(module);
 const async = require('async');
 const processUpdateEventExpressionResult = require('./processUpdateEventExpressionResult');
 const variablesReplace = require("../../lib/utils/variablesReplace");
@@ -29,7 +29,7 @@ const updateEventsMode = {
  * Get variable values
  * @param param {Object}
  * @param {Object} param.childThread
- * @param {number} param.removeCounter
+ * @param {number} param.timestamp
  * @param {Object} param.parentVariables
  * @param {0|1} param.prevUpdateEventState
  * @param {string|number|null} param.parentObjectValue
@@ -157,7 +157,7 @@ function getUpdateEventState(variables, param, callback) {
     if (!param.parentOCID || !param.updateEventExpression) {
         if(!param.variablesDebugInfo.UPDATE_EVENT_STATE) {
             param.variablesDebugInfo.UPDATE_EVENT_STATE = {
-                timestamp: Date.now(),
+                timestamp: param.timestamp,
                 counterID: param.counterID,
                 expression: param.updateEventExpression || 'none',
                 functionDebug: [],
@@ -239,7 +239,7 @@ function getCounterParameters(param, variables, callback) {
         var value = res ? fromHuman(res.value) : parameter.value;
         var variablesDebugName = parameter.name + ': ' + counter;
         param.variablesDebugInfo[variablesDebugName] = {
-            timestamp: Date.now(),
+            timestamp: param.timestamp,
             name: parameter.name + ': ' + counter,
             expression: parameter.value,
             variables: variables,
@@ -262,10 +262,10 @@ function getCounterParameters(param, variables, callback) {
 
             var res = variablesReplace(value, variables);
             if(!res || res.unresolvedVariables.length) {
-                return callback(new Error(param.objectName + '(' + param.counterName +
-                    '): Counter parameter ' + parameter.name + ': ' + counter + ' (' +
-                    parameter.value + ') ' +
-                    (!res ? 'not a string' : 'has unresolved variables: ' + (res.unresolvedVariables.join(',')))));
+                return callback(new Error(log.createMessage(param.objectName, '(', param.counterName,
+                    '): counter parameter ', parameter.name, ': ', counter, ' (',
+                    parameter.value, ') ',
+                    (!res ? 'not a string' : 'has unresolved variables: ' + (res.unresolvedVariables.join(','))))));
             }
             value = res ? fromHuman(res.value) : parameter.value;
             // some time got Stack: TypeError: Cannot set property 'result' of undefined
@@ -294,9 +294,10 @@ function getVar(initVariableName, variables, param, callback) {
         // too mach depth for variable calculation
         var maxVarCalcDepth = conf.get('maxVarCalcDepth') || 20;
         if(++varCalcDepth > maxVarCalcDepth) {
-            return callback(new Error('The maximum calculation depth (' + maxVarCalcDepth +
-                ') of the variable ' + variableName +
-                ' has been reached. Perhaps the calculation of the variable is looped.'));
+            return callback(new Error(log.createMessage(param.objectName, '(', param.counterName,
+                ') the maximum calculation depth (', maxVarCalcDepth,
+                ') of the variable ', variableName,
+                ' has been reached. Perhaps the calculation of the variable is looped.')));
         }
 
         /*
@@ -325,11 +326,13 @@ function getVar(initVariableName, variables, param, callback) {
                 getVariableFunc = getVarFromHistory;
             }
             if(!variable) {
-                return callback(new Error('Variable name ' + variableName + ' is not defined. Cache props: ' +
-                    [...param.cache.objectsProperties.keys()].join(', ') +
-                    '; vars expr: ' + [...param.cache.variablesExpressions.keys()].join(', ') +
-                    '; vars hist: ' + [...param.cache.variablesHistory.keys()].join(', ')
-                ));
+                return callback(new Error(log.createMessage(param.objectName, '(', param.counterName,
+                    '): variable name ', variableName, ' is not defined. Cache props: ',
+                    param.cache.objectsProperties,
+                    '; vars expr: ', param.cache.variablesExpressions,
+                    '; vars hist: ', param.cache.variablesHistory,
+                    '; objectID: ', param.objectID, '; counterID: ', param.counterID
+                )));
             }
         } else {
             variableName = 'UPDATE_EVENT_STATE';

@@ -362,7 +362,8 @@ function STMT(sql, prepareArgs) {
     if (prepareArgs.length > 0 && typeof prepareArgs[prepareArgs.length - 1] === 'function') {
         var callback = prepareArgs.pop();
         if (typeof callback === 'function') {
-            var t = setImmediate(callback);
+            // Don't use setImmediate(). This leads to large delays
+            var t = setTimeout(callback, 0);
             t.unref();
         }
     }

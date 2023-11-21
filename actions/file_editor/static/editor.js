@@ -372,6 +372,8 @@ function Editor(initCfg) {
         }
         resultElm.value = text;
 
+        isTextChanged = false;
+
         callback();
     }
 

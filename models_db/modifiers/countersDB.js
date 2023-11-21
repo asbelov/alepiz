@@ -27,6 +27,7 @@ countersDB.delete = function(counterID, callback) {
  * @param {Object} counter counter object
  * @param {string} counter.name counter name
  * @param {string} counter.collectorID collector ID (collector dir name)
+ * @param {number} counter.groupID counter group ID
  * @param {number|null} counter.unitID counter unit ID
  * @param {number} counter.sourceMultiplier counter sourceMultiplier
  * @param {number} counter.keepHistory counter keepHistory days
@@ -75,6 +76,7 @@ countersDB.updateCounter = function(counter, callback) {
  * Inserting a new counter into the database
  * @param {Object} counter - object with a counter parameters
  * @param {string} counter.name - counter name
+ * @param {number} counter.timestamp
  * @param {string} counter.collectorID - collector name (collector directory)
  * @param {number} counter.groupID - group ID
  * @param {number} counter.unitID - unit ID
@@ -112,7 +114,7 @@ countersDB.insertCounter = function(counter, callback) {
             $debug: counter.debug,
             $taskCondition: counter.taskCondition,
         },
-        function(err, info) {
+        function(err/*, info*/) {
             if (err) return callback(err);
             callback(null, id);
         }

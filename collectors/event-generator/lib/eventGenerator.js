@@ -70,7 +70,8 @@ eventGenerator.get = eventGenerator.getOnce = function (param, callback) {
             Stack: RangeError: Maximum call stack size exceeded
             ...
          */
-        var t = setImmediate(processQueue);
+        // Don't use setImmediate(). This leads to large delays
+        var t = setTimeout(processQueue, 0);
         t.unref();
     });
 }

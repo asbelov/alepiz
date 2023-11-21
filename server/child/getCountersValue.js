@@ -167,7 +167,7 @@ function destroyCollectors(callback) {
  * @param {Object} param object with parentOCID and OCID
  * @param {number} param.parentOCID parent OCID
  * @param {number} param.OCID OCID
- * @param {number} param.timestamp timestamp
+ * @param {number} [param.timestamp] timestamp
  */
 function sendCompleteExecutionResult(param) {
     childThread.send({

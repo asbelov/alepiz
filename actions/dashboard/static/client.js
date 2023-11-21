@@ -290,7 +290,9 @@ var JQueryNamespace = (function ($) {
             return '<option value="' + idx + '">' + dayOfWeek + '</option>';
         });
         disableDaysOfWeekElm.append(daysOfWeek.join(''));
-        M.FormSelect.init(disableDaysOfWeekElm[0], {});
+
+        // When there are no rights, the materialize element cannot be initialized
+        try { M.FormSelect.init(disableDaysOfWeekElm[0], {}); } catch(e) {}
 
         M.Timepicker.init(document.getElementById('disableTimeIntervalFrom'), {
             twelveHour: false,
@@ -1518,8 +1520,11 @@ var JQueryNamespace = (function ($) {
                 }
             }
         }
-        M.FormSelect.init(disableDaysOfWeekElm[0], {});
-        M.FormSelect.init(timeIntervalsElm[0], {});
+        // When there are no rights, the materialize element cannot be initialized
+        try {
+            M.FormSelect.init(disableDaysOfWeekElm[0], {});
+            M.FormSelect.init(timeIntervalsElm[0], {});
+        } catch(e) {}
 
         if(!disabledEventsCheckedCnt) {
             enableEventsElm.prop('checked', false);

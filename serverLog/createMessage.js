@@ -58,14 +58,13 @@ var consoleColors = {
 
 /** Set color for a string
  * @param {string} str part of the log message for se color
- * @param {string} colorLabel message color label
+ * @param {string|null} colorLabel message color label. null to disable coloring
  * @returns {string} part of the log message with color
  */
 function setColor(str, colorLabel) {
     if(colorLabel in colorsLabels) {
         return consoleColors[colorsLabels[colorLabel][0]] + str + consoleColors[colorsLabels[colorLabel][1]];
-    }
-    else return str;
+    } else return str;
 }
 
 /**
@@ -92,7 +91,7 @@ createMessage.createHeader = function (level, label, sessionID, date, TID_PID) {
 /**
  * Convert args to string and create message body
  * @param {Array} args array of the message parts. Parts can be any types
- * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"} level message debug level
+ * @param {"D"|"I"|"W"|"E"|"EXIT"|"THROW"|null} level message debug level. null to disable coloring
  * @param {{
  *     printObjectWithDepth: number,
  *     printMaxArrayLength: number,
@@ -111,8 +110,8 @@ createMessage.createBody = function (args, level, cfg) {
     var breakLength= Number(cfg.printBreakLength) || 80;
 
     return args.map(arg => {
-        if (typeof arg === 'number') return setColor(String(arg), 'number');
-        if (typeof arg === 'boolean') return setColor(String(arg), 'boolean');
+        if (typeof arg === 'number') return setColor(String(arg), level && 'number');
+        if (typeof arg === 'boolean') return setColor(String(arg), level && 'boolean');
         if (typeof arg === 'string') {
             if(arg.length > maxStringLength) arg = arg.substring(0, maxStringLength) + '...';
             return setColor(arg.replace(/[\r\n]+$/, ''), level);
@@ -120,7 +119,7 @@ createMessage.createBody = function (args, level, cfg) {
 
         try {
             return (util.inspect(arg, {
-                colors: true,
+                colors: !!level,
                 showHidden: true,
                 depth: objectDepth,
                 maxArrayLength: maxArrayLength,
