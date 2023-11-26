@@ -505,19 +505,19 @@ function processTaskExecutionCondition(args, taskID, hasRightsForRunByActions,
         if(!hasRightsForRunByActions) {
             return callback(new Error('User ' + args.username + ' has no rights for executing task ID ' + taskID));
         }
+        tasks.processWorkflows(args.username, taskID, workflow, 'approve', null, function () {
+            taskClient.runTask({
+                userName: args.username,
+                taskID: taskID,
+                filterTaskActionIDs: filterTaskActionIDs,
+                runTaskFrom: 'taskMaker',
+                runOnLocalNode: true,
+            }, function (err) {
+                if (err) log.error('User ', args.username, ': run task: ', err.message);
 
-        taskClient.runTask({
-            userName: args.username,
-            taskID: taskID,
-            filterTaskActionIDs: filterTaskActionIDs,
-            runTaskFrom: 'taskMaker',
-            runOnLocalNode: true,
-        }, function(err) {
-            if(err) log.error('User ', args.username, ': run task: ', err.message);
-
-            tasks.processWorkflows(args.username, taskID, workflow, 'execute', err, callback);
+                tasks.processWorkflows(args.username, taskID, workflow, 'execute', err, callback);
+            });
         });
-
         return;
     }
 
@@ -550,32 +550,34 @@ function processApproves(username, taskActionID, newApproves, workflow, callback
 
             // [2 - ask to run now; 12 - run now already started; 32 - canceled run now] => run task now
             if(runType === 2 || runType === 12 || runType === 32) {
-                taskClient.runTask({
-                    userName: username,
-                    taskID: taskID,
-                    taskActionID: taskActionID,
-                    runTaskFrom: 'taskMaker',
-                    runOnLocalNode: true,
-                }, function(err) {
-                    if(err) log.error('User ', username, ': run task when processed approves: ', err.message);
+                tasks.processWorkflows(username, taskID, workflow, 'approve', null, function () {
+                    taskClient.runTask({
+                        userName: username,
+                        taskID: taskID,
+                        taskActionID: taskActionID,
+                        runTaskFrom: 'taskMaker',
+                        runOnLocalNode: true,
+                    }, function(err) {
+                        if(err) log.error('User ', username, ': run task when processed approves: ', err.message);
 
-                    tasks.processWorkflows(username, taskID, workflow, 'execute', err, function() {
+                        tasks.processWorkflows(username, taskID, workflow, 'execute', err, function() {
 
-                        transactionsDB.begin(function(err) {
-                            if(err) {
-                                return callback(new Error('Can\'t start transaction for save approve for task ID ' +
-                                    taskID + ': ' + err.message));
-                            }
+                            transactionsDB.begin(function(err) {
+                                if(err) {
+                                    return callback(new Error('Can\'t start transaction for save approve for task ID ' +
+                                        taskID + ': ' + err.message));
+                                }
 
-                            tasksDB.approveTask(username, taskID, function (err) {
-                                if(err) return transactionsDB.rollback(err, callback);
-
-                                // 12 - run now already started
-                                if(runType === 12) return transactionsDB.end(callback);
-
-                                tasksDB.addRunCondition(taskID, 12, null, function (err) {
+                                tasksDB.approveTask(username, taskID, function (err) {
                                     if(err) return transactionsDB.rollback(err, callback);
-                                    transactionsDB.end(callback);
+
+                                    // 12 - run now already started
+                                    if(runType === 12) return transactionsDB.end(callback);
+
+                                    tasksDB.addRunCondition(taskID, 12, null, function (err) {
+                                        if(err) return transactionsDB.rollback(err, callback);
+                                        transactionsDB.end(callback);
+                                    });
                                 });
                             });
                         });
