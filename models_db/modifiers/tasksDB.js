@@ -175,6 +175,7 @@ tasksDB.renameTasksGroup = function(groupID, newGroupName, callback){
  * @param {function(Error)|function(null, number)} callback callback(err, groupID), where groupID is a new group ID
  */
 tasksDB.addTasksGroup = function(groupName, callback) {
+    // The hash algorithm is too simple. There may be problems with renaming
     const id = unique.createHash(groupName);
 
     db.run('INSERT INTO tasksGroups (id, name) VALUES (?, ?)', [id, groupName], function (err) {

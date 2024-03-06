@@ -18,21 +18,21 @@ module.exports = rightsWrapper;
 /** Get object properties for specified object IDs. Return properties from DB if properties were not updated more than
  * objectPropertiesCacheExpireTime ms or from the cache
  *
- * @param {string} user - username for check right for objects
+ * @param {string} username - username for check right for objects
  * @param {Array|string|number} objectIDs - array or comma separated string with objects IDs
  * @param {boolean} errorOnNoRights - return error if user has not rights for some objects from objectIDs
  * @param {function(Error)|function(null, Array)} callback - return error or an Array with all object properties
  *  using SELECT * FROM objectsProperties WHERE objectID = ?
  */
 
-function getProperties(user, objectIDs, errorOnNoRights, callback) {
+function getProperties(username, objectIDs, errorOnNoRights, callback) {
     checkIDs(objectIDs, function(err, checkedIDs) {
         if (err) return callback(err);
 
-        user = prepareUser(user);
+        username = prepareUser(username);
 
         rightsDB.checkObjectsIDs({
-            user: user,
+            user: username,
             IDs: checkedIDs,
             checkVew: true,
             errorOnNoRights: errorOnNoRights,
@@ -53,9 +53,9 @@ function getProperties(user, objectIDs, errorOnNoRights, callback) {
  * [{name:..., value:..., description:..., mode:...}]
  */
 
-rightsWrapper.getSharedProperties = function(user, objectsIDs, noCache, callback) {
+rightsWrapper.getSharedProperties = function(username, objectsIDs, noCache, callback) {
 
-    sortProperties(user, objectsIDs, [], true, function(err, obj) {
+    sortProperties(username, objectsIDs, [], true, function(err, obj) {
         if(err) return callback(err);
 
         callback(null, Object.values(obj.shared).map(function (properties) {
@@ -71,25 +71,25 @@ rightsWrapper.getSharedProperties = function(user, objectsIDs, noCache, callback
 
 /** Get object properties for specified object IDs
  *
- * @param {string} user - username for check right for objects
+ * @param {string} username - username for check right for objects
  * @param {Array|string|number} objectsIDs - array or comma separated string with objects IDs
  * @param {function(Error)|function(null, Array)} callback - return error or an Array with all
  *  of object properties using SELECT * FROM objectsProperties WHERE objectID = ?
  */
-rightsWrapper.getProperties = function(user, objectsIDs, callback) {
-    getProperties(user, objectsIDs, true, callback);
+rightsWrapper.getProperties = function(username, objectsIDs, callback) {
+    getProperties(username, objectsIDs, true, callback);
 };
 
 /**
  * Getting all object properties for object by OCIDs
  *
- * @param {string} user - username for check right for objects
+ * @param {string} username - username for check right for objects
  * @param {Array|string|number} OCIDs -  array or string with objects counters IDs
  * @param {number} mode - property mode
  * @param {function(Error)|function(null, Array)} callback - return error or an Array of properties
  * [{OCID:..., name:..., value:...}, ...]
  */
-rightsWrapper.getPropertiesByOCIDs = function (user, OCIDs, mode, callback) {
+rightsWrapper.getPropertiesByOCIDs = function (username, OCIDs, mode, callback) {
     checkIDs(OCIDs, function(err, checkedOCIDs) {
         if (err && (!checkedOCIDs || !checkedOCIDs.length)) return callback(err);
 
@@ -106,7 +106,7 @@ rightsWrapper.getPropertiesByOCIDs = function (user, OCIDs, mode, callback) {
                 else objectsIDs2OCIDs[row.objectID].push(row.OCID);
             });
 
-            getProperties(user, Object.keys(objectsIDs2OCIDs), false, function(err, rows) {
+            getProperties(username, Object.keys(objectsIDs2OCIDs), false, function(err, rows) {
                 if(err) {
                     return callback(new Error('Can\'t get objects properties for objects IDs  ' +
                         JSON.stringify(Object.keys(objectsIDs2OCIDs)) + ': ' + err.message));
@@ -144,7 +144,7 @@ rightsWrapper.getPropertiesByOCIDs = function (user, OCIDs, mode, callback) {
  * [{objectName:..., objectID:..., propName:..., propVal:..., propMode:... propDescription:...}, ....]
  */
 
-rightsWrapper.getObjectsForProperty = function(user, propertyName, callback) {
+rightsWrapper.getObjectsForProperty = function(username, propertyName, callback) {
 
     if(!propertyName || typeof propertyName !== 'string') {
         return callback(new Error('Getting objects for property: unknown property name: ' + JSON.stringify(propertyName)));
@@ -153,10 +153,10 @@ rightsWrapper.getObjectsForProperty = function(user, propertyName, callback) {
     objectsPropertiesDB.getObjectsForProperty(propertyName, function(err, rows) {
         if(err) return callback(new Error('Getting objects for property error: ' + err.message));
 
-        user = prepareUser(user);
+        username = prepareUser(username);
 
         rightsDB.checkObjectsIDs({
-            user: user,
+            user: username,
             IDs: rows.map(row => row.objectID),
             checkVew: true,
             errorOnNoRights: false
@@ -171,11 +171,23 @@ rightsWrapper.getObjectsForProperty = function(user, propertyName, callback) {
 
 /** Save properties for specific objects. !! Use transaction in a parent function
  *
- * @param {string} user - username for check right for objects
- * @param {Array|string|number} objectsIDs - array or comma separated string with objects IDs
- * @param {Object} propertiesForSave - properties for save [{name:..., mode:..., value:..., description:...}, ...]
- * @param {boolean} [deleteNotListedProperties] - if true, then delete properties, which not listed in "properties" array for use in automatic tasks
- * @param {function(Error)|function(null, Array, Object)} callback - return error or callback(null, objetIDs, properties)
+ * @param {string} username username for check right for objects
+ * @param {Array<number>|string|number} objectsIDs array or comma separated string with objects IDs
+ * @param {Array<{
+ *     name: string,
+ *     mode: 0|1|2|3,
+ *     value: string,
+ *     description: string,
+ * }>} propertiesForSave properties for save [{name:..., mode:..., value:..., description:...}, ...]
+ * @param {boolean} [deleteNotListedProperties] - if true, then delete properties, which is not listed in the "properties"
+ *  array for use in automatic tasks
+ * @param {function(Error)|function(null, Array<number>, {
+ *      insert: Object,
+ *      update: Object,
+ *      updateDescription: Object,
+ *      deleteShared: Array<number>|undefined,
+ *      shared: Object,
+ * })} callback - return error or callback(null, objetIDs, properties)
  * where objectIDs is an Array of modified object IDs, properties is an object with information about properties
  * modification
  * @example
@@ -188,12 +200,11 @@ rightsWrapper.getObjectsForProperty = function(user, propertyName, callback) {
  *      shared: {<objectID1>: propertyForSave1 ,...}, // sharedPropertiesNamesForDelete
  * }
  */
-
-rightsWrapper.saveObjectsProperties = function (user, objectsIDs, propertiesForSave, deleteNotListedProperties, callback) {
+rightsWrapper.saveObjectsProperties = function (username, objectsIDs, propertiesForSave, deleteNotListedProperties, callback) {
 
     log.debug('Saving properties: ', propertiesForSave, ' for objectsIDs: ', objectsIDs);
 
-    sortProperties(user, objectsIDs, propertiesForSave, deleteNotListedProperties, function(err, properties) {
+    sortProperties(username, objectsIDs, propertiesForSave, deleteNotListedProperties, function(err, properties) {
         if(err) return callback(err);
 
         var updatedObjectsIDs = {};
@@ -238,12 +249,23 @@ rightsWrapper.saveObjectsProperties = function (user, objectsIDs, propertiesForS
 
 /** Sorting properties for saving
  *
- * @param {string} user - username for check right for objects
+ * @param {string} username - username for check right for objects
  * @param {Array|string|number} objectsIDs - array or comma separated string with objects IDs
- * @param {Object} initProperties - properties for sorting [{name:..., mode:..., value:..., description:...}, ...]
+ * @param {Array<{
+ *     name: string,
+ *     mode: 0|1|2|3,
+ *     value: string,
+ *     description: string,
+ * }>} initProperties - properties for sorting [{name:..., mode:..., value:..., description:...}, ...]
  * @param {boolean} [deleteNotListedProperties] - if true, then delete properties, which not listed in "properties"
  *  array for use in automatic tasks
- * @param {function(Error)|function(null, Array, Object)} callback - return error or callback(null, objetIDs, properties)
+ * @param {function(Error)|function(null, {
+ *     insert: Object,
+ *     update: Object,
+ *     updateDescription: Object,
+ *     deleteShared: Array<string>|undefined,
+ *     shared: Object,
+ * })} callback - return error or callback(null, properties)
  * where objectIDs is an Array of modified object IDs, properties is an object with information about properties
  * modification
  * @example
@@ -255,9 +277,9 @@ rightsWrapper.saveObjectsProperties = function (user, objectsIDs, propertiesForS
  *      deleteShared: deleteNotListedProperties ? Object.keys(sharedPropertiesNamesForDelete) : undefined,
  *      shared: {<objectID1>: propertyForSave1 ,...}, // sharedPropertiesNamesForDelete
  * } */
-function sortProperties(user, objectsIDs, initProperties, deleteNotListedProperties, callback) {
+function sortProperties(username, objectsIDs, initProperties, deleteNotListedProperties, callback) {
 
-    getProperties(user, objectsIDs, true, function(err, rows) {
+    getProperties(username, objectsIDs, true, function(err, rows) {
         if (err) return callback(err);
 
         var sharedProperties = {};
@@ -331,6 +353,33 @@ function sortProperties(user, objectsIDs, initProperties, deleteNotListedPropert
             updateDescription: propertiesWithDifferentDescriptions,
             deleteShared: deleteNotListedProperties ? Object.keys(sharedPropertiesNamesForDelete) : undefined,
             shared: sharedPropertiesNamesForDelete
+        });
+    });
+}
+
+/**
+ * Delete all properties for object IDs
+ * @param {string} username username
+ * @param {Array<number>} objectIDs object IDs
+ * @param {function()|function(Error)} callback callback(err)
+ */
+rightsWrapper.deleteAllProperties = function (username, objectIDs, callback) {
+    if(!Array.isArray(objectIDs) || !objectIDs.length) return callback();
+
+    checkIDs(objectIDs, function(err, checkedIDs) {
+        if (err) return callback(err);
+
+        username = prepareUser(username);
+
+        rightsDB.checkObjectsIDs({
+            user: username,
+            IDs: checkedIDs,
+            checkChange: true,
+            errorOnNoRights: true,
+        }, function (err, checkedObjectsIDs) {
+            if (err) return callback(err);
+
+            objectsPropertiesDB.deleteAllProperties(checkedObjectsIDs, callback);
         });
     });
 }

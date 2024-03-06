@@ -6,7 +6,7 @@ const log = require('../lib/log')(module);
 const fs = require('fs');
 const Database = require('better-sqlite3');
 
-var lastTruncate = Date.now();
+var lastTruncateTimestamp = Date.now();
 var truncateInProgress = false;
 
 module.exports = {
@@ -71,8 +71,8 @@ function truncateWal(dbPath, db, maxWalSize) {
         return;
     }
 
-    if(truncateInProgress || Date.now() - lastTruncate < 30000) return;
-    lastTruncate = Date.now();
+    if(truncateInProgress || Date.now() - lastTruncateTimestamp < 30000) return;
+    lastTruncateTimestamp = Date.now();
     truncateInProgress = true;
     try {
         var stat = fs.statSync(dbPath + '-wal');
@@ -93,6 +93,8 @@ function truncateWal(dbPath, db, maxWalSize) {
         } catch (err) {
             log.error('Can\' optimize DB: ', err.message);
         }
+        log.info('DB truncation and optimization completed in ',
+            Math.round((Date.now() - lastTruncateTimestamp) / 1000), 'sec' );
     }
     truncateInProgress = false;
 }

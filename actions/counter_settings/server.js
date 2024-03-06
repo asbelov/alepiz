@@ -128,43 +128,45 @@ module.exports = function(args, callback) {
 
     var variables = {};
     for(num in preparedVariables) {
-        if (!preparedVariables.hasOwnProperty(num)) continue;
 
-        if(!preparedVariables[num].name) return callback(new Error('One of variable names is not set: ' +
-            JSON.stringify(preparedVariables[num])));
+        var preparedVariable = preparedVariables[num];
+        if(!preparedVariable.name) return callback(new Error('One of variable names is not set: ' +
+            JSON.stringify(preparedVariable, null, 4)));
 
         // convert to upper case, remove "%:", ":%" and spaces from begin and end of variable name
-        name = preparedVariables[num].name.toUpperCase().replace(/^%:(.+):%$/, '$1').replace(/^ *(.+?) *$/, '$1');
+        name = preparedVariable.name
+            .toUpperCase()
+            .replace(/^%:(.+):%$/, '$1').replace(/^ *(.+?) *$/, '$1');
 
         if (variables[name]) return callback(new Error('Some variables has an equal names: ' + name));
 
         variables[name] = {};
 
-        variables[name].variableOrder = preparedVariables[num].variableOrder ===
-            parseInt(String(preparedVariables[num].variableOrder), 10) &&
-            preparedVariables[num].variableOrder >= 0 ? preparedVariables[num].variableOrder : null;
+        variables[name].variableOrder = preparedVariable.variableOrder ===
+            parseInt(String(preparedVariable.variableOrder), 10) &&
+            preparedVariable.variableOrder >= 0 ? preparedVariable.variableOrder : null;
 
-        variables[name].description = preparedVariables[num].description || null;
+        variables[name].description = preparedVariable.description || null;
 
         // variable with expression
-        if (preparedVariables[num].expression !== undefined) {
+        if (preparedVariable.expression !== undefined) {
 
-            if(preparedVariables[num].expression === '') return callback(new Error('Expression for variable "'+name+'" is not set'));
-            variables[name].expression = preparedVariables[num].expression;
+            if(preparedVariable.expression === '') return callback(new Error('Expression for variable "'+name+'" is not set'));
+            variables[name].expression = preparedVariable.expression;
 
         } else {
 
-            if (!preparedVariables[num].parentCounterName) return callback(new Error('Counter for variable "'+name+'" is not set'));
-            variables[name].parentCounterName = preparedVariables[num].parentCounterName.toUpperCase();
+            if (!preparedVariable.parentCounterName) return callback(new Error('Counter for variable "'+name+'" is not set'));
+            variables[name].parentCounterName = preparedVariable.parentCounterName.toUpperCase();
 
-            if (preparedVariables[num].objectID) variables[name].objectID = Number(preparedVariables[num].objectID);
-            else if (preparedVariables[num].objectVariable) variables[name].objectName = preparedVariables[num].objectVariable.trim();
+            if (preparedVariable.objectID) variables[name].objectID = Number(preparedVariable.objectID);
+            else if (preparedVariable.objectVariable) variables[name].objectName = preparedVariable.objectVariable.trim();
 
-            if (!preparedVariables[num].function) return callback(new Error('Function for variable "'+name+'" is not set'));
-            variables[name].function = preparedVariables[num].function;
+            if (!preparedVariable.function) return callback(new Error('Function for variable "'+name+'" is not set'));
+            variables[name].function = preparedVariable.function;
 
-            if (preparedVariables[num].function_parameters)
-                variables[name].functionParameters = preparedVariables[num].function_parameters !== undefined ? preparedVariables[num].function_parameters : '';
+            variables[name].functionParameters =
+                preparedVariable.function_parameters === undefined ? '' : preparedVariable.function_parameters;
         }
     }
     log.debug('Variables: ', variables);

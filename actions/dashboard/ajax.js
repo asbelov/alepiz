@@ -153,7 +153,7 @@ function initDB(args, callback) {
 function checkActionsRights(user, actions, callback) {
 
     var checkedActions = [];
-    async.each(actions, function (action, callback) {
+    async.eachSeries(actions, function (action, callback) {
         if(!action.ID || !action.name) return callback();
 
         actionsRights.checkActionRights(user, action.ID, 'ajax', function(err) {

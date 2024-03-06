@@ -165,6 +165,5 @@ var JQueryNamespace = (function ($) {
             });
             searchResultElm.html(HTML.join(''));
         });
-
     }
 })(jQuery); // end of jQuery name space

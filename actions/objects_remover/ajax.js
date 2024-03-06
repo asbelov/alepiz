@@ -61,7 +61,7 @@ function getObjectsTree(user, objects, depth, maxObjectsCnt, callback) {
     var newObjects = [];
     // use async each because objectListCreate.filter return objects, which interact for all objects
     // in first function parameter. But we need to get all child objects for each object in objects
-    async.eachLimit(objects, 20,function(object, callback) {
+    async.eachSeries(objects, function(object, callback) {
 
         if(maxObjectsCnt && objects.length >= maxObjectsCnt) return callback();
 

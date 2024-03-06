@@ -18,6 +18,7 @@ module.exports = groupsDB;
  * @param {function(Error)|function()} callback callback(err)
  */
 groupsDB.addCounterGroup = function(groupName, callback) {
+    // The hash algorithm is too simple. There may be problems with renaming
     const id = unique.createHash(groupName);
 
     db.run('INSERT INTO countersGroups (id, name) VALUES (?, ?)', [id, groupName], function(err){

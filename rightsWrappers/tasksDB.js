@@ -49,7 +49,7 @@ rightsWrapper.checkActionsRights = function(username, actionIDs, checkedRights, 
     }
 
     var actionsRights = {};
-    async.each(actionIDs, function (actionID, callback) {
+    async.eachSeries(actionIDs, function (actionID, callback) {
         if(typeof actionID !== 'string') {
             return callback(new Error('Can\'t check rights for action ID "' + actionID +
                 '", user "' + username + '": actionID is not a string in actions array ' + actionIDs.join(', ')));

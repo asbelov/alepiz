@@ -14,7 +14,7 @@ module.exports = countersDB;
 /**
  * Delete counter
  * @param {number} counterID counter ID
- * @param {function(err)} callback callback(err)
+ * @param {function()|function(Error)} callback callback(err)
  */
 countersDB.delete = function(counterID, callback) {
     log.info('Deleting counter with ID ', counterID);
@@ -38,7 +38,7 @@ countersDB.delete = function(counterID, callback) {
  * @param {0|1} counter.disabled is counter disabled
  * @param {0|1} counter.debug is counter debug switched on
  * @param {0|1} counter.taskCondition is counter a taskCondition
- * @param {function(err)|function(err, number)} callback callback(err, counterID) where counterID is a
+ * @param {function(err)|function(Error, number)} callback callback(err, counterID) where counterID is a
  *  ID of updated counter
  */
 countersDB.updateCounter = function(counter, callback) {
@@ -202,7 +202,7 @@ countersDB.insertCounterParameters = function(counterID, counterParameters, call
  * Delete counter parameters from database
  * @param {number} counterID counter ID
  * @param {Array} counterParameterNames counter parameter  names like [name1, name2, ....]
- * @param {function(err)|function()} callback callback(err)
+ * @param {function(Error)|function()} callback callback(err)
  * @returns {*}
  */
 countersDB.deleteCounterParameters = function(counterID, counterParameterNames, callback) {
@@ -231,7 +231,10 @@ countersDB.getObjectsToCounterRelations = function(counterID, callback) {
 
 /**
  * Save object counter IDs
- * @param {Array} objectsCountersIDs - array of the objectID and counterID [{objectID:...,  counterID:...}, ... ]
+ * @param {Array<{
+ *     objectID: number,
+ *     counterID: number,
+ * }>} objectsCountersIDs - array of the objectID and counterID [{objectID:...,  counterID:...}, ... ]
  * @param {function} callback - callback(err)
  */
 countersDB.saveObjectsCountersIDs = function(objectsCountersIDs, callback) {
@@ -239,8 +242,9 @@ countersDB.saveObjectsCountersIDs = function(objectsCountersIDs, callback) {
 
     log.info('Inserting object to counter relations into the database: ', objectsCountersIDs);
 
-    var stmt = db.prepare('INSERT INTO objectsCounters (id, objectID, counterID) VALUES ($id, $objectID, $counterID)',
-        function(err) {
+    var stmt = db.prepare('INSERT INTO objectsCounters (id, objectID, counterID) ' +
+        'VALUES ($id, $objectID, $counterID)',function(err) {
+
         if (err) return callback(err);
         async.eachSeries(objectsCountersIDs, function(obj, callback) {
             const id = unique.createHash(obj.objectID.toString(36) + obj.counterID.toString(36));
@@ -250,8 +254,8 @@ countersDB.saveObjectsCountersIDs = function(objectsCountersIDs, callback) {
                 $objectID: obj.objectID,
                 $counterID: obj.counterID
             }, function(err) {
-                if (err) return callback(new Error('Error inserting object (' + obj.objectID + ') to counter (' + obj.counterID +
-                    ') relations to the database: ' + err.message));
+                if (err) return callback(new Error('Error inserting object (' + obj.objectID +
+                    ') to counter (' + obj.counterID + ') relations to the database: ' + err.message));
                 callback();
             });
         }, function(err) {
@@ -263,14 +267,16 @@ countersDB.saveObjectsCountersIDs = function(objectsCountersIDs, callback) {
 
 /**
  * Delete objects counters relations
- * @param {Array} objectsCountersIDs is not an OCID, there is an array of object IDs and counter IDs
- * [{objectID:...,  counterID:...}, ... ]
+ * @param {Array<{
+ *     objectID: number,
+ *     counterID: number,
+ * }>} objectsCountersIDs is not an OCID, there is an array of object IDs and counter IDs
  * @param {function} callback - callback(err)
  */
 countersDB.deleteObjectCounterID = function(objectsCountersIDs, callback) {
     if(!objectsCountersIDs.length) return callback();
 
-    log.info('Delete object to counter relations from the database: ', objectsCountersIDs);
+    log.info('Delete object to counter relations for: ', objectsCountersIDs);
 
     var stmt = db.prepare('DELETE FROM objectsCounters WHERE objectID=$objectID AND counterID=$counterID', function(err) {
         if (err) return callback(err);
@@ -279,8 +285,10 @@ countersDB.deleteObjectCounterID = function(objectsCountersIDs, callback) {
                 $objectID: obj.objectID,
                 $counterID: obj.counterID
             }, function(err) {
-                if (err) return callback(new Error('Error deleting object (' + obj.objectID + ') to counter (' + obj.counterID +
-                    ') relations from the database: ' + err.message));
+                if (err) {
+                    return callback(new Error('Error deleting object (' + obj.objectID + ') to counter (' +
+                        obj.counterID + ') relations from the database: ' + err.message));
+                }
                 callback();
             });
         }, function(err) {
@@ -289,6 +297,35 @@ countersDB.deleteObjectCounterID = function(objectsCountersIDs, callback) {
         });
     });
 };
+
+/**
+ * Delete all linked counters for the object IDs
+ * @param {Array<number>} objectIDs object IDs
+ * @param {function()|function(Error)} callback callback(err)
+ */
+countersDB.deleteAllCountersRelationsForObject = function(objectIDs, callback) {
+    if(!objectIDs.length) return callback();
+
+    log.info('Delete all object to counter relations for objectIDs: ', objectIDs);
+
+    var stmt =
+        db.prepare('DELETE FROM objectsCounters WHERE objectIDs=?', function(err) {
+        if (err) return callback(err);
+        async.eachSeries(objectIDs, function(objectID, callback) {
+            stmt.run(objectID, function(err) {
+                if (err) {
+                    return callback(new Error('Error deleting object to counter relations for object ID ' +
+                        objectID + ' from the database: ' + err.message));
+                }
+                callback();
+            });
+        }, function(err) {
+            stmt.finalize();
+            callback(err);
+        });
+    });
+};
+
 
 /**
  * Insert update events for specific counterID
@@ -303,8 +340,8 @@ countersDB.insertUpdateEvents = function(counterID, updateEvents, callback) {
 
     log.info('Insert update events for ', counterID, ':', updateEvents);
 
-    var stmt = db.prepare('INSERT INTO countersUpdateEvents (id, counterID, parentCounterID, parentObjectID, expression, ' +
-        'mode, objectFilter, description, updateEventOrder) ' +
+    var stmt = db.prepare('INSERT INTO countersUpdateEvents (id, counterID, parentCounterID, ' +
+        'parentObjectID, expression, mode, objectFilter, description, updateEventOrder) ' +
         'VALUES ($id, $counterID, $parentCounterID, $parentObjectID, $expression, $mode, $objectFilter, ' +
         '$description, $updateEventOrder)',
         function(err) {
@@ -337,7 +374,7 @@ countersDB.insertUpdateEvents = function(counterID, updateEvents, callback) {
  * @param {number} counterID counter ID
  * @param {Array<Object>} updateEvents array of the objects with update events like
  *         [{objectID:<parent object ID>, expression:<string with expression>, mode: <0|1|2|3|4>}, {..}, ...]
- * @param {function(err)|function()} callback callback(err)
+ * @param {function(Error)|function()} callback callback(err)
  */
 countersDB.deleteUpdateEvents = function(counterID, updateEvents, callback) {
     if(!updateEvents.length) return callback();
@@ -397,8 +434,8 @@ countersDB.insertVariables = function(counterID, variables, callback) {
     log.info('Insert variables for ', counterID, ': ', variables);
 
     var stmt = db.prepare(
-        'INSERT INTO variables (id, counterID, name, objectID, parentCounterName, function, functionParameters, objectName, ' +
-        'description, variableOrder) ' +
+        'INSERT INTO variables (id, counterID, name, objectID, parentCounterName, function, ' +
+        'functionParameters, objectName, description, variableOrder) ' +
         'VALUES ($id, $counterID, $name, $objectID, $parentCounterName, $function, $functionParameters, $objectName,' +
         '$description, $variableOrder)',
         function(err) {
@@ -413,7 +450,8 @@ countersDB.insertVariables = function(counterID, variables, callback) {
 
                     // eachSeries used for transaction
                     async.eachSeries(Object.keys(variables), function(name, callback) {
-                        const id = unique.createHash(counterID.toString(36) + name + JSON.stringify(variables[name]));
+                        const id = unique.createHash(counterID.toString(36) + name +
+                            JSON.stringify(variables[name]));
 
                         if (variables[name].expression) {
 
@@ -436,7 +474,8 @@ countersDB.insertVariables = function(counterID, variables, callback) {
                                 $objectID: variables[name].objectID || null,
                                 $parentCounterName: variables[name].parentCounterName,
                                 $function: variables[name].function,
-                                $functionParameters: variables[name].functionParameters !== undefined ? variables[name].functionParameters : null,
+                                $functionParameters: variables[name].functionParameters !== undefined ?
+                                    variables[name].functionParameters : null,
                                 $objectName: variables[name].objectName || null,
                                 $description: variables[name].description || null,
                                 $variableOrder: variables[name].variableOrder,
@@ -462,10 +501,16 @@ countersDB.deleteVariables = function(counterID, callback) {
     log.info('Remove all variables for counter ID ', counterID);
 
     db.run('DELETE FROM variables WHERE variables.counterID = ?', counterID, function(err) {
-        if (err) return callback(new Error('Can\'t delete previous variables for counter ID ' + counterID + ': ' + err.message));
+        if (err) {
+            return callback(new Error('Can\'t delete previous variables for counter ID ' + counterID +
+                ': ' + err.message));
+        }
 
         db.run('DELETE FROM variablesExpressions WHERE variablesExpressions.counterID = ?', counterID, function(err) {
-            if (err) return callback(new Error('Can\'t delete previous variables with expressions for counter ID ' + counterID + ': ' + err.message));
+            if (err) {
+                return callback(new Error('Can\'t delete previous variables with expressions for counter ID ' +
+                    counterID + ': ' + err.message));
+            }
             callback();
         });
     });
@@ -475,12 +520,13 @@ countersDB.deleteVariables = function(counterID, callback) {
  * Update parent counter name for variables when counter name is changed
  * @param {string} oldCounterName case insensitive old counter name
  * @param {string} newCounterName new counter name
- * @param {function(err)} callback callback(err)
+ * @param {function()|function(Error)} callback callback(err)
  */
 countersDB.updateVariablesRefs = function(oldCounterName, newCounterName, callback) {
     log.info('Updating variables refers for counter ', oldCounterName, '->', newCounterName);
 
-    db.run('UPDATE variables SET parentCounterName = $newCounterName WHERE parentCounterName = $oldCounterName COLLATE NOCASE', {
+    db.run('UPDATE variables SET parentCounterName = $newCounterName ' +
+        'WHERE parentCounterName = $oldCounterName COLLATE NOCASE', {
         $newCounterName: newCounterName.toUpperCase(),
         $oldCounterName: oldCounterName
     }, callback);

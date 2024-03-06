@@ -212,10 +212,6 @@ router.all('/'+confActions.get('dir')+'/:action_sessionID/:mode',
 
         var args = req.method === 'POST' ? req.body : req.query;
 
-        // for ajax run action directly from webServer without actionClient->actionServer IPC
-        // but action server connected to history and server and make too many connections
-        // and when webServer is restarted, we receive an errors in log from IPC system
-        //var actionProcessor = executionMode === 'ajax' ? actionServer : actionClient;
         actionClient.runAction({
             actionID: actionID,
             executionMode: executionMode,

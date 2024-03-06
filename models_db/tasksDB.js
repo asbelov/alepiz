@@ -122,6 +122,7 @@ WHERE ' + (taskID ? 'tasks.id = ?' : 'users.name = ? AND tasks.name IS NULL'),
  * @param {string} param.taskName task name
  * @param {number} param.taskID task id
  * @param {number} param.groupID task group ID
+ * @param {number} param.dateFromChangeTimestamp timestamp when dateFrom was changed
  * @param {function(Error)|function(null, Array)} callback callback(err, rows) where row is an array
  * @example
  * example of the returned array (rows)
@@ -146,6 +147,9 @@ tasksDB.getTaskList = function(username, timestampFrom, timestampTo, param, call
         param.taskName ? '%' + param.taskName.replace(/[*]+/g, '%') + '%' : undefined;
     var creatorName =
         param.ownerName ? '%' + param.ownerName.replace(/[*]+/g, '%') + '%': undefined;
+
+    // max number of returned rows
+    var rowsLimit = 2000;
 
     // for searching in the stringified objects array, like
     // [{"id":59984,"name":"Test"},{"id":59985,"name":"Test1"}] using regexp
@@ -180,7 +184,7 @@ WHERE tasks.timestamp >= $timestampFrom AND tasks.timestamp <= $timestampTo AND 
         (param.taskID ? ' AND tasks.id=$taskID OR ' +
             '(tasksParameters.name="o" AND tasksParameters.value regexp $objectSearchStrFromID)' : '') +
         (!param.taskID && !taskName && !creatorName ? ' AND tasks.groupID = $groupID' : '') +
-        ' ORDER by tasks.timestamp DESC LIMIT 500', {
+        ' ORDER by tasks.timestamp DESC LIMIT ' + rowsLimit, {
 
             $timestampFrom: timestampFrom,
             $timestampTo: timestampTo,
@@ -194,7 +198,16 @@ WHERE tasks.timestamp >= $timestampFrom AND tasks.timestamp <= $timestampTo AND 
         }, function(err, taskData) {
             if(err) return callback(new Error('Error while getting task data: '+err.message));
 
-            if(taskData.length >= 20) return callback(null, taskData);
+            // calculate number of tasks
+            var taskIDs = new Set();
+            taskData.forEach(row => taskIDs.add(row.id));
+            if(taskIDs.size >= 20 || param.dateFromChangeTimestamp > Date.now()) return callback(null, taskData);
+
+            /*
+            Got a lot of rows because the tasks have a lot of parameters.
+            Increase the number of rows limit by 2 times
+            */
+            if(taskData.length === rowsLimit) rowsLimit *= 2;
 
             db.all('\
 SELECT tasks.id AS id, tasks.name AS name, tasks.timestamp AS timestamp, users.name AS ownerName, \
@@ -217,7 +230,7 @@ WHERE tasks.timestamp <= $timestampTo AND \
             (param.taskID ? ' AND tasks.id=$taskID OR ' +
                 '(tasksParameters.name="o" AND tasksParameters.value regexp $objectSearchStrFromID)' : '') +
         (!param.taskID && !param.taskName  && !creatorName ? ' AND tasks.groupID = $groupID' : '') +
-        ' ORDER by tasks.timestamp DESC LIMIT 500', {
+        ' ORDER by tasks.timestamp DESC LIMIT ' + rowsLimit, {
 
                     $timestampTo: timestampTo,
                     $ownerName: creatorName,

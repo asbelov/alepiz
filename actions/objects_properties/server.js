@@ -42,7 +42,8 @@ module.exports = function(args, callback) {
         if(!args.hasOwnProperty(attr)) continue;
         if(!/^property\d+(name|mode|value|description)$/.test(attr)) continue;
 
-        var propertyParameters = attr.replace(/^property(\d+)(.+)$/, '$1,$2').split(',');
+        var propertyParameters =
+            attr.replace(/^property(\d+)(.+)$/, '$1,$2').split(',');
         var propIdx = Number(propertyParameters[0]); // idx
         var propPrm = propertyParameters[1]; // (name|mode|value|description)
 
@@ -50,8 +51,14 @@ module.exports = function(args, callback) {
         propertiesObj[propIdx][propPrm] = args[attr];
     }
 
-    /*
-    properties: [{name:.., mode:.., val:.., description:..}, ...]
+    /**
+     * an array with properties for save
+     * @type {Array<{
+     *     name: string,
+     *     mode: 0|1|2|3,
+     *     value: string,
+     *     description: string
+     * }>}
      */
     var properties = Object.keys(propertiesObj).filter(function(key) {
             var prop = propertiesObj[key];

@@ -499,14 +499,19 @@ var JQueryNamespace = (function ($) {
         });
 
         addDisabledIntervalBtnElm.click(function () {
-            var from =  getTimeFromStr(disableTimeIntervalFromInstance.time) || '';
-            var to = getTimeFromStr(disableTimeIntervalToInstance.time) || '';
+            var from =  getTimeFromStr(disableTimeIntervalFromInstance.time);
+            var to = getTimeFromStr(disableTimeIntervalToInstance.time);
 
-            if(!from) return M.toast({html: 'Please set the start of the time interval', displayLength: 1000});
-            if(!to) return M.toast({html: 'Please set the end of the time interval', displayLength: 1000});
-            if(from + 60000 > to) return M.toast({html: 'Please set correct time interval', displayLength: 1000});
+            if(to === 0) to = 86400000;
+            if(from === undefined) return M.toast({html: 'Please set the start of the time interval', displayLength: 1000});
+            if(to === undefined) return M.toast({html: 'Please set the end of the time interval', displayLength: 1000});
+            if(from < to && to - from < 60000) return M.toast({html: 'Time interval too short', displayLength: 1000});
 
-            disablingTimeIntervals.push(from + '-' + to);
+            if(from < to) disablingTimeIntervals.push(from + '-' + to);
+            else {
+                disablingTimeIntervals.push(from + '-' + 86400000);
+                disablingTimeIntervals.push(0 + '-' + to);
+            }
             disablingTimeIntervals = clearIntervals(disablingTimeIntervals);
 
             drawTimeIntervals();
@@ -1279,7 +1284,7 @@ var JQueryNamespace = (function ($) {
         return time in ms
      */
     function getTimeFromStr(timeStr) {
-        if(!timeStr) return;
+        if(timeStr === '' || timeStr === undefined) return;
         var timeParts = timeStr.match(/^(\d\d?):(\d\d?)$/);
         if(timeParts === null) return;
         return Number(timeParts[1]) * 3600000 + Number(timeParts[2]) * 60000;

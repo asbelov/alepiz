@@ -15,9 +15,20 @@ module.exports = countersDB;
 /**
  * Return all counter parameters for specific objects
  * @param {Array<number>} objectIDs an array with the object IDs
- * @param {function(Error)|function(null, Array<Object>)} callback callback(err, rows)
- *     rows: [{id:.., name:.., taskCondition:..., unitID:..., collectorID:..., debug:..., sourceMultiplier:...,
- *     groupID:..., OCID:..., objectID:..., objectName:..., objectDescription:..}, ...]
+ * @param {function(Error)|function(null, Array<{
+ *     id: number,
+ *     name: string,
+ *     taskCondition: 0|1,
+ *     unitID: number,
+ *     collectorID: string,
+ *     debug: 0|1,
+ *     sourceMultiplier: number|null,
+ *     groupID: number,
+ *     OCID: number,
+ *     objectID: number,
+ *     objectName:string,
+ *     objectDescription: string,
+ * }>)} callback callback(err, rows)
  */
 countersDB.getCountersForObjectsAndGroups = function(objectIDs, callback) {
     log.debug('Try to get counters for objects ', objectIDs);
@@ -36,7 +47,7 @@ WHERE objectsCounters.objectID = ? \
 ORDER BY countersGroups.name, counters.name, objects.name', function(err) {
         if(err) return callback(err);
 
-        async.eachLimit(objectIDs,100,function(objectID, callback) {
+        async.eachSeries(objectIDs, function(objectID, callback) {
             stmt.all(objectID, function(err, rowsPart) {
                 if(err) return callback(err);
                 rows.push.apply(rows, rowsPart);
@@ -291,7 +302,7 @@ JOIN objectsCounters ON counterParameters.counterID=objectsCounters.counterID \
 WHERE objectsCounters.id = ?', function(err) {
         if(err) return callback(err);
 
-        async.eachLimit(OCIDs, 100,function(objectCounterID, callback) {
+        async.eachSeries(OCIDs, function(objectCounterID, callback) {
             stmt.all(objectCounterID, function(err, param) {
                 if(err) return callback(err);
                 rows.push.apply(rows, param);
@@ -363,8 +374,12 @@ countersDB.getObjectsCounters = function(OCIDs, callback) {
 /**
  * Get data form the objectsCounters table for an array of specified object IDs using
  * SELECT * FROM objectsCounters WHERE objectsCounters.objectID = ?
- * @param {Array} objectsIDs - array of objectIDs [<objectID1>, <objectID2>, ...]
- * @param {function} callback - callback(err, rows), where rows [{id: objectCounterID, objectID: ..., counterID: ...}, {},...]
+ * @param {Array} objectsIDs array of objectIDs [<objectID1>, <objectID2>, ...]
+ * @param {function(Error)|function(null, Array<{
+ *     id: number,
+ *     objectID: number,
+ *     counterID: number,
+ * }>)} callback callback(err, rows), where rows [{id: objectCounterID, objectID: ..., counterID: ...}, {},...]
  */
 countersDB.getCountersForObjects = function(objectsIDs, callback) {
     log.debug('Getting countersIDs and objectCountersIDs for objects IDs: ', objectsIDs);

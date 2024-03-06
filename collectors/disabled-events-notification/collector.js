@@ -70,8 +70,8 @@ collector.get = function(param, callback) {
     try {
         var rows = db.prepare('SELECT events.counterID AS counterID, events.objectName AS objectName, ' +
             'events.counterName AS counterName, ' +
-            'disabledEvents.disableUntil AS disableUntil, disabledEvents.timestamp AS timestamp,' +
-            'disabledEvents.user AS user, disabledEvents.intervals AS disableIntervals ' +
+            'disabledEvents.disableUntil AS disableUntil, disabledEvents.timestamp AS timestamp, ' +
+            'disabledEvents.user AS user, disabledEvents.intervals AS disableIntervals, ' +
             'disabledEvents.disableFrom AS disableFrom, disabledEvents.disableDaysOfWeek AS disableDaysOfWeek ' +
             'FROM disabledEvents JOIN events ON disabledEvents.eventID = events.id ' +
             'WHERE disabledEvents.disableUntil < ? AND disabledEvents.disableUntil - disabledEvents.timestamp > ?')

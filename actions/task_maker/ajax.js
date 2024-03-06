@@ -141,15 +141,15 @@ function getCounters(username, objectsIDsStr, callback){
 
 /**
  * Get the task list
- * @param {Object} filterParam parameters for filter tasks
- * @param {string} filterParam.username username
- *
- * @param {number} filterParam.timestampFrom date from
- * @param {number} filterParam.timestampTo date to
- * @param {number} filterParam.groupID group ID
- * @param {string} filterParam.taskName task name
- * @param {string} filterParam.userName owner name
- * @param {boolean} filterParam.searchFirstNotEmptyGroup !!groupID
+ * @param {Object} args parameters for filter tasks
+ * @param {string} args.username username
+ * @param {string} args.timestampFrom date from
+ * @param {string} args.timestampTo date to
+ * @param {string} args.groupID group ID
+ * @param {string} args.taskName task name
+ * @param {string} args.userName owner name
+ * @param {boolean} args.searchFirstNotEmptyGroup !!groupID
+ * @param {string} args.dateFromChangeTimestamp timestamp when dateFrom was changed
  * @param {function(Error)|function(null, Array<Object>)} callback callback(err, taskListObject)
  * where rows - task List rows, groupID - groupID with task for finding task List
  * @example
@@ -163,72 +163,73 @@ function getCounters(username, objectsIDsStr, callback){
  *      groupID: groupID,
  *}
  */
-function getTaskList(filterParam, callback) {
-    if(!filterParam.timestampFrom) {
+function getTaskList(args, callback) {
+    if(!args.timestampFrom) {
         return callback(new Error('Undefined first timestamp while getting task list'));
     }
 
-    var timestampFrom = Number(filterParam.timestampFrom);
+    var timestampFrom = Number(args.timestampFrom);
     if(!timestampFrom || timestampFrom !== parseInt(String(timestampFrom), 10) || timestampFrom < 946659600000 ) {
-        return callback(new Error('Incorrect first timestamp ("' + filterParam.timestampFrom +
+        return callback(new Error('Incorrect first timestamp ("' + args.timestampFrom +
             '") while getting task list'));
     }
 
-    if(!filterParam.timestampTo) return callback(new Error('Undefined last timestamp while getting task list'));
-    var timestampTo = Number(filterParam.timestampTo);
+    if(!args.timestampTo) return callback(new Error('Undefined last timestamp while getting task list'));
+    var timestampTo = Number(args.timestampTo);
     if(!timestampTo || timestampTo !== parseInt(String(timestampTo), 10) || timestampTo < 946659600000 ) {
-        return callback(new Error('Incorrect last timestamp ("' + filterParam.timestampTo +
+        return callback(new Error('Incorrect last timestamp ("' + args.timestampTo +
             '") while getting task list'));
     }
 
     if(timestampFrom >= timestampTo) {
-        return callback(new Error('First timestamp ("' + filterParam.timestampFrom +
-            '") more then last timestamp ("' + filterParam.timestampTo + '") for getting task list'));
+        return callback(new Error('First timestamp ("' + args.timestampFrom +
+            '") more then last timestamp ("' + args.timestampTo + '") for getting task list'));
     }
 
-    var groupID = Number(filterParam.groupID);
+    var groupID = Number(args.groupID);
     if(!groupID) groupID = 0;
     else if(groupID !== parseInt(String(groupID), 10)) {
-        return callback(new Error('Incorrect group ID ("' + filterParam.groupID + '") while getting task list'));
+        return callback(new Error('Incorrect group ID ("' + args.groupID + '") while getting task list'));
     }
 
-    getTaskGroups(filterParam.username, function (err, groupObj) {
+    getTaskGroups(args.username, function (err, groupObj) {
         if(err) return callback(err);
 
         var allowedTasksGroupsIDs = groupObj.allowedTasksGroupsIDs;
         var groupIDs = groupObj.groupIDs;
 
         if(allowedTasksGroupsIDs.indexOf(groupID) === -1) {
-            return callback(new Error('Group ' + groupIDs[groupID] + ' is not allowed for user ' + filterParam.username));
+            return callback(new Error('Group ' + groupIDs[groupID] + ' is not allowed for user ' + args.username));
         }
 
-        if(filterParam.userName) var ownerName = filterParam.userName;
+        if(args.userName) var ownerName = args.userName;
 
         // if taskName is an integer, then try to search taskID
-        if(filterParam.taskName) {
-            if(Number(filterParam.taskName) === parseInt(filterParam.taskName, 10) &&
-                Number(filterParam.taskName) > 0
+        if(args.taskName) {
+            if(Number(args.taskName) === parseInt(args.taskName, 10) &&
+                Number(args.taskName) > 0
             ) {
-                var taskID = parseInt(filterParam.taskName, 10);
+                var taskID = parseInt(args.taskName, 10);
             } else {
-                var taskName = filterParam.taskName;
+                var taskName = args.taskName;
             }
         }
 
         getRawTaskList({
-            username: filterParam.username,
+            username: args.username,
             timestampFrom: timestampFrom,
             timestampTo: timestampTo,
             groupID: groupID,
             taskID: taskID,
             taskName: taskName,
             ownerName: ownerName,
-            searchFirstNotEmptyGroup: !!filterParam.groupID,
+            searchFirstNotEmptyGroup: !!args.groupID,
+            dateFromChangeTimestamp: Number(args.dateFromChangeTimestamp) || 0,
         }, groupObj.workflowGroups, groupIDs, function(err, rows, groupID) {
             if(err) return callback(err);
 
             if(!rows.length) {
-                log.debug('No tasks found for user ', filterParam.username, ' from ',
+                log.debug('No tasks found for user ', args.username, ' from ',
                     new Date(timestampFrom).toLocaleString(), ' to ', new Date(timestampTo).toLocaleString(),
                     ', group: ', groupIDs[groupID], '; taskName: ', taskName, '; ownerName: ', ownerName);
                 return callback(null, {
@@ -249,7 +250,7 @@ function getTaskList(filterParam, callback) {
                 } else tasks[row.id].actionIDs.push(row.actionID);
                 if(!actions[row.actionID]) actions[row.actionID] = true;
             });
-            rightsWrapper.checkActionsRights(filterParam.username, Object.keys(actions), null,
+            rightsWrapper.checkActionsRights(args.username, Object.keys(actions), null,
                 function (err, actionsRights) {
                 if(err) {
                     return callback(new Error('Error checking rights for the actions in task: ' + err.message +
@@ -262,7 +263,7 @@ function getTaskList(filterParam, callback) {
                         var actionID = tasks[taskID].actionIDs[i];
 
                         if(!actionsRights[actionID] || !actionsRights[actionID].view) {
-                            log.debug('User: ', filterParam.username, ': has no rights for action ', actionID,
+                            log.debug('User: ', args.username, ': has no rights for action ', actionID,
                                 ' in task ', taskID, ' group ', groupIDs[groupID] ,'. Remove task from list');
                             delete tasks[taskID];
                             break;
@@ -272,7 +273,7 @@ function getTaskList(filterParam, callback) {
                     }
                 }
 
-                log.debug('User: ', filterParam.username, ': receiving task list in group ', groupIDs[groupID],
+                log.debug('User: ', args.username, ': receiving task list in group ', groupIDs[groupID],
                     ': ', tasks, '; rows: ', rows);
 
                 callback(null, {
@@ -301,6 +302,7 @@ function getTaskList(filterParam, callback) {
  * @param {number} filterParam.taskID
  * @param {string} filterParam.ownerName
  * @param {boolean} filterParam.searchFirstNotEmptyGroup groupID === ''
+ * @param {number} filterParam.dateFromChangeTimestamp timestamp when dateFrom was changed
  * @param {Object} workflowGroups group chain in workflow workflowGroup[groupID] = nextGroupID
  * @param {function(Error)|function(null, Array<Object>, number)} callback callback(err, rows, groupID)
  * where rows - task List rows, groupID - groupID with task for finding task List
@@ -335,7 +337,8 @@ function getRawTaskList(filterParam, workflowGroups, groupIDs, callback) {
             groupID: groupID,
             taskName: filterParam.taskName,
             taskID: filterParam.taskID,
-            ownerName: filterParam.ownerName
+            ownerName: filterParam.ownerName,
+            dateFromChangeTimestamp: filterParam.dateFromChangeTimestamp,
         }, function(err, _rows) {
             if (!err && _rows && _rows.length) rows = _rows;
             else if(filterParam.searchFirstNotEmptyGroup) {

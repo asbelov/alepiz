@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018. Alexander Belov. Contacts: <asbel@alepiz.com>
+ * Copyright (C) 2017. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
 /**
@@ -34,6 +34,16 @@ function getFilesList(args, callback) {
     actionConf.getConfiguration(args.actionID, function(err, config) {
         if(err) return callback(err);
 
+        /**
+         *
+         * @type {{
+         *  skipDirs: string,
+         *  order: string,
+         *  recursion: number,
+         *  filePath: string,
+         *  filterFiles: string,
+         *  }}
+         */
         var options = config.options;
         log.debug('Options: ', options);
 
@@ -69,23 +79,34 @@ function getFilesList(args, callback) {
                 }
             });
             async.each(Object.keys(services), function (objectID, callback) {
-                if(!services[objectID].HOST || (!services[objectID].SERVICE_PATH && !services[objectID][filePath])) return callback();
+                /**
+                 * @type {{
+                 *     SERVICE_PATH: string,
+                 *     RECURSION_FOR_FILES: string,
+                 *     files: Array<string>,
+                 *     UNC: string,
+                 *     HOST: string
+                 * }}
+                 */
+                var service = services[objectID];
 
-                if(services[objectID][filePath]) {
-                    var dir = getUNC( services[objectID][filePath], services[objectID].HOST );
+                if(!service.HOST || (!service.SERVICE_PATH && !service[filePath])) return callback();
+
+                if(service[filePath]) {
+                    var dir = getUNC( service[filePath], service.HOST );
                 } else {
-                    dir = getUNC(getPath( services[objectID].SERVICE_PATH ), services[objectID].HOST );
+                    dir = getUNC(getPath( service.SERVICE_PATH ), service.HOST );
                 }
-                var myRecursion = Number(services[objectID].RECURSION_FOR_FILES) || recursion;
+                var myRecursion = Number(service.RECURSION_FOR_FILES) || recursion;
 
-                log.debug('Properties for ', objectID, ': ', services[objectID]);
+                log.debug('Properties for ', objectID, ': ', service);
 
                 getFiles(dir, skipDirs, filterFilesRE, myRecursion, '', function(err, _files) {
                     if(err) return callback(err);
 
                     log.debug('files in ', dir ,' for ', objectID,': ', _files);
-                    services[objectID].files = sortFiles(_files, order) || [];
-                    services[objectID].UNC = dir;
+                    service.files = sortFiles(_files, order) || [];
+                    service.UNC = dir;
                     callback();
                 });
             }, function (err) {
@@ -104,6 +125,12 @@ function getFilesList(args, callback) {
     });
 }
 
+/**
+ * Sort files
+ * @param {Array<string>} files file list
+ * @param {Array<string>} order order for sort files (this file names will be placed at the first position)
+ * @return {Array<string>} sorted file list
+ */
 function sortFiles(files, order) {
 
     if(!order) return files;
@@ -138,11 +165,24 @@ function sortFiles(files, order) {
     return sortedFiles;
 }
 
-function getUNC(_path, server) {
-    if(/^[a-z]:/i.test(_path)) _path = _path.replace(/^([a-z]):\\(.+)$/i, '\\\\' + server + '\\' + '$1$\\$2');
-    return _path;
+/**
+ * Convert WINDOWS local path like DISK:\\DIR1\\DIR2 to the WINDOWS UNC path \\\\SERVER\\$DISK\\DIR1\DIR2
+ * @param {string} localPath WINDOWS local path
+ * @param {string} server server name
+ * @return {string} WINDOWS UNC path
+ */
+function getUNC(localPath, server) {
+    if(/^[a-z]:/i.test(localPath)) {
+        localPath = localPath.replace(/^([a-z]):\\(.+)$/i, '\\\\' + server + '\\' + '$1$\\$2');
+    }
+    return localPath;
 }
 
+/**
+ * Get path to the file ( ...\\DIR\\file.exe => ...\\DIR or "...\\DIR\\file" => ...\\DIR)
+ * @param {string} _path path to the file with file name
+ * @return {string} path to the file without file name
+ */
 function getPath(_path) {
     if(process.platform === 'win32') {
         var quote = _path.charAt(0);
@@ -154,6 +194,15 @@ function getPath(_path) {
     } else return path.dirname(_path);
 }
 
+/**
+ * Get list of the directory
+ * @param {string} dir directory name
+ * @param {string} skipDirs comma separated dirs which will be skipped
+ * @param {RegExp} filterFilesRE return files which match to this RegExp
+ * @param {number} recursion find files with specific dir recursion
+ * @param {string} subDir subDir used for recursion
+ * @param {function(Error)|function(null, Array<string>)} callback callback(err, fileList)
+ */
 function getFiles(dir, skipDirs, filterFilesRE, recursion, subDir, callback) {
     if(recursion < 0) return callback();
 
@@ -186,6 +235,18 @@ function getFiles(dir, skipDirs, filterFilesRE, recursion, subDir, callback) {
     });
 }
 
+/**
+ * Get part of the file
+ * @param {Object} args arguments
+ * @param {"getFilePart"|"getFileSize"} args.function
+ * @param {string} args.fileName sile name
+ * @param {"0"|"1"} args.direction read file 0 forward, 1 backward
+ * @param {string} args.filePos read file position
+ * @param {string} args.loadSize read file load size
+ * @param {string} args.search regExp for search data in the file
+ * @param {string} args.codePage file code page
+ * @param {function(null, string)|function(Error)} callback callback(err, text)
+ */
 function getFilePart(args, callback) {
 
     fs.stat(args.fileName, function(err, stats) {
@@ -204,54 +265,61 @@ function getFilePart(args, callback) {
         if(loadSize !== parseInt(String(loadSize), 10) || !loadSize)
             return callback(new Error('Incorrect load size ' + args.loadSize));
 
-        fs.open(args.fileName, 'r', function(err, fd) {
-            if(err) return callback(new Error('Can\'t open file' + args.fileName + ': ' + err.message));
+        var buffer = Buffer.alloc(loadSize),
+            continueSearching = true,
+            prevFilePos = filePos;
 
-            var buffer = Buffer.alloc(loadSize),
-                continueSearching = true,
-                prevFilePos = filePos;
+        if(args.search) {
+            try {
+                var searchRE = new RegExp(args.search || '', 'gmi');
+            } catch (e) {
+                return callback(new Error('Error in search regExp /' + args.search + '/gmi: ' + e.message));
+            }
+        } else searchRE = null;
+        async.whilst(function() {
+            return continueSearching;
+        }, function(callback) {
+            fs.open(args.fileName, 'r', function(err, fd) {
+                if (err) return callback(new Error('Can\'t open file ' + args.fileName + ': ' + err.message));
 
-            if(args.search) {
-                try {
-                    var searchRE = new RegExp(args.search || '', 'gmi');
-                } catch (e) {
-                    return callback(new Error('Error in search regExp /' + args.search + '/gmi: ' + e.message));
-                }
-            } else searchRE = null;
-            async.whilst(function() {
-                return continueSearching;
-            }, function(callback) {
-                fs.read(fd, buffer, 0, loadSize, filePos, function(err, bytesRead , buffer) {
-                    if(err) return callback(new Error('Can\'t read from file' + args.fileName + ': ' + err.message));
+                fs.read(fd, buffer, 0, loadSize, filePos, function (err, bytesRead, buffer) {
+                    fs.close(fd, function(errClose) {
+                        if (err && errClose) {
+                            return callback(new Error('Can\'t read file ' + args.fileName + ': ' + err.message +
+                                '; args: loadSize: ' + loadSize + '; filePos: ' + filePos +
+                                '; Can\'t close file : ' + errClose.message));
+                        }
+                        if (err) {
+                            return callback(new Error('Can\'t read from file' + args.fileName + ': ' + err.message +
+                                '; args: loadSize: ' + loadSize + '; filePos: ' + filePos));
+                        }
+                        if (errClose) {
+                            return callback(new Error('Can\'t close file ' + args.fileName + ': ' + errClose.message));
+                        }
 
-                    var text = args.codePage ? recode.decode(buffer, args.codePage) : buffer.toString();
-                    var searchRes = searchRE ? searchRE.test(text) : true;
-                    prevFilePos = filePos;
-                    filePos = direction >= 0 ? filePos + loadSize : filePos - loadSize;
-                    if(filePos < 0) {
-                        filePos = 0;
-                        loadSize = filePos;
-                    }
-                    if(searchRes || bytesRead !== initLoadSize) {
-                        continueSearching = false;
-                        fs.close(fd, function(err) {
-                            if(err) return callback(new Error('Can\'t close file' + args.fileName + ': ' + err.message));
-
-                            return callback(null, String(prevFilePos) + '\n' + String(prevFilePos + bytesRead) + '\n' + text);
-                            /*
-                            return callback(null, {
-                                begin: prevFilePos,
-                                end: prevFilePos + bytesRead,
-                                text: text,
-                                searchRes: searchRes,
-                                fileSize: fileSize
-                            });
-
-                             */
-                        });
-                    } else callback();
+                        var text = args.codePage ? recode.decode(buffer, args.codePage) : buffer.toString();
+                        var searchRes = searchRE ? searchRE.test(text) : true;
+                        prevFilePos = filePos;
+                        filePos = direction >= 0 ? filePos + loadSize : filePos - loadSize;
+                        if (filePos < 0) {
+                            filePos = 0;
+                            loadSize = filePos;
+                        }
+                        if (searchRes || bytesRead !== initLoadSize) {
+                            continueSearching = false;
+                            return callback(null, String(prevFilePos) + '\n' + String(prevFilePos + bytesRead) +
+                                '\n' + text);
+                        } else callback();
+                    });
                 });
-            }, callback); // callback(err, text)
+            });
+        }, function (err, text) {
+
+            if(err) {
+                return callback(new Error('Error: ' + err.message), text);
+            }
+
+            return callback(null, text);
         });
     });
 }

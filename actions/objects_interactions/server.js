@@ -167,8 +167,12 @@ function editObjectsInteractions(user, args, callback){
 
             // series used for possible transaction rollback if error occurred
             async.series([
-                function(callback){ rightsWrapper.insertInteractions(user, interactionsForInserting, callback) },
-                function(callback){ rightsWrapper.deleteInteractions(user, interactionsForDeleting, callback); }
+                function(callback){
+                    rightsWrapper.insertInteractions(user, interactionsForInserting, false, callback)
+                },
+                function(callback){
+                    rightsWrapper.deleteInteractions(user, interactionsForDeleting, callback);
+                }
             ], function(err){
                 if(err) return transactionDB.rollback(err, callback);
                 transactionDB.end(function(err) {

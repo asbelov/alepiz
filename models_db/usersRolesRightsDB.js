@@ -79,6 +79,7 @@ WHERE isDeleted=0', function(err, rows) {
  *  Can be an array of objects IDs or array of objects, like [{id:.., name:..., ...}, {}]
  * @param {boolean} [param.checkView] check rights to view object (default, if nothing set to check)
  * @param {boolean} [param.checkChange] check rights to change object
+ * @param {boolean} [param.checkMakeTask] check rights able to make a task
  * @param {boolean} [param.checkChangeInteractions] check rights for change interactions for objects
  * @param {boolean} [param.errorOnNoRights] generate an error when the user does not have rights to some objects
  * @param {function(err)|function(null, Array)} callback callback(err, checkedObjectsIDs) where
@@ -194,7 +195,7 @@ rightsDB.checkCounterID = function(param, callback) {
 rightsDB.checkCountersIDs = function(counters, param, callback) {
 
     var checkedCountersIDs = [];
-    async.each(counters, function(counter, callback) {
+    async.eachSeries(counters, function(counter, callback) {
         var newParams = {};
         for(var key in param) newParams[key] = param[key];
         newParams.id = counter.id ? counter.id : counter;

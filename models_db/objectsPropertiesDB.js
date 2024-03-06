@@ -28,7 +28,7 @@ objectsPropertiesDB.getProperties = function (objectsIDs, callback) {
     var stmt = db.prepare('SELECT * FROM objectsProperties WHERE objectID = ?', function(err) {
         if(err) return callback(err);
 
-        async.eachLimit(objectsIDs,100,function(objectID, callback) {
+        async.eachSeries(objectsIDs, function(objectID, callback) {
             stmt.all(objectID, function(err, res) {
                 if(err) return callback(err);
                 rows.push.apply(rows, res);

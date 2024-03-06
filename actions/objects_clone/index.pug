@@ -76,40 +76,49 @@ html(lang="en" xml:lang="en" xmlns="http://www.w3.org/1999/xhtml")
                                 div.row
                                     div.col.s12.m4.l4
                                         div.row
-                                            div.col.s12
+                                            div.col.s12.input-field
+                                                label
+                                                    input(type="checkbox")#clearExistingCounters
+                                                    span: b Clear all existing counter links
+                                            div.col.s12.input-field
                                                 label
                                                     input(type="checkbox" checked)#isCloneCounters
                                                     span: b Link templates counters to objects
-                                        div.row
-                                            div.col.s12
+                                            div.col.s12.input-field
                                                 label
                                                     input(type="checkbox" checked)#cloneAllCounters
                                                     span: b Link all counters, linking with templates
-                                            div.col.s12#counters
+                                            div.col.s12.input-field#counters
                                     div.col.s12.m4.l4
                                         div.row
-                                            div.col.s12
+                                            div.col.s12.input-field
+                                                label
+                                                    input(type="checkbox")#clearExistingInteractions
+                                                    span: b Clear all existing interactions
+                                            div.col.s12.input-field
                                                 label
                                                     input(type="checkbox" checked)#isCloneInteractions
                                                     span: b Clone templates interactions
-                                        div.row
-                                            div.col.s12
+                                            div.col.s12.input-field
                                                 label
                                                     input(type="checkbox" checked)#cloneAllInteractions
                                                     span: b Clone all templates interactions
-                                            div.col.s12#interactingObjects
+                                            div.col.s12.input-field#interactingObjects
                                     div.col.s12.m4.l4
                                         div.row
-                                            div.col.s12
+                                            div.col.s12.input-field
+                                                label
+                                                    input(type="checkbox")#clearExistingProperties
+                                                    span: b Clear all existing properties
+                                            div.col.s12.input-field
                                                 label
                                                     input(type="checkbox" checked)#isCloneProperties
                                                     span: b Clone templates properties
-                                        div.row
-                                            div.col.s12
+                                            div.col.s12.input-field
                                                 label
                                                     input(type="checkbox" checked)#cloneAllProperties
-                                                    span: b Clone all templates properties (identical properties will be overwritten in the order of the list of object templates)
-                                            div.col.s12#properties
+                                                    span: b Clone all templates properties
+                                            div.col.s12.input-field#properties
                         select(title="New groups for destination objects"
                             description="Select groups for destination objects or leave empty. It add 'include' objects interaction i.e. groups will be include a destination objects")#upLevelObjectsIDs
 

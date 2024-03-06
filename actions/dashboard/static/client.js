@@ -980,8 +980,8 @@ var JQueryNamespace = (function ($) {
                     if (timeIntervalTo > timeIntervalFrom) {
                         $('#disableTimeInterval').val(String(timeIntervalFrom) + '-' + String(timeIntervalTo));
                     } else {
-                        $('#disableTimeInterval').val(String(timeIntervalFrom) + '-' + getTimeFromStr('23:59') +
-                            ';' + getTimeFromStr('00:00') + '-' + String(timeIntervalTo));
+                        $('#disableTimeInterval').val(String(timeIntervalFrom) + '-86400000;0-' +
+                            String(timeIntervalTo));
                     }
                 } else {
                     if(timeStrFrom || timeStrTo) {

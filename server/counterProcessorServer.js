@@ -478,16 +478,16 @@ function updateCache() {
 
 /**
  * Removing counters from data collection
- * @param {Object} countersForRemove countersForRemove object with OCIDs for remove and description
- * @param {Array<number>} countersForRemove.removeCounters an array with OCIDs for remove
- * @param {string} countersForRemove.description description of why counters are being deleted
+ * @param {Object} message object with OCIDs for remove and description
+ * @param {Array<number>} message.removeCounters an array with OCIDs for remove
+ * @param {string} message.description description of why counters are being deleted
  * @param {function()} [callback] callback()
  */
-function removeCounters(countersForRemove, callback) {
-    if(!countersForRemove) return typeof callback === 'function' && callback();
+function removeCounters(message, callback) {
+    if(!message) return typeof callback === 'function' && callback();
 
-    log.info('Remove counters reason: ', countersForRemove.description, '. OCIDs: ', countersForRemove.removeCounters);
-    var OCIDs = countersForRemove.removeCounters;
+    log.info('Remove counters reason: ', message.description, '. OCIDs: ', message.removeCounters);
+    var OCIDs = message.removeCounters;
 
     getCountersValueThreads.sendAndReceive({removeCounters: OCIDs}, function() {
         // remove OCIDs from updateEventsStatus Map

@@ -59,6 +59,7 @@ var taskListJQueryNamespace = (function ($) {
     var serverURL = parameters.action.link+'/ajax',
         taskListParameters,
         unnamedTaskName = 'New unnamed task',
+        dateFromChangeTimestamp = 0,
         prevDateFrom,
         prevDateTo,
         taskDateFromInstance,
@@ -282,6 +283,7 @@ var taskListJQueryNamespace = (function ($) {
                     if (timestampTo <= timestampFrom) dateToElm.val(getDateString(new Date(timestampFrom + 86400000)));
 
                     prevDateFrom = dateFromElm.val();
+                    dateFromChangeTimestamp = Date.now() + 3600000;
                     drawTasksList(taskListParameters);
                 });
             });
@@ -425,6 +427,7 @@ var taskListJQueryNamespace = (function ($) {
             taskName: filterByTaskName,
             userName: filterByTaskOwner,
             groupID: groupID,
+            dateFromChangeTimestamp: dateFromChangeTimestamp,
         };
 
         /**
@@ -471,8 +474,8 @@ var taskListJQueryNamespace = (function ($) {
              *     name: string,
              *     id: number,
              *     runType: number,
-             *     userApproved: Boolean,
-             *     userCanceled: Boolean,
+             *     userApproved: string,
+             *     userCanceled: string,
              *     changeStatusTimestamp: number,
              *     canExecuteTask: Boolean,
              *     ownerName: string,
@@ -553,7 +556,7 @@ var taskListJQueryNamespace = (function ($) {
                 }
 
                 if(taskListParameters.aprovedTasks && taskListParameters.aprovedTasks[task.id]) {
-                    var approvedTaskInput = '<input type="hidden" id="taskRunType_' + escapeHtml(task.id) +
+                    var approvedTaskInput = '<input type="hidden" id="taskRunType_' + task.id +
                         '" value="' + launchMode + '">';
                     var icon = launchModeThemeDefaultSettings[launchModeThemeDefaultSettings[launchMode].nextLaunchMode].icon;
                     var dataColorAttr = 'red lighten-4';
@@ -564,12 +567,13 @@ var taskListJQueryNamespace = (function ($) {
                 }
 
                 html += '\
-<a href="#!" data-task-id="'+escapeHtml(task.id)+'" data-color="' + dataColorAttr +
+<a href="#!" data-task-id="' + task.id + '" data-color="' + dataColorAttr +
                     '" class="collection-item avatar black-text ' + dataColorAttr + '" style="min-height:auto">\
     <i class="material-icons circle' + approveBtnClass + '"' + approveAttr + '>' + icon + '</i>\
-    <span>#' + escapeHtml(task.id) + ': </span><span class="title">' + taskName + '</span><span>' + runStateComment +
+    <span>#' + task.id + ': </span><span class="title">' + taskName + '</span><span>' + runStateComment +
                     '</span>\
-    <p>Modified at ' + new Date(task.timestamp).toLocaleString() + ' by ' + escapeHtml(task.ownerFullName) +
+    <p>Modified at ' + new Date(task.changeStatusTimestamp || task.timestamp).toLocaleString() +
+                    ' by ' + escapeHtml(task.ownerFullName) +
                     ' (' + escapeHtml(task.ownerName)+ ')' + approvedComment + '</p>\
     <span class="secondary-content">' + addHTML + removeHTML + '</span><span data-is-approved>' + approvedTaskInput +
                     '</span>\
@@ -579,9 +583,18 @@ var taskListJQueryNamespace = (function ($) {
             });
 
             // set fromDate to timestamp of last showed task
-            if(tasksData.length && tasksData[tasksData.length - 1].timestamp < timestampFrom) {
-                $('#taskDateFrom').val(getDateString(new Date(tasksData[tasksData.length - 1].timestamp)));
-                taskDateFromInstance.setDate(new Date(tasksData[tasksData.length - 1].timestamp));
+            if(tasksData.length && dateFromChangeTimestamp < Date.now()) {
+                var lastShowedTaskModificationTimestamp =
+                    tasksData[tasksData.length - 1].changeStatusTimestamp || tasksData[tasksData.length - 1].timestamp;
+/*
+                console.log('lastShowedTaskModificationTimestamp: ', lastShowedTaskModificationTimestamp,
+                    ' (', new Date(lastShowedTaskModificationTimestamp).toLocaleString(),
+                    '); dateFromChangeTimestamp: ', dateFromChangeTimestamp,
+                    ' (', new Date(dateFromChangeTimestamp).toLocaleString(), ')');
+ */
+
+                $('#taskDateFrom').val(getDateString(new Date(lastShowedTaskModificationTimestamp)));
+                taskDateFromInstance.setDate(new Date(lastShowedTaskModificationTimestamp));
             }
 
             var taskListElm = $('#taskList');

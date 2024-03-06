@@ -98,9 +98,20 @@ rightsWrapper.getAllCounters = function(username, callback) {
  * @param {Array<number>} objectsIDs array of object IDs
  * @param {Array<number>|null} groupsIDs array of group IDs or null for return all counter that linked to the
  * specific object IDs
- * @param {function(Error) | function() | function(null, Array<Object>)} callback - callback(err, rows),
- * where rows: [{id:.., name:.., taskCondition:..., unitID:..., collectorID:..., debug:..., sourceMultiplier:...,
- *     groupID:..., OCID:..., objectID:..., objectName:..., objectDescription:..}, ...]
+ * @param {function(Error) | function() | function(null, Array<{
+ *     id: number,
+ *     name: string,
+ *     taskCondition: 0|1,
+ *     unitID: number,
+ *     collectorID: string,
+ *     debug: 0|1,
+ *     sourceMultiplier: number,
+ *     groupID: number,
+ *     OCID: number,
+ *     objectID: number,
+ *     objectName:string,
+ *     objectDescription: string,
+ * }>)} callback - callback(err, rows)
  */
 rightsWrapper.getCountersForObjects = function(username, objectsIDs, groupsIDs, callback){
     if(!objectsIDs) return callback();
@@ -252,21 +263,23 @@ rightsWrapper.getVariables = function(username, counterID, callback){
             if (err) return callback(err);
             if(!checkedCounterID) return callback();
 
-            async.parallel({
-                variables: function(callback) {
-                    countersDB.getVariables(checkedCounterID, function(err, variablesDBRows) {
-                        if(err) return callback(new Error('Can\'t get variables for counter ID '+checkedCounterID+': '+err.message));
-                        else callback(null, variablesDBRows);
-                    })
-                },
-
-                variablesExpression: function(callback) {
-                    countersDB.getVariablesExpressions(checkedCounterID, function(err, variablesExpressionsDBRows) {
-                        if(err) return callback(new Error('Can\'t get variables expressions for counter ID '+counterID+': '+err.message));
-                        else callback(null, variablesExpressionsDBRows);
-                    })
+            countersDB.getVariables(checkedCounterID, function(err, variablesDBRows) {
+                if(err) {
+                    return callback(new Error('Can\'t get variables for counter ID ' + checkedCounterID +
+                        ': ' + err.message));
                 }
-            }, callback); //(err, {variables: [..], variablesExpression:[..]})
+                countersDB.getVariablesExpressions(checkedCounterID, function(err, variablesExpressionsDBRows) {
+                    if(err) {
+                        return callback(new Error('Can\'t get variables expressions for counter ID ' + counterID +
+                            ': ' + err.message));
+                    }
+
+                    callback(null, {
+                        variables: variablesDBRows,
+                        variablesExpression: variablesExpressionsDBRows,
+                    });
+                });
+            });
         });
     });
 };

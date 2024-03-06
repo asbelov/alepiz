@@ -171,12 +171,19 @@ var jqueryNameSpace = (function ($) {
                 102: 'Excluded from '
             };
             objectsInteractions = _objectsInteractions;
+
+            /**
+             * an array with source object IDs from the multiple select element
+             * @type {Array<string>}
+             */
             var objectsIDs = $('#sourceObjectsIDs').val();
 
             objectsInteractions
                 .sort(function (a, b) {
-                    return (objectsIDs.indexOf(b.id1) === -1 ? a.name1.localeCompare(b.name1) : a.name2.localeCompare(b.name2))
-                }).forEach(function (interaction, idx) {
+                    return (objectsIDs.indexOf(b.id1) === -1 ?
+                        a.name1.localeCompare(b.name1) : a.name2.localeCompare(b.name2))
+                })
+                .forEach(function (interaction, idx) {
 
                 if (objectsIDs.indexOf(String(interaction.id1)) !== -1) {
                     interactions[interactionTypes[interaction.type] + interaction.name2] = {
@@ -191,11 +198,12 @@ var jqueryNameSpace = (function ($) {
                     }
                 } else {
                     interactions[interactionTypes[interaction.type + 100] + interaction.name1] = {
-                        data: interaction.id1 + ',' + interaction.type,
+                        data: (interaction.type === 0 ? -interaction.id1 : interaction.id1) + ',' + interaction.type,
                         idx: idx,
                     };
                 }
             });
+            //console.log(objectsIDs, interactions)
         }
 
         $('#interactingObjects').html(Object.keys(interactions).map(function(name) {

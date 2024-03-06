@@ -138,7 +138,7 @@ function getObjectsByX(params, condition, suffix, callback) {
  */
 function getSTMTResult(stmt, params, callback) {
     var rows = [];
-    async.each(params, function(param, callback) {
+    async.eachSeries(params, function(param, callback) {
         stmt.all(param, function(err, subRows) {
             if(err) return callback(err);
 
@@ -151,9 +151,17 @@ function getSTMTResult(stmt, params, callback) {
     })
 }
 
-/** Get interactions for specified objects IDs. Check user rights before using it functions
- * @param {Array} IDs - array of objects IDs
- * @param {function(Error)|function(null, Array)} callback - callback(err, interactions) where interactions described
+/** Get interactions for specified object IDs
+ * @param {Array<number>} objectIDs array of object IDs
+ * @param {function(Error)|function(null, Array<{
+ *     name1: string,
+ *     description1: string,
+ *     id1: number,
+ *     name2: string,
+ *     description2: string,
+ *     id2: number,
+ *     type: number,
+ * }>)} callback - callback(err, interactions) where interactions described
  * at example bellow
  * @example
  * // interactions returned by callback(err, interactions)
@@ -166,20 +174,20 @@ function getSTMTResult(stmt, params, callback) {
  * function can be used for less than 999 objects, according  SQLITE_MAX_VARIABLE_NUMBER, which defaults to 999
  * https://www.sqlite.org/limits.html
  */
-objectsDB.getInteractions = function(IDs, callback){
-    var questionStr = IDs.map(function(){return '?'}).join(',');
+objectsDB.getInteractions = function(objectIDs, callback){
+    var questionStr = objectIDs.map(function(){return '?'}).join(',');
 
-    // copy array of IDs to new array IDForSelect
-    var IDsForSelect = IDs.slice();
+    // copy array of object IDs to new array IDForSelect
+    var IDsForSelect = objectIDs.slice();
     // add array IDs to array IDForSelect
-    IDsForSelect.push.apply(IDsForSelect, IDs);
+    IDsForSelect.push.apply(IDsForSelect, objectIDs);
 
     db.all('SELECT objects1.name AS name1, objects1.description AS description1, interactions.objectID1 AS id1, ' +
         'objects2.name AS name2, objects2.description AS description2, interactions.objectID2 AS id2, ' +
         'interactions.type AS type FROM interactions ' +
         'JOIN objects objects1 ON objects1.id=interactions.objectID1 ' +
         'JOIN objects objects2 ON objects2.id=interactions.objectID2 ' +
-        'WHERE interactions.objectID1 IN ('+questionStr+') OR interactions.objectID2 IN ('+questionStr+') ' +
+        'WHERE interactions.objectID1 IN (' + questionStr + ') OR interactions.objectID2 IN (' + questionStr + ') ' +
         'ORDER BY objects2.sortPosition, objects2.name, objects1.sortPosition, objects1.name',
         IDsForSelect, callback);
 };
@@ -230,7 +238,7 @@ objectsDB.getObjectsCountersIDs = function (objectsIDs, callback){
         if(err) return callback(err);
 
         var rows = [];
-        async.eachLimit(objectsIDs, 20,function(objectID, callback) {
+        async.eachSeries(objectsIDs, function(objectID, callback) {
             stmt.all(objectID, function(err, subRows) {
                 if(err) return callback(err);
 

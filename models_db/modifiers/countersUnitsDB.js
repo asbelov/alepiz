@@ -54,6 +54,7 @@ unitsDB.addCounterUnit = function(unitName, abbreviation, prefixes, multiplies, 
     if(Number(onlyPrefixes) !== 0) onlyPrefixes = 1;
     else onlyPrefixes = 0;
 
+    // The hash algorithm is too simple. There may be problems with renaming
     const id = unique.createHash(unitName + abbreviation + prefixes + multiplies + onlyPrefixes);
 
     db.run(

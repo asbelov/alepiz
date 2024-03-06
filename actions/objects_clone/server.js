@@ -11,16 +11,37 @@ const server = require('../../server/counterProcessor');
 const Conf = require("../../lib/conf");
 const confMyNode = new Conf('config/node.json');
 
+/**
+ *
+ * @param {Object} args
+ * @param {string} args.username username
+ * @param {number} args.timestamp timestamp
+ * @param {string} args.alepizIDs
+ * @param {string} args.disabled
+ * @param {string} args.cloneToObjectsIDs
+ * @param {string} args.objectsColor
+ * @param {string} args.objectsShade
+ * @param {string} args.sourceObjectsIDs
+ * @param {string} args.o
+ * @param {string} args.objectsDescription
+ * @param {string} args.objectsOrder
+ * @param {string} args.isCloneProperties
+ * @param {string} args.isCloneCounters
+ * @param {string} args.isCloneInteractions
+ * @param {string} args.cloneAllProperties
+ * @param {string} args.cloneAllCounters
+ * @param {string} args.clearExistingCounters
+ * @param {string} args.clearExistingInteractions
+ * @param {string} args.clearExistingProperties
+ * @param {string} args.upLevelObjectsIDs
+ * @param {function(Error)|function(null, string)} callback callback(err, <comma separated updated object IDs>
+ */
 module.exports = function(args, callback) {
 
     parseArgs(args, function(err, param) {
         if(err) return callback(err);
 
         var user = args.username;
-        var addNewObjects = param.newObjectsNames.length ? objectsDB.addObjects : nop;
-        var _saveProperties = args.isCloneProperties ? saveProperties : nop;
-        var _saveCounters = args.isCloneCounters ? saveCounters : nop;
-        var _saveInteractions = args.isCloneInteractions ? saveInteractions : nop;
 
         transactionDB.begin(function(err) {
             if (err) return callback(err);
@@ -33,21 +54,21 @@ module.exports = function(args, callback) {
                 if(updateData) log.info('Update object information: ', updateData, ' for ', objectNames);
 
                 if(param.newObjectsNames.length) log.info('Add a new objects: ', param.newObjectsNames);
-                addNewObjects(user, param.newObjectsNames, param.description, param.order, param.disabled, param.color,
-                    args.timestamp, function(err, newObjectsIDs) {
+                objectsDB.addObjects(user, param.newObjectsNames, param.description, param.order, param.disabled,
+                    param.color, args.timestamp, function(err, newObjectsIDs) {
                     if(err) return transactionDB.rollback(err, callback);
 
                     if(newObjectsIDs) Array.prototype.push.apply(param.objectsIDs, newObjectsIDs);
 
-                    _saveProperties(user, param, args.cloneAllProperties, function(err, updatedObjectsIDs/*, propertiesDebugInfo*/) {
+                    saveProperties(user, param, function(err, updatedObjectsIDs/*, propertiesDebugInfo*/) {
                         if(err) return transactionDB.rollback(err, callback);
 
                         // callback(err, [<OCID1>, <OCID2>, ...]): array of updated objectsCountersIDs
-                        _saveCounters(user, param, args.cloneAllCounters, function(err, updatedOCIDs) {
+                        saveCounters(user, param, function(err, updatedOCIDs) {
                             if(err) return transactionDB.rollback(err, callback);
 
 
-                            _saveInteractions(user, param.objectsIDs, args, function(err, isUpdatedInteractions) {
+                            saveInteractions(user, param.objectsIDs, args, function(err, isUpdatedInteractions) {
                                 if (err) return transactionDB.rollback(err, callback);
 
                                 // args.alepizIDs can be '-1', '' or f.e. '1,2,3'
@@ -221,11 +242,10 @@ function parseArgs(args, callback) {
     }
 
     var newObjectsNames = [];
-    var objectsIDs = args.cloneToObjectsIDs.filter(function (id) {
-        if(!Number(id) || Number(id) !== parseInt(id, 10)) newObjectsNames.push(id);
-        else return true
-    }).map(function(id) {
-        return Number(id);
+    var objectsIDs = [];
+    args.cloneToObjectsIDs.forEach(function (idOrName) {
+        if(Number(idOrName) && Number(idOrName) === parseInt(idOrName, 10)) objectsIDs.push(Number(idOrName));
+        else newObjectsNames.push(idOrName);
     });
 
     var description = objectsIDs.length > 1 && args.objectsDescription === '' ? undefined : args.objectsDescription;
@@ -262,6 +282,14 @@ function parseArgs(args, callback) {
         color: color,
         countersIDs: countersIDs,
         propertiesIDs: propertiesIDs,
+        isCloneProperties: !!args.isCloneProperties,
+        isCloneCounters: !!args.isCloneCounters,
+        isCloneInteractions: !!args.isCloneInteractions,
+        cloneAllProperties: !!args.cloneAllProperties,
+        cloneAllCounters: !!args.cloneAllCounters,
+        clearExistingCounters: !!args.clearExistingCounters,
+        clearExistingInteractions: !!args.clearExistingInteractions,
+        clearExistingProperties: !!args.clearExistingProperties,
     };
 
     log.debug('Parsed parameters: ', parameters);
@@ -287,19 +315,27 @@ function createInteractions(cloneToObjectIDs, args) {
             if(args[arg]) {
                 if (arg.indexOf('interactionID-') === 0) { // interactionID-<objectID>,<interactionType>
                     var [id1, type] = arg.substring('interactionID-'.length).split(/\s*[,;]\s*/);
-                    id1 = parseInt(id1); type = parseInt(type, 10);
+                    id1 = parseInt(id1, 10); type = parseInt(type, 10);
                     // IDs will be verified later
                     if([0,1,2].indexOf(type) === -1) return;
                     if(id1 > 0) {
-                        newInteractions.push({
-                            id1: id1,
-                            id2: id2,
-                            type: type,
-                        });
+                        if(type === 0) {
+                            newInteractions.push({
+                                id1: id2,
+                                id2: id1,
+                                type: type,
+                            });
+                        } else {
+                            newInteractions.push({
+                                id1: id1,
+                                id2: id2,
+                                type: type,
+                            });
+                        }
                     } else {
                         newInteractions.push({
-                            id1: id2,
-                            id2: -id1,
+                            id1: -id1,
+                            id2: id2,
                             type: type,
                         });
                     }
@@ -311,44 +347,45 @@ function createInteractions(cloneToObjectIDs, args) {
     return newInteractions;
 }
 
-/*
-    get latest argument and run it as callback function
- */
-function nop() {
-    // run latest argument as callback from function arguments
-    arguments[arguments.length - 1]();
-}
+function saveCounters(user, parameters, callback) {
+    if(!parameters.isCloneCounters && !parameters.clearExistingCounters) return callback();
 
-function saveCounters(user, parameters, cloneAllCounters, callback) {
-
-    countersDB.getCountersForObjects(user, parameters.templatesObjectsIDs, null,function(err, rows) {
+    countersDB.getCountersForObjects(user, parameters.templatesObjectsIDs, null,
+        function(err, rows) {
         if(err) return callback(err);
 
-        var countersIDs = cloneAllCounters ? rows.map(row => row.id) :
+        var countersIDs = parameters.cloneAllCounters ? rows.map(row => row.id) :
             rows.filter(row => parameters.countersIDs.indexOf(row.id) !== -1).map(row => row.id);
 
         if(!countersIDs.length) {
-            log.warn('Can\'t find objects to counters relations for objects IDs: ', parameters.objectsIDs);
-            return callback();
+            log.info('Can\'t find objects to counters relations in the source objects IDs: ',
+                parameters.templatesObjectsIDs);
+            if(!parameters.clearExistingCounters) return callback();
         }
         //log.debug('Saved objects to counters relations: objects IDs: ', parameters.objectsIDs, '; counters IDs: ', countersIDs);
 
-        // callback(err, [{objectID:.., counterID:..}, {..}, ...]): array of updated objectsCountersIDs
-        counterSaveDB.saveObjectsCountersIDs(user, parameters.objectsIDs, countersIDs, function(err, updatedOCIDs) {
-            if(updatedOCIDs && updatedOCIDs.length) {
-                log.info('Updating objects to counters relations for: ', updatedOCIDs);
+        counterSaveDB.saveObjectsCountersIDs(user, parameters.objectsIDs, countersIDs,
+            parameters.clearExistingCounters, function(err, updatedOCIDs, deletedOCIDs/*, existingOCIDs*/) {
+
+            if((Array.isArray(updatedOCIDs) && updatedOCIDs.length) ||
+                (Array.isArray(deletedOCIDs) && deletedOCIDs.length) ) {
+                log.info('Objects to counters relations inserted: ', updatedOCIDs, ' deleted: ', deletedOCIDs /*,
+                    ' existing: ', existingOCIDs*/);
             }
+            // callback(err, [{objectID:.., counterID:..}, {..}, ...]): the array with a new objectsCountersIDs
             callback(err, updatedOCIDs);
         });
     });
 }
 
-function saveProperties(user, parameters, cloneAllProperties, callback) {
+function saveProperties(user, parameters, callback) {
+    if(!parameters.isCloneProperties && !parameters.clearExistingProperties) return callback();
+
     objectsPropertiesDB.getProperties(user, parameters.templatesObjectsIDs, function(err, rows) {
         if(err) return callback(err);
 
         var propertiesNames = {}; // checking for duplicate properties
-        if(!cloneAllProperties) rows = rows.filter(function (property) {
+        if(!parameters.cloneAllProperties) rows = rows.filter(function (property) {
             if(propertiesNames[property.name]) {
                 if(property.value !== propertiesNames[property.name])
                     log.warn('Templates has properties with equal names: "', property.name,
@@ -358,7 +395,7 @@ function saveProperties(user, parameters, cloneAllProperties, callback) {
             }
             propertiesNames[property.name] = property.value;
 
-            if(!cloneAllProperties) return parameters.propertiesIDs.indexOf(property.id) !== -1;
+            if(!parameters.cloneAllProperties) return parameters.propertiesIDs.indexOf(property.id) !== -1;
             return true;
         });
 
@@ -371,23 +408,46 @@ function saveProperties(user, parameters, cloneAllProperties, callback) {
             return prop.name && prop.value !== undefined && [0, 1, 2, 3].indexOf(prop.mode) !== -1
         });
 
-        objectsPropertiesDB.saveObjectsProperties(user, parameters.objectsIDs, properties,false,
-            function(err, updatedObjectsIDs, properties) {
-            if(updatedObjectsIDs.length) log.info('Changes in properties: ', properties);
-            callback(err, updatedObjectsIDs)
+        objectsPropertiesDB.saveObjectsProperties(user, parameters.objectsIDs, properties,
+            parameters.clearExistingProperties,function(err, updatedObjectsIDs, properties) {
+
+            if(Array.isArray(updatedObjectsIDs) && updatedObjectsIDs.length) {
+                log.info('Changes in properties: ', properties);
+            }
+            callback(err, updatedObjectsIDs);
         });
     });
 }
 
-// interaction types: 0 - include; 1 - intersect, 2 - exclude
-function saveInteractions(user, cloneToObjectIDs, args, callback) {
+/**
+ * Save interaction to the cloned object
+ * @param {string} username username
+ * @param {Array<number>} cloneToObjectIDs an array with destination object IDs
+ * @param {Object} args arguments
+ * @param {function(Error)|function()} callback callback(err)
+ * interaction types: 0 - include; 1 - intersect, 2 - exclude
+ */
+function saveInteractions(username, cloneToObjectIDs, args, callback) {
+    if(!args.isCloneInteractions && !args.clearExistingInteractions) return callback();
 
     // add upLevel interaction
     // parameters.interactionsObjectsIDs = [{id1:, id2:. type:}, {...}, ...]
     // parameters.upLevelObjectsIDs: [{id1:, id2:. type: 0}, {...}, ...] - interactions with upLevel objects
 
     var newInteractions = createInteractions(cloneToObjectIDs, args);
+    if(!newInteractions.length && !args.clearExistingInteractions) return callback();
 
-    if(!newInteractions.length) return callback();
-    objectsDB.insertInteractions(user, newInteractions, callback);
+    objectsDB.insertInteractions(username, newInteractions,
+        args.clearExistingInteractions ? cloneToObjectIDs : false,
+        function (err, insertedInteractions, deletedInteractions/*, existingInteractions*/) {
+            if(err) return callback(err);
+
+            if((Array.isArray(insertedInteractions) && insertedInteractions.length) ||
+                (Array.isArray(deletedInteractions) && deletedInteractions.length)) {
+                log.info('Interactions inserted: ', insertedInteractions, ' deleted: ', deletedInteractions /*,
+                    ' existing: ', existingInteractions*/);
+            }
+
+            callback();
+    });
 }

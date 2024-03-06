@@ -4,7 +4,6 @@
 
 var log = require('../../lib/log')(module);
 var db = require('../db');
-var async = require('async');
 
 module.exports = function(callback){
     log.debug('Creating objects and interactions tables in database: ');
@@ -79,20 +78,12 @@ function createInteractionsTable(callback){
         function (err) {
             if (err) return callback(new Error('Can\'t create interactions table in database: ' + err.message));
 
-            async.parallel([
-                function(callback){
-                    db.run('CREATE INDEX IF NOT EXISTS objectIDs_interactions_index on interactions(objectID1, objectID2)',
-                        function (err) {
-                            if (err) {
-                                return callback(new Error('Can\'t create interactions index in database: ' + err.message));
-                            }
-                            callback();
+            db.run('CREATE INDEX IF NOT EXISTS objectIDs_interactions_index on interactions(objectID1, objectID2)',
+                function (err) {
+                    if (err) {
+                        return callback(new Error('Can\'t create interactions index in database: ' + err.message));
+                    }
 
-                        }
-                    )
-                },
-
-                function(callback) {
                     db.run('CREATE INDEX IF NOT EXISTS types_interactions_index on interactions(type)',
                         function (err) {
                             if (err) {
@@ -103,7 +94,7 @@ function createInteractionsTable(callback){
                         }
                     )
                 }
-            ], callback);
+            )
         }
     );
 }

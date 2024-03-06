@@ -130,7 +130,12 @@ rightsWrapper.deleteObjects = function (objectIDs, callback) {
  * @param {0|1} disabled is object disabled. Will not be updated if not defined
  * @param {string|null} color object color. Will not be updated if not defined
  * @param {number} sessionID sessionID for create unique objectID. Not used
- * @param {function(Error)|function(null, updateData: Object, objectNames: Array)} callback
+ * @param {function(Error)|function()|function(null, updateData: {
+ *     $disabled: 0|1,
+ *     $sortPosition: number,
+ *     $description: string,
+ *     $color: string|null,
+ * }, objectNames: Array<string>)} callback
  *  callback(err, updateData, objectNames) where updateData - object with data which was really updated.
  *  objectNames - array with updated object names for print to log
  */
@@ -217,32 +222,56 @@ function getColor (color) {
 
 /**
  * Inserting new not existing object interactions
- * @param {string} user - username
- * @param {Array} newInteractions - [{id1: <objectID1>, id2: <objectID2>, type: <interactionType>}];
+ * @param {string} username username
+ * @param {Array<{
+ *     id1: number,
+ *     id2: number,
+ *     type: 0|1|2,
+ * }>} newInteractions - [{id1: <objectID1>, id2: <objectID2>, type: <interactionType>}];
  *  interaction types: 0 - include; 1 - intersect, 2 - exclude
- * @param {function(Error)|function()|function(null, Boolean)} callback - callback(err, isChangesWasMade)
- * @returns {*}
+ * @param {Array<number>|false} deleteExistingInteractionForObjectIDs delete existing interaction for specific object IDs
+ * @param {function(Error)|function(null, insertedInteractions: null|Array<{
+ *     id1: number,
+ *     id2: number,
+ *     type: 0|1|2,
+ * }>, deletedInteractions: null|Array<{
+ *     id1: number,
+ *     id2: number,
+ *     type: 0|1|2,
+ * }>, existingInteractions: null|Array<{
+ *     id1: number,
+ *     id2: number,
+ *     type: 0|1|2,
+ * }>)} callback - callback(err, insertedInteractions, deletedInteractions)
  */
-rightsWrapper.insertInteractions = function(user, newInteractions, callback) {
+rightsWrapper.insertInteractions = function(username, newInteractions,
+                                            deleteExistingInteractionForObjectIDs,
+                                            callback) {
 
-    if(!newInteractions.length) {
+    if(!newInteractions.length &&
+        (!Array.isArray(deleteExistingInteractionForObjectIDs) || !deleteExistingInteractionForObjectIDs.length)) {
         log.info('Interactions are not set: ', newInteractions);
-        return callback();
+        return callback(null, null, null, null);
     }
 
     var allInteractedObjectIDs = [];
-    newInteractions.forEach(interaction => {
-        allInteractedObjectIDs.push(interaction.id1);
-        allInteractedObjectIDs.push(interaction.id2);
-    });
+    if(!newInteractions.length &&
+        Array.isArray(deleteExistingInteractionForObjectIDs) && deleteExistingInteractionForObjectIDs.length) {
+        allInteractedObjectIDs = deleteExistingInteractionForObjectIDs;
+    } else {
+        newInteractions.forEach(interaction => {
+            allInteractedObjectIDs.push(interaction.id1);
+            allInteractedObjectIDs.push(interaction.id2);
+        });
+    }
 
     checkIDs(allInteractedObjectIDs, function(err, checkedInteractedObjectIDs) {
-        if (err && !checkedInteractedObjectIDs) return callback(err);
+        if (err && !Array.isArray(checkedInteractedObjectIDs)) return callback(err);
 
-        user = prepareUser(user);
+        username = prepareUser(username);
 
         rightsDB.checkObjectsIDs({
-            user: user,
+            user: username,
             IDs: checkedInteractedObjectIDs,
             checkChangeInteractions: true,
             errorOnNoRights: true
@@ -261,7 +290,7 @@ rightsWrapper.insertInteractions = function(user, newInteractions, callback) {
                 newInteractions.forEach(newInteraction => {
                     // finding existing interaction
                     if(!existingInteractions.some(existingInteraction => {
-                        // don't touch it
+                        // don't touch this
                         if(existingInteraction.type === newInteraction.type &&
                             (
                                 // for inclusion (0), the order of interaction of objects is important
@@ -290,14 +319,63 @@ rightsWrapper.insertInteractions = function(user, newInteractions, callback) {
                     }
                 });
 
-                if(!notExistingNewInteractions.size) return callback();
-
-                objectsDBSave.insertInteractions(Array.from(notExistingNewInteractions), function (err) {
-                    log.info('Saved not existing interactions: ', notExistingNewInteractions);
+                var notExistingNewInteractionsArray = Array.from(notExistingNewInteractions);
+                objectsDBSave.insertInteractions(notExistingNewInteractionsArray, function (err) {
+                    log.info('Saved not existing interactions: ', notExistingNewInteractionsArray);
                     if(err) return callback(err);
 
-                    objectListClient.insertInteractionsToCache(Array.from(notExistingNewInteractions));
-                    callback(null, true);
+                    if(!Array.isArray(deleteExistingInteractionForObjectIDs) ||
+                        !deleteExistingInteractionForObjectIDs.length
+                    ) {
+                        objectListClient.insertInteractionsToCache(notExistingNewInteractionsArray);
+                        return callback(null, notExistingNewInteractionsArray, null, existingInteractions);
+                    }
+
+                    var interactionsForDeletion = new Set();
+                    existingInteractions.forEach(existingInteraction => {
+
+                        if(deleteExistingInteractionForObjectIDs.indexOf(existingInteraction.id1) === -1 &&
+                            deleteExistingInteractionForObjectIDs.indexOf(existingInteraction.id2) === -1) return;
+                        // finding interactions for deletion
+                        if (!newInteractions.some(newInteraction => {
+                            // don't touch this
+                            if (newInteraction.type === existingInteraction.type &&
+                                (
+                                    // for inclusion (0), the order of interaction of objects is important
+                                    // for intersection (1) or exclusion (2), the order of interaction of objects is not important
+                                    existingInteraction.type === 0 &&
+                                    (
+                                        newInteraction.id1 === existingInteraction.id1 &&
+                                        newInteraction.id2 === existingInteraction.id2
+                                    )
+                                ) ||
+                                (
+                                    (
+                                        newInteraction.id1 === existingInteraction.id1 &&
+                                        newInteraction.id2 === existingInteraction.id2
+                                    ) ||
+                                    (
+                                        newInteraction.id1 === existingInteraction.id2 &&
+                                        newInteraction.id2 === existingInteraction.id1
+                                    )
+                                )
+                            ) {
+                                return true;
+                            }
+                        })) {
+                            interactionsForDeletion.add(existingInteraction);
+                        }
+                    });
+
+                    var interactionsForDeletionArray = Array.from(interactionsForDeletion);
+
+                    objectsDBSave.deleteInteractions(interactionsForDeletionArray, function (err) {
+                        if(err) return callback(err);
+
+                        objectListClient.insertInteractionsToCache(notExistingNewInteractionsArray);
+                        objectListClient.deleteInteractionFromCache(interactionsForDeletionArray)
+                        callback(null, notExistingNewInteractionsArray, interactionsForDeletionArray, existingInteractions);
+                    });
                 });
             });
         });

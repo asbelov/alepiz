@@ -607,7 +607,7 @@ var alepizObjectsNamespace = (function($) {
 
         // click at an object
         $('div[data-object-id]').click(function(eventObject){
-            // set checkbox of current object checked
+            //set checkbox of current object checked.
             var currentObjectID = $(eventObject.target).attr('data-object-id');
             $('#' + currentObjectID).prop('checked', true);
 
@@ -615,8 +615,7 @@ var alepizObjectsNamespace = (function($) {
 
             // create new objects list
             createObjectsListByInteractions(getSelectedObjectNames(), false,
-                function (isDrawObjects) {
-                if(!isDrawObjects) return;
+                function () {
                 alepizActionsNamespace.createActionsList(null, function () {
                     alepizDrawActionNamespace.redrawIFrameDataOnChangeObjectsList();
                     alepizMainNamespace.setBrowserHistory();

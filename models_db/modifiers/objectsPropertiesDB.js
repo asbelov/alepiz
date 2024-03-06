@@ -11,6 +11,22 @@ const unique = require('../../lib/utils/unique');
 var objectsPropertiesDB = {};
 module.exports = objectsPropertiesDB;
 
+/**
+ * Update specific properties for the object ID
+ * @param {number} objectID object ID
+ * @param {Array<{
+ *     name: string,
+ *     value: number|string,
+ *     mode: 0|1|2
+ *     description: string
+ * }>} properties an array of objects with properties
+ * @param {function(null, Array<{
+ *     name: string,
+ *     value: number|string,
+ *     mode: 0|1|2
+ *     description: string
+ * }>)|function(Error)} callback callback(err, notUpdatedProperties)
+ */
 objectsPropertiesDB.updateProperties = function(objectID, properties, callback) {
     log.debug('Updating properties for objectsIDs: ', objectID, ' properties: ', properties);
 
@@ -24,10 +40,11 @@ objectsPropertiesDB.updateProperties = function(objectID, properties, callback) 
         async.eachSeries(properties, function(property, callback) {
             stmt.run( {
                 $objectID: objectID,
-                $name: property.name,
-                $value: String(property.value), // for convert integer to TEXT correctly
+                $name: property.name.trim(),
+                $value: String(property.value).trim(), // for convert integer to TEXT correctly
                 $mode: property.mode,
-                $description: property.description
+                $description: typeof property.description === 'string' ?
+                    property.description.trim() : property.description,
             }, function(err, info) {
                 if(err) return callback(err);
 
@@ -59,15 +76,18 @@ objectsPropertiesDB.insertProperties = function(objectID, properties, callback) 
 
         // eachSeries used for possible transaction rollback if error occurred
         async.eachSeries(properties, function(property, callback) {
-            const id = unique.createHash(objectID.toString(36) + property.name + String(property.value) +
+            const id =
+                unique.createHash(objectID.toString(36) + property.name + String(property.value) +
                 property.mode + property.description);
+
             stmt.run( {
                 $id: id,
                 $objectID: objectID,
-                $name: property.name,
-                $value: String(property.value), // for convert integer to TEXT correctly
+                $name: property.name.trim(),
+                $value: String(property.value).trim(), // for convert integer to TEXT correctly
                 $mode: property.mode,
-                $description: property.description
+                $description: typeof property.description === 'string' ?
+                    property.description.trim() : property.description,
             }, callback);
         }, function(err) {
             stmt.finalize();
@@ -76,18 +96,47 @@ objectsPropertiesDB.insertProperties = function(objectID, properties, callback) 
     });
 };
 
-objectsPropertiesDB.deleteProperties = function(objectID, propertiesNames, callback) {
-    log.debug('Removing properties for objectID: ', objectID, ' properties ', propertiesNames);
+/**
+ * Delete specific properties for the objectID
+ * @param {number} objectID object ID
+ * @param {Array<string>} propertyNames an array with property names
+ * @param {function()|function(Error)} callback callback(err)
+ */
+objectsPropertiesDB.deleteProperties = function(objectID, propertyNames, callback) {
+    log.debug('Removing properties for objectID: ', objectID, ' properties ', propertyNames);
 
-    var stmt = db.prepare('DELETE FROM objectsProperties WHERE objectID = $objectID AND name = $name', function(err) {
+    var stmt = db.prepare('DELETE FROM objectsProperties WHERE objectID = $objectID AND name = $name',
+        function(err) {
         if (err) return callback(err);
 
         // eachSeries used for possible transaction rollback if error occurred
-        async.eachSeries(propertiesNames, function(propertyName, callback) {
+        async.eachSeries(propertyNames, function(propertyName, callback) {
             stmt.run( {
                 $objectID: objectID,
                 $name: propertyName,
             }, callback);
+        }, function(err) {
+            stmt.finalize();
+            callback(err);
+        });
+    });
+};
+
+/**
+ * Delete all properties for the object IDs
+ * @param {Array<number>} objectIDs an Array with object ID
+ * @param {function()|function(Error)} callback callback(err)
+ */
+objectsPropertiesDB.deleteAllProperties = function(objectIDs, callback) {
+    log.info('Deleting all properties for the object IDs: ', objectIDs);
+
+    var stmt =
+        db.prepare('DELETE FROM objectsProperties WHERE objectID = ?',function(err) {
+        if (err) return callback(err);
+
+        // eachSeries used for possible transaction rollback if error occurred
+        async.eachSeries(objectIDs, function(objectID, callback) {
+            stmt.run(objectID, callback);
         }, function(err) {
             stmt.finalize();
             callback(err);

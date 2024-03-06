@@ -123,7 +123,8 @@ function addNewObjects(user, args, callback){
                     });
                 });
 
-                rightsWrapper.insertInteractions(user, interactionsForInserting, function (err) {
+                rightsWrapper.insertInteractions(user, interactionsForInserting, false,
+                    function (err) {
 
                     if (err) return transactionDB.rollback(err, callback);
                     transactionDB.end(function (err) {

@@ -16,7 +16,7 @@ var counterSaveDB = require('../../models_db/modifiers/countersDB');
 var activeCollector = require('../../server/activeCollector');
 
 
-var collectorName = 'event-generator';
+var eventGeneratorCollectorName = 'event-generator';
 
 /**
  * Change event and counter settings
@@ -99,7 +99,7 @@ module.exports = function(args, callback) {
             var events = (param.objectsIDs.length ?
                 rows.filter(o => param.objectsIDs.indexOf(o.objectID) !== -1) : rows);
 
-            activeCollector.connect(collectorName, function (err, collector) {
+            activeCollector.connect(eventGeneratorCollectorName, function (err, collector) {
                 if (err) return callback(err);
 
                 var collectorParam = {
@@ -123,7 +123,7 @@ module.exports = function(args, callback) {
                     events: events,
                 }
 
-                log.info('Connect to "', collectorName, '", processing: ', collectorParam);
+                log.info('Connect to "', eventGeneratorCollectorName, '", processing: ', collectorParam);
 
                 collector.get(collectorParam, function (err) {
                     if (err) return callback(err);
@@ -148,7 +148,7 @@ module.exports = function(args, callback) {
                             if(!counter) return callback(new Error('Can\'t find counter ' + counterID + ' in database'));
                             var counterSettings = {
                                 name: args.counterName || counter.counterName,
-                                collectorID: collectorName,
+                                collectorID: eventGeneratorCollectorName,
                                 groupID: args.counterGroup === '' ? counter.counterGroup : Number(args.counterGroup),
                                 unitID: null,
                                 sourceMultiplier: 1.0,

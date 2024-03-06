@@ -64,9 +64,6 @@ objectsDB.renameObjects = function(objects, callback) {
  */
 objectsDB.addObjects = function(newObjectsNames, description, order, disabled,
                                 color, createdTimestamp, callback){
-    log.debug('Add objects: ', newObjectsNames, ', description: ', description, ', order: ', order,
-        ', disabled: ', disabled);
-
     // Prepare statement for inserting new objects into a database
     var stmt = db.prepare('INSERT INTO objects (id, name, description, sortPosition, disabled, ' +
         'color, created) VALUES ($id, $name, $description, $sortPosition, $disabled, $color, $created)',
@@ -78,6 +75,16 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled,
         var newObjectsIDs = [], newObjects = {};
 
         async.eachSeries(newObjectsNames, function(name, callback) {
+            /*
+            The createdTimestamp is required for the uniqueness of the ID.
+            Otherwise, it will be impossible to rename two objects to each other
+            (f.e. will be impossible to rename objects like "objectName1" <-> "objectName2")
+            !!!! Update !!!!
+            but when creating an object from a task, createdTimestamp will be unique when running an action on each
+            instance of Alepiz. Therefore, you cannot use createdTimestamp
+            const id = unique.createHash(name + description + order + disabled + color + createdTimestamp);
+             */
+            // The hash algorithm is too simple. There may be problems with renaming
             const id = unique.createHash(name + description + order + disabled + color);
 
             stmt.run({
@@ -88,7 +95,7 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled,
                 $disabled: disabled,
                 $color: color,
                 $created: createdTimestamp,
-            }, function (err, info) {
+            }, function (err/*, info*/) {
                 if(err) return callback(err);
                 // push new object ID into array
                 newObjectsIDs.push(id);
@@ -98,6 +105,9 @@ objectsDB.addObjects = function(newObjectsNames, description, order, disabled,
         }, function(err){
             stmt.finalize();
             if(err) return callback(err);
+
+            log.info('Added new objects: ', newObjects, ', description: ', description, ', order: ', order,
+                ', disabled: ', disabled, ', createdTimestamp: ', createdTimestamp);
             callback(null, newObjectsIDs, newObjects);
         });
     });
@@ -140,6 +150,7 @@ objectsDB.updateObjectsInformation = function (objectIDs, updateData, callback) 
  * @param {function(Error)|function()} callback - callback(err)
  */
 objectsDB.insertInteractions = function(interactions, callback){
+    if(!interactions.length) return callback();
 
     var stmt = db.prepare('INSERT INTO interactions (id, objectID1, objectID2, type) VALUES (?, ?, ?, ?)',
         function(err) {
@@ -182,6 +193,30 @@ objectsDB.deleteInteractions = function(interactions, callback){
         });
     });
 };
+
+/**
+ * Delete all interactions for the object IDs
+ * @param {Array<number>} objectIDs an array of object IDs
+ * @param {function()|function(Error)} callback callback(err)
+ */
+objectsDB.deleteAllInteractions = function (objectIDs, callback) {
+    log.info('Deleting all interactions for the object IDs: ', objectIDs);
+
+    db.run('DELETE FROM interactions WHERE objectID1=? OR objectID2=?', objectIDs, objectIDs, callback);
+
+    var stmt =
+        db.prepare('DELETE FROM interactions WHERE objectID1=? OR objectID2=?',function(err) {
+        if(err) return callback(err);
+
+        // eachSeries used for possible transaction rollback if error occurred
+        async.eachSeries(objectIDs, function(objectID, callback){
+            stmt.run([objectID, objectID], callback);
+        }, function(err) {
+            stmt.finalize();
+            callback(err);
+        });
+    });
+}
 
 /**
  * Add new object to Alepiz relationship

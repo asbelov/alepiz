@@ -176,7 +176,7 @@ function saveLinkedCounters(user, param, counters, callback) {
             notExistingCounters.join(', ') + ': counters are not exist'));
     }
 
-    counterSaveDB.saveObjectsCountersIDs(user, param.id, countersIDs,
+    counterSaveDB.saveObjectsCountersIDs(user, param.id, countersIDs, false,
         function (err, updatedOCIDs) {
         if(err) {
             return callback(new Error('Can\'t save object to counter relations for ' +
@@ -233,7 +233,7 @@ function saveInteractions(user, param, objects, callback) {
             }
         }
 
-        objectsDB.insertInteractions(user, interactions, function (err) {
+        objectsDB.insertInteractions(user, interactions, false, function (err) {
             if(err) {
                 return callback(new Error('Can\'t save object interactions for ' +
                     param.name + ' and interactions ' + JSON.stringify(interactions) +
