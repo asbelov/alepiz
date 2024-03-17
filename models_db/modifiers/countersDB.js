@@ -91,7 +91,12 @@ countersDB.updateCounter = function(counter, callback) {
  * counter ID
  */
 countersDB.insertCounter = function(counter, callback) {
-    const id = unique.createHash(JSON.stringify(counter));
+
+    // counter.timestamp is removed to create a unique counter ID that will be the same on all Alepiz nodes
+    var copyCounterParams = JSON.parse(JSON.stringify(counter));
+    delete copyCounterParams.timestamp;
+    const id = unique.createHash(JSON.stringify(copyCounterParams));
+
     log.info('Inserting new counter ', id, ' into the database: ', counter);
 
     db.run(
