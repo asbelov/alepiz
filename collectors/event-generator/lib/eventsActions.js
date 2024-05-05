@@ -379,6 +379,18 @@ function addCommentsOrDisableEvents(db, param) {
         // !sameEventOCIDs[eventOCID]: do not disable event disabled in previous iteration
         if(param.action === 'disableEvents' && !sameEventOCIDs[eventOCID]) {
             sameEventOCIDs[eventOCID] = true;
+
+            if(!disabledEventsCache.has(eventOCID)) {
+                try {
+                    var rows = db.prepare('SELECT * FROM disabledEvents WHERE OCID=?').all(eventOCID);
+                } catch (err) {
+                    return log.warn('Error getting disabled event data for OCID ',  event.OCID,
+                        ' for disable event: ', err.message, ': ', param);
+                }
+
+                if(rows && rows[0]) disabledEventsCache.set(eventOCID, rows[0]);
+            }
+
             var query;
             if (disabledEventsCache.has(eventOCID)) {
                 var cachedDisabledEvent = disabledEventsCache.get(eventOCID);

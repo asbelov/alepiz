@@ -9,12 +9,27 @@ var communication = require('../../lib/communication');
 var encrypt = require('../../lib/encrypt');
 var transactionDB = require('../../models_db/modifiers/transaction');
 
+/**
+ * Add, edit or remove users
+ * @param {Object} args action parameters
+ * @param {string} args.actionName action name
+ * @param {string} args.removedUsers comma separated list of the user UIDs for removing
+ * @param {string} args.removedUserNames comma separated list of the user names for removing (for log)
+ * @param {string} args.userPassword1 user password
+ * @param {string} args.userPassword2 user password for check
+ * @param {string} args.userName user login name
+ * @param {string} args.fullUserName full user name
+ * @param {string} args.userRoles user roles IDs
+ * @param {string} args.userID user ID
+ * @param {string} args.sessionID Alepiz session ID
+ * @param {function(Error)|function()} callback callback(err)
+ */
 module.exports = function(args, callback) {
     // prevent to print a password from parameters
-    log.debug('Starting action server "', args.actionName/*, '" with parameters', args*/);
+    log.debug('Starting action server ', args.actionName , ' with parameters', args);
 
     transactionDB.begin(function(err) {
-        if(err) return callback('Can\'t make changes with users: ' + err.message);
+        if(err) return callback(new Error('Can\'t make changes with users: ' + err.message));
 
         removeUsers(args, function(err) {
             if(err) return transactionDB.rollback(err, callback);
@@ -27,20 +42,30 @@ module.exports = function(args, callback) {
     });
 };
 
+/**
+ * Remove users
+ * @param {Object} args object with parameters
+ * @param {function(Error)|function()} callback callback(err)
+ */
 function removeUsers(args, callback) {
     if (!args.removedUsers) return callback();
-    checkIDs(args.removedUsers.split(','), function (err, removedUsersIDs) {
+    checkIDs(args.removedUsers.split(','), function (err, removedUserIDs) {
         if (err) return callback(err);
 
-        usersDBSave.removeUsers(removedUsersIDs, function(err) {
+        usersDBSave.removeUsers(removedUserIDs, function(err) {
             if(err) return callback(new Error('Can\'t remove users with IDs: ' + args.removedUsers + ': ' + err.message));
 
-            log.info('Removed users IDs: ', removedUsersIDs);
+            log.info('Removed users: ', args.removedUserNames,'; IDs: ', removedUserIDs);
             callback();
         })
     });
 }
 
+/**
+ * Add or update users
+ * @param {Object} args object with parameters
+ * @param {function(Error)|function()} callback callback(err)
+ */
 function addOrUpdateUser(args, callback) {
 
     if(!args.userID && !args.userName) return callback();
@@ -120,6 +145,11 @@ function addOrUpdateUser(args, callback) {
     });
 }
 
+/**
+ * Create medias for users
+ * @param {Object} args object with parameters
+ * @return {{}}
+ */
 function createMedias(args) {
     var medias = {};
     for(var arg in args) {
@@ -152,6 +182,12 @@ function createMedias(args) {
     return medias;
 }
 
+/**
+ * Add communication media to the user
+ * @param {number} userID user ID
+ * @param {Object} medias object with medias
+ * @param {function(Error)|function()} callback callback(err)
+ */
 function addCommunicationMedia(userID, medias, callback) {
     if(!Object.keys(medias).length) return callback();
 

@@ -2,7 +2,7 @@
  * Copyright © 2020. Alexander Belov. Contacts: <asbel@alepiz.com>
  */
 
-var removedUsersNames = [];
+var removedUserNames = [];
 var userNameElm;
 var userRolesElm;
 var userPassword1Elm;
@@ -22,14 +22,14 @@ function callbackBeforeExec(callback) {
         return;
     }
 
-    if(!removedUsersNames.length) return callback();
+    if(!removedUserNames.length) return callback();
 
-    $('#usersNamesInModalDialog').text(removedUsersNames.join(', '));
+    $('#usersNamesInModalDialog').text(removedUserNames.join(', '));
     var userNamesInModalDialogInstance = M.Modal.init(document.getElementById('modalDeleteConfirm'), {dismissible: false});
     userNamesInModalDialogInstance.open();
 
     $('#modalDeleteConfirmNo').unbind('click').click(function(){
-        callback(new Error('Delete operation for users ' + removedUsersNames.join(', ') + ' was canceled'));
+        callback(new Error('Delete operation for users ' + removedUserNames.join(', ') + ' was canceled'));
     });
 
     $('#modalDeleteConfirmYes').unbind('click').click(function(){
@@ -66,7 +66,7 @@ var JQueryNamespace = (function ($) {
     };
 
     function init(callback) {
-        removedUsersNames = [];
+        removedUserNames = [];
         $('#removedUsers').val('');
 
         getRolesInformation(function(roles) {
@@ -203,8 +203,9 @@ var JQueryNamespace = (function ($) {
             var userID = $(this).parent().parent().attr('userID');
             $(this).parent().parent().remove();
             removedUsersIDs.push(userID);
-            removedUsersNames.push($(this).parent().parent().attr('data-username'));
+            removedUserNames.push($(this).parent().parent().attr('data-username'));
             $('#removedUsers').val(removedUsersIDs.join(','));
+            $('#removedUserNames').val(removedUserNames.join(','));
 
             if(userID === userIDElm.val()) setUserProperties();
         });

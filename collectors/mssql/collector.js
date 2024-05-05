@@ -5,38 +5,24 @@
 const mssql = require("msnodesqlv8");
 const log = require('../../lib/log')(module);
 
-
 var collector = {};
 module.exports = collector;
-/*
-    get data and return it to server
 
-    param - object with collector parameters {
-        <parameter1>: <value>,
-        <parameter2>: <value>,
-        ....
-        $id: <objectCounterID>,
-        $counterID: <counterID>,
-        $objectID: <objectID>,
-        $parentID: <parentObjectCounterID>,
-        $variables: {
-            <variable1>: <variableValue1>,
-            <variable2>: <variableValue2>,
-            ...
-        }
-    }
-
-    where
-    $id - objectCounter ID
-    $counterID - counter ID,
-    $objectID - object ID
-    $parentID - parent objectCounter ID
-    $variables - variables for collector from counter settings
-
-    callback(err, result)
-    result - object {timestamp: <timestamp>, value: <value>} or simple value
-*/
-
+/**
+ * Run SQL query on MSSQL server
+ * @param {Object} param collector parameters
+ * @param {string} param.driver MSSQL driver (run ODBC Data Source (64-bit), tab "Drivers"). Default "SQL Server"
+ * @param {string} param.server MSSQL server host or IP. Default 127.0.0.1
+ * @param {string} param.port MSSQL server TCP port. Default 1433
+ * @param {string} param.trusted Use Windows integrated (trusted) authentication. Default "yes"
+ * @param {string} param.userName User name (for SQL Server authentication). Default "sa"
+ * @param {string} param.password Password (SQL Server authentication)
+ * @param {string} param.database Database to connect. Default "master"
+ * @param {string} param.connectionTimeoutSec Connection timeout (sec). Default 2
+ * @param {string} param.queryTimeoutSec Query timeout (sec). Default 2
+ * @param {string} param.query MSSQL Query (check connection when empty)
+ * @param {function(Error)|function()|function(null, 1)|function(null, string)|function(null, Array)} callback
+ */
 collector.get = function(param, callback) {
 
     for (var key in param) {
@@ -60,9 +46,9 @@ collector.get = function(param, callback) {
     if (param.driver) config.push('Driver={' + param.driver.replace(/^{(.+?)}$/, '$1') + '}');
     else config.push('Driver={SQL Server}');
 
-    param.port = Number(param.port);
-    if (param.port && (param.port !== parseInt(String(param.port), 10) || param.port < 1 || param.port > 65535)) {
-        log.error('Incorrect TCP port: ', param.port, ': ', param);
+    var port = Number(param.port);
+    if (param.port && (port !== parseInt(String(param.port), 10) || port < 1 || port > 65535)) {
+        log.error('Incorrect TCP port: ', port, ': ', param);
         return callback();
     }
 
@@ -98,14 +84,14 @@ collector.get = function(param, callback) {
         }
         //log.debug('Connected to ', param.server, 'using ', param);
         if (!param.query) return con.close(() => callback(null, 1));
-
+        var result = [];
         var q = con.query({
             query_str: param.query,
             query_timeout: queryTimeout, // specified in seconds.
         }, function(err, rows) {
             if (err) return con.close(() => callback(new Error('Error in query "' + param.query + '": ' + err.message)));
 
-            con.close(() => callback(null, rows));
+            if (rows.length > 0) result.push(rows);
         });
 
         q.on('error', function(err) {
@@ -114,6 +100,13 @@ collector.get = function(param, callback) {
 
         q.on('info', function(err) {
             log.info('Query info: ', err.message, '; ', param);
+        });
+
+        q.on('done', function() {
+            con.close(() => {
+                if (result.length === 1) return callback(null, result[0]);
+                callback(null, result);
+            });
         });
     });
 };

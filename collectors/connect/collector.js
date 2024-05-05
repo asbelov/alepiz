@@ -11,11 +11,24 @@ var log = require('../../lib/log')(module);
 var collector = {};
 module.exports = collector;
 
-
+/**
+ * Checking TCP connection
+ * @param {Object} param collector parameters
+ * @param {string} param.hosts comma separated host names or IP addresses
+ * @param {string} param.port TCP port
+ * @param {string} param.socketTimeout socket timeout in ms
+ * @param {string} param.localAddress local source IP address
+ * @param {function(Error)|function(null, string)} callback
+ * callback(err, <comma separated hosts for which connection was successfully established>
+ */
 collector.get = function(param, callback) {
 
     if(!param.hosts) return callback(new Error('Hosts is not set: ' + JSON.stringify(param)));
-    if(!param.port)  return callback(new Error('port is not set: ' + JSON.stringify(param)));
+
+    const port = Number(param.port);
+    if(!param.port || isNaN(port) || port < 1 || port > 0xFFFF)  {
+        return callback(new Error('port is not set or incorrect: ' + JSON.stringify(param)));
+    }
 
 	var hostsArray = param.hosts.split(/ *[,;] */), checkedHosts = [];
 	if(!hostsArray || !hostsArray.length) return callback(null, '');
@@ -41,7 +54,7 @@ collector.get = function(param, callback) {
                 var isCallbackCalled = false;
                 var socket = net.connect({
                     host: addressDst,
-                    port: param.port,
+                    port: port,
                     localAddress: addressSrc,
                     timeout: socketTimeout,
                 }, function () {

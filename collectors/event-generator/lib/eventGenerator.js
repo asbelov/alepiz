@@ -133,24 +133,24 @@ function eventGeneratorGet(param, callback) {
             log.info('Event occurred: ', param.$variables.OBJECT_NAME, '(', param.$variables.COUNTER_NAME, '): importance: ',
                 param.importance, ', time: ', new Date(eventTimestamp).toLocaleString(), ', parentOCID: ', param.$parentID,
                 ', OCID: ', OCID, ' for ', dbPath);
+
+            var runTaskOnProblem = confSettings.get('runTaskOnProblem');
+            if(Number(param.problemTaskID) && runTaskOnProblem) {
+                taskServer.runTask({
+                    userName: systemUser,
+                    taskID: param.problemTaskID,
+                    variables: param.$variables,
+                    runTaskFrom: 'eventGenerator',
+                    runOnLocalNode: false,
+                },function(err) {
+                    if(err) log.error(err.message, ' for ', dbPath);
+                });
+            }
         }
 
         var newEventID = onEvent(db, OCID, param.$objectID, param.$counterID, param.$variables.OBJECT_NAME,
             param.$variables.COUNTER_NAME, param.$parentID, param.importance, param.eventDescription,
             eventTimestamp, param.$dataTimestamp, param.pronunciation);
-
-        var runTaskOnProblem = confSettings.get('runTaskOnProblem');
-        if(Number(param.problemTaskID) && runTaskOnProblem) {
-            taskServer.runTask({
-                userName: systemUser,
-                taskID: param.problemTaskID,
-                variables: param.$variables,
-                runTaskFrom: 'eventGenerator',
-                runOnLocalNode: false,
-            },function(err) {
-                if(err) log.error(err.message, ' for ', dbPath);
-            });
-        }
 
         // save new event to history database too
         if(newEventID) callback(null, 1);

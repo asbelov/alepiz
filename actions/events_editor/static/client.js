@@ -172,13 +172,13 @@ var JQueryNamespace = (function ($) {
             var dateFrom = getDateTimestampFromStr(disableFromDateElm.val());
             var timeFrom = getTimeFromStr(disableFromTimeElm.val());
 
-            var disableFrom = dateFrom && timeFrom ? dateFrom + timeFrom : '';
+            var disableFrom = dateFrom && timeFrom >= 0 ? dateFrom + timeFrom : '';
             disableFromElm.val(disableFrom);
 
             var dateUntil = getDateTimestampFromStr(disableUntilDateElm.val());
             var timeUntil = getTimeFromStr(disableUntilTimeElm.val());
 
-            var disableUntil = dateUntil && timeUntil ? dateUntil + timeUntil : '';
+            var disableUntil = dateUntil && timeUntil >= 0 ? dateUntil + timeUntil : '';
             disableUntilElm.val(disableUntil);
 
             disableTimeIntervalsElm.val(disablingTimeIntervals.join(';'));
@@ -1277,11 +1277,10 @@ var JQueryNamespace = (function ($) {
         return date.getDate() + ' ' + data.monthNames[date.getMonth()] + ', ' + date.getFullYear();
     }
 
-    /*
-        Converting time string in format HH:MM to ms
-
-        timeStr: time string in format HH:MM
-        return time in ms
+    /**
+     * Converting time string in format HH:MM to ms
+     * @param {string} timeStr time string in format HH:MM
+     * @return {number|undefined} time in ms or undefined if can't parse the timeStr
      */
     function getTimeFromStr(timeStr) {
         if(timeStr === '' || timeStr === undefined) return;
@@ -1290,11 +1289,10 @@ var JQueryNamespace = (function ($) {
         return Number(timeParts[1]) * 3600000 + Number(timeParts[2]) * 60000;
     }
 
-    /*
-        Converting date string in format DD MonthName, YYYY to ms
-
-        dateStr: date string in format DD MonthName, YYYY
-        return time from 1.1.1970 in ms
+    /**
+     * Converting date string in format DD MonthName, YYYY to ms
+     * @param {string} dateStr date string in format DD MonthName, YYYY
+     * @return {number|undefined} time from 1.1.1970 in ms or undefined if can't parse the dateStr
      */
     function getDateTimestampFromStr(dateStr) {
         if(!dateStr) return;

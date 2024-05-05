@@ -14,6 +14,24 @@ module.exports = collector;
 var ZBX_NOTSUPPORTED_Length = String('ZBX_NOTSUPPORTED').length;
 var minResponseLength = String('ZBXD').length + 1 + 8 + 1;
 
+/**
+ *
+ * @param {Object} param collector parameters
+ * @param {string} param.$id OCID
+ * @param {string} param.host Zabbix agent host name or IP address
+ * @param {string} param.port Zabbix agent TCP port
+ * @param {string} param.socketTimeout TCP socket timeout in ms
+ * @param {string} param.item Zabbix item key
+ * @param {string} param.itemParameters Parameters for Zabbix item key
+ * @param {string} param.localAddress Source IP address or host name
+ * @param {string} param.LLD returns LLD (Low Level Discovery) data
+ * @param {string} param.CSV Parse CSV and return LLD data
+ * @param {string} param.onlyNumeric Return only numeric values
+ * @param {string} param.throttlingMaxSkippingValues Number of values that can be skipped (throttling)
+ * @param {string} param.throttlingMaxTimeInterval Time interval when values can be skipped (throttling)
+ * @param {string} param.throttlingDeviation Values deviation for skip 0-100%. 0 - values must be equal (throttling)
+ * @param {function(Error)|function(null, string)|function()} callback callback(err, <returned data>)
+ */
 collector.get = function(param, callback) {
 
     if(param.itemParameters) param.itemParameters = '[' + param.itemParameters + ']';
@@ -70,6 +88,10 @@ collector.get = function(param, callback) {
         return callback();
     }
 
+    const port = Number(param.port);
+    if(!param.port || isNaN(port) || port < 1 || port > 0xFFFF)  {
+        return callback(new Error('port is not set or incorrect: ' + JSON.stringify(param)));
+    }
 
     addressPrepareSrc(param.localAddress, function(err, addressSrc/*, family*/) {
         if (err) {
@@ -87,7 +109,7 @@ collector.get = function(param, callback) {
 
             var socket = net.connect({
                 host: addressDst,
-                port: param.port,
+                port: port,
                 localAddress: addressSrc,
                 timeout: param.socketTimeout || 180000,
             }, function () {
