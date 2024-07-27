@@ -466,6 +466,7 @@ function removeApproval(username, taskID, taskParams, runType, conditionsOCIDs, 
             return callback(null, true);
         }
 
+        taskClient.cancelTask(taskID);
         log.info('User ', username, ': removing previous approval from changed taskID ', taskID,
             '; runType was\\now: ', runType, '\\', newTaskData.runType,
             '; action parameters were changed: ', isActionParametersChanged);

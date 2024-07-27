@@ -83,7 +83,7 @@ objectsDB.getObjectsByNames = function(objectNames, callback) {
 
 /**
  * Get objects by object names and sorted by object names
- * (SQL LIKE comparison case insensitive) using SELECT * FROM objects WHERE name LIKE ?
+ * (SQL LIKE comparison case insensitive) using SELECT * FROM objects WHERE name LIKE ? ESCAPE "\\" COLLATE NOCASE
  * SQLite LIKE operator is case-insensitive. It means "A" LIKE "a" is true. However, for Unicode characters that are
  * not in the ASCII ranges, the LIKE operator is case sensitive e.g., "Ä" LIKE "ä" is false.
  * @param {Array<string>} objectNamesLike an array with object names in SQL like format
@@ -124,7 +124,8 @@ objectsDB.getObjectsLikeNames = function(objectNamesLike, callback) {
 function getObjectsByX(params, condition, suffix, callback) {
     if(!params || !params.length) return callback(null, []);
 
-    var stmt = db.prepare('SELECT * FROM objects WHERE ' + condition + '? ' + suffix + ' ORDER BY name', function(err) {
+    var stmt =
+        db.prepare('SELECT * FROM objects WHERE ' + condition + '? ' + suffix + ' ORDER BY name', function(err) {
         if(err) return callback(err);
         getSTMTResult(stmt, params, callback);
     });

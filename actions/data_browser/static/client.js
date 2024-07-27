@@ -1135,21 +1135,23 @@ var dataBrowserNamespace = (function ($) {
             return Math.round(val * 100) / 100;
         }
 
-        if(unit.name === 'Time' && isNumber && val > 1) return secondsToHuman(val);
-
         if(!isNumber) return escapeHtml(val) + '&nbsp;' + escapeHtml(unit.abbreviation);
 
-        if(!unit.multiplies[0]) return String(Math.round(val * 100) / 100) + ' ' + escapeHtml(unit.abbreviation);
+        // calculating multiplier index 'multiplierIdx'
+        for (var multiplierIdx = 0;
+             multiplierIdx < unit.multiplies.length && val / unit.multiplies[multiplierIdx] > 1;
+             multiplierIdx++) {} --multiplierIdx;
+        // value too small. Multiplier for this value doesn't exist
+        if(multiplierIdx < 0) {
+            return String(Math.round(val * 100) / 100) + '&nbsp;' + escapeHtml(unit.abbreviation);
+        }
 
-        // searching true multiplier index 'i'
-        for (var i = 0; i < unit.multiplies.length && val / unit.multiplies[i] > 1; i++){} --i;
+        var newVal = Math.round(val / unit.multiplies[multiplierIdx] * 100) / 100;
 
-        if(i < 0) return String(val) + '&nbsp;' + escapeHtml(unit.abbreviation);
+        if(unit.name === 'Time' && val > 1) return secondsToHuman(newVal);
 
-        var newVal = Math.round(val / unit.multiplies[i] * 100) / 100;
-
-        if(unit.onlyPrefixes || unit.prefixes[i] === unit.abbreviation) var suffix = unit.prefixes[i];
-        else suffix = unit.prefixes[i] + unit.abbreviation;
+        if(unit.onlyPrefixes || unit.prefixes[multiplierIdx] === unit.abbreviation) var suffix = unit.prefixes[multiplierIdx];
+        else suffix = unit.prefixes[multiplierIdx] + unit.abbreviation;
 
         return escapeHtml(newVal + ' ' + suffix);
     }
@@ -1175,8 +1177,10 @@ var dataBrowserNamespace = (function ($) {
     }
 
     function secondsToHuman ( seconds ) {
-        // 1477236595310 = 01/01/2000)
-        if(seconds > 1477236595310) return new Date(seconds).toLocaleString().replace(/\.\d\d(\d\d),/, '.$1');
+        // for unixTime - time from 1.1.1970 in seconds: 1477236595 = 01/01/2000)
+        if(seconds > 1477236595) {
+            return new Date(seconds * 1000).toLocaleString().replace(/\.\d\d(\d\d),/, '.$1');
+        }
 
         return [   [Math.floor(seconds / 31536000), function(y) { return y === 1 ? y + 'year ' : y + 'years ' }],
             [Math.floor((seconds % 31536000) / 86400), function(y) { return y === 1 ? y + 'day ' : y + 'days ' }],

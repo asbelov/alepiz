@@ -290,14 +290,16 @@ module.exports = function(args, callback) {
                     countersParameters.eventDuration = args['event-duration'] ? Number(args['event-duration']) : '';
 
                     if(args['event-task-on-problem']) {
-                        if ((isInt(args['event-task-on-problem']) === null || Number(args['event-task-on-problem']) < 0)) {
+                        if ((isInt(args['event-task-on-problem']) === null || Number(args['event-task-on-problem']) < 0) ||
+                            !args['event-task-on-problem'].match(/^%:.*:%$/)) {
                             return er('Incorrect taskID when event occurred ' + args['event-task-on-problem']);
                         }
                         countersParameters.problemTaskID = Number(args['event-task-on-problem'])
                     }
 
                     if(args['event-task-on-solved']) {
-                        if ((isInt(args['event-task-on-solved']) === null || Number(args['event-task-on-solved']) < 0)) {
+                        if ((isInt(args['event-task-on-solved']) === null || Number(args['event-task-on-solved']) < 0) ||
+                            !args['event-task-on-solved'].match(/^%:.*:%$/)) {
                             return er('Incorrect taskID when event solved ' + args['event-task-on-solved']);
                         }
                         countersParameters.solvedTaskID = Number(args['event-task-on-solved']);

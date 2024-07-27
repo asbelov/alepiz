@@ -9,6 +9,7 @@ const usersDB = require('../models_db/usersDB');
 const prepareUser = require('../lib/utils/prepareUser');
 const toHuman = require('../lib/utils/toHuman');
 const fromHuman = require('../lib/utils/fromHuman');
+const onFinished = require('./onFinished');
 const Conf = require('../lib/conf');
 const confWebServer = new Conf('config/webServer.json');
 
@@ -46,6 +47,11 @@ router.get('/downloadFile/', function (req, res, next) {
                     toHuman(fileSize, 'Bytes'), ' time: ',
                     toHuman(Date.now() - startTime, 'Time'));
             });
+
+            onFinished (res, function () {
+                fReadStream.destroy();
+            });
+
         } catch(e) {
             err = new Error('Can\'t send file ' + fileName + ' (' + downloadFileName + '); size: ' + fileSize +
                 ': ' + e.message);
@@ -162,10 +168,9 @@ function checkRestrictions(fileName, username, callback) {
                         toHuman(stat.size, 'Bytes'));
 
                     return true;
-                } {
+                } else {
                     error = new Error('User ' + username + ' is not allowed to download ' + fileName +
                         ' according filename restriction: ' + re);
-                    return;
                 }
             })) {
                 return callback(error);

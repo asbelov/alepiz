@@ -510,13 +510,15 @@ var JQueryNamespace = (function ($) {
                 hideClass + taskIDAttr + ' data-action-name="' + escapeHtml(row.actionName) +
                 '" data-error="' + (error ? 1 : 0) + '">' +
                 '<td style="width: 5%">' + taskLabel  +
-                '</td><td style="width: 5%">' +
+                '</td><td style="width: 5%" class="tooltipped" data-tooltip="' +
+                    (new Date(row.startTimestamp)).toLocaleString() + '">' +
                 (row.startTimestamp ?
                     (from ? '<span class="highLight">' : '') + (new Date(row.startTimestamp)).toLocaleString()
                         .replace(/\D\d\d\d\d/, '')
                         .replace(/:\d\d$/, '') + (from ? '</span>' : '') :
                     '-') +
-                '</td><td style="width: 5%">' +
+                '</td><td style="width: 5%" class="tooltipped" data-tooltip="' +
+                    (new Date(row.stopTimestamp)).toLocaleString() + '">' +
                 (row.stopTimestamp ?
                     (to ? '<span class="highLight">' : '') + (new Date(row.stopTimestamp)).toLocaleString()
                         .replace(/\D\d\d\d\d/, '')
@@ -704,6 +706,10 @@ var JQueryNamespace = (function ($) {
                 selectedTaskID = null;
                 taskIDElm.val('');
             }
+        });
+
+        M.Tooltip.init(document.querySelectorAll('.tooltipped'), {
+            enterDelay: 1000
         });
     }
 

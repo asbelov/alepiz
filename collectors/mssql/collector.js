@@ -10,10 +10,10 @@ module.exports = collector;
 
 /**
  * Run SQL query on MSSQL server
- * @param {Object} param collector parameters
+ * @param {{drivers: string, port: string, trusted: string, database: string, server: string, query: string, userName: string, password: string, connectionTimeoutSec: string, queryTimeoutSec: string}} param collector parameters
  * @param {string} param.driver MSSQL driver (run ODBC Data Source (64-bit), tab "Drivers"). Default "SQL Server"
  * @param {string} param.server MSSQL server host or IP. Default 127.0.0.1
- * @param {string} param.port MSSQL server TCP port. Default 1433
+ * @param {string|number} param.port MSSQL server TCP port. Default 1433
  * @param {string} param.trusted Use Windows integrated (trusted) authentication. Default "yes"
  * @param {string} param.userName User name (for SQL Server authentication). Default "sa"
  * @param {string} param.password Password (SQL Server authentication)

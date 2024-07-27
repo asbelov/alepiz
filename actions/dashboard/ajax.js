@@ -280,7 +280,7 @@ ORDER BY disabledEvents.eventID DESC, events.startTime DESC LIMIT 100').all([OCI
  * @param {Object} args ajax args
  * @param {number} args.from get events from date
  * @param {number} args.to get events to date
- * @param {Object} args.ObjectsIDs an array with object IDs
+ * @param {Array<Number>} args.ObjectsIDs an array with object IDs
  * @param maxImportance max event importance
  * @param {function(Error)|function(null, Array<{
  *     id: number,

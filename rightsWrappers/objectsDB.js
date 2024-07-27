@@ -424,7 +424,8 @@ rightsWrapper.deleteInteractions = function(username, interactionsForDeleting, c
 /** Get objects information by object ID
  * @param {string} user - username for check rights to objects
  * @param {Array|string|number} initIDs - array of objects IDs or comma separated string with IDs or single ID
- * @param {function(Error)|function(null, Array)} callback - callback(err, objects) return array of rows with result of SELECT * FROM objects WHERE id=?
+ * @param {function(Error)|function(null, Array)} callback - callback(err, objects) return array of rows with result of
+ * SELECT * FROM objects WHERE id=?
  * like [{id: <id>, name: <objectName>, description: <objectDescription>, sortPosition: <objectOrder>, color:..., disabled:..., color:...}, {...},...]
  */
 rightsWrapper.getObjectsByIDs = function(user, initIDs, callback) {
