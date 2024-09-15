@@ -613,7 +613,7 @@ var JQueryNamespace = (function ($) {
                         '-') +
                     '</td><td>' + escapeHtml(task.userName) +
                     '</td><td>' + task.actionName.join(',<br/>') +
-                    '</td><td>' + highlightedTaskID + ': ' + escapeHtml(task.description) +
+                    '</td><td>' + highlightedTaskID + ': ' + task.description +
                     '</td><td class="' + (task.taskComment ? 'green-text' : 'red-text') +
                         '" style="font-weight: normal; overflow-wrap: break-word;">' +
                             (task.taskComment ||

@@ -535,6 +535,7 @@ ORDER BY sessions.id DESC' + rowsLimit).all({
             new Set(req.objectIDs.split(',').map(id => Number(id))) : null;
         var objectFilter = new Set();
 
+        var filteredTask = new Set();
         sessionRows.forEach(row => {
 
             if(req.description.replace(/"/g, '') ||
@@ -548,6 +549,15 @@ ORDER BY sessions.id DESC' + rowsLimit).all({
                     foundDescription = true;
                 }
 
+                var addThisActionToTheList =- false;
+                if ((!req.description.replace(/"/g, '') || foundDescription) &&
+                    (!req.message.replace(/"/g, '') || messageFilter.has(row.id)) &&
+                    (!req.actionIDs || actionFilter.has(row.id))
+                ) {
+                    filteredTask.add(row.taskSession);
+                    addThisActionToTheList = true;
+                }
+
                 // if the current row contains an action that is started from the task
                 if (row.taskSession) {
                     // if the current row contains a task whose actions do not have
@@ -556,12 +566,13 @@ ORDER BY sessions.id DESC' + rowsLimit).all({
                     // then do not add this row
                     if (!taskSessionFilter.has(row.taskSession) && !taskNameFilter.has(row.id)) return;
                     if (taskNameFilter.has(row.id)) row.taskName = taskNameFilter.get(row.id);
+
                 } else {
                     // if the action in the current row was not started from the task and
-                    // the description of the action does not contain the desired substring and
+                    // the description of the action does not contain the desired substring or
                     // the action messages do not contain the desired substring,
                     // then it does not add this row
-                    if (!foundDescription && !messageFilter.has(row.id) && !actionFilter.has(row.id)) return;
+                    if (!addThisActionToTheList) return;
                 }
             }
             row.objects = objectStmt.all({sessionID: row.sessionID});
@@ -583,6 +594,15 @@ ORDER BY sessions.id DESC' + rowsLimit).all({
         if(filteredObjectIDs) {
             filteredResult.forEach((row, id) => {
                 if(row.taskSession && !objectFilter.has(row.taskSession)) filteredResult.delete(id);
+            });
+        }
+
+        if(req.description.replace(/"/g, '') ||
+            req.message.replace(/"/g, '') ||
+            req.actionIDs) {
+
+            filteredResult.forEach((row, id) => {
+                if(row.taskSession && !filteredTask.has(row.taskSession)) filteredResult.delete(id);
             });
         }
 

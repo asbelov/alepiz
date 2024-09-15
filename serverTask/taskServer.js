@@ -153,6 +153,10 @@ function scheduleTask(taskID, timestamp, workflow) {
         return;
     }
 
+    if (scheduledTasks.has(taskID)) {
+        log.info('Task ', taskID, ' has been scheduled previously. Skip scheduling this task twice.');
+        return;
+    }
     log.info('Schedule task ', taskID, ' to run at ', new Date(timestamp).toLocaleString());
     var scheduledTaskTimer = setTimeout(function () {
         scheduledTasks.delete(taskID);
